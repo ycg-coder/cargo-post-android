@@ -930,7 +930,6 @@ fun SettingsScreen() {
             SectionTitle("关于")
             BusCard(modifier = Modifier.fillMaxWidth()) {
                 Column {
-                    InfoRow(label = "后端地址", value = BuildConfig.BASE_URL, icon = BusIcons.info)
                     InfoRow(label = "版本", value = BuildConfig.VERSION_NAME, icon = BusIcons.info)
                     InfoRow(
                         label = "地图与开源许可",
