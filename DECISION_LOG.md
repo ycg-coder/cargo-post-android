@@ -5551,3 +5551,13 @@ canonical 仍是 D-070 §3 那一发。
 - 本机库缺的那支迁移已补：master 有 `sql/incremental/V027__idempotency_unique_keys.sql`，本地 sql 目录只到 V026。先预检（`transport_leg` 重复三元组 = 无、`transport_algorithm_request` 重复快照组 = 0）⇒ V027 在这台机器上是**纯加索引不动数据**；仍先 `mysqldump` 备份这两张表（515,639 B）再执行。落地读数：`uk_algorithm_request_snapshot(snapshot_hash)` 与 `uk_leg_plan_order_seq(plan_id,order_id,leg_sequence)` 均 `non_unique=0`，两表行数 **49 / 39 未变**。
 - ⚠ 这条 durable：**"本地后端"有三个不同的东西**——工作树（超前）、在跑的 jar（滞后）、库 schema（缺迁移）。对齐要分别量，任何一处当成"就是云上"都会得出错结论。本轮之前我台账里把 `/driver/route` 的 `routeAvailable=None` 记成"后端没给"，其实准确说法是"**这版 jar 与云上 master 都没有这个键**"。
 - 运行时对齐仍**未做**：本机没有 `mvn`、仓库没有 wrapper ⇒ 无法用 master 重打 jar。要真正对齐运行时，需要装 Maven（或让队友给一份 master 构建产物）。这一格记 `BLOCKED`，不写成已对齐。
+
+
+## D-075 · 后端 PR #184 被队友合并：契约面前进一格，本机三层仍不同步（2026-10-10 15:5x）
+
+- **实测**：`gh pr view 184` 回 `state=MERGED`，远端检查全过（algorithm / algorithm-verification 12m35s / backend / changes / container-validation / drift-check）。⇒ D-074 里那条"工作树超前于云上（13 个字段未发布）"**已作废**：`routeAvailable` / `routeComplete` / `routeDistanceMeters` / `routeDurationSeconds` / `routeUnavailableReason` / `nextStopRoadDistanceMeters` / `nextStopRoadEtaSeconds` 等现在**在 master 上**。
+- 但"在 master 上"不等于"云上在跑"：云上部署的是哪次构建我**没有凭证**（无云库、无云管理端权限，`/admin-api` 又被图形验证码挡）。所以 App 的「道路里程」在云上何时从"暂无"变成真值，取决于**队友什么时候部署 master**，这一格仍记 `未验`，不许提前写成可用。
+- 本机三层仍不同步（D-074 的三层结论不变，只是"超前"那一层换了内容）：工作树 = 已合并的这批改动；在跑的 jar = 合并前的旧构建（本机没有 Maven，今天装了便携版 3.9.9 在 `C:/temp`，但**没有用它重打并替换正在跑的那个 jar**）；库 = V027 已补。⇒ 若要本机运行期也对齐，下一步是 `mvn -pl yudao-server -am package` 重打 jar 并重启（要 Redis 口令，现读不落文件）。
+- 本轮 App 侧另收两处：① 无路线态那句改口（四处锁步：2 处用例断言 / 判据精确式与提示 / 负控锚点与标签），并逐字复核簿内 4 条含「示意线」的注入锚点全部命中源码；② 「自动进导航」提成纯函数 `shouldAutoOpenGuide` + 新用例本 4 条，`SU-b` 的 test 源集目标数 55→56 同轮改对，并做了能红证明（删掉进程内一次性那一项 → 从 XML 读出红的是「一个进程只自动跳一次否则司机结束导航后出不去」）。
+- 现在把那条一次性证明**固化成负控 M37**（`navigation_test_negative_controls.sh`，注入 = 从纯函数里删掉 `!alreadyOpenedThisProcess`），簿内 `case_run` 计数 36→37。整本在后台跑，基线读数 `exit=0 failures=0/58`；批内结果本轮未收，**下一轮必须回来读 `/c/temp/m37-negctl.log` 的 M37 那一行与"恢复核对/恢复后复跑"两行**，不许凭"加上了"就当通过。
+- ⚠ 本轮我自己撞的两次：Kotlin 里用了单引号字符串（Char 字面量）、按 `kotlin.test` 的参数顺序写 JUnit4 断言（`message` 在前）⇒ 两轮编译失败。都是"没先照抄本仓库既有测试文件的写法"。

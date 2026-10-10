@@ -470,6 +470,15 @@ s = s.replace(old, new, 1)
 "
 case_run M36 "两条开关句被并成同一种机制"
 
+# M37 「自动进导航」丢掉进程内一次性：结束导航后会被立刻弹回，司机出不去（真机实测过）
+red "$NE" "
+old = 'canNavigate && hasNavigableStop && !alreadyOpenedThisProcess'
+new = 'canNavigate && hasNavigableStop'
+assert s.count(old) == 1, 'ANCHOR-MISS M37：命中 %d 处' % s.count(old)
+s = s.replace(old, new, 1)
+"
+case_run M37 "自动进导航不再受进程内一次性约束"
+
 echo
 cmp -s "$BAK/NavigationEngine.kt" "$NE" && echo "✔ 恢复核对：与改前基线逐字节相同" || echo "✘ 恢复失败：源码与基线不一致"
 ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > /tmp/nav_neg_after.log 2>&1
