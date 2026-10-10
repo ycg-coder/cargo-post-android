@@ -21,7 +21,7 @@
 #   MV-9  降级态的"我"仍然压在最上面              → `当前任务压住下一任务且降级时我不冒充在线`
 #   MV-10 LIVE 也要多说一句                      → `正常定位时脚注不多一句话`
 #   MV-11 STALE 不转述服务原话、自己编一句         → `降级脚注转述服务原话而不是重写一句`
-#   MV-12 UNAVAILABLE 把服务给的原因丢掉           → `定位不可用时说清仍按后端下发`
+#   MV-12 UNAVAILABLE 把服务给的原因丢掉           → `定位不可用时说清显示的不是实时车位`
 #   MV-13 下一任务不再排除已完成/失败             → `当前任务跟随后端状态下一任务取其後第一个未完成`
 #   MV-14 没有后端进行中状态时不再退回导航焦点      → `没有后端进行中状态时才退回导航焦点`
 #   MV-15 高亮当前任务时顺手把 kind 改成进行中      → `高亮是视觉不改动任务状态与配色`（动了业务）
@@ -89,7 +89,7 @@ reg 'MV-4' "$V3" \
   '            headingDegrees = headingDegrees,' \
   '非 LIVE 时不把旧朝向带进画面' '非 LIVE 也把过期那拍的朝向原样带进画面'
 reg 'MV-5' "$V3" \
-  '    const val NO_FIX_NOTE = "本机定位不可用：任务点与车辆位置仍按后端下发"' \
+  '    const val NO_FIX_NOTE = "暂时没拿到当前位置：显示的是调度安排，不是实时车位"' \
   '    const val NO_FIX_NOTE = "后端说没有本机定位，任务点与车辆位置也没有"' \
   '一条 fix 都没有时也不说成后端没有位置' '本机没拿到 fix 被念成"后端说没有"'
 reg 'MV-6' "$V3" \
@@ -117,9 +117,9 @@ reg 'MV-11' "$V3" \
   '            if (holdReason.isBlank()) STALE_NOTE else "定位已降级（本页自己的说法）"' \
   '降级脚注转述服务原话而不是重写一句' '不转述服务给的原话，页面自己另写一句'
 reg 'MV-12' "$V3" \
-  '            if (holdReason.isBlank()) NO_FIX_NOTE else "本机定位不可用（$holdReason）：任务点与车辆位置仍按后端下发"' \
+  '            if (holdReason.isBlank()) NO_FIX_NOTE else "暂时没拿到当前位置（$holdReason）：显示的是调度安排，不是实时车位"' \
   '            if (holdReason.isBlank()) NO_FIX_NOTE else NO_FIX_NOTE' \
-  '定位不可用时说清仍按后端下发' '服务给了原因却被丢掉，病因只剩一句兜底'
+  '定位不可用时说清显示的不是实时车位' '服务给了原因却被丢掉，病因只剩一句兜底'
 reg 'MV-13' "$MM" \
   '        val candidates = visible.indices.filter { i -> i != current && !visible[i].isDone && !visible[i].isFailed }' \
   '        val candidates = visible.indices.filter { i -> i != current }' \

@@ -104,7 +104,7 @@ object Map3DVisual {
     const val STALE_NOTE = "定位降级：本机点龄已超过停报阈值，显示的是最后一次可信采样"
 
     /** UNAVAILABLE 且服务侧给不出原因时的兜底：只说"没拿到"，不说"后端说没有" */
-    const val NO_FIX_NOTE = "本机定位不可用：任务点与车辆位置仍按后端下发"
+    const val NO_FIX_NOTE = "暂时没拿到当前位置：显示的是调度安排，不是实时车位"
 
     /**
      * 新鲜度判据。**不新建第二个时钟**：输入是服务已经写进 `Running` 的那两格，
@@ -155,7 +155,7 @@ object Map3DVisual {
         GpsFixState.STALE ->
             if (holdReason.isBlank()) STALE_NOTE else "定位降级：$holdReason"
         GpsFixState.UNAVAILABLE ->
-            if (holdReason.isBlank()) NO_FIX_NOTE else "本机定位不可用（$holdReason）：任务点与车辆位置仍按后端下发"
+            if (holdReason.isBlank()) NO_FIX_NOTE else "暂时没拿到当前位置（$holdReason）：显示的是调度安排，不是实时车位"
     }
 
     /**

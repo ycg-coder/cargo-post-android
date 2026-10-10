@@ -84,7 +84,7 @@ class Map3DVisualContractTest {
             holdReason = "",
             headingDegrees = null,
         ).note
-        assertTrue(note, note.contains("任务点与车辆位置仍按后端下发"))
+        assertTrue(note, note.contains("显示的是调度安排，不是实时车位"))
         assertFalse(note, note.contains("后端说"))
     }
 
@@ -168,10 +168,10 @@ class Map3DVisualContractTest {
     }
 
     @Test
-    fun `定位不可用时说清仍按后端下发`() {
+    fun `定位不可用时说清显示的不是实时车位`() {
         val withReason = Map3DVisual.footnoteOf(GpsFixState.UNAVAILABLE, "等待定位信号（室内或弱信号时常见）")
         assertTrue(withReason, withReason.contains("等待定位信号"))
-        assertTrue(withReason, withReason.contains("任务点与车辆位置仍按后端下发"))
+        assertTrue(withReason, withReason.contains("显示的是调度安排，不是实时车位"))
         val fallback = Map3DVisual.footnoteOf(GpsFixState.UNAVAILABLE, "   ")
         assertEquals(Map3DVisual.NO_FIX_NOTE, fallback)
     }
