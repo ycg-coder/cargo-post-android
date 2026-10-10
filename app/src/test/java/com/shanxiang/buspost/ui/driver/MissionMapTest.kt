@@ -187,7 +187,7 @@ class MissionMapTest {
         assertTrue(!text.contains("OSM_GRAPHHOPPER"))
         assertTrue(!text.contains("接口"))
 
-        // 接口没给里程就写"接口未给"，不能拿直线距离凑一个数
+        // 后端没给里程就明说"暂无"，不能拿直线距离凑一个数
         assertTrue(missionFootnote(RouteGuide.EMPTY).contains("道路里程暂无"))
     }
 
@@ -247,7 +247,8 @@ class MissionMapTest {
     @Test
     fun `距离文案优先后端道路值`() {
         val text = MissionMarkers.nextStopDistanceText(roadMeters = 1200, straightMeters = 300.0, targetName = "高家镇")
-        assertTrue(text, text.contains("道路距离约 1.2 公里"))
+        assertTrue(text, text.contains("还有约 1.2 公里"))
+        assertTrue(text, text.contains("道路里程"))
         assertFalse("直线值不能混进道路距离文案：$text", text.contains("300"))
 
         val labeled = MissionMarkers.nextStopDistanceText(roadMeters = 0, straightMeters = 300.0, targetName = "高家镇")
@@ -255,7 +256,8 @@ class MissionMapTest {
         assertTrue(labeled, labeled.contains("不是道路里程"))
 
         val none = MissionMarkers.nextStopDistanceText(roadMeters = 0, straightMeters = -1.0, targetName = "高家镇")
-        assertTrue(none, none.contains("接口未给"))
+        assertTrue(none, none.contains("道路里程暂无"))
+        assertFalse("内部话术不许出现在界面上：$none", none.contains("接口"))
         assertFalse("没有数值时不能出现数字：$none", none.any { it.isDigit() })
     }
 }

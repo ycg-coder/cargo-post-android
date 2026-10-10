@@ -183,9 +183,9 @@ object MissionMarkers {
     fun nextStopDistanceText(roadMeters: Int, straightMeters: Double, targetName: String): String {
         val name = targetName.ifEmpty { "目标站" }
         return when {
-            roadMeters > 0 -> "距「$name」道路距离约 ${formatRoadMeters(roadMeters)}（后端路网）"
-            straightMeters >= 0 -> "距「$name」直线约 ${straightMeters.toInt()} 米（仅表示远近，不是道路里程）；道路距离接口未给"
-            else -> "距「$name」道路距离接口未给（也没有可用定位，直线远近同样不给）"
+            roadMeters > 0 -> "距「$name」还有约 ${formatRoadMeters(roadMeters)}（道路里程）"
+            straightMeters >= 0 -> "距「$name」直线约 ${straightMeters.toInt()} 米（只表示远近，不是道路里程）；道路里程暂无"
+            else -> "距「$name」的道路里程暂无（还没拿到当前位置，远近也判不了）"
         }
     }
 
