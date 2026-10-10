@@ -162,8 +162,8 @@ class DriverExceptionViewModel : ScreenViewModel() {
                 val back = feed.items.firstOrNull { it.legId == leg.legId }
                 receipt = when {
                     // 被本地幂等闸拦下：一个字节都没发出去，不能说"已提交"
-                    ack.notSent -> "同一个异常上报还在处理中，本次点击未发给后端，以下为后端当前状态"
-                    ack.demo -> "演示模式：异常未提交后端，仅本机显示"
+                    ack.notSent -> "同一个异常上报还在处理中，以下为当前状态"
+                    ack.demo -> "演示模式：异常未提交，仅本地显示"
                     back == null -> "异常已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     LegStatus.of(back.status) != LegStatus.EXCEPTION ->
                         "异常已提交，但后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
@@ -237,7 +237,7 @@ fun DriverExceptionScreen(vm: DriverExceptionViewModel = viewModel()) {
             )
             if (leg != null && !DriverLegStateMapper.of(leg).canReportException) {
                 Text(
-                    "这一段已是「${leg.statusLabel}」，异常由调度重排，本机不重复上报（docs/STATUS_MAPPING.md §4）。",
+                    "这一段已是「${leg.statusLabel}」，异常由调度重排，不重复上报。",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                 )

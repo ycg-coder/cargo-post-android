@@ -220,13 +220,13 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
     BusPage(spacedBy = 12.dp) {
         Signpost(
             title = "旧导航页（调试入口 · 非真实导航）",
-            subtitle = if (g.stations.size >= 2) "${g.stations.first().name} → ${g.stations.last().name}" else "后端下发真实道路折线，这一屏的转向只读它",
+            subtitle = if (g.stations.size >= 2) "${g.stations.first().name} → ${g.stations.last().name}" else "实际道路轨迹，这一屏的转向只读它",
             badge = if (roadOk) "剩余 ${formatMeters(vm.remainingMeters)}" else "暂无真实道路",
         ) {
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 BusTag(if (reporting) "定位上报中" else "未开启上报", tone = if (reporting) BusTone.PRIMARY else BusTone.NEUTRAL)
                 BusTag(if (vm.liveSpeed > 0) "${vm.liveSpeed} km/h" else "车速 0", tone = BusTone.CLAY)
-                SourceTag(if (usingGps) "本机 GPS" else g.dataSource)
+                SourceTag(if (usingGps) "GPS 定位" else g.dataSource)
             }
         }
 
@@ -235,8 +235,8 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
             Column {
                 Text("非真实导航：这一屏只在调试包打开", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "逐条/自动推进已删除，翻页只在司机自己点；车道箭头是按车道名文字猜的图形，后端没有给车道图形。" +
-                        "正式导航走工作台的「本班任务地图」+ 本机高德引擎（DriverSdkNavCard）。",
+                    "逐条/自动推进已删除，翻页只在司机自己点；车道箭头是按车道名文字猜的图形，没有车道图形。" +
+                        "正式导航走工作台的「本班任务地图」+ 导航引擎。",
                     color = t.textSecondary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 4.dp),
@@ -246,12 +246,12 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
 
         DemoNote(
             vm.demo,
-            text = "后端没有下发线路指引，当前是演示道路与车道数据，转向逻辑真实但位置为模拟。",
+            text = "暂无线路指引，当前是演示道路与车道数据，转向逻辑真实但位置为模拟。",
         )
         vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
 
         if (!roadOk) {
-            NavUnavailableBanner(reason = g.routeUnavailableReason ?: "后端没有下发真实道路折线", onRetry = { vm.load() })
+            NavUnavailableBanner(reason = g.routeUnavailableReason ?: "暂无真实道路轨迹", onRetry = { vm.load() })
         }
 
         if (offRoute) {
@@ -286,12 +286,12 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
             highlightStationId = g.stations.getOrNull(min(vm.stepIndex, (g.stations.size - 1).coerceAtLeast(0)))?.id ?: 0L,
             height = 240.dp,
             reason = g.routeUnavailableReason
-                ?: "后端没有下发这一班的真实道路折线。导航需要道路数据，这里不用站点连线代替。",
+                ?: "暂无这一班的真实道路轨迹。导航需要道路数据，这里不用站点连线代替。",
             onReplan = { vm.load() },
         )
         BusCard(modifier = Modifier.fillMaxWidth()) {
             Column {
-                InfoRow("车辆位置", if (g.vehicleGeo != null) "%.5f, %.5f".format(g.vehicleGeo!!.lat, g.vehicleGeo!!.lng) else "接口未给")
+                InfoRow("车辆位置", if (g.vehicleGeo != null) "%.5f, %.5f".format(g.vehicleGeo!!.lat, g.vehicleGeo!!.lng) else "暂未知")
                 InfoRow(
                     "我的位置",
                     if (pos != null) "%.5f, %.5f".format(pos.lat, pos.lng) else if (reporting) "等待定位信号" else "未开启上报",
@@ -302,21 +302,21 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
                 InfoRow(
                     "到折线垂距",
                     when {
-                        !roadOk -> "后端没给真实道路折线，算不出垂距"
-                        pos == null -> "本机还没有定位，算不出垂距"
-                        else -> "%.0f 米（本机算的距离，不是偏航判定）".format(vm.crossTrackMeters())
+                        !roadOk -> "暂无道路轨迹，算不出垂距"
+                        pos == null -> "暂无定位，算不出垂距"
+                        else -> "%.0f 米（估算距离，非偏航判定）".format(vm.crossTrackMeters())
                     },
                 )
                 InfoRow("行驶朝向", if (roadOk) "${g.headingDegrees.toInt()}°" else "—")
                 InfoRow("道路来源", if (roadOk) RouteSource.parse(g.routeSourceName).label else "—")
                 InfoRow(
                     "道路里程",
-                    if (g.roadDistanceMeters > 0) formatMeters(g.roadDistanceMeters) else "接口未给（不用直线距离补）",
+                    if (g.roadDistanceMeters > 0) formatMeters(g.roadDistanceMeters) else "暂未知",
                 )
                 InfoRow(
                     "下一站道路里程",
                     if (g.nextStopRoadDistanceMeters > 0) formatMeters(g.nextStopRoadDistanceMeters)
-                    else "接口未给（旧字段是直线值，不显示）",
+                    else "暂未知",
                 )
                 BusDivider(Modifier.padding(vertical = 4.dp))
                 BusButton(
@@ -490,12 +490,11 @@ private fun LaneGuideStrip(lanes: List<String>, recommended: Int?) {
                     BusTag("推荐走 ${recommended + 1} 车道", tone = BusTone.PRIMARY)
                 } else {
                     // 后端没给建议车道 ⇒ 什么都不标。旧写法读成 0，于是这条会指着第 1 车道说"推荐走 1 车道"。
-                    BusTag("接口未给建议车道", tone = BusTone.NEUTRAL)
+                    BusTag("暂无建议车道", tone = BusTone.NEUTRAL)
                 }
             }
             Text(
-                "车道名与建议车道都来自演示报文：AppDriverRouteRespVO:17-86 里没有任何 steps/lanes/车道键，" +
-                    "箭头图形还是本页按名字猜的 ⇒ 这一条不算车道级引导",
+                "车道名与建议车道来自演示数据，箭头图形是按名字猜的，不算车道级引导",
                 color = t.textTertiary,
                 fontSize = (10.5 * scale).sp,
                 modifier = Modifier.padding(top = 3.dp),
@@ -614,10 +613,9 @@ private fun DeviationBanner(onReroute: () -> Unit) {
             Icon(BusIcons.warning, contentDescription = null, tint = t.danger, modifier = Modifier.size((22 * scale).dp))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("后端判定偏航（deviated）", color = t.danger, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
+                Text("路线偏离", color = t.danger, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "这一句只由 /driver/route 下发的 deviated 决定；本机不测距、不卡阈值判偏航。" +
-                        "导航进行中的偏航由高德的回调说，看工作台「本班任务地图」下面那张本机导航引擎卡片。",
+                    "这一句只由路线偏离状态决定；导航进行中的偏航由导航引擎回调判定。",
                     color = t.textSecondary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 2.dp),
@@ -739,7 +737,7 @@ private fun DebugEntryClosed() {
             Column {
                 Text("这一屏只在调试包开放", color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "旧导航页不算正式导航。正式导航在工作台的「本班任务地图」与本机高德引擎里。",
+                    "旧导航页不算正式导航。正式导航在工作台的「本班任务地图」与导航引擎里。",
                     color = t.textSecondary,
                     fontSize = (12.5 * scale).sp,
                     modifier = Modifier.padding(top = 4.dp),

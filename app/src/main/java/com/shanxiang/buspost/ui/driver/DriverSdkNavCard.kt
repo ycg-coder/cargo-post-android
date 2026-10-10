@@ -250,7 +250,7 @@ fun DriverSdkNavCard(
                 )
 
                 BusButton(
-                    text = if (calculating) "正在等高德回执…" else "用高德算一条真实道路",
+                    text = if (calculating) "正在计算路线…" else "计算真实道路",
                     variant = BusButtonVariant.CLAY,
                     enabled = gate.canNavigate && !calculating,
                     loading = calculating,
@@ -315,7 +315,7 @@ fun DriverSdkNavCard(
 
                             val running = session is NavigationSession.Running
                             BusButton(
-                                text = if (running) "停止本机导航" else "开始本机导航（GPS）",
+                                text = if (running) "停止导航" else "开始导航",
                                 variant = if (running) BusButtonVariant.DANGER else BusButtonVariant.PRIMARY,
                                 // 开始要过闸门，停止永远能按：导航中定位丢一下就把"停"也锁住，是把闸门锁错了方向
                                 enabled = running || gate.canNavigate,

@@ -126,7 +126,7 @@ private fun TicketCardRow(e: Earnings) {
             }
             Spacer(Modifier.height(2.dp))
             Text(
-                "结算口径以后端为准，本机只做展示统计。",
+                "结算口径以系统为准，此处仅供参考。",
                 color = t.textTertiary,
                 fontSize = (11 * scale).sp,
             )

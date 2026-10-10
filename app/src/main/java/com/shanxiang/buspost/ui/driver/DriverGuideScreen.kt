@@ -277,13 +277,13 @@ private fun guidePhaseDetail(p: GuidePhase, destination: String): String = when 
     is GuidePhase.NoTarget ->
         "这一次没有带上目的地（调度没给未完成的任务点）。导航不自己决定去哪里 —— 请回工作台从任务点卡进入。"
     is GuidePhase.NoFix ->
-        "本机还没有定位点，算不出起点。请先在工作台打开「位置上报（前台服务）」，等坐标出现后再进这一页。"
-    is GuidePhase.Calculating -> "正在向高德请求真实道路…"
+        "暂无定位，算不出起点。请先在工作台打开「位置上报（前台服务）」，等坐标出现后再进这一页。"
+    is GuidePhase.Calculating -> "正在请求真实道路…"
     is GuidePhase.EngineBlocked -> "导航组件不可用：${p.reason}"
-    is GuidePhase.Refused -> "高德没能给出可用道路：${p.reason}"
+    is GuidePhase.Refused -> "未能给出可用道路：${p.reason}"
     is GuidePhase.Ready ->
-        "已就绪：前往${destination.ifEmpty { "任务点" }}（高德道路 ${p.roadMeters} 米 / " +
-            "${if (p.roadEtaSeconds > 0) "${p.roadEtaSeconds / 60} 分钟" else "耗时未给"}）"
+        "已就绪：前往${destination.ifEmpty { "任务点" }}（道路 ${p.roadMeters} 米 / " +
+            "${if (p.roadEtaSeconds > 0) "${p.roadEtaSeconds / 60} 分钟" else "耗时未知"}）"
 }
 
 /**
@@ -335,7 +335,7 @@ private fun AmapNaviSurface(
                         viewRef = v
                     }
                 }.getOrElse { e ->
-                    failed = "高德导航视图在本机装不起来：${e.javaClass.simpleName}" +
+                    failed = "导航视图无法加载：${e.javaClass.simpleName}" +
                         (e.message?.let { " · $it" } ?: "")
                     android.view.View(ctx)
                 }
@@ -376,7 +376,7 @@ private fun AmapNaviSurface(
                     tint = Color(0xFFE8C271),
                     modifier = Modifier.size(34.dp),
                 )
-                Text("车道级导航在本机不可用", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("车道级导航不可用", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text(reason, color = Color(0xFFD6D0C2), fontSize = 12.5.sp)
                 Text(
                     "可以退回工作台，用「交给高德 / 交给百度」把目的地交给手机里装的导航 App。",
@@ -487,8 +487,8 @@ private fun GuideTopStrip(
                 Text(
                     // 转向动作只查 javap 核对过的 IconType 映射表；表外的码如实说"不在这张表里"
                     // （与 DriverSdkNavCard 同一口径：`turnIconSpeechOf` 返回 null 不等于"没有帧"）
-                    frame?.let { turnIconSpeechOf(it.iconType) ?: "转向码 ${it.iconType}（不在已核对的表里）" }
-                        ?: "等待高德第一帧",
+                    frame?.let { turnIconSpeechOf(it.iconType) ?: "暂不支持此转向类型" }
+                        ?: "等待导航数据",
                     color = Color.White,
                     fontSize = (22 * scale).sp,
                     fontWeight = FontWeight.Black,

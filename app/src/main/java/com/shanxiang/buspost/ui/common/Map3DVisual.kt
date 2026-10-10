@@ -101,7 +101,7 @@ object Map3DVisual {
      * STALE 那一句：阈值只有一个生产者（[LocationReportPolicy.MAX_FIX_AGE_MS]，就是服务侧
      * 决定"暂停上报"用的同一个数字），这里不写第二个毫秒数，也不重复政策的整句话。
      */
-    const val STALE_NOTE = "定位降级：本机点龄已超过停报阈值，显示的是最后一次可信采样"
+    const val STALE_NOTE = "定位降级：定位数据较旧，显示的是最后一次可信采样"
 
     /** UNAVAILABLE 且服务侧给不出原因时的兜底：只说"没拿到"，不说"后端说没有" */
     const val NO_FIX_NOTE = "暂时没拿到当前位置：显示的是调度安排，不是实时车位"

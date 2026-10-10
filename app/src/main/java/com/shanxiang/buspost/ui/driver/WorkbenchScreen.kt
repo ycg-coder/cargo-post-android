@@ -961,7 +961,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                     // 必须是两种长相，否则空列表会替后端下一句它没说过的结论（F-3 ⑧ 同一条理由）。
                     // 话术走全项目那一个口径「接口未给」（MR-d 禁的就是"后端没有下发"这种替后端下结论的写法）。
                     item(key = "taskEmpty") {
-                        SectionTitle("今日运营任务", subtitle = "任务段接口未给")
+                        SectionTitle("今日运营任务", subtitle = "暂无任务段")
                     }
                 }
 
@@ -1290,7 +1290,7 @@ private fun ShiftCard(
                 }
             }
             if (timeline.isEmpty()) {
-                Text("接口未给经停站", color = t.textTertiary, fontSize = (12 * scale).sp, modifier = Modifier.padding(top = 6.dp))
+                Text("暂无经停站", color = t.textTertiary, fontSize = (12 * scale).sp, modifier = Modifier.padding(top = 6.dp))
             } else {
                 StationTimeline(
                     stops = if (stationsExpanded || timeline.size <= TimelinePreview) timeline

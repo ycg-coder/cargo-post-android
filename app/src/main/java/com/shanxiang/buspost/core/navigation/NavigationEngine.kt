@@ -148,19 +148,19 @@ fun navigationGateOf(
     EngineReadiness.Loading -> NavigationGate(
         code = NavigationGateCode.LOADING,
         reason = "导航引擎正在加载（首次进入约需数秒）",
-        detail = "高德原生组件正在后台加载，加载完这一格会自动变成「导航可用」，不需要退出重进。",
+        detail = "导航组件正在后台加载，加载完这一格会自动变成「导航可用」，不需要退出重进。",
     )
 
     EngineReadiness.Initializing -> NavigationGate(
         code = NavigationGateCode.INITIALIZING,
-        reason = "导航引擎还在等高德回初始化结果（不是失败，也不是可用）",
+        reason = "导航引擎正在初始化",
         detail = "initResult=null",
     )
 
     EngineReadiness.Ready -> when {
         !hasOrigin -> NavigationGate(
             code = NavigationGateCode.NO_ROUTE,
-            reason = "本机还没有定位，没有起点就不算路",
+            reason = "暂无定位，没有起点就不算路",
             detail = "hasOrigin=false（不用终点或默认点顶替）",
         )
 
@@ -268,19 +268,19 @@ fun routeBindingOf(
     currentPath: SdkPathShape?,
 ): RouteBinding = when {
     accepted == null -> RouteBinding.Unbound(
-        reason = "本机还没有一次通过验证的算路，不能开始导航",
+        reason = "还没有通过验证的路线，不能开始导航",
         detail = "accepted=null（§九：没有 accepted route 就禁止 startGpsNavi，要重新算真实道路）",
     )
 
     currentPath == null -> RouteBinding.Unbound(
-        reason = "高德当前没有路径几何，本机无法确认要导哪一条",
+        reason = "当前没有路径数据，无法确认导航路线",
         // detail 里印指纹而不是 data class 的 toString：现场按一种格式 grep，两处成因两种写法就查不动
         detail = "getNaviPath()=null，本机记录=${accepted.routeFingerprint}",
     )
 
     currentPath.coordCount != accepted.coordCount || currentPath.roadDistanceMeters != accepted.roadDistanceMeters ->
         RouteBinding.Unbound(
-            reason = "高德手里的路径与本机刚验证过的那条不是同一条，请重新算路",
+            reason = "当前路径与已验证路线不一致，请重新算路",
             detail = "session=${accepted.routeFingerprint} now=pts=${currentPath.coordCount}|m=${currentPath.roadDistanceMeters}",
         )
 
@@ -454,13 +454,13 @@ fun readinessOf(
 ): EngineReadiness = when {
     !sdkPresent -> EngineReadiness.Blocked(
         code = NavigationGateCode.NOT_INSTALLED,
-        reason = "导航能力未就绪：高德导航组件未随包发布",
+        reason = "导航能力未就绪：导航组件未安装",
         detail = "sdkPresent=false",
     )
 
     !keyConfigured -> EngineReadiness.Blocked(
         code = NavigationGateCode.SDK_UNAVAILABLE,
-        reason = "导航能力未就绪：没有配置高德 key",
+        reason = "导航能力未就绪：未配置地图 key",
         detail = "keyConfigured=false（缺 key 时 SDK 不会回调，导航不能算可用）",
     )
 
@@ -468,7 +468,7 @@ fun readinessOf(
     initResult -> EngineReadiness.Ready
     else -> EngineReadiness.Blocked(
         code = NavigationGateCode.ERROR,
-        reason = "导航能力未就绪：高德导航引擎初始化失败",
+        reason = "导航能力未就绪：导航引擎初始化失败",
         detail = "onInitNaviFailure",
     )
 }
@@ -747,7 +747,7 @@ internal fun laneDisplayTextOf(display: LaneDisplay?): String = when (display) {
     LaneDisplay.Cleared -> "当前路段不显示车道"
 
     is LaneDisplay.Groups ->
-        "高德给了 ${display.groupCount} 组车道信息"
+        "${display.groupCount} 组车道信息"
 
     is LaneDisplay.Single -> {
         val frame = display.frame
@@ -817,19 +817,19 @@ sealed class EngineRecalcDisplay {
  * 算路成功的回执又不带原因，本机无论站哪一头都说不出来这句话。
  */
 internal fun engineRecalcTextOf(display: EngineRecalcDisplay?): String = when (display) {
-    null -> "高德没说过它在重新算路（偏航与拥堵都由高德自己说，本机不拿距离卡阈值判偏航）"
+    null -> "暂无重新算路记录"
 
     EngineRecalcDisplay.Yaw ->
-        "高德说车辆偏离了它给的这条路线，它要重新算路（回调无入参：偏了多少米、往哪偏，高德没说）"
+        "车辆偏离路线，正在重新算路"
 
     EngineRecalcDisplay.TrafficJam ->
-        "高德说前方拥堵，它要重新算路（拥堵在哪一段、多重，高德没说）"
+        "前方拥堵，正在重新算路"
 
     is EngineRecalcDisplay.EngineInitiatedSuccess ->
-        "高德自己回了一次算路成功（errorCode=${display.code}）；这条回执不带原因，本机不说它就是刚才那次偏航或拥堵的结果"
+        "重新算路完成（errorCode=${display.code}）"
 
     is EngineRecalcDisplay.EngineInitiatedFailure ->
-        "高德自己回了一次算路失败（errorCode=${display.code}）；这条回执不带原因，本机不猜它要重算的那条成没成"
+        "重新算路失败（errorCode=${display.code}）"
 }
 
 /**

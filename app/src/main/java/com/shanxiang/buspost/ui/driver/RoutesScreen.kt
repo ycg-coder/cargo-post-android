@@ -228,8 +228,8 @@ private fun VehicleCard(v: BusVehicle) {
                 SourceTag(v.dataSource)
             }
             Spacer(Modifier.width(4.dp))
-            InfoRow("下一站", v.nextStation.ifEmpty { "接口未给" })
-            InfoRow("预计到达", if (v.etaMinutes != null) "${v.etaMinutes} 分钟" else "后端未给 ETA")
+            InfoRow("下一站", v.nextStation.ifEmpty { "暂未知" })
+            InfoRow("预计到达", if (v.etaMinutes != null) "${v.etaMinutes} 分钟" else "暂未知")
             InfoRow("当前车速", if (v.speedKmh != null) "${v.speedKmh} km/h" else "—")
             InfoRow("线路", v.lineName.ifEmpty { "—" })
             if (!v.isReal) {
@@ -301,7 +301,7 @@ private fun LegRow(
                     if (!done) {
                         Text(
                             // 段契约（AppDriverLegRespVO / AppSendLegRespVO）根本没有 etaMinutes 键，真接口下走这条文案（审计 §71）
-                            leg.etaMinutes?.let { "$it 分" } ?: "到站分钟未下发",
+                            leg.etaMinutes?.let { "$it 分" } ?: "暂未知",
                             color = t.textTertiary,
                             fontSize = (11 * scale).sp,
                             modifier = Modifier.padding(top = 3.dp),

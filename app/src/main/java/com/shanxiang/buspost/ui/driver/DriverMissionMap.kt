@@ -206,7 +206,7 @@ internal fun stopStatusColor(t: BusTokens, stop: MissionStop) = when {
 }
 
 internal fun formatRoadMeters(meters: Int): String = when {
-    meters <= 0 -> "接口未给"
+    meters <= 0 -> "暂未知"
     meters < 1000 -> "$meters 米"
     else -> "%.1f 公里".format(meters / 1000.0)
 }

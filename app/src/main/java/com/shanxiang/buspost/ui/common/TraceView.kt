@@ -62,7 +62,7 @@ fun TraceView(
         TicketCard(
             serial = trace.orderNo,
             stubValue = trace.etaMinutes?.toString() ?: "—",
-            stubLabel = if (trace.etaMinutes != null) "分钟预计到" else "接口未给\n到站分钟",
+            stubLabel = if (trace.etaMinutes != null) "分钟预计到" else "暂无\n预计到站",
             stubColor = if (trace.etaMinutes != null && trace.etaMinutes in 1..10) t.danger else t.primary,
         ) {
             Column(Modifier.weight(1f)) {

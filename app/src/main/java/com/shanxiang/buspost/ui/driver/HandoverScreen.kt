@@ -116,8 +116,8 @@ class HandoverViewModel : ScreenViewModel() {
                 mergeDemo(ack.demo, c.demo)
                 val back = c.value
                 receipt = when {
-                    ack.notSent -> "同一个段动作还在处理中，本次点击未发给后端，以下为后端当前状态"
-                    ack.demo -> "演示模式：段动作未提交后端，仅本机显示"
+                    ack.notSent -> "同一个段动作还在处理中，以下为当前状态"
+                    ack.demo -> "演示模式：段动作未提交，仅本地显示"
                     back == null -> "动作已提交，但没能回读段状态，请下拉刷新核对"
                     back.status == leg.status ->
                         "动作已提交，后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
@@ -163,13 +163,13 @@ class HandoverViewModel : ScreenViewModel() {
                 val onServer = feed.items.firstOrNull { it.id == task.id }
                 val photoStored = onServer?.photoUrl?.isNotEmpty() == true
                 receipt = when {
-                    ack.notSent -> "本次确认未发给后端（同一个交接单还在处理中），以下为后端当前状态"
-                    ack.demo -> "演示模式：交接未提交后端，仅本机显示"
-                    feed.error != null -> "已提交后端，但未能回读确认，请下拉刷新核对"
+                    ack.notSent -> "本次确认未发送（同一个交接单还在处理中），以下为当前状态"
+                    ack.demo -> "演示模式：交接未提交，仅本地显示"
+                    feed.error != null -> "已提交，但未能回读确认，请下拉刷新核对"
                     uploaded.isNotEmpty() && !photoStored -> "已提交，但回读里没有凭证照片，请稍后刷新核对或补拍"
-                    uploaded.isNotEmpty() && photoStored -> "交接已提交后端，凭证照片已入库"
-                    onServer == null -> "已提交后端，该交接单已不在司机列表中，请下拉刷新核对"
-                    else -> "已提交后端，当前状态「${onServer.status}」（未附凭证照片）"
+                    uploaded.isNotEmpty() && photoStored -> "交接已提交，凭证照片已入库"
+                    onServer == null -> "已提交，该交接单已不在司机列表中，请下拉刷新核对"
+                    else -> "已提交，当前状态「${onServer.status}」（未附凭证照片）"
                 }
             } finally {
                 busy = false
