@@ -57,6 +57,10 @@ val signingProps = Properties().apply {
 val releaseBaseUrl = cfg("baseUrl")
 val isCiRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
 
+// versionCode 走 CI 的 GITHUB_RUN_NUMBER（每次 workflow 运行自增），本地开发用 1。
+// 这样每个 CI 构建都有唯一版本号，app 内更新才能正确比较新旧。
+val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
 fun qu(v: String) = "\"${v.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
@@ -76,8 +80,8 @@ android {
         // 用 34 编译会在新系统上按"兼容模式"运行（界面不会真全屏、部分限制不触发），
         // 那不是"能跑"，是"跑在旧行为里"。对齐 36 才能暴露真实行为。
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0-android"
+        versionCode = ciVersionCode
+        versionName = "1.0.$ciVersionCode-android"
 
         buildConfigField("String", "BASE_URL", qu(releaseBaseUrl ?: ""))
         // Android 地图 SDK 的 key（「Android 平台」类型，绑包名 + 签名 SHA1）——注入到 manifest meta-data。

@@ -16,7 +16,7 @@ on:
         default: "https://api.qwer2333.com/api"
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   BUSPOST_RELEASE_BASE_URL: ${{ github.event.inputs.baseUrl || 'https://api.qwer2333.com/api' }}
@@ -126,3 +126,18 @@ jobs:
         with:
           name: release-apk
           path: app/build/outputs/apk/release/*.apk
+
+      - name: 创建 GitHub Release（app 内更新靠它）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          TAG="v${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" "$APK#app-release.apk" \
+            --title "v${GITHUB_RUN_NUMBER}" \
+            --notes "自动构建 #${GITHUB_RUN_NUMBER}
+
+          安装方式：
+          - 旧版 app 启动后会自动弹窗提示更新
+          - 或手动下载下方 APK 安装" \
+            --latest
