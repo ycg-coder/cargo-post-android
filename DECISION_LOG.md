@@ -5538,3 +5538,16 @@ canonical 仍是 D-070 §3 那一发。
 - **CI 第一次跑就红，而且是真缺陷**：`单元测试` 步骤 `exit 126` = 命令存在但**不可执行**。根因是 Windows 上提交时 `gradlew` 记成了 `100644`，Linux runner 上 `./gradlew` 直接 permission denied。修法 `git update-index --chmod=+x gradlew`（复验 `git ls-files -s gradlew` = **100755**）。⚠ durable：**本机（Windows）git 化后，任何要在 Linux CI 里直接 `./xxx` 跑的脚本都得补 +x**，本地能跑不代表远端能跑；这一族和"我的命令行给了什么 ≠ 包里是什么"是同一类错误。
 - 交接文档落 `docs/GITHUB_DEPLOY_HANDOFF.md`（转移两步、出包命令、以及"云上账号未解决 + 源仓 DEMO_GUIDE 口令已过期 + 本机后端落后 master"三条实测事实）。
 - NEXT：① 等这次重推后的 CI 变绿（126 修完还有 SDK/判据在 Linux 上能不能跑这两关没验）；② #7 界面话术收口；③ #8 拍照上传真机闭环；④ 管理员配合 transfer 后手动触发 release。
+
+
+## D-074 · 本机后端对齐云上：契约面同源、jar 是子集、缺的那支迁移已补（2026-10-10 13:5x）
+
+- 用户口径：云上账号暂时不方便，先在本地后端验；但**本地后端要对齐云上后端**，否则本地验出来的东西不算数。
+- 先守住不能破坏的东西：本地 `cargo-post-platform` 工作树有 **63 个未提交改动**，正好覆盖我今天读契约的那几个文件（`AppDriverController`、`AppDriverRouteRespVO`、`AppSendLegRespVO`、`RoadPolylineService`…）⇒ **没有 checkout / reset**，先 `git diff` 存成 `C:/temp/backend-uncommitted-20261010-135542.patch`（2354 行）再动。
+- 三方对照（全部实测，不是推断）：
+  ① `git diff --stat HEAD origin/master -- .../controller/app` **为空** ⇒ PR #183 没碰 app-api，**本地 HEAD 与云上 master 的接口源码一致**，我今天读到的接口形状就是云上的形状。
+  ② 真打本机 `/driver/route`，把返回键集合与两版 VO 字段比对：`jar 有但 master 没有 = []` ⇒ **在跑的 jar 是 master 契约的子集**（比云上旧）。含义：本地验证是**下界**，不会出现"本地能跑、云上少键"的假阳性；反过来云上可能多给键，本机看不见。
+  ③ 工作树的 `AppDriverRouteRespVO` 比 master **多 13 个字段**（`routeAvailable` / `routeComplete` / `routeDistanceMeters` / `routeDurationSeconds` / `routeUnavailableReason` / `nextStopRoadDistanceMeters` / `nextStopRoadEtaSeconds` 等）⇒ 这批是"超前于云上"的未发布后端工作。**App 里"道路里程/路线是否可用"那一族读的正是这些键** ⇒ 结论：在云上后端合入并发布这批之前，界面上那一格**本来就该是"暂无"**（本轮把脚注改成「道路里程暂无，开始导航后给实时剩余」正好与这个事实对齐，不是回避）。
+- 本机库缺的那支迁移已补：master 有 `sql/incremental/V027__idempotency_unique_keys.sql`，本地 sql 目录只到 V026。先预检（`transport_leg` 重复三元组 = 无、`transport_algorithm_request` 重复快照组 = 0）⇒ V027 在这台机器上是**纯加索引不动数据**；仍先 `mysqldump` 备份这两张表（515,639 B）再执行。落地读数：`uk_algorithm_request_snapshot(snapshot_hash)` 与 `uk_leg_plan_order_seq(plan_id,order_id,leg_sequence)` 均 `non_unique=0`，两表行数 **49 / 39 未变**。
+- ⚠ 这条 durable：**"本地后端"有三个不同的东西**——工作树（超前）、在跑的 jar（滞后）、库 schema（缺迁移）。对齐要分别量，任何一处当成"就是云上"都会得出错结论。本轮之前我台账里把 `/driver/route` 的 `routeAvailable=None` 记成"后端没给"，其实准确说法是"**这版 jar 与云上 master 都没有这个键**"。
+- 运行时对齐仍**未做**：本机没有 `mvn`、仓库没有 wrapper ⇒ 无法用 master 重打 jar。要真正对齐运行时，需要装 Maven（或让队友给一份 master 构建产物）。这一格记 `BLOCKED`，不写成已对齐。
