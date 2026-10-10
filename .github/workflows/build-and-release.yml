@@ -1,0 +1,128 @@
+name: build-and-release
+
+# 为什么分两个 job：verify 每次 push 都要绿（用例 + 本工程自己的判据簿），
+# release 只有人手触发时才构建生产包 —— 且缺签名材料必须显式失败，
+# 不许静默打出一个未签名的 release 包再把它当成"能发布的产物"。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      baseUrl:
+        description: "release 包的后端地址（必须 https）"
+        required: false
+        default: "https://api.qwer2333.com/api"
+
+permissions:
+  contents: read
+
+env:
+  BUSPOST_RELEASE_BASE_URL: ${{ github.event.inputs.baseUrl || 'https://api.qwer2333.com/api' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 写本机 SDK 配置（local.properties 不入库）
+        run: |
+          : > local.properties
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> local.properties
+          echo "amap.key=${{ secrets.AMAP_ANDROID_KEY }}" >> local.properties
+          echo "amap.webKey=${{ secrets.AMAP_WEB_KEY }}" >> local.properties
+          echo "buspost.baseUrl=${BUSPOST_RELEASE_BASE_URL}" >> local.properties
+      - name: 单元测试
+        run: ./gradlew :app:testDebugUnitTest --console=plain --no-daemon
+      - name: 判据簿（tools/check_*.sh）
+        run: |
+          rc=0
+          for s in tools/check_*.sh; do
+            echo "===== $s ====="
+            bash "$s" | tail -20 || rc=1
+          done
+          exit $rc
+      - name: 台账表格自检
+        run: python3 tools/check_ledger_tables.py
+      - name: 出 debug 包
+        run: ./gradlew :app:assembleDebug --console=plain --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: 签名材料齐备性闸门（缺就红，不出包）
+        env:
+          KS: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+          SP: ${{ secrets.SIGNING_STOREPASSWORD }}
+          KA: ${{ secrets.SIGNING_KEYALIAS }}
+          KP: ${{ secrets.SIGNING_KEYPASSWORD }}
+        run: |
+          [ -n "$KS" ] || { echo "::error::缺 SIGNING_KEYSTORE_B64：签名文件按红线不入库，只能走 secrets"; exit 1; }
+          [ -n "$SP" ] && [ -n "$KA" ] && [ -n "$KP" ] || { echo "::error::缺 SIGNING_STOREPASSWORD / SIGNING_KEYALIAS / SIGNING_KEYPASSWORD"; exit 1; }
+          case "$BUSPOST_RELEASE_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::release 必须是 https 后端，当前=$BUSPOST_RELEASE_BASE_URL"; exit 1;;
+          esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 把签名材料还原到工程之外（源码树内不留任何签名文件）
+        env:
+          KS: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+          SP: ${{ secrets.SIGNING_STOREPASSWORD }}
+          KA: ${{ secrets.SIGNING_KEYALIAS }}
+          KP: ${{ secrets.SIGNING_KEYPASSWORD }}
+        run: |
+          mkdir -p ../buspost-signing-backup
+          printf '%s' "$KS" | base64 -d > ../buspost-signing-backup/buspost-release.jks
+          {
+            echo "storeFile=buspost-release.jks"
+            echo "storePassword=$SP"
+            echo "keyAlias=$KA"
+            echo "keyPassword=$KP"
+          } > ../buspost-signing-backup/keystore.properties
+          echo "源码树内 jks/keystore 命中数（必须 0）：$(find . -name '*.jks' -o -name '*.keystore' | wc -l)"
+          test "$(find . -name '*.jks' -o -name '*.keystore' | wc -l)" -eq 0
+      - name: 写本机 SDK 配置
+        run: |
+          : > local.properties
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> local.properties
+          echo "amap.key=${{ secrets.AMAP_ANDROID_KEY }}" >> local.properties
+          echo "amap.webKey=${{ secrets.AMAP_WEB_KEY }}" >> local.properties
+          echo "buspost.baseUrl=${BUSPOST_RELEASE_BASE_URL}" >> local.properties
+      - name: 出 release 包
+        run: ./gradlew :app:assembleRelease --console=plain --no-daemon
+      - name: 扫包取证（包内地址必须是给定的 https，且不许残留本机/内网地址）
+        run: |
+          python3 - <<'PY'
+          import glob, os, re, zipfile, sys
+          apk = glob.glob('app/build/outputs/apk/release/*.apk')[0]
+          z = zipfile.ZipFile(apk)
+          blob = b''.join(z.read(n) for n in z.namelist() if re.match(r'classes\d*\.dex$', n))
+          want = os.environ['BUSPOST_RELEASE_BASE_URL'].encode()
+          host = want.decode().split('//', 1)[1].encode()
+          print('APK =', apk, 'dex bytes =', len(blob))
+          print('给定 https 地址命中 =', blob.count(want))
+          for bad in (b'127.0.0.1', b'localhost', b'10.0.2.2', b'1.15.29.107'):
+              n = blob.count(bad)
+              print('禁止残留', bad.decode(), '=', n)
+              if n:
+                  sys.exit('release 包里残留本机/内网地址：' + bad.decode())
+          if blob.count(want) == 0:
+              sys.exit('包里找不到给定的 baseUrl —— 配置没进包，别把它当成可发布的包')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk
