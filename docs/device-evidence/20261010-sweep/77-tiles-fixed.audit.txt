@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\77-tiles-fixed.txt (96 节点)
+== docs\device-evidence\20261010-sweep\77-tiles-fixed.xml: 96 节点 / 41 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 5481px² (29%): '客货邮 · 城乡直达' [276,271][559,337] × '位置未取到' [317,310][520,442]
+TOTAL_ISSUES=1

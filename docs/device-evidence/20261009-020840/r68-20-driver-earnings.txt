@@ -1,0 +1,45 @@
+- | FrameLayout | 1080x2340 @ 0,0
+  - | LinearLayout | 1080x2274 @ 0,0
+    - | FrameLayout | 1080x2208 @ 0,66
+      - | ComposeView | 1080x2208 @ 0,66
+        - | View | 1080x2208 @ 0,66
+          - | View | 1080x2208 @ 0,66
+            - | ScrollView | 1080x2016 @ 0,66
+              运营统计 | TextView | 230x80 @ 88,155
+              今日 0 元 | TextView | 129x66 @ 368,162
+              跑班收入按件计费，明细可回溯到订单 | TextView | 595x66 @ 88,247
+              今日 | TextView | 62x66 @ 77,443
+              0 | TextView | 32x66 @ 77,517
+              元 | TextView | 30x66 @ 77,583
+              本周 | TextView | 62x66 @ 416,443
+              未给 | TextView | 110x80 @ 416,517
+              本月 | TextView | 62x66 @ 755,443
+              未给 | TextView | 110x80 @ 755,517
+              累计收益 | TextView | 164x66 @ 83,787
+              631.95 元 | TextView | 717x60 @ 280,790
+              累计件数 | TextView | 164x66 @ 83,913
+              47 单 | TextView | 717x60 @ 280,916
+              累计载重 | TextView | 164x66 @ 83,1039
+              后端无此口径 | TextView | 717x60 @ 280,1042
+              按件计费 | TextView | 124x66 @ 108,1154
+              T+1 结算 | TextView | 124x66 @ 301,1154
+              结算口径以后端为准，本机只做展示统计。 | TextView | 570x66 @ 83,1234
+              按日收益 | TextView | 152x66 @ 83,1411
+              近 2 天，单位元 | TextView | 219x66 @ 83,1483
+              70 | TextView | 32x66 @ 289,1582
+              27.62 | TextView | 71x66 @ 740,1607
+              10-08 | TextView | 72x66 @ 740,1786
+              收益明细 | TextView | 176x66 @ 69,1924
+              10 笔 | TextView | 79x66 @ 69,1996
+            - | View C | 270x151 @ 0,2104
+              工作台 | View | 61x61 @ 105,2112
+              工作台 | TextView | 90x66 @ 90,2181
+            - | View C | 270x151 @ 270,2104
+              我的路线 | View | 61x61 @ 375,2112
+              我的路线 | TextView | 120x66 @ 345,2181
+            - | View C | 270x151 @ 540,2104
+              我的收益 | View | 61x61 @ 645,2112
+              我的收益 | TextView | 120x66 @ 615,2181
+            - | View C | 270x151 @ 810,2104
+              用户版 | View | 61x61 @ 915,2112
+              用户版 | TextView | 90x66 @ 900,2181

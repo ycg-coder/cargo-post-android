@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-112223\26-real2-filled.txt (33 节点)
+== docs\device-evidence\20261010-112223\26-real2-filled.xml: 33 节点 / 13 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

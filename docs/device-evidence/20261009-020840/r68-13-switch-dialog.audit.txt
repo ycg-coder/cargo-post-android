@@ -1,0 +1,4 @@
+LISTING -> docs/device-evidence/20261009-020840/r68-13-switch-dialog.txt (41 节点)
+== docs/device-evidence/20261009-020840/r68-13-switch-dialog.xml: 41 节点 / 25 段文字 / 屏幕 1080x2400 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

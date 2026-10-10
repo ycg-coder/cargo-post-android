@@ -1,0 +1,4 @@
+LISTING -> docs/device-evidence/20261009-020840/r68-15-wb-scroll1.txt (45 节点)
+== docs/device-evidence/20261009-020840/r68-15-wb-scroll1.xml: 45 节点 / 27 段文字 / 屏幕 1080x2400 ==
+  [LAYOUT] 热区不足 126px: 'View' [17,1993][83,2104] = 66x111
+TOTAL_ISSUES=1

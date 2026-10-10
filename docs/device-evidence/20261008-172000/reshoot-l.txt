@@ -1,0 +1,24 @@
+verifying what is actually on the device before re-shooting
+  versionName=1.0.0-android
+  lastUpdateTime=2026-10-08 09:25:18
+=== A) L-w —— 完全没有 fix（location_mode 0）：顶栏不许念县城垫子查出来的地名 ===
+  role '我是用户' found=True
+  SMS_CODE='9999'
+  location_mode 回读='0'
+  no-fix     HEAD '乡邮智联'                 bounds="[84,214][301,289]"
+  no-fix     HEAD '县城⇄乡村'                bounds="[348,220][495,283]"
+  no-fix     fabrication=none  位置未取到=True
+  诚实提示『定位不可用…按县城中心展示』present=True
+=== B) L-x —— 有 fix 但落在服务范围外（加州点）：站点为空，选择器必须说人话 ===
+  ca-fix     HEAD '乡邮智联'                 bounds="[84,214][301,289]"
+  ca-fix     HEAD '县城⇄乡村'                bounds="[348,220][495,283]"
+  ca-fix     fabrication=none  位置未取到=True
+  切换 ▾ found=True
+  dialog labels: 客货邮 · 城乡直达 / 位置未取到 / 切换 ▾ / 定位不可用，附近公交与天气暂按县城中心展示 / 重新定位 / 27°C 阴 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示
+  空态文案『暂无可选村庄：接口未返回站点』present=False
+=== C) 回到合川真点：站点非空 ⇒ 选择器列真站点、且不得出现空态文案 ===
+  hc-fix     HEAD '乡邮智联'                 bounds="[84,214][301,289]"
+  hc-fix     HEAD '县城⇄乡村'                bounds="[348,220][495,283]"
+  hc-fix     fabrication=none  位置未取到=True
+  dialog labels: 客货邮 · 城乡直达 / 位置未取到 / 切换 ▾ / 定位不可用，附近公交与天气暂按县城中心展示 / 重新定位 / 27°C 阴 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示
+  空态文案 present(应为 False，因为有真站点)=False

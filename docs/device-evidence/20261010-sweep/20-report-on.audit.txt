@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\20-report-on.txt (89 节点)
+== docs\device-evidence\20261010-sweep\20-report-on.xml: 89 节点 / 39 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 25184px² (37%): '#401' [280,2747][2053,2802] × '距「南城大道」道路距离接口未给（也没有可用定位，直线远近同样不给）' [44,2713][1067,2779]
+TOTAL_ISSUES=1

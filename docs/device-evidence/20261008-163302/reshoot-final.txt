@@ -1,0 +1,16 @@
+# A) 顶栏地名诚实化 —— 加州 mock 点（37.42,-122.16），旧包这一格念的是『云山村』
+  role '我是用户' found=True
+  SMS_CODE='9999'
+  landed labels: 乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 位置未取到 / 切换 ▾ / 20°C 晴 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交 / 更多 / 已更新：17:09 / 当前不在运营时间 / 首页 / 首页 / 商城 / 商城 / 快递 / 快递 / 我的 / 我的
+  HEAD '乡邮智联'                   bounds="[84,214][301,289]"
+  HEAD '县城⇄乡村'                  bounds="[348,220][495,283]"
+   fabrication(云山村/飞龙村/石桥驿/兴隆场/高炉村/白合村) present = False
+  诚实回落『位置未取到』present = True
+=== B) DriverShell 系统返回（补丁③，同一份新包）===
+  role '我是司机' found=True
+  SMS_CODE='9999'
+  landed labels: 司机工作台 / 在途 / 346路司机A · 渝A·B5204 / 额定载重 600 kg / SH-L346-05 / 346路(悠山路--较场口) / 16:40 发车 / 在途 / — / 件货物 / 经停站点 / 1/14 / 悠山路 / 文峰公社 / +3 分 / 吉祥路口 / +6 分 / 南山路 / +8 分 / 中研所 / +11 分 / 邮电大学 / +14 分 / 黄桷垭 / +17 分 / 工作台 / 工作台 / 我的路线 / 我的路线 / 我的收益 / 我的收益 / 用户版 / 用户版
+  driver tab bar: 我的路线, 我的收益, 工作台
+  BACK from 我的路线   in_app=True  回工作台=True  focus=mCurrentFocus=Window{bc229cd u0 com.shanxiang.buspost/com.shanxiang.buspost.Main
+  BACK from 我的收益   in_app=True  回工作台=True  focus=mCurrentFocus=Window{bc229cd u0 com.shanxiang.buspost/com.shanxiang.buspost.Main
+  BACK from 工作台    in_app=False 回工作台=False focus=mCurrentFocus=Window{a19ae71 u0 com.google.android.apps.nexuslauncher/com.google

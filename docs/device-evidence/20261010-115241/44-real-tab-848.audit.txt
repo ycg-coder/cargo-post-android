@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-115241\44-real-tab-848.txt (147 节点)
+== docs\device-evidence\20261010-115241\44-real-tab-848.xml: 147 节点 / 67 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

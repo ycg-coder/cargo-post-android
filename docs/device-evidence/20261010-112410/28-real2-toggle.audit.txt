@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-112410\28-real2-toggle.txt (81 节点)
+== docs\device-evidence\20261010-112410\28-real2-toggle.xml: 81 节点 / 33 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

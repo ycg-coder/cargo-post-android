@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bus_paper">#FFF5F8FC</color>
+    <color name="bus_ink">#FF2B2B28</color>
+    <color name="bus_primary">#FF1F5E9E</color>
+    <color name="bus_launcher_bg">#FF123F6E</color>
+</resources>

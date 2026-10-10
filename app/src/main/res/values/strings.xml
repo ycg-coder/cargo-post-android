@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">乡邮智联</string>
+    <string name="channel_order_name">订单事件</string>
+    <string name="channel_order_desc">寄货、购物订单的审核、发车、交接、妥投提醒</string>
+    <string name="channel_shift_name">班次调度</string>
+    <string name="channel_shift_desc">司机排班、发车任务与交接任务提醒</string>
+    <string name="channel_arrival_name">车快到了</string>
+    <string name="channel_arrival_desc">班车距目标站点小于 10 分钟时的高优先级提醒</string>
+    <string name="channel_service_name">司机在途上报</string>
+    <string name="channel_service_desc">行驶中持续上报车辆位置的常驻通知</string>
+
+    <!-- App Shortcuts 长按菜单 -->
+    <string name="shortcut_send_label">我要寄货</string>
+    <string name="shortcut_send_long_label">寄一件山货或包裹</string>
+    <string name="shortcut_bus_label">实时公交</string>
+    <string name="shortcut_bus_long_label">查看附近班车</string>
+    <string name="shortcut_parcel_label">我的包裹</string>
+    <string name="shortcut_parcel_long_label">查看寄货和购物订单</string>
+
+    <!-- App Widget 桌面小组件 -->
+    <string name="widget_bus_description">显示下一班到车时间，无需打开应用</string>
+</resources>

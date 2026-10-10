@@ -1,0 +1,16 @@
+pkg: ['lastUpdateTime=2026-10-08 09:25:18']
+  setprop tz=Asia/Shanghai 回读='Asia/Shanghai'
+  adb root already: 0
+  add-test-provider: ''
+  location_mode 回读='3' tz 回读='Asia/Shanghai'
+=== C 正控：合川真点（30.03,106.30）⇒ 后端有站点，选择器必须列真站点、不得出现空态 ===
+  inject(30.03,106.30) 回读=last location=Location[gps 30.030000,106.300000 hAcc=100.0 et=+16m10s435ms mock] => landed=True
+  C      顶栏那一格='位置未取到' fabrication=none 附近共=[] 已更新=[] 提示=['定位不可用，附近公交与天气暂按县城中心展示']
+  C      opened=True 空态=['暂无可选村庄：接口未返回站点'] 条目=选择所在村庄 / 暂无可选村庄：接口未返回站点
+=== B 空态：加州点（37.42,-122.16）⇒ 后端不给站点，选择器必须说『暂无可选村庄：接口未返回站点』 ===
+  inject(37.42,-122.16) 回读=last location=Location[gps 37.420000,-122.160000 hAcc=100.0 et=+16m30s356ms mock] => landed=True
+  B      顶栏那一格='位置未取到' fabrication=none 附近共=[] 已更新=[] 提示=['定位不可用，附近公交与天气暂按县城中心展示']
+  B      opened=True 空态=['暂无可选村庄：接口未返回站点'] 条目=选择所在村庄 / 暂无可选村庄：接口未返回站点
+=== verdict ===
+  C(正控 站点非空) = 拿不到 fix 就不判，见上面 inject 回读
+  B(空态 站点为空) = PASS

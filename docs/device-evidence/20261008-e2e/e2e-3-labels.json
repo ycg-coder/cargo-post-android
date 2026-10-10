@@ -1,0 +1,56 @@
+[
+ {
+  "label": "乡邮智联",
+  "cls": "TextView",
+  "bounds": "[414,421][666,512]",
+  "click": false
+ },
+ {
+  "label": "客货邮 · 城乡直达",
+  "cls": "TextView",
+  "bounds": "[409,523][672,586]",
+  "click": false
+ },
+ {
+  "label": "选择身份",
+  "cls": "TextView",
+  "bounds": "[53,670][209,733]",
+  "click": false
+ },
+ {
+  "label": "我是用户",
+  "cls": "TextView",
+  "bounds": "[179,802][335,865]",
+  "click": false
+ },
+ {
+  "label": "我是司机",
+  "cls": "TextView",
+  "bounds": "[179,965][335,1028]",
+  "click": false
+ },
+ {
+  "label": "手机号",
+  "cls": "TextView",
+  "bounds": "[58,1128][160,1191]",
+  "click": false
+ },
+ {
+  "label": "密码",
+  "cls": "TextView",
+  "bounds": "[58,1383][126,1446]",
+  "click": false
+ },
+ {
+  "label": "请输入密码",
+  "cls": "TextView",
+  "bounds": "[174,1501][369,1564]",
+  "click": false
+ },
+ {
+  "label": "验证码登录",
+  "cls": "TextView",
+  "bounds": "[413,1620][667,1633]",
+  "click": true
+ }
+]

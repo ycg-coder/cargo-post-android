@@ -1,0 +1,12 @@
+N-j 合规类 javap 取证（2026-10-10，对 AmapCompliance.kt 的两个 SDK 类）
+jar: navi-3dmap-10.0.600_3dmap10.0.600.jar sha256 前缀 9fa3cfb81ff7ab57
+
+== com.amap.api.maps.MapsInitializer（grep privacy）==
+  public static synchronized void updatePrivacyShow(android.content.Context, boolean, boolean);
+  public static synchronized void updatePrivacyAgree(android.content.Context, boolean);
+
+== com.amap.api.location.AMapLocationClient（grep privacy）==
+  public static void updatePrivacyShow(android.content.Context, boolean, boolean);
+  public static void updatePrivacyAgree(android.content.Context, boolean);
+
+结论：AmapCompliance.kt 调用的 4 个静态方法（两类各 updatePrivacyShow/updatePrivacyAgree）与 javap 读到的 public 签名逐字一致，两处 import 入白名单有据。

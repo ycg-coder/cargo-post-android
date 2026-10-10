@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\28-voice-on.txt (63 节点)
+== docs\device-evidence\20261010-sweep\28-voice-on.xml: 63 节点 / 13 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 5311px² (50%): '进入' [326,137][452,221] × '乡邮智联 · 车道级导航' [105,118][439,184]
+TOTAL_ISSUES=1

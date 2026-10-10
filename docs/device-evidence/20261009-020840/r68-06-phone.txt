@@ -1,0 +1,26 @@
+- | FrameLayout | 1080x2340 @ 0,0
+  - | LinearLayout | 1080x2274 @ 0,0
+    - | FrameLayout | 1080x2208 @ 0,66
+      - | ComposeView | 1080x2208 @ 0,66
+        - | View | 1080x2208 @ 0,66
+          - | ScrollView | 1080x2208 @ 0,66
+            乡邮智联 | TextView | 264x96 @ 408,440
+            客货邮 · 城乡直达 | TextView | 272x66 @ 404,547
+            选择身份 | TextView | 164x66 @ 55,701
+            - | View C | 970x144 @ 55,800
+              我是用户 | TextView | 164x66 @ 188,839
+            - | View C | 970x144 @ 55,972
+              我是司机 | TextView | 164x66 @ 188,1011
+            手机号 | TextView | 105x66 @ 61,1182
+            13800138001 | EditText C | 854x154 @ 138,1262
+              - | View | 766x48 @ 182,1315
+            密码 | TextView | 70x66 @ 61,1449
+            - | EditText C | 854x154 @ 138,1529
+              请输入密码 | TextView | 205x66 @ 182,1573
+            验证码登录 | TextView C | 268x132 @ 406,1697
+            - | CheckBox C | 132x132 @ 29,1839
+            我已阅读并同意《服务协议》 | TextView C | 429x132 @ 138,1838
+            - | View C | 970x138 @ 55,1997
+              登录 | TextView | 91x66 @ 495,2033
+            - | View C | 970x132 @ 55,2135
+              大字模式 | TextView | 132x66 @ 499,2168

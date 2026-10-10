@@ -1,0 +1,33 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | LinearLayout | 2136x3200 @ 0,0
+        - | FrameLayout | 2136x3200 @ 0,0
+          - | FrameLayout | 2136x3200 @ 0,0
+            - | View C | 2136x3200 @ 0,0
+            - | LinearLayout C | 1487x804 @ 324,1198
+              - | LinearLayout | 742x680 @ 324,1260
+                - | LinearLayout | 742x283 @ 324,1260
+                - | ImageView | 83x83 @ 653,1260
+                允许“乡邮智联”获取位置信息？ | TextView | 556x123 @ 417,1379
+                - | ScrollView | 742x397 @ 324,1543
+                - | ViewGroup | 742x397 @ 324,1543
+                - | FrameLayout | 742x397 @ 324,1543
+                - | ScrollView | 742x397 @ 324,1543
+                - | LinearLayout | 742x397 @ 324,1543
+                - | LinearLayout | 742x397 @ 324,1543
+                - | ViewGroup | 742x361 @ 324,1558
+                模糊位置 | RadioButton C | 323x361 @ 372,1558
+                - | LinearLayout | 323x297 @ 372,1558
+                - | ImageView | 281x255 @ 393,1579
+                模糊位置 | TextView | 323x49 @ 372,1870
+                精确位置 | RadioButton | 323x361 @ 695,1558
+                - | LinearLayout | 323x297 @ 695,1558
+                - | ImageView | 281x255 @ 716,1579
+                精确位置 | TextView | 323x49 @ 695,1870
+              - | View | 2x680 @ 1066,1260
+              - | ScrollView | 743x447 @ 1068,1376
+                - | LinearLayout | 743x447 @ 1068,1376
+                仅在使用中允许 | Button C | 621x129 @ 1129,1376
+                本次使用允许 | Button C | 621x129 @ 1129,1535
+                拒绝 | Button C | 621x129 @ 1129,1694

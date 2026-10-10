@@ -1,0 +1,164 @@
+[
+ {
+  "label": "乡邮智联",
+  "cls": "TextView",
+  "bounds": "[84,149][301,224]",
+  "click": false
+ },
+ {
+  "label": "县城⇄乡村",
+  "cls": "TextView",
+  "bounds": "[348,155][495,218]",
+  "click": false
+ },
+ {
+  "label": "客货邮 · 城乡直达",
+  "cls": "TextView",
+  "bounds": "[84,237][347,300]",
+  "click": false
+ },
+ {
+  "label": "位置未取到",
+  "cls": "TextView",
+  "bounds": "[123,274][319,386]",
+  "click": true
+ },
+ {
+  "label": "切换 ▾",
+  "cls": "TextView",
+  "bounds": "[319,305][392,368]",
+  "click": false
+ },
+ {
+  "label": "14°C 多云",
+  "cls": "TextView",
+  "bounds": "[170,417][821,480]",
+  "click": false
+ },
+ {
+  "label": "4日预报",
+  "cls": "TextView",
+  "bounds": "[821,417][928,480]",
+  "click": false
+ },
+ {
+  "label": "暂无公告",
+  "cls": "TextView",
+  "bounds": "[462,829][618,892]",
+  "click": false
+ },
+ {
+  "label": "村里的好消息上架后会在这里展示",
+  "cls": "TextView",
+  "bounds": "[285,905][795,968]",
+  "click": false
+ },
+ {
+  "label": "实时公交",
+  "cls": "TextView",
+  "bounds": "[42,1253][186,1316]",
+  "click": false
+ },
+ {
+  "label": "农产品",
+  "cls": "TextView",
+  "bounds": "[214,1253][322,1316]",
+  "click": false
+ },
+ {
+  "label": "我的快递",
+  "cls": "TextView",
+  "bounds": "[349,1253][493,1316]",
+  "click": false
+ },
+ {
+  "label": "我要寄货",
+  "cls": "TextView",
+  "bounds": "[509,1253][653,1316]",
+  "click": false
+ },
+ {
+  "label": "附近公交",
+  "cls": "TextView",
+  "bounds": "[103,1374][271,1437]",
+  "click": false
+ },
+ {
+  "label": "更多",
+  "cls": "TextView",
+  "bounds": "[910,1374][978,1437]",
+  "click": false
+ },
+ {
+  "label": "已更新：12:39",
+  "cls": "TextView",
+  "bounds": "[66,1482][262,1545]",
+  "click": false
+ },
+ {
+  "label": "当前不在运营时间",
+  "cls": "TextView",
+  "bounds": "[384,1847][696,1910]",
+  "click": false
+ },
+ {
+  "label": "优质农产品 · 村里直发",
+  "cls": "TextView",
+  "bounds": "[103,2112][514,2153]",
+  "click": false
+ },
+ {
+  "label": "更多",
+  "cls": "TextView",
+  "bounds": "[910,2112][978,2153]",
+  "click": false
+ },
+ {
+  "label": "首页",
+  "cls": "View",
+  "bounds": "[106,2182][164,2240]",
+  "click": false
+ },
+ {
+  "label": "首页",
+  "cls": "TextView",
+  "bounds": "[107,2248][163,2311]",
+  "click": false
+ },
+ {
+  "label": "商城",
+  "cls": "View",
+  "bounds": "[376,2182][434,2240]",
+  "click": false
+ },
+ {
+  "label": "商城",
+  "cls": "TextView",
+  "bounds": "[377,2248][433,2311]",
+  "click": false
+ },
+ {
+  "label": "快递",
+  "cls": "View",
+  "bounds": "[646,2182][704,2240]",
+  "click": false
+ },
+ {
+  "label": "快递",
+  "cls": "TextView",
+  "bounds": "[647,2248][703,2311]",
+  "click": false
+ },
+ {
+  "label": "我的",
+  "cls": "View",
+  "bounds": "[916,2182][974,2240]",
+  "click": false
+ },
+ {
+  "label": "我的",
+  "cls": "TextView",
+  "bounds": "[917,2248][973,2311]",
+  "click": false
+ }
+]

@@ -1,0 +1,19 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | LinearLayout | 2136x3200 @ 0,0
+        - | FrameLayout | 2136x3200 @ 0,0
+          - | FrameLayout | 2136x3200 @ 0,0
+            - | View C | 2136x3200 @ 0,0
+            - | LinearLayout C | 950x737 @ 593,1231
+              - | LinearLayout | 950x309 @ 593,1293
+                - | ImageView | 170x170 @ 983,1293
+                保存“乡邮智联”的账号密码？ | TextView | 764x62 @ 686,1499
+              - | ScrollView | 950x154 @ 593,1602
+                - | ViewGroup | 950x154 @ 593,1602
+                - | LinearLayout | 806x113 @ 665,1602
+                - | LinearLayout | 806x113 @ 665,1602
+                系统将为您安全地存储账号密码，下次登录时自动填充 | TextView | 806x113 @ 665,1602
+              - | LinearLayout | 950x129 @ 593,1777
+                取消 | Button C | 399x129 @ 654,1777
+                保存密码 | Button C | 399x129 @ 1083,1777

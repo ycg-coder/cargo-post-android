@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 消息提醒（小程序无法在关闭后继续提醒，Android 靠通知 + WorkManager） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 司机端：位置上报 + 内置导航（前台服务可持续定位，小程序切后台即断） -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!--
+      高德定位 SDK 的网络定位依赖这两个权限（官方定位 SDK 集成说明里的必备项）。
+      缺它们时 WifiManager 读不到开关状态，SDK 一律当成「WIFI 开关关闭」：
+      真机实测（Redmi Pad Pro，WiFi 已连 CQUPT-5G 且能 ping 223.5.5.5）仍报
+      AmapErr 定位失败,19 …没有检查到SIM卡，并且关闭了WIFI开关…#1901#pm000011，
+      于是没有起点、导航整条链路起不来。不是设备问题，是清单漏了权限。
+    -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- 司机端扫码（装车 / 妥投 / 取件核销）：对应小程序 wx.scanCode -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Android 11+ 包可见性：内置导航要能唤起外部地图 -->
+    <queries>
+        <package android:name="com.autonavi.minimap" />
+        <package android:name="com.baidu.BaiduMap" />
+        <package android:name="com.tencent.map" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
+
+    <!-- allowBackup=false：会话 token 存在 SharedPreferences 里，开云备份 / adb backup 等于把登录态交出去 -->
+    <application
+        android:name=".BusPostApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BusPost"
+        tools:targetApi="34">
+
+        <!-- 明文 HTTP 开关按构建类型分置，main 里刻意不声明：
+             · src/debug/AndroidManifest.xml    usesCleartextTraffic=true  —— 开发服务器多为 http://IP/api
+             · src/release/AndroidManifest.xml  usesCleartextTraffic=false —— 正式包禁明文 -->
+
+        <!-- 高德地图/定位/天气 key（与 BuildConfig.AMAP_KEY 同源，只有一处真值） -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="@string/amap_key" />
+
+        <!-- 高德定位服务（APSService）：官方要求显式声明。
+             先前漏声明时实测 logcat 报
+             「Unable to start service Intent { cmp=…/com.amap.api.location.APSService } … not found」，
+             高德内部定位随之失败（AmapErr #1201），导航拿不到起点。 -->
+        <service android:name="com.amap.api.location.APSService" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 长按快捷入口 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+            <!-- 通知点击直达对应页面 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="buspost" android:host="app" />
+            </intent-filter>
+        </activity>
+
+        <!-- 司机行驶中位置上报：常驻前台服务 -->
+        <service
+            android:name=".driver.DriverLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <receiver
+            android:name=".notify.BootRestartReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 桌面小组件：下一班到车时间 -->
+        <receiver
+            android:name=".widget.NextBusWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.shanxiang.buspost.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_bus_info" />
+        </receiver>
+
+        <!-- 快速设置磁贴：到车提醒开关（API 24+） -->
+        <service
+            android:name=".qs.ArrivalAlertTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_arrival_alert"
+            android:label="到车提醒"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

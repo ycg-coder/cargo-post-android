@@ -1,0 +1,13 @@
+--------- beginning of main
+10-09 23:06:53.507 22102 22102 I BUS_NAV : 预热开始 @main: 导航类存在=true
+10-09 23:06:53.508 22102 22102 I BUS_NAV : AMapNavi.getInstance 耗时 0ms @main
+10-09 23:06:53.508 22102 22102 I BUS_NAV : 已注册初始化监听，等高德回调
+10-09 23:06:53.508 22102 22102 I BUS_NAV : readiness=Ready @main
+10-09 23:08:08.699 22102 22102 I BUS_NAV : 预热开始 @main: 导航类存在=true
+10-09 23:08:08.699 22102 22102 I BUS_NAV : AMapNavi.getInstance 耗时 0ms @main
+10-09 23:08:08.699 22102 22102 I BUS_NAV : 已注册初始化监听，等高德回调
+10-09 23:08:08.700 22102 22102 I BUS_NAV : readiness=Ready @main
+10-09 23:09:20.773 22102 22102 I BUS_NAV : 预热开始 @main: 导航类存在=true
+10-09 23:09:20.773 22102 22102 I BUS_NAV : AMapNavi.getInstance 耗时 0ms @main
+10-09 23:09:20.773 22102 22102 I BUS_NAV : 已注册初始化监听，等高德回调
+10-09 23:09:20.773 22102 22102 I BUS_NAV : readiness=Ready @main

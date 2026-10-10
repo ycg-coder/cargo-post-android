@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\11-home-located.txt (101 节点)
+== docs\device-evidence\20261010-sweep\11-home-located.xml: 101 节点 / 45 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 6534px² (34%): '客货邮 · 城乡直达' [88,271][371,337] × '南岸区南山街道' [129,310][402,429]
+TOTAL_ISSUES=1

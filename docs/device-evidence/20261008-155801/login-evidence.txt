@@ -1,0 +1,20 @@
+PROBE_LOCAL_TIME = 2026-10-08 15:40:12
+
+== system_sms_code last 3 for 13800138001 (id, create_time, code, scene, used, used_time, create_ip, used_ip) ==
+712	2026-10-08 15:39:33	9999	1	1	2026-10-08 15:39:47	127.0.0.1	127.0.0.1
+711	2026-10-08 15:24:36	9999	1	0	NULL	127.0.0.1	NULL
+708	2026-10-08 12:18:17	9999	1	1	2026-10-08 12:18:17	127.0.0.1	127.0.0.1
+
+== system_login_log last 4 (id, log_type, create_time, username, result, user_ip) ==
+5523	104	2026-10-08 15:39:47	13800138001	0	127.0.0.1
+5522	104	2026-10-08 12:22:58	13800000000	0	127.0.0.1
+5521	104	2026-10-08 12:20:09	13800000000	0	127.0.0.1
+5520	104	2026-10-08 12:18:17	13800138001	0	127.0.0.1
+
+== infra_api_access_log last 8 for auth endpoints (url, result_code, duration, begin_time) ==
+
+
+== oauth2_access_token for member user_type=1 (id, create_time, user_id, expires_time) ==
+108627	2026-10-08 15:39:47	4	2026-10-08 16:09:47
+108626	2026-10-08 12:22:58	3	2026-10-08 12:52:58
+108625	2026-10-08 12:20:09	3	2026-10-08 12:50:09

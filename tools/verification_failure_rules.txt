@@ -1,0 +1,36 @@
+# §三十三 四类构建/验证失败的**唯一规则表**（F-2 第 7 步）
+# 消费者：tools/classify_verification_failure.sh（判据 VF-*）、app/src/test/.../VerificationFailureTest.kt
+# 格式：三列 TAB 分隔 —— MARKER <TAB> 字面量 <TAB> 出处
+#
+# 四条刻意的写法约束（每条都是被坑过或推理出来的，不是风格）：
+#  1) 字面量只准 **纯文本子串**（分类器用 grep -aF，用例用 String.contains）：
+#     一旦允许正则，bash 的 grep -E 与 JVM 的 Regex 语义就不再等价，同一份日志两侧可能分出不同结果。
+#     用例 VF/`F-b` 逐行验"字面量里不含正则元字符"，把这条约束钉成机器闸。
+#  2) 只准 **ASCII**：样例日志的编码不统一（worker 日志混有 GBK 字节与 EF BF BD 替换符；
+#     编译错误日志里的家目录名是 E8 A2 81 三字节序列，不是 UTF-8 的 袁）。
+#     非 ASCII 模式在这种混合编码上会安静地读 0，而"读 0"和"真的没有"长得一样。
+#  3) **不用 `> Task :app:... FAILED` 这类任务失败行**当任何一类的判据：
+#     四类失败都会带任务失败行（用例失败也带），拿它分类等于什么都不分。
+#     反面证据在册：negative-control-tests-failed-not-a-build-failure.log 里有
+#     `Task :app:testDebugUnitTest FAILED` 与 `BUILD FAILED`，四类字面量**一条都不命中** ⇒ 正确输出是 UNCLASSIFIED。
+#  4) **不用 `List of devices attached`** 判设备不可用：那行在"接着一台设备"与"后面空着"两种输出里都在，
+#     它只是表头不是缺席证据。用的是 adb 真报错 `no devices/emulators found`（本轮实测 rc=1）。
+#
+# 出处列第三种取值 `未实测` 的含义：**这条文案在别的工程/文档里常见，但本工作区从没产出过它**。
+# 分类器命中这类行时会额外打 `首次命中（本工程从未产出过这条文案）`，提示人去读原文而不是直接抄结论。
+SOURCE_FAILURE	e: file:	实测:source-failure-kotlinc.log:30
+SOURCE_FAILURE	Unresolved reference	实测:source-failure-kotlinc.log:30
+SOURCE_FAILURE	error: cannot find symbol	未实测:javac 已知文案
+DEPENDENCY_FAILURE	Could not resolve	实测:dependency-failure-could-not-find.log:17
+DEPENDENCY_FAILURE	Could not find	实测:dependency-failure-could-not-find.log:18
+DEPENDENCY_FAILURE	Could not download	未实测:gradle 已知文案
+DEPENDENCY_FAILURE	Could not GET	未实测:wrapper/网络已知文案
+ENVIRONMENT_FAILURE	GradleWorkerMain	实测:environment-failure-worker-classnotfound.log:83
+ENVIRONMENT_FAILURE	Unable to start the daemon process	实测:environment-failure-daemon-bad-jvmarg.log:6
+ENVIRONMENT_FAILURE	Unrecognized VM option	实测:environment-failure-daemon-bad-jvmarg.log:12
+ENVIRONMENT_FAILURE	not a git repository	实测:environment-failure-not-a-git-repository.log:2
+ENVIRONMENT_FAILURE	SDK location not found	未实测:AGP 已知文案
+ENVIRONMENT_FAILURE	Java heap space	未实测:JVM 已知文案
+DEVICE_UNAVAILABLE	no devices/emulators found	实测:device-unavailable-adb.log:9
+DEVICE_UNAVAILABLE	device unauthorized	未实测:verify_device.sh 在册状态
+DEVICE_UNAVAILABLE	No connected devices!	未实测:AGP connectedAndroidTest 已知文案

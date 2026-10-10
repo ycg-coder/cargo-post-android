@@ -1,0 +1,4 @@
+LISTING -> docs/device-evidence/20261009-020840/r68-12-workbench.txt (49 节点)
+== docs/device-evidence/20261009-020840/r68-12-workbench.xml: 49 节点 / 23 段文字 / 屏幕 1080x2400 ==
+  [LAYOUT] 兄弟文字重叠 4536px² (25%): '客货邮 · 城乡直达' [88,247][360,313] × '当前位置' [129,286][297,405]
+TOTAL_ISSUES=1

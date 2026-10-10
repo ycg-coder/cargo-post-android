@@ -1,0 +1,63 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | ComposeView | 2136x3200 @ 0,0
+        - | View | 2136x3200 @ 0,0
+          - | View | 2136x3200 @ 0,0
+            - | View | 2136x3200 @ 0,0
+              - | ViewFactoryHolder | 2136x3200 @ 0,0
+                - | FrameLayout | 2136x3200 @ 0,0
+                - | LinearLayout | 2136x3200 @ 0,0
+                - | RelativeLayout | 2136x3200 @ 0,0
+                - | RelativeLayout | 2136x3200 @ 0,0
+                - | RelativeLayout | 2136x3200 @ 0,0
+                - | FrameLayout | 2136x3200 @ 0,0
+                - | FrameLayout | 2136x3200 @ 0,0
+                - | ViewGroup | 2136x3200 @ 0,0
+                - | TextureView | 2136x3200 @ 0,0
+                - | RelativeLayout C | 2136x61 @ 0,0
+                - | LinearLayout | 1026x61 @ 28,0
+                - | LinearLayout | 1026x61 @ 1082,0
+                - | RelativeLayout | 2108x314 @ 14,55
+                - | RelativeLayout | 2108x314 @ 14,55
+                - | RelativeLayout | 2080x292 @ 28,55
+                - | ImageView | 209x209 @ 61,96
+                - | RelativeLayout | 154x292 @ 298,55
+                进入 | TextView | 126x84 @ 326,137
+                - | RelativeLayout | 56x52 @ 2035,69
+                - | LinearLayout | 56x52 @ 2035,69
+                - | ImageView | 39x39 @ 2052,75
+                - | LinearLayout | 17x52 @ 2035,69
+                - | RelativeLayout | 2136x185 @ 0,369
+                - | FrameLayout | 146x146 @ 28,1527
+                - | FrameLayout | 179x369 @ 0,2831
+                - | LinearLayout | 165x165 @ 14,2831
+                - | LinearLayout | 2136x193 @ 0,3007
+                退出 | TextView C | 138x165 @ 14,3013
+                - | ImageView | 3x110 @ 152,3040
+                - | FrameLayout | 1964x165 @ 155,3013
+                - | LinearLayout | 1964x95 @ 155,3048
+                - | LinearLayout | 1964x21 @ 155,3048
+                - | LinearLayout | 1964x74 @ 155,3069
+                - | ImageView | 3x110 @ 2119,3040
+                - | LinearLayout | 165x369 @ 1971,2831
+                - | ImageView C | 165x165 @ 1971,2831
+              - | View | 2058x377 @ 39,118
+                乡邮智联 · 车道级导航 | TextView | 334x66 @ 105,118
+                县城客运站 | TextView | 205x66 @ 105,184
+                退出 | TextView C | 176x132 @ 1921,118
+                等待高德第一帧 | TextView | 420x80 @ 39,332
+                — | TextView | 55x74 @ 2042,272
+                — | TextView | 35x66 @ 2062,346
+                高德没给车道信息（这不等于这条路没有车道） | TextView | 2005x66 @ 92,429
+              - | View | 2058x138 @ 39,2990
+                - | View C | 668x138 @ 39,2990
+                - | View | 132x132 @ 208,2994
+                播报已开 | TextView | 182x66 @ 318,3026
+                - | View C | 667x138 @ 735,2990
+                - | View | 132x132 @ 904,2994
+                车头朝上 | TextView | 182x66 @ 1014,3026
+                - | View C | 667x138 @ 1430,2990
+                - | View | 132x132 @ 1599,2994
+                结束导航 | TextView | 182x66 @ 1709,3026
+              本机还没有一次通过验证的算路，不能开始导航 | TextView | 693x66 @ 722,1567

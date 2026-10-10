@@ -1,0 +1,14 @@
+pkg=['lastUpdateTime=2026-10-08 09:25:18']
+tz='Asia/Shanghai' location_mode='3'
+=== C 正控：合川（30.03,106.30）边喂点边按『重新定位』 ===
+  C-cold  cell='位置未取到' fabrication=none 附近共=[] 定位提示=['定位不可用，附近公交与天气暂按县城中心展示']
+  C       喂点结束，回读=last location=Location[gps 30.030000,106.300000 hAcc=100.0 et=+18m52s643ms mock]
+  C-fed   cell='位置未取到' fabrication=none 附近共=[] 定位提示=['定位不可用，附近公交与天气暂按县城中心展示']
+  C       opened=True 空态=['暂无可选村庄：接口未返回站点'] 条目(0)=
+=== B 空态：加州（37.42,-122.16）同样喂点 ===
+  B       喂点结束，回读=last location=Location[gps 37.420000,-122.160000 hAcc=100.0 et=+19m13s387ms mock]
+  B-fed   cell='位置未取到' fabrication=none 附近共=[] 定位提示=['定位不可用，附近公交与天气暂按县城中心展示']
+  B       opened=True 空态=['暂无可选村庄：接口未返回站点'] 条目(0)=
+=== verdict（只按上面的实测读数判，不按意图判）===
+  C 站点非空正控 = 未取得：见 C-fed 那行
+  B 站点为空空态 = PASS

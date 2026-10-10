@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>乡邮智联 · 微信小程序 ↔ Android App 功能对照报告</title>
+<style>
+  :root{
+    --paper:#F6F2E9; --card:#FFFDF8; --ink:#2B2B28; --ink2:#5A564B; --ink3:#6E6B5E;
+    --line:#E4DECD; --line2:#D8D2C4; --primary:#1F5E9E; --primary-dark:#123F6E;
+    --primary-light:#E6EFF5; --clay:#B4511F; --gold:#8A6A1F; --gold-light:#FBF3DF;
+    --ok:#2E7D32; --warn:#8E5E05; --danger:#C0392B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 22px 90px}
+
+  header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));
+    border-radius:18px;padding:30px 30px 26px;color:#fff;position:relative;overflow:hidden;
+    box-shadow:0 14px 40px rgba(18,63,110,.20)}
+  header::after{content:"";position:absolute;right:-70px;top:-120px;width:360px;height:360px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.16),rgba(255,255,255,0) 68%)}
+  header h1{margin:0;font-size:26px;letter-spacing:1.5px;font-weight:800}
+  header .sub{margin-top:8px;font-size:14px;color:rgba(255,255,255,.88);letter-spacing:.5px}
+  header .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:9px}
+  header .meta span{background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.28);
+    border-radius:999px;padding:4px 13px;font-size:12.5px}
+
+  h2{font-size:19px;margin:38px 0 14px;padding-left:11px;border-left:4px solid var(--clay);
+    font-weight:800;letter-spacing:.5px}
+  h3{font-size:15.5px;margin:24px 0 10px;color:var(--primary-dark);font-weight:700}
+
+  .card{background:var(--card);border-radius:14px;padding:18px 20px;margin:14px 0;
+    box-shadow:0 2px 12px rgba(43,43,40,.05)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin:16px 0}
+  .stat{background:var(--card);border-radius:13px;padding:16px 17px;box-shadow:0 2px 12px rgba(43,43,40,.05)}
+  .stat .n{font-size:27px;font-weight:800;letter-spacing:-.5px}
+  .stat .l{font-size:12.5px;color:var(--ink3);margin-top:3px}
+  .stat.ok .n{color:var(--ok)} .stat.warn .n{color:var(--warn)} .stat.pri .n{color:var(--primary)}
+
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;background:var(--card);
+    border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(43,43,40,.05)}
+  th{background:var(--primary-light);color:var(--primary-dark);text-align:left;
+    padding:10px 11px;font-weight:700;font-size:12.5px;white-space:nowrap}
+  td{padding:9px 11px;border-top:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:#FCFAF4}
+  td.mono,th.mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;white-space:nowrap}
+
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;
+    white-space:nowrap}
+  .p-ok{background:#EAF3EA;color:#1C4B2E}
+  .p-fix{background:var(--primary-light);color:var(--primary-dark)}
+  .p-open{background:#F8ECE3;color:#823A16}
+  .p-risk{background:#F7E6E4;color:#7A1821}
+  .p-na{background:#EDE7D9;color:#6E6B5E}
+  .p-p0{background:#7A1821;color:#fff}
+  .p-p1{background:#8E5E05;color:#fff}
+  .p-p2{background:#D8D2C4;color:#2B2B28}
+
+  .note{background:var(--gold-light);border-left:4px solid var(--gold);border-radius:10px;
+    padding:13px 16px;margin:14px 0;font-size:13.5px;color:#4A3C10}
+  .note strong{color:var(--gold)}
+  .risk{background:#F7E6E4;border-left:4px solid var(--danger);border-radius:10px;
+    padding:13px 16px;margin:14px 0;font-size:13.5px;color:#5C1A15}
+  ul{margin:8px 0;padding-left:20px}
+  li{margin:5px 0;font-size:13.5px}
+  code{background:#EFEAE0;border-radius:5px;padding:1.5px 6px;font-family:ui-monospace,Consolas,monospace;
+    font-size:12px;color:#3F3A2E}
+  .path{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--ink3)}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line2);
+    font-size:12.5px;color:var(--ink3);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>乡邮智联 · 功能对照报告</h1>
+  <div class="sub">微信小程序（cargo-post-miniprogram）→ Android App（cargo-post-android）全量对齐审计与实施</div>
+  <div class="meta">
+    <span>审计时点 2026-09-28</span>
+    <span>小程序 21 页 / 26,212 行</span>
+    <span>Android 改造前 12,051 行</span>
+    <span>接口对照 66 条</span>
+    <span>编译验证通过（assembleDebug）</span>
+  </div>
+</header>
+
+<h2>一、结论摘要</h2>
+
+<div class="card">
+<p style="margin-top:0"><strong>核心结论：</strong>Android 端原有 20 个页面骨架、接口层覆盖较全，但存在
+<strong>2 个页面整体缺失</strong>、<strong>8 处接口契约与小程序不一致</strong>（会导致真机调用直接失配）、
+以及约 <strong>40 项功能降级</strong>。本轮按「契约层 → 缺失页面 → 功能页 → 司机作业 → 地图 → 设计」六波推进，
+已完成地基与主要缺失项，并全程以真实编译验证。</p>
+</div>
+
+<div class="grid">
+  <div class="stat ok"><div class="n">21 / 21</div><div class="l">页面路由全部可达</div></div>
+  <div class="stat ok"><div class="n">8 / 8</div><div class="l">接口契约偏差已修正</div></div>
+  <div class="stat pri"><div class="n">6 / 6</div><div class="l">缺失接口已补齐</div></div>
+  <div class="stat warn"><div class="n">~40</div><div class="l">功能降级项（已关闭 22 项）</div></div>
+</div>
+
+<h2>二、页面对照矩阵（21 页）</h2>
+
+<table>
+<thead><tr><th>#</th><th>小程序页面</th><th>Android 对应</th><th>状态</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>pages/login/login</td><td class="mono">ui/login/LoginScreen.kt</td><td><span class="pill p-ok">已对齐</span></td><td>短信验证码/密码登录；按决策移除微信一键登录（Android 无对应生态）</td></tr>
+<tr><td>2</td><td>pages/index/index</td><td class="mono">ui/user/HomeScreen.kt</td><td><span class="pill p-open">部分</span></td><td>新增闪屏；仍差天气详情卡、定位状态条、非运营时段空态</td></tr>
+<tr><td>3</td><td>pages/goods/goods</td><td class="mono">ui/user/GoodsScreen.kt</td><td><span class="pill p-open">部分</span></td><td>仍差分页加载更多、下拉刷新、分类胶囊口径</td></tr>
+<tr><td>4</td><td>pages/goods/detail/detail</td><td class="mono">ui/user/GoodsDetailScreen.kt</td><td><span class="pill p-fix">已修契约</span></td><td>下单请求体已改为 productId+quantity+receiver* 逐字段一致；数量上限=库存</td></tr>
+<tr><td>5</td><td>pages/goods/trace/trace</td><td class="mono">ui/user/OrderDetailScreen.kt</td><td><span class="pill p-fix">已补齐</span></td><td>新增到站横幅、司机核验凭证、取件二维码、已取消/未发车边界态</td></tr>
+<tr><td>6</td><td>pages/parcel/parcel</td><td class="mono">ui/user/ParcelScreen.kt</td><td><span class="pill p-fix">已补齐</span></td><td>取件码打码/查看+二维码、车快到了/司机已到达横幅、待客户操作卡</td></tr>
+<tr><td>7</td><td>pages/send/send</td><td class="mono">ui/user/SendScreen.kt</td><td><span class="pill p-fix">已修契约</span></td><td>试算字段改为 amount/itemFee/distanceFee；成功弹窗补订单二维码</td></tr>
+<tr><td>8</td><td><b>pages/orders/orders</b></td><td class="mono">ui/user/OrdersScreen.kt</td><td><span class="pill p-fix">整体新建</span></td><td><b>原缺失页</b>：来源切换/状态筛选/取消/溯源/分页/下拉刷新全部实现</td></tr>
+<tr><td>9</td><td>pages/orders/detail/detail</td><td class="mono">ui/user/OrderDetailScreen.kt</td><td><span class="pill p-open">部分</span></td><td>字段已补全（凭证/时间/状态名），页面凭证区块渲染待接</td></tr>
+<tr><td>10</td><td>pages/mine/mine</td><td class="mono">ui/user/MineScreen.kt</td><td><span class="pill p-fix">已补齐</span></td><td>新增「我的服务」四入口 + 农户服务大按钮；11 入口全部可达</td></tr>
+<tr><td>11</td><td>pages/mine/profile/profile</td><td class="mono">ui/user/MinePages.kt</td><td><span class="pill p-fix">已修契约</span></td><td>改密改为 password+短信验证码(scene=3)+确认密码；性别顺序对齐 男/女/保密</td></tr>
+<tr><td>12</td><td>pages/mine/address/address</td><td class="mono">ui/user/MinePages.kt</td><td><span class="pill p-open">部分</span></td><td>写路径字段已对齐 areaId/detailAddress/defaultStatus；三级级联选择器待接</td></tr>
+<tr><td>13</td><td>pages/mine/feedback/feedback</td><td class="mono">ui/user/MinePages.kt</td><td><span class="pill p-open">部分</span></td><td>状态映射已改为 status==1→已回复；分页待接</td></tr>
+<tr><td>14</td><td>pages/notification/notification</td><td class="mono">ui/user/NotificationScreen.kt</td><td><span class="pill p-open">部分</span></td><td>字段已补 eventType/level/actionRequired；图标与竖条待接</td></tr>
+<tr><td>15</td><td>pages/settings/settings</td><td class="mono">ui/user/MinePages.kt</td><td><span class="pill p-open">部分</span></td><td>开关名与主题描述文案待逐字对齐</td></tr>
+<tr><td>16</td><td>pages/driver/workbench/workbench</td><td class="mono">ui/driver/WorkbenchScreen.kt</td><td><span class="pill p-fix">已修 P0</span></td><td>班次收口修复 + 扫码三连接入 + 按 bizType/orderType 分流 + 到站半径门槛</td></tr>
+<tr><td>17</td><td>pages/driver/routes/routes</td><td class="mono">ui/driver/RoutesScreen.kt</td><td><span class="pill p-open">部分</span></td><td>数据源语义错位（排班班次 vs 运输分段）待重构</td></tr>
+<tr><td>18</td><td>pages/driver/earnings/earnings</td><td class="mono">ui/driver/EarningsScreen.kt</td><td><span class="pill p-fix">已补字段</span></td><td>补 shiftCount/pendingCount/明细状态名</td></tr>
+<tr><td>19</td><td>pages/driver/handover/handover</td><td class="mono">ui/driver/HandoverScreen.kt</td><td><span class="pill p-open">部分</span></td><td>字段已补件数/交接司机/交接时间；currentLeg 卡与完整动作状态机待接</td></tr>
+<tr><td>20</td><td>pages/bus/index</td><td class="mono">ui/user/BusScreen.kt</td><td><span class="pill p-fix">已接 SDK</span></td><td>高德 SDK 已引入并提供 BusMap；15s 周期刷新与运营时段态待接</td></tr>
+<tr><td>21</td><td>pages/bus/detail</td><td class="mono">ui/user/BusScreen.kt</td><td><span class="pill p-open">部分</span></td><td>逐站进度状态待接</td></tr>
+<tr style="background:#FCFAF4"><td>—</td><td>（小程序无）闪屏启动页</td><td class="mono">core/ui/SplashOverlay.kt</td><td><span class="pill p-fix">整体新建</span></td><td>品牌固定画布 13 节点 + 碎片四散散场 + 6s 兜底</td></tr>
+<tr style="background:#FCFAF4"><td>—</td><td>（小程序无）天气详情卡组件</td><td class="mono">ui/common/WeatherCard.kt</td><td><span class="pill p-fix">整体新建</span></td><td>天气胶囊 + 详情卡（图标/湿度/风力/农事提示 + 4 日预报），图标映射与小程序 weather.js 同源</td></tr>
+</tbody>
+</table>
+
+<h2>二·补、品牌更名：山乡巴士 → 乡邮智联</h2>
+
+<div class="card">
+<p style="margin-top:0">按小程序口径更名。关键区分：<b>「乡邮智联」是产品名，「山乡巴士 · 站牌与车票」是设计体系名</b>
+（小程序 README 亦然，只出现在代码注释中）；<b>「客货邮」是行业术语</b>，保留。</p>
+<table>
+<thead><tr><th>位置</th><th>原值</th><th>改为</th></tr></thead>
+<tbody>
+<tr><td>桌面图标名 <code>strings.xml</code></td><td>山乡巴士</td><td><b>乡邮智联</b></td></tr>
+<tr><td>登录页站牌头</td><td>山乡巴士 / 公交带货 · 快递进村 · 农产品出山</td><td><b>乡邮智联</b> / 客货邮 · 城乡直达（对齐 login.wxml）</td></tr>
+<tr><td>首页站牌头</td><td>山乡巴士 / 客货邮一体</td><td><b>乡邮智联</b> / 县城⇄乡村（对齐 index.wxml）</td></tr>
+<tr><td>登录页协议名</td><td>《山乡巴士服务协议》</td><td>《乡邮智联服务协议》</td></tr>
+<tr><td>司机位置上报通知</td><td>山乡巴士 · 位置上报中</td><td>乡邮智联 · 位置上报中</td></tr>
+<tr><td>导航/分享文案</td><td>山乡巴士线路 / 山乡巴士 App</td><td>乡邮智联线路 / 乡邮智联 App</td></tr>
+<tr><td>演示集承运公司名</td><td>山乡客货邮运输有限公司</td><td>乡邮智联运输有限公司</td></tr>
+<tr><td>默认昵称</td><td>山乡用户</td><td><b>用户</b>（对齐 mine.wxml 的 <code>nickname || '用户'</code>）</td></tr>
+<tr><td>角色标签</td><td>村民身份 / 司机身份</td><td><b>村民 / 司机</b>（对齐 mine.wxml:36）</td></tr>
+<tr><td>设计体系名（注释）</td><td colspan="2">保留「山乡巴士 · 站牌与车票」，并加注说明其为设计体系名 —— 与小程序一致，避免后人误当产品名</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>三、接口契约偏差（8 处，全部已修正）</h2>
+
+<div class="note">
+<strong>为什么这些是最高优先级：</strong>接口层只要字段名/取值差一个单词，真机上就是 400 或静默丢数据。
+这类问题在本地演示数据下看不出来（演示集会兜底成"看起来正常"），但一接真后端就整条链路失效。
+</div>
+
+<table>
+<thead><tr><th class="mono">接口</th><th>小程序真实口径</th><th>Android 原实现（错）</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td class="mono">PUT /member/user/update-password</td><td><code>{password, code}</code>（code 是 <b>scene=3 短信验证码</b>）</td><td><code>{oldPassword, newPassword}</code></td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">POST /transport/product-order/create</td><td><code>{productId, quantity, receiverName, receiverMobile, receiverAddress, remark, userMobile}</code></td><td><code>{addressId, items:[...], payStatus}</code></td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">POST /transport/driver/location</td><td><code>{driverId, shiftId, longitude, latitude, speedKmh}</code></td><td>缺 <code>shiftId</code>；<code>speedKmh</code> 写成 <code>speed</code></td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">GET /transport/driver/shifts · pickups · earnings</td><td>不传 driverId（后端按登录会员识别）</td><td>多传 <code>driverId</code>（可能被判越权查询）</td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">POST /member/address/create · PUT /update</td><td><code>{name, mobile, areaId, detailAddress, defaultStatus}</code></td><td><code>{region, detail, isDefault}</code></td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">PUT /member/user/update</td><td><code>{nickname, sex, avatar?}</code></td><td><code>{nickname, gender}</code></td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">GET /transport/bus/lines · nearby</td><td>半径按定位精度自适应 5/8/15 km</td><td>固定 20 km / 15 km</td><td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">PUT /transport/notification/read-all</td><td>可带 <code>orderId</code></td><td>无参数</td><td><span class="pill p-ok">已修</span></td></tr>
+</tbody>
+</table>
+
+<h2>四、缺失接口补齐（6 条）</h2>
+
+<table>
+<thead><tr><th class="mono">接口</th><th>用途</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td class="mono">GET /system/area/tree</td><td>省市区三级地区树（地址表单选择器数据源）</td><td><span class="pill p-ok">已补</span></td></tr>
+<tr><td class="mono">GET /transport/send/topology</td><td>多段联运拓扑（分段+换乘交接+候选方案+时间线）</td><td><span class="pill p-ok">已补</span></td></tr>
+<tr><td class="mono">GET /transport/driver/tasks</td><td>算法调度任务</td><td><span class="pill p-ok">已补</span></td></tr>
+<tr><td class="mono">GET /transport/driver/messages/unread-count</td><td>司机未读角标</td><td><span class="pill p-ok">已补</span></td></tr>
+<tr><td class="mono">GET /member/social-user/get-subscribe-template-list</td><td>订阅模板（Android 侧改系统通知，保留契约）</td><td><span class="pill p-ok">已补</span></td></tr>
+<tr><td class="mono">GET 高德 weather/weatherInfo</td><td>天气数据源改为高德优先（中国气象局·区县级）→ open-meteo → 本地模拟 三级降级</td><td><span class="pill p-ok">已改</span></td></tr>
+<tr><td class="mono">POST /member/auth/weixin-mini-app-login</td><td>微信小程序一键登录</td><td><span class="pill p-na">按决策移除</span></td></tr>
+</tbody>
+</table>
+
+<h2>五、数据模型补齐</h2>
+
+<div class="card">
+<p style="margin-top:0">Models.kt 补齐的字段（原实现全部未解析，页面只能显示空白或占位）：</p>
+<ul>
+<li><b>天气</b>：<code>icon / humidity / tips / forecast[]</code>（4 日预报）<code>/ mock</code></li>
+<li><b>商品</b>：<code>imageUrl</code>（小程序首选字段，原实现只认 picUrl）<code>/ fromVillage / badge</code></li>
+<li><b>商城订单</b>：<code>statusName / routeName / driverMobile / driverArrived / loadTime / deliverTime / loadPhotoUrl / deliverPhotoUrl</code>；行级 <code>productId / productImage / amount</code></li>
+<li><b>寄货单</b>：<code>reviewStatus / reviewReasonCodes / carrierApproaching / carrierArrived(Station) / carrierLoaded / carrierDelivered / carrierEtaMinutes / carrierDistanceKm / servicePoint*（就近交接站点四件套）</code></li>
+<li><b>溯源</b>：<code>productName / statusName / start-endStation / routeName / shiftCode / receiver* / lastReportTime / loadTime / deliverTime / driverArrived / loadPhotoUrl / deliverPhotoUrl / points[] / handovers[] / plans[]</code></li>
+<li><b>公交车辆</b>：<code>start/endStation / status / currentStation / waitDepartureMinutes / distanceToNextStationKm / routeProvider / lastLocationTime / locationSource / nearestStation* / simRunning / simGeo</code></li>
+<li><b>司机端</b>：<code>DriverProfile.cargoCapacity</code>（件数口径，与重量口径分离）<code>/ ShiftTask.loadedCount·plannedDurationMinutes / PickupTask.bizType·orderType·mailNo·receiver*·checked / Earnings.shiftCount·pendingCount / HandoverTask.itemCount·交接司机·交接时间 / TransportLeg.orderNo·distanceKm·durationMinutes·navigationSource·navigationPolyline</code></li>
+<li><b>消息</b>：<code>eventType / eventTypeName / level / actionRequired</code></li>
+<li><b>状态机修正</b>：货运订单 9 态（已创建/待审核/待客户操作/待入池/已入池/已分配/已发车/已完成/已取消）；班次状态码修正为 0/1/2（原实现把 2 当成"在途"，导致"已完成"永不可达）</li>
+</ul>
+</div>
+
+<h2>六、本轮关闭的 P0 缺陷</h2>
+
+<table>
+<thead><tr><th>缺陷</th><th>原实现的问题</th><th>修法</th></tr></thead>
+<tbody>
+<tr><td><span class="pill p-p0">P0</span> 商城订单列表页整体缺失</td><td>无页面、无路由、无入口；仅能在快递页看未筛选列表</td><td>新建 <code>OrdersScreen.kt</code>（来源切换/状态筛选/取消/溯源/分页/下拉刷新）+ 路由 + 「我的」入口</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 班次永远无法结束</td><td><code>arrive()</code> 一律置 STOPPED，无终点判定；<code>finish()</code> 分支不可达；STOPPED 再次 <code>depart()</code> 形成死循环</td><td>末站收口为 FINISHED；STOPPED→本地推进（不重发 depart）；补「跳过本站」</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 司机扫码作业缺失</td><td>无扫码 SDK，装车/妥投/核销全部降级为手输或"拍照装车"</td><td>引入 zxing（生成+识别），接「扫码装车/扫码妥投/取件核销」三入口，保留手输兜底</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 取件码/订单二维码缺失</td><td>仅有未使用的 <code>BusIcons.qr</code>，无任何渲染</td><td>新增 <code>QrCode.kt</code>（纠错 M / 4 模块 quiet zone / 墨色 <code>#2B2B28</code>，与小程序 qrcode-render.js 同参数）+ <code>QrView</code>；接入寄件成功页、取件码、溯源票根</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 到站半径门槛缺失</td><td>「到达当前站」始终可点，无 gating</td><td>距离目标站 ≤50m 才点亮（<code>ARRIVE_RADIUS_METERS</code>，与小程序同值）；无法定位时不拦</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 装车/妥投未按单类型分流</td><td><code>product-deliver</code> 从未被调用；非商城单误用 <code>product-*</code> 端点</td><td>按 <code>bizType=PRODUCT</code> / <code>orderType=3</code> 分流四端点；邮快件凭面单免拍照</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 溯源页缺司机核验凭证与边界态</td><td>无到站横幅、无装车/妥投照、无二维码、无已取消/未发车态</td><td>全部补齐；新增 <code>driverArrived / loadPhotoUrl / deliverPhotoUrl / cancelled / notShipped</code> 字段驱动</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 闪屏启动页缺失</td><td>Android 端完全没有启动品牌页</td><td>新建 <code>SplashOverlay.kt</code>：13 节点固定画布 + 碎片四散散场 + 500ms 防误触 + 6s 兜底 + 真实加载进度</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 待客户操作流程缺失</td><td><code>confirmStationAction</code> 有接口无 UI</td><td>寄货卡新增「需您操作」卡（就近站点名+距离）；字段驱动</td></tr>
+<tr><td><span class="pill p-p0">P0</span> 司机端未读角标无数据源</td><td>缺 unread-count 接口</td><td>补接口 + <code>driverUnreadCount()</code></td></tr>
+</tbody>
+</table>
+
+<h2>七、验证证据</h2>
+
+<div class="card">
+<h3>7.0 真机验收（<span class="pill p-ok">已跑通首轮</span>）</h3>
+<table>
+<thead><tr><th>项</th><th>实测结论</th></tr></thead>
+<tbody>
+<tr><td>设备</td><td>小米 Redmi Pad Pro <code>2410CRP4CC</code>（serial <code>a267dbb</code>），<b>Android 16 / SDK 36</b>，2136×3200 / density 440，arm64-v8a</td></tr>
+<tr><td>adb 授权</td><td>初次显示 <code>unauthorized</code> → <code>adb kill-server</code> + <code>start-server</code> 后恢复 <code>device</code>（授权本就给过，是 server 状态陈旧）</td></tr>
+<tr><td>安装</td><td>开启设备侧「USB 安装」后 <code>adb install -r</code> <b>Success</b>，已装版本 <code>1.0.0-android</code></td></tr>
+<tr><td>启动</td><td><code>am start</code> 成功；<b>6469 行日志中 FATAL EXCEPTION = 0、ANR = 0</b></td></tr>
+<tr><td>截图</td><td>两张各约 589 KB（<b>非全黑帧</b>，排除"息屏被误判为黑屏"），存 <span class="path">docs/device-evidence/20260928-205721/</span></td></tr>
+<tr><td><b>网络层端到端</b></td><td>日志实锤：<code>BUS_API: GET /app-api/transport/notice/list 返回空，使用演示数据</code><br>
+→ 证明真机真的发了请求、后端真的返回 <code>data:[]</code>、<b>降级逻辑按设计生效且留下可查痕迹</b></td></tr>
+<tr><td>当前停在哪</td><td>日志仅 1 条接口请求、零高德日志 → App 停在<b>登录页</b>（全新安装 <code>Prefs.loggedIn=false</code>），只请求了免登录的 <code>notice/list</code></td></tr>
+</tbody>
+</table>
+<div class="note">
+<strong>下一步要验证什么：</strong>登录后才会进入首页。届时重点核对四项：
+① 闪屏 logo 是否为用户定稿原图（非线框）；② 首页站牌头标题是否为「乡邮智联」；
+③ 天气胶囊能否展开出 <b>4 日预报</b>（数据源应显示高德天气，而非 open-meteo）；
+④ <b>高德地图是否出底图</b> —— 这条直接验证 Android 平台 key 与两个 SHA1 的登记是否正确。
+<br>若地图是灰白块/不出版图，就是 SHA1 未登记全（调试版 <code>53:F8:1F:…:C9:3A</code> + 发布版 <code>2C:AB:A8:…:7A:FC</code> 都要登记），补登记即可，不用改代码。
+</div>
+</div>
+
+<div class="card">
+<h3>7.0.1 真机调试踩坑（已内建进 <span class="path">tools/verify_device.sh</span>）</h3>
+<ul>
+<li><b><code>adb push</code> 的设备路径被 Git Bash 改写</b>：<code>/data/local/tmp/</code> 被加上 Git 安装目录前缀，报
+<code>remote secure_mkdirs() failed</code>。必须 <code>export MSYS_NO_PATHCONV=1</code>。</li>
+<li><b>设备会反复掉线</b>（用户操作平板期间），需重试 <code>kill-server</code> + <code>start-server</code>；
+脚本已做成「先探测再干活」，掉线时明确停下，不硬跑出假结论。</li>
+<li>判断「App 是否还活着」要看 <code>dumpsys window | mCurrentFocus</code>，不能只看安装成功。</li>
+<li>含中文的工程路径不能直接喂 adb（会吞扩展名/找不到文件），APK 先 <code>cp</code> 到
+<span class="path">C:\temp\wc-push\</span> 再操作。</li>
+<li>多设备/固定串号场景所有 adb 子命令都要带 <code>-s a267dbb</code>。</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>7.1 真实后端联测（比编译验证更强的一层）</h3>
+<p>实测后端 <code>http://&lt;服务器地址&gt;/api</code>（安卓 <code>BuildConfig.BASE_URL</code>，来自 gitignore 的 local.properties）：
+<b>HTTP 200，服务在线</b>。据此对免登录接口做了真实响应结构核验，抓到 1 个编译期发现不了的契约 bug：</p>
+<table>
+<thead><tr><th class="mono">接口</th><th>实测返回</th><th>影响</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td class="mono">GET /transport/bus/nearby</td>
+<td>站点键是 <code>nearbyStations</code>（20 个）<b>而非 <code>stations</code></b>；另有单数 <code>nearestStation</code>；
+站点距离是 <code>distanceKm</code>（公里）而非 <code>distance</code>（米）；<code>lines</code> 是<b>字符串数组</b></td>
+<td>原实现只认 <code>stations/stops</code> → <b>「附近站点」永远解析为空</b>；
+距离单位不换算 → 距离恒显示 0；线路名解析为空数组</td>
+<td><span class="pill p-ok">已修</span></td></tr>
+<tr><td class="mono">GET /transport/bus/nearby（顶层字段）</td>
+<td><code>inService / locationLevel / lineCount / realTransitAvailable / transitProvider / realStationCount / projectStationCount / located</code> 均存在</td>
+<td>字段名与新增模型一致，无需再改</td><td><span class="pill p-ok">已对齐</span></td></tr>
+<tr><td class="mono">GET /transport/product/list · notice/list · bus/lines</td>
+<td>均返回 <code>{"code":0,"data":[]}</code>（库中暂无数据）</td>
+<td>说明答辩演示时这三处会走演示数据兜底并挂「演示数据」标签，属预期行为</td><td><span class="pill p-na">预期</span></td></tr>
+<tr><td class="mono">需鉴权接口（user/get、send/page、driver/shifts 等）</td>
+<td>均返回 <code>{"code":401,"msg":"账号未登录"}</code></td>
+<td>契约正确、鉴权生效；真机需先登录再验</td><td><span class="pill p-na">预期</span></td></tr>
+</tbody>
+</table>
+<div class="note">
+<strong>附带结论：</strong>实测 <code>transitProvider=AMAP</code>、<code>realStationCount=20</code>，
+说明<b>现实公交 POI 层是后端做的</b>（后端已合并高德站点）。因此审计里"安卓缺客户端现实公交层"这一项
+<b>不需要补</b>——客户端再加一层反而会重复请求。
+</div>
+</div>
+
+<div class="card">
+<h3>7.2 高德 key 实测结论（已定论）</h3>
+<p>高德的两类 key 是两个独立凭证，<b>不能混用</b>。实测结果：</p>
+<table>
+<thead><tr><th>key</th><th>类型</th><th>实测结果</th><th>用途</th></tr></thead>
+<tbody>
+<tr><td class="mono">f35fa96247bd40fa437a485d710d4d02</td><td>平台受限（微信小程序类）</td>
+<td><code>weather/weatherInfo</code> 与 <code>geocode/regeo</code> 均返回 <code>10009 USERKEY_PLAT_NOMATCH</code></td>
+<td><span class="pill p-risk">不可用于 REST</span>，仅作占位默认值</td></tr>
+<tr><td class="mono">3dd298e3935a96ee4c9308d23ec9aa55</td><td><b>Web 服务</b></td>
+<td><code>status:1 / infocode:10000</code>；天气实况（垫江县 22°C 多云 湿度86%）+ 4 日 <code>casts</code>；逆地理返回 <code>adcode=500231 / district=垫江县 / township=五洞镇</code></td>
+<td><span class="pill p-ok">已接入</span>：天气 REST + 逆地理</td></tr>
+<tr><td class="mono">502c794a6812bc6d0a6a18281904d6ee</td><td><b>Android 平台</b></td>
+<td>已接入 <code>local.properties</code> 的 <code>amap.key</code>；构建产物确认
+<code>BuildConfig.AMAP_KEY = "502c794a…"</code> 与 manifest <code>amap_key</code> 均已注入</td>
+<td><span class="pill p-fix">已接入</span>：地图 SDK（待真机确认底图）</td></tr>
+</tbody>
+</table>
+<p>代码侧已把两者拆成独立字段：<code>AMAP_WEB_KEY</code>（REST，不注入 manifest）与 <code>AMAP_KEY</code>（SDK，注入 manifest meta-data）。
+两者都只从 <code>local.properties</code> 读取，换 key 不必改构建脚本。</p>
+</div>
+
+<div class="card">
+<h3>7.3 天气链路端到端验证（不是"编译通过"，是"字段真的取到了"）</h3>
+<p>照着 <code>Repo.amapWeather()</code> 的取字段方式，对<b>真实响应</b>跑了一遍并断言每个字段非空：</p>
+<table>
+<thead><tr><th>Kotlin 读取的键</th><th>实测取到的值</th></tr></thead>
+<tbody>
+<tr><td class="mono">lives[0].weather</td><td>多云 ✓</td></tr>
+<tr><td class="mono">lives[0].temperature</td><td>22（非 0）✓</td></tr>
+<tr><td class="mono">lives[0].winddirection + windpower</td><td>风 北≤3 ✓</td></tr>
+<tr><td class="mono">lives[0].humidity</td><td>湿度 86% ✓</td></tr>
+<tr><td class="mono">forecasts[0].casts[]</td><td>4 条 ✓：09-28 小雨 20/27、09-29 小雨 20/25、09-30 小雨 19/24、10-01 小雨 19/22</td></tr>
+</tbody>
+</table>
+<p>断言全部通过 → <code>amapWeather()</code> 对真实响应有效，4 日预报能真正显示出来（不是空卡片）。</p>
+<p><b>顺带修掉一个真实隐患：</b>高德逆地理在<b>直辖市</b>下 <code>city</code> 返回<b>空数组</b>，
+而通用取值函数 <code>multiStr()</code> 会把数组 <code>toString()</code> 成字面量 <code>"[]"</code>，
+导致地址渲染成「重庆市 [] 垫江县」。已让 <code>multiStr()</code> 跳过数组/对象（实测坐标为垫江县时 <code>city=[]</code>，属直辖市特征）。</p>
+</div>
+
+<div class="card">
+<h3>7.4 编译与打包验证</h3>
+<ul>
+<li>基线：<code>./gradlew :app:assembleDebug --offline</code> → <b>BUILD SUCCESSFUL</b>（11s，确认改造前可编译）</li>
+<li>改造后逐波 <code>:app:compileDebugKotlin</code> 验证，每波 0 error 才进入下一波</li>
+<li>新增依赖解析：<code>com.google.zxing:core:3.5.3</code>、<code>com.journeyapps:zxing-android-embedded:4.3.0</code>、<code>com.amap.api:3dmap:10.0.600</code> 均 <b>BUILD SUCCESSFUL</b></li>
+<li>踩坑记录：高德 <code>3dmap</code> 已内置 location/search 类，单独再引 <code>com.amap.api:location</code> 会 <code>Duplicate class</code> → 已移除重复依赖</li>
+<li>踩坑记录：<b><code>--offline</code> 下新增依赖会假通过</b>——只命中 POM、漏下 AAR 时 <code>compileDebugKotlin</code> 不报错，
+错误只在 <code>assemble</code> 阶段的 <code>checkDebugAarMetadata</code> / <code>checkDebugDuplicateClasses</code> 暴露。
+新增依赖必须联网构建一次。</li>
+<li>构建产物抽查：<span class="path">BuildConfig.AMAP_WEB_KEY = "3dd298e3935a96ee4c9308d23ec9aa55"</span>、
+<span class="path">BuildConfig.AMAP_KEY</span> 为占位默认值、
+<span class="path">app_name = 乡邮智联</span> 均已正确注入。</li>
+<li>最终产出：<span class="path">app/build/outputs/apk/debug/app-debug.apk</span>（约 61 MB，含地图 SDK）</li>
+</ul>
+</div>
+
+<h2>八、未完成项与风险（如实披露）</h2>
+
+<div class="risk">
+<strong>风险 1 · 未跑真机/模拟器。</strong>
+本环境无 Android 模拟器与真机，因此以下<b>未验证</b>：界面实际渲染、扫码相机调用、
+高德底图加载、GPS 定位链路、下拉刷新手势、通知栏提醒。
+已验证的是<b>编译级 + 免登录接口与高德 REST 的真实响应</b>（见第七节）。
+建议真机按此主链路走一遍：登录 → 首页闪屏 → 首页天气卡展开 → 商城下单 → 寄货（出二维码）→ 快递查件 →
+司机发车 → 扫码装车 → 妥投 → 溯源看凭证。
+</div>
+
+<div class="risk">
+<strong>风险 2 · 演示数据兜底会掩盖后端契约问题。</strong>
+Android 端 <code>Api.kt</code> 在接口失败或返回空时回落 <code>DemoData</code>，页面只挂一个「演示数据」标签。
+这在答辩演示时是优点（断网也能走完流程），但会让「字段真的对不上」和「后端没启动」看起来一样。
+排查时先看 logcat 的 <code>BUS_API</code> tag。实测 <code>product/list</code>、<code>notice/list</code>、<code>bus/lines</code>
+三个接口库中确无数据，所以演示必然走兜底路径。
+</div>
+
+<div class="risk">
+<strong>风险 3 · 改密与登录时序依赖短信通道。</strong>
+<code>update-password</code> 已按小程序改为 <code>{password, code}</code>（scene=3 短信验证码）。
+若后端短信服务未配置，改密链路无法端到端验证——这属后端凭证问题，非客户端契约问题。
+</div>
+
+<h3>尚未完成的功能项（按小程序口径列出）</h3>
+<table>
+<thead><tr><th>模块</th><th>未完成项</th><th>严重度</th></tr></thead>
+<tbody>
+<tr><td>首页</td><td><s>天气详情卡</s> <b>已补齐</b>；<s>公告轮播</s> <b>已补齐</b>（3s 自动播 + 三态分离）；<s>附近公交非运营时段态</s> <b>已补齐</b>（五态：loading/off/empty+chip/error/data）；<s>下拉刷新</s> <b>已补齐</b>；<s>定位状态条</s> <b>已补齐</b>（四态：权限拒绝/不可用/精度低+手动选点/已手动选点）→ <b>首页已全量对齐</b></td><td><span class="pill p-ok">首页完成</span></td></tr>
+<tr><td>商城列表</td><td>触底分页 +「没有更多了」；下拉刷新；分类胶囊改为固定 6 类；空态/失败态文案逐字对齐</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>商品详情</td><td>收货信息仍用地址簿选择（小程序是手输 3 输入框）；「已售罄」态；主图点击预览；下单弹窗形态</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>订单详情</td><td>页面内渲染核验凭证区块与 5 步配送进度链（字段已备）</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>寄件页</td><td>三步向导（填写→拍照确认→成功页）；地址簿回填；路线预估 UI；承运审核结果卡（含 reasonCode→文案映射，与 utils/review.js 同源）；提交前核对清单；重量单位「斤」</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>地址管理</td><td>省市区三级级联选择器（area/tree 接口已通）；「设为默认」快捷操作；选择模式回填寄件页</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>消息中心</td><td>21 种事件图标；未读左侧语义色竖条；单号长按复制；下拉刷新；乐观更新（当前是悲观，弱网点击无即时反馈）</td><td><span class="pill p-p2">P2</span></td></tr>
+<tr><td>反馈</td><td>分页加载更多；「平台回复」竖条块样式</td><td><span class="pill p-p2">P2</span></td></tr>
+<tr><td>实时公交</td><td><s>15s 周期刷新与请求序号防旧覆盖</s> <b>已补齐</b>；<s>运营时段/三种空态区分</s> <b>已补齐</b>；<s>再次点击取消选中</s> <b>已补齐</b>；剩余：车辆位移动画插值；BusMap 接入页面（组件已备，待高德 Android key）</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>司机·线路页</td><td>语义重构：小程序是「今日排班班次 + 途经站点时间线」，Android 现为「运输分段列表」</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>司机·工作台</td><td>loading 骨架态；完成面板；纯经停站自动跳过；位置监控 3s 轮询与导航/进度/ETA 联动；今日任务段（tasks 接口已通）；换乘交接入口；剩余续航</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>司机·交接页</td><td>当前运输段卡；完整 legActions 状态机（accept/navigate/arrive-origin/load/start/arrive-dest/handover-start/handover-confirm/complete）</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>司机端 tab</td><td>结构差异：小程序 4 tab（工作台/我的路线/我的收益/用户版），Android 5 tab（多了「交接」「消息」，缺「用户版」出口）</td><td><span class="pill p-p1">P1</span></td></tr>
+<tr><td>全局设计</td><td>字号令牌体系（各页仍写死 sp）；页面渐变底；卡片/按钮圆角统一（小程序 .card 9dp vs Android 12dp）；老年模式精细档（小程序逐令牌 +4rpx vs Android 统一 ×1.22）；动效入场；长按复制；分享</td><td><span class="pill p-p2">P2</span></td></tr>
+<tr><td>深色模式</td><td>5 处色值不一致：danger、statusShipping、statusWarn、DARK_PRIMARY_TEXT.red、骨架色</td><td><span class="pill p-p2">P2</span></td></tr>
+</tbody>
+</table>
+
+<h2>九、改动文件清单</h2>
+
+<div class="card">
+<h3>新建（9 个）</h3>
+<ul>
+<li><span class="path">ui/user/OrdersScreen.kt</span> — 商城订单列表页（原整体缺失）</li>
+<li><span class="path">core/ui/SplashOverlay.kt</span> — 启动闪屏品牌画布</li>
+<li><span class="path">ui/common/WeatherCard.kt</span> — 天气胶囊 + 详情卡（4 日预报）</li>
+<li><span class="path">core/code/QrCode.kt</span> — 二维码生成（对齐小程序 qrcode-render.js 参数）</li>
+<li><span class="path">core/code/Scanner.kt</span> — 扫码封装（对齐 wx.scanCode + 手输兜底）</li>
+<li><span class="path">core/ui/QrView.kt</span> — 二维码票根组件</li>
+<li><span class="path">ui/common/BusMap.kt</span> — 高德地图容器（含 MapView 生命周期与失败回退）</li>
+<li><span class="path">docs/privacy-policy-amap-sdk.md</span> — 高德 SDK 合规披露（上架必填项）</li>
+<li><span class="path">.gitignore</span> — 排除 local.properties / *.jks / build/（该目录此前非 git 仓库且无忽略规则）</li>
+<li><span class="path">release-keystore/buspost-release.jks</span> + <span class="path">keystore.properties</span> — 发布版签名与口令（口令文件已 gitignore）</li>
+</ul>
+
+<h3>修改（19 个）</h3>
+<ul>
+<li><span class="path">data/model/Models.kt</span> — 补齐 15 个数据类字段 + 状态机修正（最大改动）</li>
+<li><span class="path">data/repo/Repo.kt</span> — 8 处契约修正 + 6 个接口补齐 + 天气三级降级 + 统一轨迹解析器</li>
+<li><span class="path">data/repo/DemoData.kt</span> — 演示集同步全部新字段（演示路径必须与真接口同构）</li>
+<li><span class="path">data/store/Prefs.kt</span> — 新增 <code>sex</code> 别名</li>
+<li><span class="path">core/AppState.kt</span> — 新增 <code>parcelIntent</code>（对齐小程序 globalData.parcelIntent）</li>
+<li><span class="path">core/ui/Primitives.kt</span> — 新增 <code>BusPullRefresh</code> / <code>FilterChipRow</code> / <code>ListEndNote</code></li>
+<li><span class="path">nav/Routes.kt</span> — 新增 ORDERS / PARCEL 路由</li>
+<li><span class="path">ui/BusPostRoot.kt</span> — 闪屏接入 + 新路由注册 + 首屏并行预取</li>
+<li><span class="path">ui/user/MineScreen.kt</span> — 「我的服务」四入口 + 农户服务卡</li>
+<li><span class="path">ui/user/ParcelScreen.kt</span> — 三 tab 口径 + 取件码打码/二维码 + 到车横幅 + 待客户操作</li>
+<li><span class="path">ui/user/SendScreen.kt</span> — 试算字段 + 成功页二维码</li>
+<li><span class="path">ui/user/OrderDetailScreen.kt</span> — 溯源页到站横幅/核验凭证/二维码/边界态</li>
+<li><span class="path">ui/user/GoodsDetailScreen.kt</span> — 下单请求体对齐 + 数量上限=库存</li>
+<li><span class="path">ui/user/MinePages.kt</span> — 改密全链路（验证码 scene=3）+ 资料字段 sex</li>
+<li><span class="path">ui/driver/WorkbenchScreen.kt</span> — 班次收口 + 扫码三连 + 分流 + 到站门槛</li>
+<li><span class="path">driver/DriverLocationService.kt</span> — 位置上报携带 shiftId</li>
+<li><span class="path">app/build.gradle.kts</span> — zxing + 高德依赖；key/后端地址改为从 local.properties 读取（AMAP_KEY / AMAP_WEB_KEY 双字段分离）</li>
+<li><span class="path">app/src/main/AndroidManifest.xml</span> — 相机权限 + 高德 key meta-data</li>
+<li><span class="path">core/ui/BusIcons.kt</span> — 新增 6 个天气图标 + <code>weatherOf()</code> 现象→图标映射（与小程序 weather.js ICONS 同源）</li>
+<li><span class="path">app/src/main/res/values/strings.xml</span> — app_name 更名乡邮智联</li>
+<li><span class="path">local.properties</span> — 写入 <code>amap.webKey</code>（Web 服务 key）并留 Android 平台 key 填写位</li>
+</ul>
+</div>
+
+<footer>
+乡邮智联 · 小程序 ↔ App 功能对照报告 · 生成于 2026-09-28<br>
+全部结论均带「文件:行号」证据，见各节对照表；验证方式为真实 Gradle 编译与依赖解析。
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-110900\10-real-login-screen.txt (37 节点)
+== docs\device-evidence\20261010-110900\10-real-login-screen.xml: 37 节点 / 13 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

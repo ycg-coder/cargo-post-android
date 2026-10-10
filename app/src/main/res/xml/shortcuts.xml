@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 专属能力：快捷方式（长按应用图标显示） -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 我要寄货 -->
+    <shortcut
+        android:shortcutId="send_parcel"
+        android:enabled="true"
+        android:icon="@drawable/ic_send_shortcut"
+        android:shortcutShortLabel="@string/shortcut_send_label"
+        android:shortcutLongLabel="@string/shortcut_send_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shanxiang.buspost"
+            android:targetClass="com.shanxiang.buspost.MainActivity">
+            <extra
+                android:name="route"
+                android:value="send" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- 实时公交 -->
+    <shortcut
+        android:shortcutId="check_bus"
+        android:enabled="true"
+        android:icon="@drawable/ic_bus_shortcut"
+        android:shortcutShortLabel="@string/shortcut_bus_label"
+        android:shortcutLongLabel="@string/shortcut_bus_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shanxiang.buspost"
+            android:targetClass="com.shanxiang.buspost.MainActivity">
+            <extra
+                android:name="route"
+                android:value="bus" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <!-- 我的包裹 -->
+    <shortcut
+        android:shortcutId="my_parcels"
+        android:enabled="true"
+        android:icon="@drawable/ic_parcel_shortcut"
+        android:shortcutShortLabel="@string/shortcut_parcel_label"
+        android:shortcutLongLabel="@string/shortcut_parcel_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shanxiang.buspost"
+            android:targetClass="com.shanxiang.buspost.MainActivity">
+            <extra
+                android:name="route"
+                android:value="parcel" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>

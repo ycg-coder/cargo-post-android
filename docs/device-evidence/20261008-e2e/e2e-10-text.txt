@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    print(m.group(1),'|',(m.group(2)),(m.group(3)),(m.group(4)),(m.group(5)))
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u21c4' in position 2: illegal multibyte sequence
+ÏçÓÊÖÇÁª | 84 149 301 224

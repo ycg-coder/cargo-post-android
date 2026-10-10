@@ -1,0 +1,19 @@
+# 真实形态真机在环 logcat 摘录（本机后端 127.0.0.1:48080 / DEMO_ALLOWED=false / 已补 ACCESS_WIFI_STATE+CHANGE_WIFI_STATE）
+# 采集：2026-10-10 11:08–11:53，设备 a267dbb（小米平板6）；原始 24MB 缓冲未留档，只留下面这些判定点
+
+## 补权限之前（WiFi 已连 CQUPT-5G、系统 network provider 有真点，但 SDK 认为 WiFi 关闭）
+10-10 11:14:02.507 E/AmapErr (18167): 定位失败,19: 定位失败，没有检查到SIM卡，并且关闭了WIFI开关，请打开WIFI开关或者插入SIM卡 请到http://lbs.amap.com/api/android-location-sdk/guide/utilities/errorcode/查看错误码说明,错误详细信息:没有检查到SIM卡，并且WIFI开关关闭，请打开WIFI开关或者插入SIM卡#1901#pm000011
+10-10 11:14:03.535 E/AmapErr (18167): 定位失败,19: 定位失败，没有检查到SIM卡，并且关闭了WIFI开关，请打开WIFI开关或者插入SIM卡 请到http://lbs.amap.com/api/android-location-sdk/guide/utilities/errorcode/查看错误码说明,错误详细信息:没有检查到SIM卡，并且WIFI开关关闭，请打开WIFI开关或者插入SIM卡#1901#pm000011
+10-10 11:14:04.541 E/AmapErr (18167): 定位失败,19: 定位失败，没有检查到SIM卡，并且关闭了WIFI开关，请打开WIFI开关或者插入SIM卡 请到http://lbs.amap.com/api/android-location-sdk/guide/utilities/errorcode/查看错误码说明,错误详细信息:没有检查到SIM卡，并且WIFI开关关闭，请打开WIFI开关或者插入SIM卡#1901#pm000011
+
+## 补权限 + 重新授权之后（每秒一条 19 号错误归零，定位出点）
+AmapErr 命中数（本轮最后一次 25s 采样窗口）= 0
+10-10 11:41:59.424 D/BUS_LOC (21331): WGS84→GCJ02 偏移 481m @ 29.524684,106.602411
+10-10 11:42:04.441 D/BUS_LOC (21331): WGS84→GCJ02 偏移 481m @ 29.524684,106.602411
+10-10 11:42:49.447 D/BUS_LOC (23357): WGS84→GCJ02 偏移 481m @ 29.524684,106.602411
+
+## 导航引擎
+10-10 11:41:43.959 I/BUS_NAV (21331): 已注册初始化监听，等高德回调
+10-10 11:41:43.960 I/BUS_NAV (21331): readiness=Ready @main
+10-10 11:42:10.956 I/BUS_NAV (23357): AMap 隐私合规已设置：MapsInitializer.updatePrivacyShow/Agree = true
+10-10 11:42:10.957 I/BUS_NAV (23357): AMap 隐私合规已设置：AMapLocationClient.updatePrivacyShow/Agree = true

@@ -1,0 +1,224 @@
+[
+ {
+  "label": "我的包裹",
+  "cls": "TextView",
+  "bounds": "[42,105][262,186]",
+  "click": false
+ },
+ {
+  "label": "寄货 1 单 · 商城 0 单",
+  "cls": "TextView",
+  "bounds": "[42,194][326,257]",
+  "click": false
+ },
+ {
+  "label": "",
+  "cls": "View",
+  "bounds": "[946,118][1072,244]",
+  "click": true
+ },
+ {
+  "label": "到车提醒",
+  "cls": "TextView",
+  "bounds": "[156,326][308,389]",
+  "click": false
+ },
+ {
+  "label": "后台每 15 分钟检查一次，车到站前 10 分钟系统通知栏提醒",
+  "cls": "TextView",
+  "bounds": "[156,397][864,523]",
+  "click": false
+ },
+ {
+  "label": "",
+  "cls": "View",
+  "bounds": "[864,362][1001,488]",
+  "click": true
+ },
+ {
+  "label": "TP20261008204746971",
+  "cls": "TextView",
+  "bounds": "[79,616][456,679]",
+  "click": false
+ },
+ {
+  "label": "黄桷垭站",
+  "cls": "TextView",
+  "bounds": "[79,695][235,758]",
+  "click": false
+ },
+ {
+  "label": "渝A·B5207 · 已分配",
+  "cls": "TextView",
+  "bounds": "[79,766][342,829]",
+  "click": false
+ },
+ {
+  "label": "实时",
+  "cls": "TextView",
+  "bounds": "[103,850][163,913]",
+  "click": false
+ },
+ {
+  "label": "1",
+  "cls": "TextView",
+  "bounds": "[922,610][950,673]",
+  "click": false
+ },
+ {
+  "label": "分钟到站（直线估算）",
+  "cls": "TextView",
+  "bounds": "[849,673][1022,799]",
+  "click": false
+ },
+ {
+  "label": "输入运单号查询物流",
+  "cls": "TextView",
+  "bounds": "[163,1027][514,1090]",
+  "click": false
+ },
+ {
+  "label": "查询",
+  "cls": "TextView",
+  "bounds": "[896,1004][1038,1130]",
+  "click": true
+ },
+ {
+  "label": "我的寄货",
+  "cls": "TextView",
+  "bounds": "[139,1193][283,1256]",
+  "click": false
+ },
+ {
+  "label": "我的购物",
+  "cls": "TextView",
+  "bounds": "[469,1193][613,1256]",
+  "click": false
+ },
+ {
+  "label": "单号查询",
+  "cls": "TextView",
+  "bounds": "[798,1193][942,1256]",
+  "click": false
+ },
+ {
+  "label": "单号: TP20261008204746971",
+  "cls": "TextView",
+  "bounds": "[79,1349][542,1412]",
+  "click": false
+ },
+ {
+  "label": "柑橘",
+  "cls": "TextView",
+  "bounds": "[150,1433][801,1496]",
+  "click": false
+ },
+ {
+  "label": "重量 5.0kg · 2026-10-08 20:47",
+  "cls": "TextView",
+  "bounds": "[79,1507][486,1570]",
+  "click": false
+ },
+ {
+  "label": "农产品",
+  "cls": "TextView",
+  "bounds": "[103,1599][187,1662]",
+  "click": false
+ },
+ {
+  "label": "1 件",
+  "cls": "TextView",
+  "bounds": "[251,1599][302,1662]",
+  "click": false
+ },
+ {
+  "label": "车快到了 · 距黄桷垭站约 1 分钟（直线估算），请提前到站点等候",
+  "cls": "TextView",
+  "bounds": "[158,1712][685,1838]",
+  "click": false
+ },
+ {
+  "label": "看车辆",
+  "cls": "TextView",
+  "bounds": "[667,1713][793,1839]",
+  "click": true
+ },
+ {
+  "label": "车距站约 1 分钟（直线估算）",
+  "cls": "TextView",
+  "bounds": "[103,1885][494,1948]",
+  "click": false
+ },
+ {
+  "label": "¥9.43",
+  "cls": "TextView",
+  "bounds": "[699,1885][801,1948]",
+  "click": false
+ },
+ {
+  "label": "实时",
+  "cls": "TextView",
+  "bounds": "[103,1980][163,2043]",
+  "click": false
+ },
+ {
+  "label": "已分配",
+  "cls": "TextView",
+  "bounds": "[862,1343][1009,1414]",
+  "click": false
+ },
+ {
+  "label": "包裹状态",
+  "cls": "TextView",
+  "bounds": "[880,1414][992,1477]",
+  "click": false
+ },
+ {
+  "label": "首页",
+  "cls": "View",
+  "bounds": "[106,2182][164,2240]",
+  "click": false
+ },
+ {
+  "label": "首页",
+  "cls": "TextView",
+  "bounds": "[107,2248][163,2311]",
+  "click": false
+ },
+ {
+  "label": "商城",
+  "cls": "View",
+  "bounds": "[376,2182][434,2240]",
+  "click": false
+ },
+ {
+  "label": "商城",
+  "cls": "TextView",
+  "bounds": "[377,2248][433,2311]",
+  "click": false
+ },
+ {
+  "label": "快递",
+  "cls": "View",
+  "bounds": "[646,2182][704,2240]",
+  "click": false
+ },
+ {
+  "label": "快递",
+  "cls": "TextView",
+  "bounds": "[647,2248][703,2311]",
+  "click": false
+ },
+ {
+  "label": "我的",
+  "cls": "View",
+  "bounds": "[916,2182][974,2240]",
+  "click": false
+ },
+ {
+  "label": "我的",
+  "cls": "TextView",
+  "bounds": "[917,2248][973,2311]",
+  "click": false
+ }
+]

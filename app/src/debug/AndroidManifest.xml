@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  开发构建：允许明文 HTTP。
+  后端开发环境通常是 http://<内网或公网 IP>/api（地址只写在 gitignore 的 local.properties 里），
+  Android 9+ 默认禁明文，所以只在 debug 变体放开。release 变体不继承这份声明（见 src/release/AndroidManifest.xml）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:usesCleartextTraffic="true" />
+
+</manifest>

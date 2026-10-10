@@ -1,0 +1,9 @@
+起点 gps=last location=Location[gps 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=30.0 {Bundle[{satellites=0, maxCn0=0, meanCn0=0}]}]
+E1 labels=乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 25°C 阴 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递
+喂北京点中 gps=last location=Location[gps 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=30.0 {Bundle[{satellites=0, maxCn0=0, meanCn0=0}]}]
+  E2      cell='合川区钓鱼城街道' fabrication=none 附近共=['附近共 1 条公交线路'] 提示=[]
+  E3      cell='合川区钓鱼城街道' fabrication=none 附近共=['附近共 1 条公交线路'] 提示=[]
+终帧 gps=last location=Location[gps 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=30.0 {Bundle[{satellites=0, maxCn0=0, meanCn0=0}]}]
+  E       tap '合川区钓鱼城街道' @272,395 clickable=android.widget.TextView
+  E       opened=True 空态=[] 条目(2)=合川汽车客运中心 / 步步高公交站
+判定：有 fix 且在服务范围外（北京）⇒ 站点为空空态 = 未取得（顶栏='合川区钓鱼城街道' 空态=[] 条目=['合川汽车客运中心', '步步高公交站']）

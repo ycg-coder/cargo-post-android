@@ -1,0 +1,42 @@
+[
+ {
+  "text": "乡邮智联",
+  "desc": "",
+  "cls": "android.widget.TextView",
+  "bounds": "bounds=\"[84,214][301,289]\"",
+  "cy": 251,
+  "click": ""
+ },
+ {
+  "text": "县城⇄乡村",
+  "desc": "",
+  "cls": "android.widget.TextView",
+  "bounds": "bounds=\"[348,220][495,283]\"",
+  "cy": 251,
+  "click": ""
+ },
+ {
+  "text": "客货邮 · 城乡直达",
+  "desc": "",
+  "cls": "android.widget.TextView",
+  "bounds": "bounds=\"[84,302][347,365]\"",
+  "cy": 333,
+  "click": ""
+ },
+ {
+  "text": "位置未取到",
+  "desc": "",
+  "cls": "android.widget.TextView",
+  "bounds": "bounds=\"[123,339][319,451]\"",
+  "cy": 395,
+  "click": ""
+ },
+ {
+  "text": "切换 ▾",
+  "desc": "",
+  "cls": "android.widget.TextView",
+  "bounds": "bounds=\"[319,370][392,433]\"",
+  "cy": 401,
+  "click": ""
+ }
+]

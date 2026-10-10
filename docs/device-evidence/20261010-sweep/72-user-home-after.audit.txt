@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\72-user-home-after.txt (101 节点)
+== docs\device-evidence\20261010-sweep\72-user-home-after.xml: 101 节点 / 45 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 5481px² (29%): '客货邮 · 城乡直达' [88,271][371,337] × '位置未取到' [129,310][332,442]
+TOTAL_ISSUES=1

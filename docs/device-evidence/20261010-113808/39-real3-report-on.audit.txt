@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-113808\39-real3-report-on.txt (91 节点)
+== docs\device-evidence\20261010-113808\39-real3-report-on.xml: 91 节点 / 43 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

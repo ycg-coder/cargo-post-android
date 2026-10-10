@@ -1,0 +1,9 @@
+- | FrameLayout | 3200x2136 @ 0,0
+  - | LinearLayout | 3200x2136 @ 0,0
+    - | FrameLayout | 3200x2136 @ 0,0
+      - | FrameLayout | 3200x2136 @ 0,0
+        - | ViewGroup | 3200x2136 @ 0,0
+          - | SurfaceView | 3200x2136 @ 0,0
+        - | View | 3200x2136 @ 0,0
+        扫描装车（订单二维码 / 面单条码） | TextView | 623x52 @ 1288,2084
+  - | View | 3200x44 @ 0,2092

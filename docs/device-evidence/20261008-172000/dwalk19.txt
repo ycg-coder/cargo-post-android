@@ -1,0 +1,6 @@
+起点 gps=last location=Location[gps 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc
+窗口内喂北京后 gps=last location=Location[gps 39.899998,116.400000 hAcc=5.0 et=+35m47s82ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=
+  F1      cell='东城区东华门街道' fabrication=none 附近共=[] 提示=[]
+终帧 gps=last location=Location[gps 39.899998,116.400000 hAcc=5.0 et=+35m47s82ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=
+  F       opened=True 空态=['暂无可选村庄：接口未返回站点'] 条目(0)=
+判定：有 fix 但在服务范围外（北京）⇒ 选择器空态 = PASS（顶栏='东城区东华门街道' 空态=['暂无可选村庄：接口未返回站点'] 条目=[]）

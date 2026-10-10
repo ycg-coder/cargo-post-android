@@ -1,0 +1,26 @@
+=== A) home tree: entries and clickable ancestors ===
+    home: 乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 27°C 阴 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交
+  实时公交     self.click=false ancestors_clickable=0 []
+  农产品      self.click=false ancestors_clickable=0 []
+  我的快递     self.click=false ancestors_clickable=0 []
+  我要寄货     self.click=false ancestors_clickable=0 []
+  附近公交     self.click=false ancestors_clickable=0 []
+  更多       self.click=false ancestors_clickable=0 []
+  首页       self.click=false ancestors_clickable=0 []
+  商城       self.click=false ancestors_clickable=0 []
+  快递       self.click=false ancestors_clickable=0 []
+  我的       self.click=false ancestors_clickable=0 []
+  切换 ▾     self.click=false ancestors_clickable=0 []
+  total nodes=28 clickable=true nodes=2
+=== B) visit remaining entries ===
+  我的快递 -> 我的包裹 / 寄货 0 单 · 商城 0 单 / 到车提醒 / 后台每 15 分钟检查一次，车到站前 10 分钟系统通知栏提醒 / 输入运单号查询物流 / 查询 / 我的寄货 / 我的购物 / 单号查询 / 还没有寄货记录 / 山货出山、包裹进村，点这里寄一件 / 去寄一件 / 首页 / 首页
+  附近公交 -> 乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 27°C 阴 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交
+  更多 -> 实时公交 / 正在定位… / 班次时刻 / 0 条线路
+  我要寄货 -> 填写货物信息 / 第 1 步 · 共 3 步 / 写清货物与收发站点，费用提前算给你看 / 可达性暂不可用 / 后端没有返回可达性判定（不代表车辆能到） / 请手动选择取货站点；本单不声称车辆可上门 / 物品信息 / 货物名称 * / 如：脆李、土鸡蛋、红薯粉 / 货物重量 * / 如：50 / 货物件数 * / − / 1 件
+=== C) system BACK from each tab ===
+  BACK from 商城   app_still_foreground=False focus=mCurrentFocus=Window{183ebc1 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.Ne
+       labels: Thu, Oct 8 / Gmail / Photos / YouTube / Home / Phone / Messages / Chrome / Gmail / Google app / Voice search / Google Lens
+  BACK from 快递   app_still_foreground=False focus=mCurrentFocus=Window{183ebc1 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.Ne
+       labels: Thu, Oct 8 / Gmail / Photos / YouTube / Home / Phone / Messages / Chrome / Gmail / Google app / Voice search / Google Lens
+  BACK from 我的   app_still_foreground=False focus=mCurrentFocus=Window{183ebc1 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.Ne
+       labels: Thu, Oct 8 / Gmail / Photos / YouTube / Home / Phone / Messages / Chrome / Gmail / Google app / Voice search / Google Lens

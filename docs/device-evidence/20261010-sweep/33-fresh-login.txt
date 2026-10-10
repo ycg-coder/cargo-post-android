@@ -1,0 +1,19 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | LinearLayout | 2136x3200 @ 0,0
+        - | FrameLayout | 2136x3200 @ 0,0
+          - | FrameLayout | 2136x3200 @ 0,0
+            - | View C | 2136x3200 @ 0,0
+            - | LinearLayout C | 950x650 @ 593,1275
+              - | LinearLayout | 950x222 @ 593,1337
+                - | ImageView | 83x83 @ 1026,1337
+                允许“乡邮智联”发送通知？ | TextView | 764x62 @ 686,1456
+              - | ScrollView | 950x154 @ 593,1559
+                - | ViewGroup | 950x154 @ 593,1559
+                - | LinearLayout | 806x113 @ 665,1559
+                - | LinearLayout | 806x113 @ 665,1559
+                包括消息推送、桌面图标角标、声音和振动提醒等，可在“设置”中修改。 | TextView | 806x113 @ 665,1559
+              - | LinearLayout | 950x129 @ 593,1734
+                拒绝 | Button C | 399x129 @ 654,1734
+                始终允许 | Button C | 399x129 @ 1083,1734

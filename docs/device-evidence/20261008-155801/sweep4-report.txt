@@ -1,0 +1,46 @@
+=== A0-launch (27 labelled nodes)
+  false y=251   x=192   217x75 TextView                '乡邮智联'
+  false y=251   x=421   147x63 TextView                '县城⇄乡村'
+  false y=333   x=215   263x63 TextView                '客货邮 · 城乡直达'
+  true y=395   x=272   298x112 TextView                '合川区钓鱼城街道'
+  false y=401   x=457   73x63 TextView                '切换 ▾'
+  false y=513   x=495   651x63 TextView                '27°C 阴 · 合川区钓鱼城街道'
+  false y=513   x=874   107x63 TextView                '4日预报'
+  false y=925   x=540   156x63 TextView                '暂无公告'
+  false y=1001  x=540   510x63 TextView                '村里的好消息上架后会在这里展示'
+  false y=1349  x=114   144x63 TextView                '实时公交'
+  false y=1349  x=268   108x63 TextView                '农产品'
+  false y=1349  x=421   144x63 TextView                '我的快递'
+  false y=1349  x=581   144x63 TextView                '我要寄货'
+  false y=1470  x=187   168x63 TextView                '附近公交'
+  false y=1470  x=944   68x63 TextView                '更多'
+  false y=1578  x=246   360x63 TextView                '根据合川区钓鱼城街道展示'
+  false y=1578  x=598   196x63 TextView                '已更新：15:49'
+  false y=1943  x=540   312x63 TextView                '当前不在运营时间'
+  false y=2019  x=540   341x63 TextView                '。附近共 1 条公交线路'
+  false y=2211  x=135   58x58 View                    '首页'
+  false y=2279  x=135   56x63 TextView                '首页'
+  false y=2211  x=405   58x58 View                    '商城'
+  false y=2279  x=405   56x63 TextView                '商城'
+  false y=2211  x=675   58x58 View                    '快递'
+  false y=2279  x=675   56x63 TextView                '快递'
+  false y=2211  x=945   58x58 View                    '我的'
+  false y=2279  x=945   56x63 TextView                '我的'
+  (identity switch node: clickable=false @457,401)
+location now: Location[gps 30.030000,106.300000 hAcc=5.0 et=+10m4s561ms mock]
+      enabled=true
+      a
+--- entry '实时公交' clickable=false cls=TextView id=
+    node itself not clickable; enclosing clickable=None label=None
+  tap '实时公交' @114,1349
+    after: 实时公交 / 已按你的位置排序 / 15:49:12 更新 / 班次时刻 / 附近 2 个站点 / 1 条线路 / 当前不在运营时间 / 。附近共 1 条公交线路
+    back -> 乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 27°C 阴 · 合川区钓鱼城街道 / 4日预报 / 暂无公告
+--- entry '农产品' clickable=false cls=TextView id=
+    node itself not clickable; enclosing clickable=None label=None
+  tap '农产品' @268,1349
+    after: 山货集市 / 商城 / 村里直发 · 今日班车直达县城共配仓 / 搜名称、产地或村庄 / 全部 / 水果 / 蔬菜 / 禽蛋 / 茶叶 / 干货 / 今日在售 / 价格含班车运费，到村自提 / 高山脆李 / 大巴直通车 / 高山脆李 / 云山村 / ¥68 / /斤 / 土鸡蛋30枚装 / 大巴直通车 / 土鸡蛋30枚装 / 大湾村
+    back -> Thu, Oct 8 / Gmail / Photos / YouTube / Home / Phone / Messages / Chrome
+!! home has no node '我的快递'
+!! home has no node '我要寄货'
+!! home has no node '附近公交'
+!! home has no node '更多'

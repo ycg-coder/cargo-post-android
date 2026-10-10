@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  正式构建：显式关闭明文 HTTP。
+  后端地址由构建期校验强制为 https（app/build.gradle.kts validateReleaseBaseUrl），
+  这里再关一次，防止有人用 -Pbuspost.allowInsecureRelease=true 绕过校验后带着 http 上线。
+  两者同时生效：即便 baseUrl 是 http，系统层也直接拒绝请求，不会静默降级成明文传输 token。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:usesCleartextTraffic="false" />
+
+</manifest>

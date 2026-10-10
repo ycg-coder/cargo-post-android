@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\50-cloud-driver-login.txt (36 节点)
+== docs\device-evidence\20261010-sweep\50-cloud-driver-login.xml: 36 节点 / 14 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

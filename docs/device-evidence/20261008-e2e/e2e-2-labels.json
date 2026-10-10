@@ -1,0 +1,86 @@
+[
+ {
+  "label": "乡邮智联",
+  "cls": "TextView",
+  "bounds": "[414,421][666,512]",
+  "clickable": false
+ },
+ {
+  "label": "客货邮 · 城乡直达",
+  "cls": "TextView",
+  "bounds": "[409,523][672,586]",
+  "clickable": false
+ },
+ {
+  "label": "选择身份",
+  "cls": "TextView",
+  "bounds": "[53,670][209,733]",
+  "clickable": false
+ },
+ {
+  "label": "我是用户",
+  "cls": "TextView",
+  "bounds": "[179,802][335,865]",
+  "clickable": false
+ },
+ {
+  "label": "我是司机",
+  "cls": "TextView",
+  "bounds": "[179,965][335,1028]",
+  "clickable": false
+ },
+ {
+  "label": "手机号",
+  "cls": "TextView",
+  "bounds": "[58,1128][160,1191]",
+  "clickable": false
+ },
+ {
+  "label": "请输入手机号",
+  "cls": "TextView",
+  "bounds": "[174,1246][408,1309]",
+  "clickable": false
+ },
+ {
+  "label": "密码",
+  "cls": "TextView",
+  "bounds": "[58,1383][126,1446]",
+  "clickable": false
+ },
+ {
+  "label": "请输入密码",
+  "cls": "TextView",
+  "bounds": "[174,1501][369,1564]",
+  "clickable": false
+ },
+ {
+  "label": "验证码登录",
+  "cls": "TextView",
+  "bounds": "[413,1620][667,1746]",
+  "clickable": true
+ },
+ {
+  "label": "",
+  "cls": "CheckBox",
+  "bounds": "[27,1754][153,1880]",
+  "clickable": true
+ },
+ {
+  "label": "我已阅读并同意《服务协议》",
+  "cls": "TextView",
+  "bounds": "[132,1755][535,1881]",
+  "clickable": true
+ },
+ {
+  "label": "登录",
+  "cls": "TextView",
+  "bounds": "[497,1941][584,2004]",
+  "clickable": false
+ },
+ {
+  "label": "大字模式",
+  "cls": "TextView",
+  "bounds": "[502,2070][626,2133]",
+  "clickable": false
+ }
+]

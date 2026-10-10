@@ -1,0 +1,37 @@
+# P1 subtitle punctuation on HOME (device re-shoot, APK 240e5016)
+LAUNCH Starting: Intent { cmp=com.shanxiang.buspost/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.shanxiang.buspost/.MainActivity
+TotalTime: 3041
+WaitTime: 3043
+Complete
+SPLASH 乡邮智联 / 客货邮 · 城乡直达 / 选择身份 / 我是用户 / 我是司机 / 手机号 / 请输入手机号 / 密码 / 请输入密码 / 验证码登录 / 我已阅读并同意《服务协议》 / 登录 / 大字模式
+SCREEN 乡邮智联 / 客货邮 · 城乡直达 / 选择身份 / 我是用户 / 我是司机 / 手机号 / 请输入手机号 / 密码 / 请输入密码 / 验证码登录 / 我已阅读并同意《服务协议》 / 登录 / 大字模式
+  -> not logged in, running login flow
+  SMS_CODE='9999'
+  TOKEN rows=9
+  home labels: 乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 26°C 多云 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交 / 更多 / 根据合川区钓鱼城街道展示 / 已更新：16:38 / 当前不在运营时间 / 附近共 1 条公交线路 / 首页 / 首页 / 商城 / 商城 / 快递 / 快递 / 我的 / 我的
+  SUB clean  '实时公交'
+  SUB clean  '附近公交'
+  SUB clean  '附近共 1 条公交线路'
+=== P1b same shape on the bus tab ===
+  SUB clean  '实时公交'
+  SUB clean  '附近公交'
+  SUB clean  '附近共 1 条公交线路'
+=== P2 system BACK per tab (want: stay in app, land on home) ===
+  BACK from 商城   in_app=True  | before=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    after=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    labels=乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 26°C 多云 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交 / 更多 / 根据合川区钓鱼城街道展示 / 已更新：16:38 / 当前不在运营时间 / 附近共 
+  BACK from 快递   in_app=True  | before=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    after=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    labels=乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 26°C 多云 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交 / 更多 / 根据合川区钓鱼城街道展示 / 已更新：16:38 / 当前不在运营时间 / 附近共 
+  BACK from 我的   in_app=True  | before=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    after=mCurrentFocus=Window{1a9ca2e u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+                    labels=乡邮智联 / 县城⇄乡村 / 客货邮 · 城乡直达 / 合川区钓鱼城街道 / 切换 ▾ / 26°C 多云 · 合川区钓鱼城街道 / 4日预报 / 暂无公告 / 村里的好消息上架后会在这里展示 / 实时公交 / 农产品 / 我的快递 / 我要寄货 / 附近公交 / 更多 / 根据合川区钓鱼城街道展示 / 已更新：16:38 / 当前不在运营时间 / 附近共 
+=== P2d BACK from HOME (want: exit app -- that is correct) ===
+  BACK on home -> focus=mCurrentFocus=Window{566ecb5 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.Ne (exited=True)
+=== crash / error readback for the whole re-shoot ===
+  FATAL EXCEPTION    = 0
+  UnsatisfiedLink    = 0
+  NetworkException   = 4

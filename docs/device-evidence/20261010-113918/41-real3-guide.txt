@@ -1,0 +1,73 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | ComposeView | 2136x3200 @ 0,0
+        - | View | 2136x3200 @ 0,0
+          - | View | 2136x3200 @ 0,0
+            - | View | 2136x3200 @ 0,0
+              - | ViewFactoryHolder | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | LinearLayout | 2136x2411 @ 0,529
+                - | RelativeLayout | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | ViewGroup | 2136x2411 @ 0,529
+                - | TextureView | 2136x2411 @ 0,529
+                - | View | 2136x2411 @ 0,529
+                - | RelativeLayout | 2136x2235 @ 0,529
+                江南隧道 | TextView | 282x110 @ 927,2654
+                - | RelativeLayout C | 2136x61 @ 0,529
+                - | LinearLayout | 1026x61 @ 28,529
+                - | LinearLayout | 1026x61 @ 1082,529
+                - | RelativeLayout | 2108x313 @ 14,584
+                - | RelativeLayout | 2108x313 @ 14,584
+                - | RelativeLayout | 2080x291 @ 28,584
+                - | ImageView | 209x209 @ 61,625
+                - | RelativeLayout | 460x291 @ 298,584
+                2.8公里 | TextView | 306x146 @ 298,617
+                进入 | TextView | 126x84 @ 632,666
+                兴塘路 | TextView | 189x84 @ 312,750
+                - | RelativeLayout | 251x52 @ 1840,598
+                - | LinearLayout | 251x52 @ 1840,598
+                卫星信号弱 | TextView | 195x52 @ 1840,598
+                - | ImageView | 39x39 @ 2052,604
+                - | LinearLayout | 17x52 @ 1840,598
+                - | RelativeLayout | 2136x185 @ 0,897
+                - | RelativeLayout | 2136x2026 @ 0,914
+                - | FrameLayout | 146x146 @ 28,1661
+                - | FrameLayout | 179x369 @ 0,2571
+                - | LinearLayout | 165x165 @ 14,2571
+                - | LinearLayout | 2136x193 @ 0,2747
+                退出 | TextView C | 138x165 @ 14,2753
+                - | ImageView | 3x110 @ 152,2780
+                - | FrameLayout | 1964x165 @ 155,2753
+                - | LinearLayout | 1964x159 @ 155,2756
+                - | LinearLayout | 1964x85 @ 155,2756
+                11.5公里 | TextView | 193x85 @ 898,2756
+                14分钟 | TextView | 151x85 @ 1119,2756
+                - | ImageView | 49x49 @ 1292,2777
+                7 | TextView | 34x85 @ 1341,2756
+                - | LinearLayout | 1964x74 @ 155,2841
+                11:54到达 | TextView | 241x74 @ 1016,2841
+                - | ImageView | 3x110 @ 2119,2780
+                - | LinearLayout | 165x368 @ 1971,2572
+                - | ImageView C | 165x165 @ 1971,2572
+              - | View | 2058x383 @ 39,118
+                乡邮智联 · 车道级导航 | TextView | 334x66 @ 105,118
+                四公里交通换乘枢纽站 | TextView | 410x66 @ 105,184
+                退出 | TextView C | 176x132 @ 1921,118
+                向左并线 | TextView | 240x80 @ 39,272
+                江南隧道 · 下一段 兴塘路 | TextView | 387x66 @ 39,352
+                11.5 公里 | TextView | 239x74 @ 1858,278
+                13 分钟 | TextView | 115x66 @ 1982,352
+                高德没给车道信息（这不等于这条路没有车道） | TextView | 2005x66 @ 92,435
+              - | View | 2058x138 @ 39,2990
+                - | View C | 668x138 @ 39,2990
+                - | View | 132x132 @ 208,2994
+                播报已关 | TextView | 182x66 @ 318,3026
+                - | View C | 667x138 @ 735,2990
+                - | View | 132x132 @ 904,2994
+                车头朝上 | TextView | 182x66 @ 1014,3026
+                - | View C | 667x138 @ 1430,2990
+                - | View | 132x132 @ 1599,2994
+                结束导航 | TextView | 182x66 @ 1709,3026

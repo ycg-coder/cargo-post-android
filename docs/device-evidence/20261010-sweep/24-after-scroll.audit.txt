@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-sweep\24-after-scroll.txt (90 节点)
+== docs\device-evidence\20261010-sweep\24-after-scroll.xml: 90 节点 / 39 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 21411px² (46%): '打开旧导航页（调试·非真实导航）' [716,2718][1420,2784] × '距「兴隆场站」道路距离接口未给（也没有可用定位，直线远近同样不给）' [44,2713][1067,2779]
+TOTAL_ISSUES=1

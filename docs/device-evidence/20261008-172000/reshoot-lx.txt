@@ -1,0 +1,14 @@
+pkg on device: ['lastUpdateTime=2026-10-08 09:25:18']
+=== B) 有 fix 但落在服务范围外（加州 37.42,-122.16）：站点为空 ⇒ 选择器必须说人话 ===
+  location_mode 回读='3'
+  B fabrication=none  位置未取到=True  附近公交线路行=[]
+  B        HEAD '乡邮智联'                 clickable=android.widget.TextView bounds="[84,214][301,289]"
+  B        HEAD '县城⇄乡村'                clickable=android.widget.TextView bounds="[348,220][495,283]"
+  B        !! 顶栏没有可点的那一格
+=== C) 合川真点（30.03,106.30）：站点非空 ⇒ 列真站点、不得出现空态 ===
+  C        没有『重新定位』那一格（说明当前不是无 fix 状态）
+  C 附近公交线路行=[]
+  C        HEAD '乡邮智联'                 clickable=android.widget.TextView bounds="[84,214][301,289]"
+  C        HEAD '县城⇄乡村'                clickable=android.widget.TextView bounds="[348,220][495,283]"
+  C        !! 顶栏没有可点的那一格
+  C 真站点条目数（含空态行以外的可点条目）=13

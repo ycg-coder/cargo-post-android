@@ -1,0 +1,6 @@
+装机读数（adb dumpsys 回读，设备侧钟面）:
+  firstInstallTime=2026-10-08 07:10:47
+  lastUpdateTime=2026-10-08 10:27:57
+  versionCode=1 minSdk=26 targetSdk=34
+  versionName=1.0.0-android
+  设备 date = Thu Oct  8 18:53:58 CST 2026

@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-114126\43-real-user-home.txt (98 节点)
+== docs\device-evidence\20261010-114126\43-real-user-home.xml: 98 节点 / 41 段文字 / 屏幕 2136x3200 ==
+  [LAYOUT] 兄弟文字重叠 6534px² (34%): '客货邮 · 城乡直达' [276,271][559,337] × '南岸区南山街道' [317,310][590,429]
+TOTAL_ISSUES=1

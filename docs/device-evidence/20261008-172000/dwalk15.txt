@@ -1,0 +1,8 @@
+location_mode=3
+起点 gps=last location=Location[gps 37.420000,-122.160000 hAcc=100.0 et=+19m13s387ms mock] ;; last location=Location[fused 37.420000,-122.160000 hAcc=100.0 et=+19m13s387ms mock] ;; gps provider: ;; mStarted=false   (changed +12m7s887ms ago) ;; 10-08 09:16:38.812: gps p
+首屏 labels=乡邮智联 / 乡邮智联 / 公交带货 · 快递进村 · 农产品出山 / 轻触屏幕进入 / › / v1.0.0
+  C0       cell='' fabrication=none 附近共=[] 提示=[]
+  R1 没有『重新定位』那一格（可能已有 fix）
+终帧 gps=last location=Location[gps 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 vAcc=0.5 vel=0.0 sAcc=0.5 bear=0.0 bAcc=30.0 {Bundle[{satellites=0, maxCn0=0, meanCn0=0}]}] ;; last location=Location[fused 30.030498,106.300498 hAcc=5.0 et=+26m35s772ms alt=0.0 v
+  C        !! 顶栏那一格找不到
+判定：C 站点非空正控 = 未取得（见上面 C*-fed 与喂点后 gps 行） / B 空态 = 不适用
