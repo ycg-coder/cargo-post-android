@@ -52,12 +52,6 @@ class DriverLocationService : Service() {
     @Volatile
     private var lastReportedGeo: Geo? = null
 
-    /** 静止检测阈值：移动距离小于此值（米）且在静止窗口内，跳过上报 */
-    private companion object {
-        const val STATIONARY_THRESHOLD_M = 20.0
-        const val STATIONARY_WINDOW_MS = 60_000L
-    }
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -238,6 +232,10 @@ class DriverLocationService : Service() {
 
         /** 定位流退出后重新注册的间隔 */
         private const val RESTART_DELAY_MS = 5_000L
+
+        /** 静止检测阈值：移动距离小于此值（米）且在静止窗口内，跳过上报 */
+        private const val STATIONARY_THRESHOLD_M = 20.0
+        private const val STATIONARY_WINDOW_MS = 60_000L
 
         fun start(context: Context) {
             if (!Locator.allowed(context)) return

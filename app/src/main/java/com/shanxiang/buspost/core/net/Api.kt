@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.data.repo.DemoData
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException

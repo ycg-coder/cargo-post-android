@@ -638,7 +638,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                 BusCard(modifier = Modifier.fillMaxWidth()) {
                     if (vm.photoUri != null) {
                         NetworkImage(
-                            url = vm.photoUri,
+                            url = vm.photoUri?.toString(),
                             contentDescription = null,
                             width = 400.dp,
                             height = 150.dp,
