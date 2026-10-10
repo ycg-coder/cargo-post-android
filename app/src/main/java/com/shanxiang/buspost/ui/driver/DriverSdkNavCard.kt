@@ -121,6 +121,17 @@ fun DriverSdkNavCard(
         hasNavigableDestination = nextStop != null,
     )
 
+    // 界面上不再念诊断原文（引擎 / 算路 / 回执 / 字段名一律不进界面），
+    // 但这些读数排障时必须有 —— 全部字段化进 logcat：adb logcat -s BUS_UI BUS_NAV
+    androidx.compose.runtime.LaunchedEffect(gate.code, vehicleGeo, nextStop?.stationId, sdkFrame?.remainMeters) {
+        android.util.Log.i(
+            "BUS_UI",
+            "nav_card gate=${gate.code} canNavigate=${gate.canNavigate} detail=${gate.detail} " +
+                "origin=${vehicleGeo?.lat},${vehicleGeo?.lng} nextStop=${nextStop?.stationId}@${nextStop?.name} " +
+                "remainMeters=${sdkFrame?.remainMeters} stops=${guide.stops.size}",
+        )
+    }
+
     BusCard(modifier = Modifier.fillMaxWidth(), warm = gate.engineBlocked) {
         Column {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -195,7 +206,7 @@ fun DriverSdkNavCard(
                 InfoRow(
                     "剩余里程",
                     sdkFrame?.let { if (it.hasRemainDistance) formatSdkMeters(it.remainMeters) else "高德没给" }
-                        ?: "高德还没回过实时回执",
+                        ?: "还没开始导航",
                 )
             }
 
