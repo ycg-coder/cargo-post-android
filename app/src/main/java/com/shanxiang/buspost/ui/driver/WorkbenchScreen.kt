@@ -801,7 +801,6 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                             vehicleGeo = serviceGeo,
                             onToast = { vm.showReceipt(it) },
                             onOpenLaneGuide = { nav.navigate(Routes.DRIVER_GUIDE) },
-                            inTransit = vm.shift?.state == ShiftState.RUNNING,
                         )
                     }
                 }

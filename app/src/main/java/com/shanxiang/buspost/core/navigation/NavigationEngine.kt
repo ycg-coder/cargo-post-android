@@ -487,6 +487,22 @@ internal fun nextNavigableStop(guide: RouteGuide): MissionStop? =
     guide.stops.filter { !it.isDone && it.hasGeo }.minByOrNull { it.visitSequence }
 
 /**
+ * 「自动进导航」的唯一判定（用户口径 A：在途司机打开 App 就直接给他导航）。
+ *
+ * 纯函数：不持状态、不读 BuildConfig、不碰 SDK —— 状态由调用方递进来，判断只在这一处有一份。
+ * 三条都必须成立，缺一条就不许跳：
+ * - `canNavigate`：引擎可用 + 有真实起点 + 调度给了可导的点（见 [navigationGateOf]，不许拿假起点凑）；
+ * - `hasNavigableStop`：目的地只能来自调度（硬规则 3），没有点就没有"跳过去干什么"；
+ * - `!alreadyOpenedThisProcess`：**一个进程只自动跳一次**。真机实测过反面：
+ *   司机按「结束导航」回到工作台，若没有这一条会被立刻弹回导航页（日志连打三次），人被困住。
+ */
+internal fun shouldAutoOpenGuide(
+    canNavigate: Boolean,
+    hasNavigableStop: Boolean,
+    alreadyOpenedThisProcess: Boolean,
+): Boolean = canNavigate && hasNavigableStop && !alreadyOpenedThisProcess
+
+/**
  * 可插拔导航引擎。
  *
  * 实现只有两种：[AmapNavigationEngine]（真调 SDK）与 [BlockedNavigationEngine]（一条请求都不发、

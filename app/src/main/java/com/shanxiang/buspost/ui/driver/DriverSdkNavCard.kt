@@ -30,6 +30,7 @@ import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.navigation.NavigationEngines
 import com.shanxiang.buspost.core.navigation.NavigationSession
 import com.shanxiang.buspost.core.navigation.engineRecalcTextOf
+import com.shanxiang.buspost.core.navigation.shouldAutoOpenGuide
 import com.shanxiang.buspost.core.navigation.guidanceSwitchOffText
 import com.shanxiang.buspost.core.navigation.laneDisplayTextOf
 import com.shanxiang.buspost.core.navigation.naviVoiceTypeNameOf
@@ -71,7 +72,6 @@ fun DriverSdkNavCard(
     vehicleGeo: Geo?,
     onToast: (String) -> Unit,
     onOpenLaneGuide: () -> Unit = {},
-    inTransit: Boolean = false,
 ) {
     val context = LocalContext.current
     val t = LocalBusTokens.current
@@ -123,17 +123,13 @@ fun DriverSdkNavCard(
     )
 
     /**
-     * 用户口径 v3「发车之后开始导航」：本次运行里班次从"没在跑"翻成"在跑"，
-     * 且三件齐了（引擎可用 + 有真实起点 + 调度给了未完成且有坐标的任务点）就自己进导航页。
-     * 冷启动时班次本来就在途的不算"刚发车"（armed 初值 = !inTransit），
-     * 否则司机只是重开 App 就被糊一脸全屏导航。缺任何一件就留在工作台，绝不拿假起点凑一次跳转。
+     * 用户口径 A：在途司机打开 App 就直接给他导航；判断只有一份，住在
+     * [shouldAutoOpenGuide]（纯函数）。这里只负责"跳一次"这件事的状态位与动作。
      */
     // 一次性：进程内已经自动跳过一次，就再也不自动跳（手动按钮永远在）
-    var autoGuideArmed by remember { mutableStateOf(!inTransit && !AppState.autoGuideUsed) }
-    LaunchedEffect(autoGuideArmed, gate.canNavigate, nextStop?.stationId) {
+    LaunchedEffect(AppState.autoGuideUsed, gate.canNavigate, nextStop?.stationId) {
         val stop = nextStop ?: return@LaunchedEffect
-        if (!autoGuideArmed || !gate.canNavigate) return@LaunchedEffect
-        autoGuideArmed = false
+        if (!shouldAutoOpenGuide(gate.canNavigate, true, AppState.autoGuideUsed)) return@LaunchedEffect
         AppState.autoGuideUsed = true
         android.util.Log.i("BUS_UI", "auto_open_guide stop=${stop.stationId} origin=${vehicleGeo?.lat},${vehicleGeo?.lng}")
         AppState.openGuide(
