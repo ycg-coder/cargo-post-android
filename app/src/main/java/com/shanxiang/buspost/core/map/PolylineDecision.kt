@@ -49,7 +49,7 @@ internal fun polylineSubtitleOf(phase: PolylinePhase, pointCount: Int, failure: 
     phase == PolylinePhase.Asking -> "正在向后端要这条线路的折线…"
     phase == PolylinePhase.NotAsked -> "还没去问这条线路的折线"
     failure != null -> "这次没问到折线，可重试"
-    else -> "暂无线路折线"
+    else -> "后端未回传该线路折线"
 }
 
 /**

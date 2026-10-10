@@ -268,19 +268,18 @@ fun routeBindingOf(
     currentPath: SdkPathShape?,
 ): RouteBinding = when {
     accepted == null -> RouteBinding.Unbound(
-        reason = "还没有通过验证的路线，不能开始导航",
+        reason = "还没有一次通过验证的算路",
         detail = "accepted=null（§九：没有 accepted route 就禁止 startGpsNavi，要重新算真实道路）",
     )
 
     currentPath == null -> RouteBinding.Unbound(
-        reason = "当前没有路径数据，无法确认导航路线",
-        // detail 里印指纹而不是 data class 的 toString：现场按一种格式 grep，两处成因两种写法就查不动
+        reason = "没有路径几何",
         detail = "getNaviPath()=null，本机记录=${accepted.routeFingerprint}",
     )
 
     currentPath.coordCount != accepted.coordCount || currentPath.roadDistanceMeters != accepted.roadDistanceMeters ->
         RouteBinding.Unbound(
-            reason = "当前路径与已验证路线不一致，请重新算路",
+            reason = "不是同一条",
             detail = "session=${accepted.routeFingerprint} now=pts=${currentPath.coordCount}|m=${currentPath.roadDistanceMeters}",
         )
 
@@ -454,13 +453,13 @@ fun readinessOf(
 ): EngineReadiness = when {
     !sdkPresent -> EngineReadiness.Blocked(
         code = NavigationGateCode.NOT_INSTALLED,
-        reason = "导航能力未就绪：导航组件未安装",
+        reason = "导航能力未就绪：导航组件未随包发布",
         detail = "sdkPresent=false",
     )
 
     !keyConfigured -> EngineReadiness.Blocked(
         code = NavigationGateCode.SDK_UNAVAILABLE,
-        reason = "导航能力未就绪：未配置地图 key",
+        reason = "导航能力未就绪：没有配置高德 key",
         detail = "keyConfigured=false（缺 key 时 SDK 不会回调，导航不能算可用）",
     )
 
@@ -817,19 +816,19 @@ sealed class EngineRecalcDisplay {
  * 算路成功的回执又不带原因，本机无论站哪一头都说不出来这句话。
  */
 internal fun engineRecalcTextOf(display: EngineRecalcDisplay?): String = when (display) {
-    null -> "暂无重新算路记录"
+    null -> "高德没有说过重算（本机不拿距离卡阈值判偏航）"
 
     EngineRecalcDisplay.Yaw ->
-        "车辆偏离路线，正在重新算路"
+        "高德说车辆偏离路线，它要重新算路"
 
     EngineRecalcDisplay.TrafficJam ->
-        "前方拥堵，正在重新算路"
+        "高德说前方拥堵，它要重新算路"
 
     is EngineRecalcDisplay.EngineInitiatedSuccess ->
-        "重新算路完成（errorCode=${display.code}）"
+        "高德回了算路结果（errorCode=${display.code}，回执不带原因）"
 
     is EngineRecalcDisplay.EngineInitiatedFailure ->
-        "重新算路失败（errorCode=${display.code}）"
+        "高德回了算路失败（errorCode=${display.code}，回执不带原因）"
 }
 
 /**

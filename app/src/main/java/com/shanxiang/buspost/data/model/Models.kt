@@ -325,7 +325,7 @@ data class Product(
     /** 只有后端真给了 0/负数才叫售罄；缺键（stock=null）不许自动变成"已售罄"（F-3 ⑯：null/0 不许自己变成业务结论） */
     val soldOut: Boolean get() = stock != null && stock <= 0
     /** 库存角标：缺键时明说"库存未给"，不许渲染成"库存 0" */
-    val stockText: String get() = stock?.let { "库存 $it" } ?: "库存暂未知"
+    val stockText: String get() = stock?.let { "库存 $it" } ?: "库存未给"
     /** 原始字段值由 parse 填入，见下方伴生对象 */
     var rawFromVillage: String = ""
     var rawBadge: String = ""
@@ -659,7 +659,11 @@ data class BusVehicle(
      * 所以本机不许说"在途"、也不许拼一个空站名（§14 没有值不许有业务语义；审计 §72）。
      */
     val positionOnlyTag: String
-        get() = if (dataSource.isEmpty()) "定位中" else "实时"
+        get() = when {
+            dataSource.isEmpty() -> "位置来源未给"
+            status == VehicleStatus.UNKNOWN -> "位置来源 $dataSource（未给状态）"
+            else -> "位置来源 $dataSource"
+        }
 
     /**
      * "到下一站"的分钟数（向上取整、至少 1，与小程序 `detail.js:132-136` 的 `Math.max(1, ceil())` 同口径）：
@@ -706,7 +710,7 @@ data class BusVehicle(
             status == VehicleStatus.ARRIVED -> "已到终点站"
             status == VehicleStatus.OFF_DUTY -> "车辆停用"
             status == VehicleStatus.NO_LOCATION -> "暂无定位，无法预估"
-            running -> remainingRouteMinutesText ?: "到站时间暂未知"
+            running -> remainingRouteMinutesText ?: "到站时间未给"
             else -> "暂无到站预估"
         }
     /** 站点行文案（对齐小程序 index.js:438-446）：后端按线路站点序算好的"你最方便的站"优先 */
@@ -1550,8 +1554,8 @@ data class EarningItem(
     val type: String = "",
     val createTime: String = "",
 ) {
-    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额暂未知"
-    val weightText: String get() = weightKg?.let { "${yuan(it)} kg" } ?: "重量暂未知"
+    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额未给"
+    val weightText: String get() = weightKg?.let { "${yuan(it)} kg" } ?: "重量未给"
 }
 
 /**
@@ -1584,14 +1588,14 @@ data class Earnings(
     /** 今日订单数（后端 todayOrders，与累计 totalOrders 是两个口径） */
     val todayOrders: Int? = null,
 ) {
-    val todayText: String get() = today?.let { yuan(it) } ?: "暂未知"
-    val weekText: String get() = week?.let { yuan(it) } ?: "暂未知"
-    val monthText: String get() = month?.let { yuan(it) } ?: "暂未知"
-    val totalText: String get() = total?.let { "${yuan(it)} 元" } ?: "暂未知"
-    val todayBadgeText: String get() = today?.let { "今日 ${yuan(it)} 元" } ?: "今日 —"
-    val orderCountText: String get() = orderCount?.let { "$it 单" } ?: "暂未知"
-    val todayOrdersText: String get() = todayOrders?.let { "$it 单" } ?: "暂未知"
-    val totalWeightText: String get() = totalWeight?.let { "${yuan(it)} kg" } ?: "暂未知"
+    val todayText: String get() = today?.let { yuan(it) } ?: "未给"
+    val weekText: String get() = week?.let { yuan(it) } ?: "未给"
+    val monthText: String get() = month?.let { yuan(it) } ?: "未给"
+    val totalText: String get() = total?.let { "${yuan(it)} 元" } ?: "累计收益未给"
+    val todayBadgeText: String get() = today?.let { "今日 ${yuan(it)} 元" } ?: "今日收益未给"
+    val orderCountText: String get() = orderCount?.let { "$it 单" } ?: "累计单数未给"
+    val todayOrdersText: String get() = todayOrders?.let { "$it 单" } ?: "今日订单数未给"
+    val totalWeightText: String get() = totalWeight?.let { "${yuan(it)} kg" } ?: "后端无此口径"
 }
 
 data class HandoverTask(
