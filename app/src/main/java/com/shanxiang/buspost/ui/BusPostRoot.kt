@@ -60,6 +60,7 @@ import com.shanxiang.buspost.ui.user.SendScreen
 import com.shanxiang.buspost.ui.user.MapPointPickerScreen
 import com.shanxiang.buspost.ui.user.SendAddressPickerScreen
 import com.shanxiang.buspost.ui.user.BusQrScreen
+import com.shanxiang.buspost.ui.user.WalletScreen
 import com.shanxiang.buspost.ui.user.SettingsScreen
 import com.shanxiang.buspost.ui.user.TraceScreen
 import com.shanxiang.buspost.ui.user.UserShell
@@ -212,6 +213,8 @@ fun BusPostRoot() {
         composable(Routes.SEND_ADDRESS_PICKER) { com.shanxiang.buspost.ui.common.BusRouteBody { SendAddressPickerScreen() } }
         // 乘车码：当地公交乘车二维码
         composable(Routes.BUS_QR) { com.shanxiang.buspost.ui.common.BusRouteBody { BusQrScreen() } }
+        // 钱包：余额、充值、交易记录
+        composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }
     }
 
     // 闪屏压在导航图之上（含底部导航栏），与小程序"页面内 fixed 遮罩 + 隐藏 tabBar"等效

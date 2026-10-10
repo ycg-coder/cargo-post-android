@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,9 @@ import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.ui.common.BackTopBar
 import com.shanxiang.buspost.ui.common.LocalNavController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+private val DEFAULT_CENTER = Geo(29.5630, 106.5516)
 
 /**
  * 地图选点页：用户在地图上点击选择位置，底部显示逆地理地址和坐标。
@@ -73,15 +77,24 @@ fun MapPointPickerScreen(
     var addressText by remember { mutableStateOf("") }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var marker by remember { mutableStateOf<Marker?>(null) }
+    var locating by remember { mutableStateOf(selectedGeo == null) }
 
     LaunchedEffect(Unit) {
-        // 如果没有初始位置，用当前位置
         if (selectedGeo == null) {
-            val current = Locator.once(context)
-            if (current != null) {
-                selectedGeo = current
-            }
+            // 用较长超时，确保拿到真实位置；Locator 内部已有缓存→GPS→旧缓存三级回落
+            val current = Locator.once(context, timeoutMs = 15000L)
+            selectedGeo = current ?: DEFAULT_CENTER
+            locating = false
         }
+    }
+
+    // 定位完成或初始坐标变化时，移动相机
+    LaunchedEffect(selectedGeo, mapView) {
+        val map = mapView?.map ?: return@LaunchedEffect
+        val geo = selectedGeo ?: return@LaunchedEffect
+        val latLng = LatLng(geo.lat, geo.lng)
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+        updateMarker(map, marker, geo)?.let { marker = it }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -98,17 +111,9 @@ fun MapPointPickerScreen(
                             aMap.uiSettings.isZoomControlsEnabled = true
                             aMap.uiSettings.isCompassEnabled = true
 
-                            // 点击地图选择位置
                             aMap.setOnMapClickListener { latLng ->
                                 val geo = Geo(latLng.latitude, latLng.longitude)
                                 selectedGeo = geo
-                                updateMarker(aMap, marker, geo)?.let { marker = it }
-                            }
-
-                            // 初始位置
-                            selectedGeo?.let { geo ->
-                                val latLng = LatLng(geo.lat, geo.lng)
-                                aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
                                 updateMarker(aMap, marker, geo)?.let { marker = it }
                             }
                         }
@@ -118,20 +123,76 @@ fun MapPointPickerScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 中心十字准星（提示用户点击选点）
-            if (selectedGeo == null) {
+            // 定位中提示
+            if (locating) {
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.15f))
                         .clickable(enabled = false) {},
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        BusIcons.location,
-                        null,
-                        tint = t.primary.copy(alpha = 0.6f),
-                        modifier = Modifier.size(48.dp),
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = t.primary,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "正在获取位置…",
+                            color = t.ink,
+                            fontSize = (13 * scale).sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+
+            // 回到当前位置按钮
+            if (!locating) {
+                var relocating by remember { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.BottomEnd,
+                ) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(BusRadius.m))
+                            .background(Color.White)
+                            .clickable {
+                                relocating = true
+                                scope.launch {
+                                    val loc = Locator.once(context, timeoutMs = 10000L)
+                                    if (loc != null) {
+                                        selectedGeo = loc
+                                        mapView?.map?.let { aMap ->
+                                            val latLng = LatLng(loc.lat, loc.lng)
+                                            aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+                                        }
+                                    }
+                                    relocating = false
+                                }
+                            }
+                            .padding(12.dp),
+                    ) {
+                        if (relocating) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                color = t.primary,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                BusIcons.myLocation,
+                                "回到当前位置",
+                                tint = t.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

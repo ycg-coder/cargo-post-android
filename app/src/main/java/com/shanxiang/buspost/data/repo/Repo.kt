@@ -1021,6 +1021,110 @@ object Repo {
     suspend fun submitFeedback(content: String, name: String, mobile: String): Ack =
         Ack(Api.post("$T/feedback/create", mapOf("content" to content, "name" to name, "mobile" to mobile)).demo)
 
+    // ---------- 钱包 ----------
+
+    data class WalletBalance(
+        val balance: Double,
+        val frozenAmount: Double,
+        val totalRecharge: Double,
+        val totalSpent: Double,
+    ) {
+        companion object {
+            fun parse(obj: JSONObject): WalletBalance = WalletBalance(
+                balance = obj.optDouble("balance", 0.0),
+                frozenAmount = obj.optDouble("frozenAmount", 0.0),
+                totalRecharge = obj.optDouble("totalRecharge", 0.0),
+                totalSpent = obj.optDouble("totalSpent", 0.0),
+            )
+        }
+    }
+
+    data class WalletTx(
+        val transactionNo: String,
+        val type: String,
+        val amount: Double,
+        val balanceAfter: Double,
+        val title: String,
+        val payMethod: String,
+        val status: Int,
+        val createTime: String,
+    ) {
+        companion object {
+            fun parse(obj: JSONObject): WalletTx = WalletTx(
+                transactionNo = obj.optString("transactionNo", ""),
+                type = obj.optString("type", ""),
+                amount = obj.optDouble("amount", 0.0),
+                balanceAfter = obj.optDouble("balanceAfter", 0.0),
+                title = obj.optString("title", ""),
+                payMethod = obj.optString("payMethod", ""),
+                status = obj.optInt("status", 0),
+                createTime = obj.optString("createTime", ""),
+            )
+        }
+    }
+
+    suspend fun walletBalance(): WalletBalance = try {
+        val p = Api.get("$T/wallet/balance")
+        WalletBalance.parse(p.obj ?: org.json.JSONObject())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        WalletBalance(0.0, 0.0, 0.0, 0.0)
+    }
+
+    suspend fun walletRecharge(amount: Double): WalletTx? = try {
+        val p = Api.post("$T/wallet/recharge", emptyMap(), mapOf("amount" to amount))
+        WalletTx.parse(p.obj ?: org.json.JSONObject())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * 创建充值支付订单。返回 { orderNo, orderString, channel, simulated }
+     * - channel=alipay 且 orderString 非空 → 客户端用 orderString 调起支付宝
+     * - simulated=true → 支付未配置，走模拟充值
+     */
+    suspend fun createPayOrder(amount: Double, channel: String = "alipay"): org.json.JSONObject? = try {
+        val p = Api.post("$T/wallet/create-pay-order", emptyMap(), mapOf("amount" to amount, "channel" to channel))
+        p.obj
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    /** 查询支付订单状态（前端轮询确认） */
+    suspend fun queryPayOrder(orderNo: String): org.json.JSONObject? = try {
+        val p = Api.get("$T/wallet/query-pay-order", mapOf("orderNo" to orderNo))
+        p.obj
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    suspend fun walletPay(amount: Double, title: String, refNo: String = ""): WalletTx? = try {
+        val p = Api.post("$T/wallet/pay", emptyMap(), mapOf("amount" to amount, "title" to title, "refNo" to refNo))
+        WalletTx.parse(p.obj ?: org.json.JSONObject())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    suspend fun walletTransactions(limit: Int = 20): List<WalletTx> = try {
+        val p = Api.get("$T/wallet/transactions", mapOf("limit" to limit))
+        p.arr?.let { arr ->
+            (0 until arr.length()).map { WalletTx.parse(arr.getJSONObject(it)) }
+        } ?: emptyList()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        emptyList()
+    }
+
     // ---------- 司机端读取 ----------
 
     private val driverId: Long get() = Prefs.driverId

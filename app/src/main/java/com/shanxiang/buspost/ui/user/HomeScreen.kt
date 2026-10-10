@@ -408,11 +408,11 @@ fun HomeScreen(
             FeatureTile(BusIcons.bell, "消息通知", FeatureBg.GOLD, {
                 if (guest) onLoginClick?.invoke() else nav.navigate(Routes.NOTIFICATIONS)
             }, Modifier.weight(1f), 5)
-            FeatureTile(BusIcons.wallet, "出行优惠", FeatureBg.DEEP, {
-                if (guest) onLoginClick?.invoke() else onSelectTab(3)
+            FeatureTile(BusIcons.wallet, "钱包", FeatureBg.DEEP, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.WALLET)
             }, Modifier.weight(1f), 6)
-            FeatureTile(BusIcons.calendar, "我的订单", FeatureBg.CLAY, {
-                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.ORDERS)
+            FeatureTile(BusIcons.camera, "扫一扫", FeatureBg.CLAY, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.BUS_QR)
             }, Modifier.weight(1f), 7)
         }
         }

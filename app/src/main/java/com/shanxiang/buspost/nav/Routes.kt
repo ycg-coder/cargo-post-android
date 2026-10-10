@@ -30,6 +30,8 @@ object Routes {
     const val SEND_ADDRESS_PICKER = "sendAddressPicker"
     /** 乘车码：当地公交乘车二维码 */
     const val BUS_QR = "busQr"
+    /** 钱包：余额、充值、交易记录 */
+    const val WALLET = "wallet"
     const val FEEDBACK = "feedback"
     const val SETTINGS = "settings"
     /** 设置 → 关于 →「地图与开源许可」：OSM 署名与随包分发的第三方组件清单（指令 v2.1 ⑭） */

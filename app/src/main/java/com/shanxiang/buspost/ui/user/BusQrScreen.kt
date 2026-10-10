@@ -1,5 +1,9 @@
 package com.shanxiang.buspost.ui.user
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,6 +12,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,9 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -40,19 +48,17 @@ import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.QrView
 import com.shanxiang.buspost.ui.common.BackTopBar
 
-/**
- * 乘车码页面：展示当地公交乘车二维码，扫码上车。
- * 对标支付宝/微信乘车码：大二维码 + 动态刷新 + 线路提示。
- */
+private const val ALIPAY_TRANSIT_QR = "alipays://platformapi/startapp?appId=20001104"
+private const val ALIPAY_QR_SCANNER = "alipays://platformapi/startapp?appId=10000007"
+
 @Composable
 fun BusQrScreen() {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val context = LocalContext.current
 
-    // 二维码内容：用用户ID + 时间戳生成动态码（每分钟刷新）
     val qrContent = "BUSPOST-QR:${System.currentTimeMillis() / 60000}"
 
-    // 呼吸动画提示扫码
     val infiniteTransition = rememberInfiniteTransition(label = "qr-pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
@@ -64,6 +70,22 @@ fun BusQrScreen() {
         label = "pulse",
     )
 
+    fun openAlipayTransit() {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ALIPAY_TRANSIT_QR)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "未检测到支付宝，请先安装支付宝", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openAlipayScanner() {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ALIPAY_QR_SCANNER)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "未检测到支付宝，请先安装支付宝", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         BackTopBar(title = "乘车码", subtitle = "扫码乘车 · 到站自动扣费")
 
@@ -72,23 +94,35 @@ fun BusQrScreen() {
                 .fillMaxWidth()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // 顶部提示
-            BusCard(modifier = Modifier.fillMaxWidth(), warm = true) {
+            // 支付宝乘车码入口（主推）
+            BusCard(
+                modifier = Modifier.fillMaxWidth().clickable { openAlipayTransit() },
+                warm = true,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(BusIcons.bus, null, tint = t.goldDeep, modifier = Modifier.size(20.dp))
-                    Column(Modifier.padding(start = 10.dp).weight(1f)) {
-                        Text("城乡公交乘车码", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
-                        Text("请将二维码对准车载扫码机", color = t.textSecondary, fontSize = (12 * scale).sp)
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1677FF)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("支", color = Color.White, fontSize = (16 * scale).sp, fontWeight = FontWeight.Black)
                     }
+                    Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                        Text("重庆公交乘车码", color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
+                        Text("支付宝官方 · 全市公交通用", color = t.textSecondary, fontSize = (12 * scale).sp)
+                    }
+                    Text("打开 →", color = t.primaryOnLight, fontSize = (13 * scale).sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            // 二维码区域
+            // 本 App 二维码
             Box(
                 Modifier
-                    .size(240.dp)
+                    .size(220.dp)
                     .clip(RoundedCornerShape(BusRadius.l))
                     .background(Color.White)
                     .border(
@@ -96,7 +130,7 @@ fun BusQrScreen() {
                         color = t.primary.copy(alpha = pulseAlpha),
                         shape = RoundedCornerShape(BusRadius.l),
                     )
-                    .padding(20.dp),
+                    .padding(18.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 QrView(
@@ -106,14 +140,30 @@ fun BusQrScreen() {
                 )
             }
 
-            // 刷新提示
             Text(
-                "二维码每分钟自动刷新",
+                "乡邮智联乘车码 · 每分钟自动刷新",
                 color = t.textTertiary,
                 fontSize = (11 * scale).sp,
+                textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(8.dp))
+            // 双入口按钮
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                BusButton(
+                    text = "支付宝乘车码",
+                    onClick = ::openAlipayTransit,
+                    modifier = Modifier.weight(1f),
+                )
+                BusButton(
+                    text = "扫码付款",
+                    onClick = ::openAlipayScanner,
+                    modifier = Modifier.weight(1f),
+                    variant = com.shanxiang.buspost.core.ui.BusButtonVariant.OUTLINE,
+                )
+            }
 
             // 支持的线路
             BusCard(modifier = Modifier.fillMaxWidth()) {
@@ -148,7 +198,7 @@ fun BusQrScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("使用须知", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "· 上车扫码，下车无需再扫\n· 票价按站点距离自动计算\n· 余额不足时请提前充值\n· 如遇扫码失败请联系司机",
+                        "· 推荐使用支付宝乘车码，全市公交通用\n· 上车扫码，下车无需再扫\n· 票价按站点距离自动计算\n· 余额不足时请提前充值",
                         color = t.textSecondary,
                         fontSize = (12 * scale).sp,
                         lineHeight = (18 * scale).sp,
