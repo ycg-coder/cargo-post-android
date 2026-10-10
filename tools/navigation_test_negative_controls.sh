@@ -79,7 +79,7 @@ case_run() { # $1=编号 $2=破口说明
   # 「✘ 用例仍然全绿，这条判据证明不了任何东西」——一条假发现。red 里的字节比对挡不住这种，因为比对压根没跑到。
   cmp -s "$BAK/NavigationEngine.kt" "$NE" && { echo "✘ $1 注入没落地：源码与基线逐字节相同（空跑），拒绝跑 gradle，更拒绝记成判据失效"; exit 5; }
   rm -f $XML
-  ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > "/tmp/nav_neg_$1.log" 2>&1
+  ./gradlew $JVMARGS :app:testDebugUnitTest --rerun-tasks $CLS > "/tmp/nav_neg_$1.log" 2>&1
   code=$?
   n=$(fails $XML)
   if [ "$n" = "NOXML" ]; then
@@ -94,7 +94,7 @@ case_run() { # $1=编号 $2=破口说明
   restore
 }
 
-echo "[基线]"; ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > /tmp/nav_neg_baseline.log 2>&1
+echo "[基线]"; ./gradlew $JVMARGS :app:testDebugUnitTest --rerun-tasks $CLS > /tmp/nav_neg_baseline.log 2>&1
 BASE=$?
 if [ "$BASE" != 0 ]; then echo "✘ 基线就红（exit=$BASE），下面每条都失去意义"; exit 1; fi
 echo "  ✔ 基线 exit=0 failures=$(fails $XML)"
@@ -489,7 +489,7 @@ case_run M37 "自动进导航不再受进程内一次性约束"
 
 echo
 cmp -s "$BAK/NavigationEngine.kt" "$NE" && echo "✔ 恢复核对：与改前基线逐字节相同" || echo "✘ 恢复失败：源码与基线不一致"
-./gradlew $JVMARGS :app:testDebugUnitTest $CLS > /tmp/nav_neg_after.log 2>&1
+./gradlew $JVMARGS :app:testDebugUnitTest --rerun-tasks $CLS > /tmp/nav_neg_after.log 2>&1
 AFTER=$?
 echo "[恢复后复跑] exit=$AFTER failures=$(fails $XML)"
 [ "$AFTER" = 0 ] && echo "✔ 全部破口已回滚，用例重新全绿" || { echo "✘ 恢复后仍红，本轮未收口"; exit 1; }

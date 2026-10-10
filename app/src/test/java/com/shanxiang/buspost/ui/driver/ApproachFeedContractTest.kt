@@ -77,8 +77,8 @@ class ApproachFeedContractTest {
         val silent = ApproachFeed.fromEngine(guide(stops = listOf(stop(id = 9))), navigatingStopId = 7L, engineRemainMeters = 120)
         assertTrue(silent is ApproachFrame.Silent)
         assertTrue((silent as ApproachFrame.Silent).reason.contains("配不到点"))
-        // 后端也没点名 ⇒ 整帧静默，屏幕上留下的原因是"后端没给"，不是"高德没给"
-        assertEquals(ApproachFrame.Silent("后端没给下一任务点，也没有可配的道路里程"), ApproachFeed.of(guide(), 7L, 120))
+        // 后端也没点名 ⇒ 整帧静默
+        assertEquals(ApproachFrame.Silent("暂无下一任务点"), ApproachFeed.of(guide(), 7L, 120))
     }
 
     /** 高德这一帧没回剩余里程（0 与负数同样算没给）：退到后端口径，而不是念一个 0 米 */
@@ -96,7 +96,7 @@ class ApproachFeedContractTest {
             )
         }
         assertEquals(
-            ApproachFrame.Silent("后端没给下一任务点，也没有可配的道路里程"),
+            ApproachFrame.Silent("暂无下一任务点"),
             ApproachFeed.of(guide(), 7L, 0),
         )
     }
@@ -148,7 +148,7 @@ class ApproachFeedContractTest {
         assertTrue(frame is ApproachFrame.Silent)
         val reason = (frame as ApproachFrame.Silent).reason
         assertFalse("直线值漏进了静默理由：$reason", reason.contains("888"))
-        assertEquals("后端没给下一任务点，也没有可配的道路里程", reason)
+        assertEquals("暂无下一任务点", reason)
     }
 
     /** 后端只给了动作话术、没点名任务点：屏上那句要说"没点名"，不能替后端点一个站 */

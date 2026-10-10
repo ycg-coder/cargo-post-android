@@ -227,7 +227,7 @@ fun DriverSdkNavCard(
                 InfoRow("导航", if (gate.canNavigate) gate.userText else gate.reason)
                 InfoRow(
                     "剩余里程",
-                    sdkFrame?.let { if (it.hasRemainDistance) formatSdkMeters(it.remainMeters) else "高德没给" }
+                    sdkFrame?.let { if (it.hasRemainDistance) formatSdkMeters(it.remainMeters) else "暂未知" }
                         ?: "还没开始导航",
                 )
             }
@@ -238,7 +238,7 @@ fun DriverSdkNavCard(
                 if (!gate.canNavigate) InfoRow("差在哪一步", gate.detail)
                 InfoRow(
                     "当前位置",
-                    if (vehicleGeo != null) "%.5f, %.5f".format(vehicleGeo.lat, vehicleGeo.lng) else "本机还没有定位",
+                    if (vehicleGeo != null) "%.5f, %.5f".format(vehicleGeo.lat, vehicleGeo.lng) else "暂无定位",
                 )
                 InfoRow(
                     "导航目的地",
@@ -305,11 +305,11 @@ fun DriverSdkNavCard(
                             InfoRow(
                                 "道路里程",
                                 if (route.roadDistanceMeters > 0) formatSdkMeters(route.roadDistanceMeters)
-                                else "高德没给（不用直线距离补）",
+                                else "暂无",
                             )
                             InfoRow(
                                 "道路耗时",
-                                if (route.roadEtaSeconds > 0) "${route.roadEtaSeconds / 60} 分钟" else "高德没给",
+                                if (route.roadEtaSeconds > 0) "${route.roadEtaSeconds / 60} 分钟" else "暂无",
                             )
                             InfoRow("折线点数", "${route.points.size} 点")
 
@@ -347,33 +347,33 @@ fun DriverSdkNavCard(
                     }
                 }
 
-                // 高德这一帧没回过 = 页面没有任何"推进"可显示；这里不做假步进，也不留最后一个数
+                // 导航实时数据
                 sdkFrame?.let { frame ->
                     BusDivider(Modifier.padding(vertical = 6.dp))
                     Text(
-                        "高德实时回执（最近一帧）",
+                        "导航实时数据",
                         color = t.textSecondary,
                         fontSize = (12 * scale).sp,
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     InfoRow(
                         "剩余里程",
-                        if (frame.hasRemainDistance) formatSdkMeters(frame.remainMeters) else "高德没给",
+                        if (frame.hasRemainDistance) formatSdkMeters(frame.remainMeters) else "暂未知",
                     )
                     InfoRow(
                         "剩余时间",
-                        if (frame.remainSeconds > 0) "${frame.remainSeconds / 60} 分钟" else "高德没给",
+                        if (frame.remainSeconds > 0) "${frame.remainSeconds / 60} 分钟" else "暂未知",
                     )
-                    InfoRow("当前道路", frame.currentRoad.ifEmpty { "高德没给" })
-                    InfoRow("下一段道路", frame.nextRoad.ifEmpty { "高德没给" })
+                    InfoRow("当前道路", frame.currentRoad.ifEmpty { "暂未知" })
+                    InfoRow("下一段道路", frame.nextRoad.ifEmpty { "暂未知" })
                     InfoRow(
-                        "高德步骤号",
-                        if (frame.hasStepProgress) "${frame.sdkStepIndex}" else "高德没给（不显示第 N 步）",
+                        "步骤",
+                        if (frame.hasStepProgress) "${frame.sdkStepIndex}" else "暂未知",
                     )
-                    // 转向名只查 javap 核对过的 IconType 表；表外的码就说"不在这张表里"，不猜一个动作
+                    // 转向名只查核对过的 IconType 表；表外的码就说"暂不支持"
                     InfoRow(
                         "转向",
-                        turnIconSpeechOf(frame.iconType) ?: "高德给了一个不在这张表里的转向码（${frame.iconType}）",
+                        turnIconSpeechOf(frame.iconType) ?: "暂不支持此转向类型",
                     )
                     // 车道（赛道第 10 步）：帧只能来自高德的 showLaneInfo/hideLaneInfo，四种说法由 laneDisplayTextOf 一个出口给。
                     // 「高德没给」与「这条路没车道」不是一句；开关关掉时那一句走 guidanceSwitchOffText（与下面的播报行同一个出口）。
@@ -392,8 +392,8 @@ fun DriverSdkNavCard(
                     InfoRow(
                         "播报",
                         when {
-                            !Prefs.voiceGuidance -> guidanceSwitchOffText("语音播报", "没让高德播报（开始导航时传的就是关）")
-                            else -> (sdkVoice?.text ?: "高德没给") +
+                            !Prefs.voiceGuidance -> guidanceSwitchOffText("语音播报", "语音播报已关闭")
+                            else -> (sdkVoice?.text ?: "暂无播报") +
                                 (naviVoiceTypeNameOf(sdkVoice?.typeCode)?.let { "（$it）" } ?: "")
                         },
                     )

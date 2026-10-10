@@ -108,7 +108,7 @@ fun TraceView(
 
         SectionTitle(
             "线路图",
-            subtitle = if (trace.polyline.size >= 2) "后端下发的真实道路折线" else "后端未下发折线，不画示意线",
+            subtitle = if (trace.polyline.size >= 2) "实际道路轨迹" else "暂无道路轨迹",
         )
         RouteMap(
             polyline = trace.polyline,
@@ -127,7 +127,7 @@ fun TraceView(
                 "车辆位置：" + (trace.locationSource.knownLabel ?: "新鲜度未给") +
                     if (trace.lastReportTime.isEmpty()) "，上报时间未给" else "，上报时间 ${trace.lastReportTime}"
             } else {
-                "暂无实时位置（后端未下发承运车辆坐标）"
+                "暂无实时位置"
             },
             color = t.textTertiary,
             fontSize = (12.5 * scale).sp,
@@ -140,7 +140,7 @@ fun TraceView(
                 "当前任务：" + trace.carrierTaskStatus +
                     if (trace.carrierTaskTime.isEmpty()) "" else "（更新于 ${trace.carrierTaskTime}）"
             } else {
-                "当前任务：后端未下发（尚未派单，或本单无权查看作业明细）"
+                "当前任务：暂无数据（尚未派单，或无权查看明细）"
             },
             color = t.textTertiary,
             fontSize = (12.5 * scale).sp,

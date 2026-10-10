@@ -742,21 +742,21 @@ internal fun laneFrameOf(
  * 包里没有任何材料说清这两个数组各指哪一层，所以这里**不译成**"建议车道/全部车道"那种解释。
  */
 internal fun laneDisplayTextOf(display: LaneDisplay?): String = when (display) {
-    null -> "高德没给车道信息（这不等于这条路没有车道）"
+    null -> "暂时没拿到车道信息"
 
-    LaneDisplay.Cleared -> "高德已不显示车道（hideLaneInfo）"
+    LaneDisplay.Cleared -> "当前路段不显示车道"
 
     is LaneDisplay.Groups ->
-        "高德给了 ${display.groupCount} 组车道（数组重载）；它附带的两个 byte[] 语义本机没核过，不替你挑哪一组"
+        "高德给了 ${display.groupCount} 组车道信息"
 
     is LaneDisplay.Single -> {
         val frame = display.frame
-        val background = if (frame.backgroundCount == 0) "没给"
+        val background = if (frame.backgroundCount == 0) "无"
         else frame.backgroundCodes.joinToString("、") { laneCellLabel(it) }
-        val front = if (frame.frontCount == 0) "没给"
+        val front = if (frame.frontCount == 0) "无"
         else frame.frontCodes.joinToString("、") { laneCellLabel(it) }
-        "laneCount=${frame.laneCount}；backgroundLane[$background]；frontLane[$front]" +
-            if (frame.countsAgree) "" else "（三个数对不上：laneCount=${frame.laneCount}、backgroundLane ${frame.backgroundCount} 条、frontLane ${frame.frontCount} 条；本机不补齐，也不按顺序把两个数组配成同一条道）"
+        "共 ${frame.laneCount} 条车道：后方 $background，前方 $front" +
+            if (frame.countsAgree) "" else "（车道数对不上，以实际路况为准）"
     }
 }
 

@@ -120,8 +120,8 @@ class DriverLegStateMapperTest {
 
         val broken = DriverLegStateMapper.of(leg(99))
         assertNull(broken.next)
-        // 不许本机 accept 重试到 2：异常段由调度重排（docs/STATUS_MAPPING.md §4）
-        assertTrue(broken.waitingReason!!.contains("不自行重试"))
+        // 异常段由调度重排
+        assertTrue(broken.waitingReason!!.contains("该段已异常"))
         assertTrue(!broken.canReportException)
     }
 
@@ -131,7 +131,7 @@ class DriverLegStateMapperTest {
         assertNull(flow.next)
         assertEquals(0, flow.doneSteps)
         assertTrue(!flow.isCompleted)
-        assertTrue(flow.waitingReason!!.contains("后端没给段状态"))
+        assertTrue(flow.waitingReason!!.contains("状态未知"))
     }
 
     @Test
@@ -166,7 +166,7 @@ class DriverLegStateMapperTest {
     fun `交接中却没有换乘交接单时不猜该确认哪张`() {
         val flow = DriverLegStateMapper.of(leg(9, handoverRequired = false))
         assertNull(flow.next)
-        assertTrue(flow.waitingReason!!.contains("没给出换乘交接单"))
+        assertTrue(flow.waitingReason!!.contains("缺少换乘交接单"))
     }
 
     @Test

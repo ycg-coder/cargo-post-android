@@ -305,7 +305,7 @@ private fun AmapNaviSurface(
 ) {
     var failed by remember { mutableStateOf<String?>(null) }
     if (BuildConfig.AMAP_KEY.isBlank()) {
-        failed = "本机没有配置高德 Android key（BuildConfig.AMAP_KEY 为空），导航视图起不来"
+        failed = "地图服务未配置，导航视图无法启动"
     }
     var viewRef by remember { mutableStateOf<AMapNaviView?>(null) }
 

@@ -751,17 +751,17 @@ class NavigationContractTest {
         val frame = laneFrameOf(laneCount = 3, backgroundLane = intArrayOf(0, 3), frontLane = intArrayOf(1))
         assertEquals(2, frame.backgroundCount)
         assertEquals(1, frame.frontCount)
-        assertFalse("laneCount=3 而两个数组分别 2 条 / 1 条：不许把短的补齐", frame.countsAgree)
+        assertFalse("车道数对不上：不许把短的补齐", frame.countsAgree)
 
         val text = laneDisplayTextOf(LaneDisplay.Single(frame))
-        assertTrue(text.contains("laneCount=3"))
-        assertTrue("背景那串自己念自己：$text", text.contains("backgroundLane[直行、右转]"))
-        assertTrue("前景那串自己念自己：$text", text.contains("frontLane[左转]"))
+        assertTrue("要报总车道数：$text", text.contains("共 3 条车道"))
+        assertTrue("后方车道要念出来：$text", text.contains("后方 直行、右转"))
+        assertTrue("前方车道要念出来：$text", text.contains("前方 左转"))
         assertFalse("不许把 background=0 与 front=1 配成「直行或左转」", text.contains("直行或左转"))
-        assertTrue("三个数对不上要明说：$text", text.contains("三个数对不上"))
+        assertTrue("车道数对不上要明说：$text", text.contains("车道数对不上"))
     }
 
-    /** 数组没条目 ≠ 高德没给这一格：空数组是"给了对象、里面 0 条"，话术里要有 `laneCount=0` 而不是"没给车道信息" */
+    /** 数组没条目 ≠ 高德没给这一格：空数组是"给了对象、里面 0 条"，话术里要有车道数 0 而不是"没拿到车道信息" */
     @Test
     fun `车道帧的空数组收成空列表不补数`() {
         val frame = laneFrameOf(laneCount = 0, backgroundLane = null, frontLane = intArrayOf())
@@ -769,48 +769,48 @@ class NavigationContractTest {
         assertEquals(emptyList<Int>(), frame.frontCodes)
         assertTrue(frame.countsAgree)
         val text = laneDisplayTextOf(LaneDisplay.Single(frame))
-        assertTrue(text.contains("backgroundLane[没给]"))
-        assertTrue(text.contains("frontLane[没给]"))
+        assertTrue("后方无车道要显示'无'：$text", text.contains("后方 无"))
+        assertTrue("前方无车道要显示'无'：$text", text.contains("前方 无"))
         assertNotEquals(laneDisplayTextOf(null), text)
     }
 
     /**
      * 四格分开，一格一个结论（§八 ㉛「没问到」与「没有」是两格那条规矩的车道版）：
-     * 没回调过 / 高德已经不显示 / 走的是数组重载 / 单组能逐条念。
+     * 没回调过 / 高德已经不显示 / 多组车道 / 单组能逐条念。
      */
     @Test
-    fun `没给过与已经不给与数组重载是三种不同说法`() {
-        assertEquals("高德没给车道信息（这不等于这条路没有车道）", laneDisplayTextOf(null))
-        assertEquals("高德已不显示车道（hideLaneInfo）", laneDisplayTextOf(LaneDisplay.Cleared))
+    fun `没给过与已经不给与多组车道是三种不同说法`() {
+        assertEquals("暂时没拿到车道信息", laneDisplayTextOf(null))
+        assertEquals("当前路段不显示车道", laneDisplayTextOf(LaneDisplay.Cleared))
         val groups = laneDisplayTextOf(LaneDisplay.Groups(2))
         assertTrue(groups.contains("2 组"))
-        assertTrue(groups.contains("不替你挑哪一组"))
-        assertFalse("数组重载那一格不许念出任何具体车道", Regex("直行|左转|右转|掉头").containsMatchIn(groups))
+        assertFalse("多组车道那一格不许念出任何具体车道", Regex("直行|左转|右转|掉头").containsMatchIn(groups))
     }
 
     /**
-     * 数组重载即使只有一个元素也不塌成单组。
+     * 多组车道即使只有一个元素也不塌成单组。
      *
-     * `first()` 看着无害，但它把"两个 byte[] 语义没核过"这件事一起塌掉了 ——
+     * `first()` 看着无害，但它把"两组车道的语义没核过"这件事一起塌掉了 ——
      * 页面会显示得像 `showLaneInfo(AMapLaneInfo)` 那条路径的产物，而两条路径给的字段完整度并不同。
      */
     @Test
-    fun `数组重载哪怕一组也不冒充单组`() {
+    fun `多组车道哪怕一组也不冒充单组`() {
         val groups: LaneDisplay = LaneDisplay.Groups(1)
         assertFalse(groups is LaneDisplay.Single)
         val text = laneDisplayTextOf(groups)
-        assertTrue(text.contains("1 组车道（数组重载）"))
-        assertFalse(text.contains("backgroundLane["))
+        assertTrue(text.contains("1 组车道"))
+        assertFalse(text.contains("后方"))
+        assertFalse(text.contains("前方"))
     }
 
-    /** 替身引擎一帧车道都不该有：它没有高德的回调，写"高德说这条路没车道"就是替高德说话 */
+    /** 替身引擎一帧车道都不该有：它没有高德的回调，写"暂时没拿到"是事实，写"这条路没车道"就是替高德说话 */
     @Test
     fun `替身引擎的车道流恒空`() {
         val blocked = BlockedNavigationEngine(
             readinessOf(sdkPresent = false, keyConfigured = true, initResult = null),
         )
         assertNull(blocked.lane.value)
-        assertEquals("高德没给车道信息（这不等于这条路没有车道）", laneDisplayTextOf(blocked.lane.value))
+        assertEquals("暂时没拿到车道信息", laneDisplayTextOf(blocked.lane.value))
     }
 
     // ---------- 赛道第 11 步：偏航重算（只能由导航引擎触发） ----------

@@ -48,7 +48,7 @@ object ApproachFeed {
         val name = guide.nextStopName
         if (name.isEmpty()) {
             return ApproachFrame.Silent(
-                if (guide.nextActionName.isEmpty()) "后端没给下一任务点，也没有可配的道路里程"
+                if (guide.nextActionName.isEmpty()) "暂无下一任务点"
                 else "后端说下一任务是「${guide.nextActionName}」，但没点名是哪个任务点",
             )
         }

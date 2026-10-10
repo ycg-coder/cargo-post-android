@@ -52,12 +52,12 @@ class ApproachAnnouncer(private val context: Context) {
         tts = TextToSpeech(context) { status ->
             ttsInit = status
             if (status != TextToSpeech.SUCCESS) {
-                _status.value = "本机语音引擎初始化失败，到近提醒转通知栏"
+                _status.value = "语音引擎初始化失败，到近提醒转通知栏"
             } else {
                 val lang = tts?.setLanguage(Locale.CHINA)
                 _status.value = if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED)
-                    "本机没有中文语音数据，到近提醒转通知栏"
-                else "本机语音引擎就绪，到近会读出来"
+                    "没有中文语音数据，到近提醒转通知栏"
+                else "语音引擎就绪，到近会读出来"
             }
         }
     }
@@ -100,7 +100,7 @@ class ApproachAnnouncer(private val context: Context) {
             )
             _status.value = "系统语音没出声，已转通知栏（点了会进工作台）"
         } else {
-            _status.value = "本机没出声：既没有可用语音，通知也被系统关着 —— 只有这一行字"
+            _status.value = "未出声：既没有可用语音，通知也被系统关着 —— 只有这一行字"
         }
     }
 

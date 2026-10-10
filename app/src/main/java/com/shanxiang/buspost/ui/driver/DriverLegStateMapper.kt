@@ -127,11 +127,11 @@ object DriverLegStateMapper {
 
     private fun waitingReasonOf(status: LegStatus?): String? = when (status) {
         null, LegStatus.EXCEPTION ->
-            "${STATUS_UNAVAILABLE_LABEL}：${if (status == null) "后端没给段状态" else "该段已异常"}，请联系调度，本机不自行重试"
+            "${STATUS_UNAVAILABLE_LABEL}：${if (status == null) "状态未知" else "该段已异常"}，请联系调度"
         LegStatus.PLANNED -> "本段尚未派给你，等待调度派单"
         LegStatus.COMPLETED -> null
         // 段在"交接中"却不需要交接：两个字段互相矛盾，本机不挑一个信，等回读
-        LegStatus.HANDOVER -> "后端说本段在交接中，但没给出换乘交接单，请下拉刷新核对"
-        else -> "该状态没有可由司机端发起的动作，请下拉刷新"
+        LegStatus.HANDOVER -> "本段在交接中，但缺少换乘交接单，请下拉刷新核对"
+        else -> "请下拉刷新"
     }
 }

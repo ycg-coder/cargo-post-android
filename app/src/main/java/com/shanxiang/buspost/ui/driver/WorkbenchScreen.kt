@@ -856,7 +856,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                                     Text("本班已完成", color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
                                     Text(
                                         // 收班小结也只剩 loadedCount 这一个件数口径（orderCount 无生产者，念出来就是编数）
-                                        "${shift.lineName.ifEmpty { "本机班次" }} · ${shift.loadedCount} 件货物已全部处理",
+                                        "${shift.lineName.ifEmpty { "当前班次" }} · ${shift.loadedCount} 件货物已全部处理",
                                         color = t.textSecondary,
                                         fontSize = (12.5 * scale).sp,
                                         modifier = Modifier.padding(top = 4.dp),
@@ -1234,7 +1234,7 @@ private fun ShiftCard(
         },
     ) {
         Column(Modifier.weight(1f)) {
-            Text(shift.lineName.ifEmpty { "本机班次" }, color = t.ink, fontSize = (16 * scale).sp, fontWeight = FontWeight.Bold)
+            Text(shift.lineName.ifEmpty { "当前班次" }, color = t.ink, fontSize = (16 * scale).sp, fontWeight = FontWeight.Bold)
             Text(
                 listOf(shift.departTime, shift.arriveTime).filter { it.isNotEmpty() }.joinToString(" → ") + " 发车",
                 color = t.textSecondary,
