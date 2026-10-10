@@ -152,7 +152,7 @@ fun DriverSdkNavCard(
             "BUS_UI",
             "nav_card gate=${gate.code} canNavigate=${gate.canNavigate} detail=${gate.detail} " +
                 "origin=${vehicleGeo?.lat},${vehicleGeo?.lng} nextStop=${nextStop?.stationId}@${nextStop?.name} " +
-                "remainMeters=${sdkFrame?.remainMeters} stops=${guide.stops.size}",
+                "remainMeters=${sdkFrame?.remainMeters} stops=${guide.stops.size} source=${guide.routeSourceName}",
         )
     }
 

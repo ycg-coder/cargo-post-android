@@ -153,7 +153,7 @@ class Map3DVisualContractTest {
         assertEquals("", Map3DVisual.footnoteOf(GpsFixState.LIVE, ""))
         // 策略因为"没绑司机"而停报时，定位这点其实是新的：地图脚注不该跟着谎报定位降级
         assertEquals(
-            "任务点 0 个 · 顺序由调度下发 · 道路里程接口未给",
+            "本班 0 站 · 道路里程暂无，开始导航后给实时剩余",
             missionFootnote(RouteGuide.EMPTY, Map3DVisual.footnoteOf(GpsFixState.LIVE, "司机身份未绑定（该账号没有司机档案）")),
         )
     }

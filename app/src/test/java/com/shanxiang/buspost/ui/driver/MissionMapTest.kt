@@ -181,12 +181,14 @@ class MissionMapTest {
             routeSourceName = "OSM_GRAPHHOPPER",
         )
         val text = missionFootnote(withRoad)
-        assertTrue(text.contains("任务点 1 个"))
+        assertTrue(text.contains("本班 1 站"))
         assertTrue(text.contains("1.2 公里"))
-        assertTrue(text.contains("OSM_GRAPHHOPPER"))
+        // 内部来源不再念给司机：它只进日志（用户口径 v3「界面零调试物」）
+        assertTrue(!text.contains("OSM_GRAPHHOPPER"))
+        assertTrue(!text.contains("接口"))
 
         // 接口没给里程就写"接口未给"，不能拿直线距离凑一个数
-        assertTrue(missionFootnote(RouteGuide.EMPTY).contains("道路里程接口未给"))
+        assertTrue(missionFootnote(RouteGuide.EMPTY).contains("道路里程暂无"))
     }
 
     // ---------- ⑤ 任务点业务化：时间线上的序号 / 动作 / 件数 / 状态 ----------

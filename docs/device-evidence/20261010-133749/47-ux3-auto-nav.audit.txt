@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-133749\47-ux3-auto-nav.txt (85 节点)
+== docs\device-evidence\20261010-133749\47-ux3-auto-nav.xml: 85 节点 / 31 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

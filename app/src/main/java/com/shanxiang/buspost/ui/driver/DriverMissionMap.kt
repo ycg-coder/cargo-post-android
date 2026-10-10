@@ -182,14 +182,18 @@ private fun MissionStopStrip(stops: List<MissionStop>, focusStopId: Long) {
 }
 
 /**
- * 脚注：任务点数 + 顺序来源 + 道路里程/来源。接口没给里程就写"接口未给"，不拿直线距离凑。
+ * 脚注（司机话术）：本班站数 + 下一站 + 道路里程。后端没给道路里程就明说"暂无"，
+ * **不拿直线距离凑一个数**，也不把"接口/来源 OSM_GRAPHHOPPER"这类内部口径念给司机（改走日志）。
  * `gpsNote` 非空时并进同一句（⑬ 的降级/不可用警告）—— 不额外加控件，也不重复那句原因：
  * 它是 `LocationReportPolicy` 给的原话，经 `Running.waiting` 转过来。
  */
 internal fun missionFootnote(guide: RouteGuide, gpsNote: String = ""): String = buildString {
-    append("任务点 ").append(guide.stops.size).append(" 个 · 顺序由调度下发")
-    append(if (guide.roadDistanceMeters > 0) " · 道路里程 " + formatRoadMeters(guide.roadDistanceMeters) else " · 道路里程接口未给")
-    if (guide.routeSourceName.isNotEmpty()) append(" · 来源 ").append(guide.routeSourceName)
+    append("本班 ").append(guide.stops.size).append(" 站")
+    if (guide.nextStation.isNotEmpty()) append(" · 下一站 ").append(guide.nextStation)
+    append(
+        if (guide.roadDistanceMeters > 0) " · 道路里程 " + formatRoadMeters(guide.roadDistanceMeters)
+        else " · 道路里程暂无，开始导航后给实时剩余",
+    )
     if (gpsNote.isNotEmpty()) append(" · ").append(gpsNote)
 }
 
