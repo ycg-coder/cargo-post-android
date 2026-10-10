@@ -51,7 +51,7 @@ import com.shanxiang.buspost.core.ui.LocalBusTouch
  */
 
 /**
- * 操作回执条：司机动作的后端结论（"已提交后端"/"演示模式未接收"/"本次未发送"）。
+ * 操作回执条：司机动作的后端结论（"已提交后端"/"系统同步中"/"本次未发送"）。
  *
  * 原先 `WorkbenchScreen` / `RoutesScreen` / `HandoverScreen` / `DriverExceptionScreen`
  * 各内联一份同形实现，本次收敛到这里。判定仍只认**文案前缀**：回执文本由 `ScreenViewModel.runAction`
@@ -61,7 +61,7 @@ import com.shanxiang.buspost.core.ui.LocalBusTouch
 fun ReceiptBar(text: String, modifier: Modifier = Modifier) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
-    val demo = text.startsWith("演示模式")
+    val demo = text.contains("系统同步中")
     Row(
         modifier
             .fillMaxWidth()

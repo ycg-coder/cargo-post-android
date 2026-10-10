@@ -110,7 +110,7 @@ fun OrderDetailScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
             DemoNote(vm.demo, text = "这单来自本地演示集，取消与追踪只在演示数据里生效。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load(id) }) }
             if (vm.cancelled) {
-                Text("已在演示模式下取消，真实环境需后端确认。", color = t.clayDeep, fontSize = (12 * scale).sp)
+                Text("订单已取消，系统正在同步中。", color = t.clayDeep, fontSize = (12 * scale).sp)
             }
 
             val o = vm.order

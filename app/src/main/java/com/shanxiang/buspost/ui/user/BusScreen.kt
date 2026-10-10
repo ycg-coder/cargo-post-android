@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -444,6 +445,45 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             }
         }
 
+        // 非运营时段提示卡（对标高德：明确告知用户何时可乘车）
+        if (vm.state() == "off" && vm.nearby != null) {
+            BusCard(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                warm = true,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(BusIcons.clock, null, tint = t.goldDeep, modifier = Modifier.size(20.dp))
+                    Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                        Text(
+                            "当前不在运营时段",
+                            color = t.ink,
+                            fontSize = (13 * scale).sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        val serviceTime = vm.nearby?.serviceWindowText
+                        val nextDeparture = vm.nearby?.nextDepartureTime
+                        if (!serviceTime.isNullOrEmpty()) {
+                            Text(
+                                "运营时间：$serviceTime",
+                                color = t.textSecondary,
+                                fontSize = (11 * scale).sp,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        if (!nextDeparture.isNullOrEmpty()) {
+                            Text(
+                                "下一班发车：$nextDeparture",
+                                color = t.primaryOnLight,
+                                fontSize = (11 * scale).sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         DemoNote(vm.demo, text = "该区域没有开通实时公交，下面是客货邮班车的演示线路与时刻。")
 
         // 地图区域（对标高德：地图占主视图）
@@ -680,6 +720,46 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                                         color = t.textSecondary,
                                         fontSize = (11 * scale).sp,
                                     )
+                                }
+                            }
+                            // 多班车倒计时条（对标高德：显示接下来 2-3 班车的 ETA）
+                            if (vehicles.size > 1) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp)
+                                        .clip(RoundedCornerShape(BusRadius.s))
+                                        .background(t.track.copy(alpha = 0.5f))
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    vehicles.take(3).forEachIndexed { idx, v ->
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(
+                                                v.etaValueText,
+                                                color = if (v.etaMinutes != null && v.etaMinutes <= 5) t.danger else t.ink,
+                                                fontSize = (16 * scale).sp,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                            Text(
+                                                if (idx == 0) "下一班" else "第${idx + 1}班",
+                                                color = t.textTertiary,
+                                                fontSize = (10 * scale).sp,
+                                            )
+                                        }
+                                        if (idx < 2 && idx < vehicles.size - 1) {
+                                            Box(
+                                                Modifier
+                                                    .width(1.dp)
+                                                    .height(24.dp)
+                                                    .background(t.line),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             // 运送用户商品的提示

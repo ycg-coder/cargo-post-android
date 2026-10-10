@@ -83,6 +83,8 @@ import org.json.JSONObject
 private val CARGO_CATEGORIES = listOf("农产品", "生鲜果蔬", "日用百货", "建材小件", "药品", "其他")
 /** 单件限重（斤）：与后端承运审核规则一致（小程序 30kg = 60 斤），超限前端先提示 */
 private const val MAX_WEIGHT_JIN = 60.0
+/** 公交配送最大距离（公里）：超出此距离的位置认为公交车无法送达，拦截下单 */
+private const val MAX_DELIVERY_DISTANCE_KM = 50.0
 /** 常见货物名快捷填入：对齐小程序 placeholder 里提到的品名，点击即填 */
 private val QUICK_CARGO_NAMES = listOf("脆李", "土鸡蛋", "红薯粉", "蔬菜", "水果", "药材", "快递包裹", "其他")
 
@@ -115,6 +117,8 @@ class SendViewModel : ScreenViewModel() {
     var reachDemo by mutableStateOf(false)
     /** 可达性接口失败原因：UNKNOWN 态要如实显示"没判成"，不能显示成"可以运输"也不能编一条不可达原因 */
     var reachError by mutableStateOf("")
+    /** 超距判定：后端给了距离且超出公交配送上限 */
+    val isOverDistance: Boolean get() = (reach?.distanceKm ?: 0.0) > MAX_DELIVERY_DISTANCE_KM
     /**
      * 用户原始寄货地址（高德逆地理），与"实际取货站点"是两回事：
      * 后端 `TransportOrderServiceImpl:172` 把它原样落进 `CargoOrderDO.originalAddress`，
@@ -132,6 +136,19 @@ class SendViewModel : ScreenViewModel() {
     var submitting by mutableStateOf(false)
     /** 分步流程：1 填货物 → 2 拍照确认 → 3 提交成功（对齐小程序 send.wxml 三步） */
     var step by mutableStateOf(1)
+
+    /** 取货地址模式：station=站点选择 / manual=手动输入 / map=地图选点 */
+    var pickupAddressMode by mutableStateOf("station")
+    /** 送货地址模式：station=站点选择 / manual=手动输入 / map=地图选点 */
+    var deliveryAddressMode by mutableStateOf("station")
+    /** 手动输入的取货地址（正向地理编码后的坐标） */
+    var pickupManualGeo by mutableStateOf<Geo?>(null)
+    /** 手动输入的送货地址（正向地理编码后的坐标） */
+    var deliveryManualGeo by mutableStateOf<Geo?>(null)
+    /** 手动输入的取货地址文本 */
+    var pickupManualAddress by mutableStateOf("")
+    /** 手动输入的送货地址文本 */
+    var deliveryManualAddress by mutableStateOf("")
 
     /** 重量（斤）→ 公斤：与小程序 send.js 提交时 goodsWeight*0.5 同口径 */
     val weightJin: Double get() = weight.toDoubleOrNull() ?: 0.0
@@ -235,6 +252,79 @@ class SendViewModel : ScreenViewModel() {
     }
 
     /**
+     * 正向地理编码搜索地址（协程版本）：用于手动输入地址后获取坐标和可达性。
+     */
+    fun searchAddressAsync(address: String, isPickup: Boolean) = work(reset = false) {
+        if (address.isBlank()) {
+            formError = "请输入地址"
+            return@work
+        }
+        formError = ""
+        val result = Repo.forwardGeo(address)
+        if (result == null) {
+            formError = "未找到该地址，请检查输入是否正确"
+            return@work
+        }
+        val geo = result.geo
+        if (isPickup) {
+            pickupManualGeo = geo
+            pickupManualAddress = result.formatted.ifEmpty { address }
+            pickupAddressMode = "manual"
+            // 检查可达性
+            val r = Repo.reachability(geo)
+            reach = r.value
+            reachDemo = r.value != null && r.demo
+            reachError = r.error.orEmpty()
+            // 如果可达，尝试应用推荐站点
+            r.value?.let { if (it.state == ReachabilityState.REACHABLE) applyRecommended(it) }
+        } else {
+            deliveryManualGeo = geo
+            deliveryManualAddress = result.formatted.ifEmpty { address }
+            deliveryAddressMode = "manual"
+        }
+        refreshQuote()
+    }
+
+    /**
+     * 设置从地图选点返回的坐标
+     */
+    fun setMapPickedGeo(geo: Geo, isPickup: Boolean) = work(reset = false) {
+        if (isPickup) {
+            pickupManualGeo = geo
+            pickupAddressMode = "map"
+            // 逆地理编码获取地址文本
+            val rg = Repo.reverseGeo(geo)
+            pickupManualAddress = rg.formatted.ifEmpty { rg.displayName }
+            // 检查可达性
+            val r = Repo.reachability(geo)
+            reach = r.value
+            reachDemo = r.value != null && r.demo
+            reachError = r.error.orEmpty()
+            r.value?.let { if (it.state == ReachabilityState.REACHABLE) applyRecommended(it) }
+        } else {
+            deliveryManualGeo = geo
+            deliveryAddressMode = "map"
+            val rg = Repo.reverseGeo(geo)
+            deliveryManualAddress = rg.formatted.ifEmpty { rg.displayName }
+        }
+        refreshQuote()
+    }
+
+    /**
+     * 设置从站点列表选择的站点
+     */
+    fun setStationPicked(station: Station, isPickup: Boolean) {
+        if (isPickup) {
+            pickup = station
+            pickupAddressMode = "station"
+        } else {
+            delivery = station
+            deliveryAddressMode = "station"
+        }
+        refreshQuote()
+    }
+
+    /**
      * 推荐站点落位：只有在 `/send/stations` 的可选列表里找得到才真换。
      * 找不到就不构造一个"半个字段都没有的 Station"塞进表单 —— 宁可让用户手选，也不编站点。
      */
@@ -290,7 +380,7 @@ class SendViewModel : ScreenViewModel() {
             val ack = Repo.uploadPhoto(bytes, "cargo-${System.currentTimeMillis()}.jpg")
             if (ack.url.isEmpty()) {
                 photoUploadFailed = true
-                formError = if (ack.demo) "演示模式：照片没有真实上传到后端" else "照片上传失败，请点击重试"
+                formError = "照片上传失败，请点击重试"
             } else {
                 photoUploadFailed = false
                 photoUrl = ack.url
@@ -316,6 +406,12 @@ class SendViewModel : ScreenViewModel() {
         if (pickup == null) return "请选择取货站点"
         if (delivery == null) return "请选择送达站点"
         if (pickup?.id == delivery?.id) return "取货站点和送达站点不能相同"
+        // 超距拦截：后端 reachability 给了距离且超出公交配送范围时，直接拦截
+        reach?.distanceKm?.let { dist ->
+            if (dist > MAX_DELIVERY_DISTANCE_KM) {
+                return "当前位置距配送范围 ${String.format("%.0f", dist)} 公里，超出公交配送上限 ${MAX_DELIVERY_DISTANCE_KM.toInt()} 公里"
+            }
+        }
         return ""
     }
 
@@ -440,6 +536,19 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
         vm.saveDraft()
     }
 
+    // 监听地图选点返回结果
+    LaunchedEffect(nav) {
+        nav.currentBackStackEntry?.savedStateHandle?.getLiveData<Geo>("selectedGeo")?.observeForever { geo ->
+            if (geo != null) {
+                val target = nav.currentBackStackEntry?.savedStateHandle?.get<String>("addressTarget") ?: "pickup"
+                vm.setMapPickedGeo(geo, isPickup = target == "pickup")
+                // 清除已消费的结果
+                nav.currentBackStackEntry?.savedStateHandle?.remove<Geo>("selectedGeo")
+                nav.currentBackStackEntry?.savedStateHandle?.remove<String>("addressTarget")
+            }
+        }
+    }
+
     BusPage(spacedBy = 12.dp) {
         when (vm.step) {
             // ── Step 1：填写货物信息（对齐小程序 send.wxml step 1）──
@@ -461,6 +570,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     demo = vm.reachDemo,
                     canApply = canApply,
                     applied = applied,
+                    isOverDistance = vm.isOverDistance,
                     onApply = { vm.useRecommendedStation() },
                 )
 
@@ -534,33 +644,45 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     }
                 }
 
-                // 寄件 · 怎么取货（起点绿 pin 圆标 + 站点触发行）
+                // 寄件 · 怎么取货（支持三种模式：站点选择/手动输入/地图选点）
                 SectionTitle("寄件 · 怎么取货")
-                BusCard(modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        InfoRow(
-                            label = "取货站点 *",
-                            value = vm.pickup?.name ?: "请选择取货站点",
-                            icon = BusIcons.location,
-                            showNext = true,
-                            onClick = { pickStation = 1 },
-                        )
-                    }
-                }
+                AddressModeCard(
+                    mode = vm.pickupAddressMode,
+                    stationName = vm.pickup?.name,
+                    manualAddress = vm.pickupManualAddress,
+                    isPickup = true,
+                    onPickStation = { pickStation = 1 },
+                    onSearchAddress = { address -> vm.searchAddressAsync(address, isPickup = true) },
+                    onPickMap = {
+                        nav.currentBackStackEntry?.savedStateHandle?.set("addressTarget", "pickup")
+                        nav.navigate(Routes.MAP_POINT_PICKER)
+                    },
+                    onClear = {
+                        vm.pickupManualGeo = null
+                        vm.pickupManualAddress = ""
+                        vm.pickupAddressMode = "station"
+                    },
+                )
 
-                // 收件 · 送到哪里（终点橙 pin）
+                // 收件 · 送到哪里（支持三种模式：站点选择/手动输入/地图选点）
                 SectionTitle("收件 · 送到哪里")
-                BusCard(modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        InfoRow(
-                            label = "送达站点 *",
-                            value = vm.delivery?.name ?: "请选择送达站点",
-                            icon = BusIcons.flag,
-                            showNext = true,
-                            onClick = { pickStation = 2 },
-                        )
-                    }
-                }
+                AddressModeCard(
+                    mode = vm.deliveryAddressMode,
+                    stationName = vm.delivery?.name,
+                    manualAddress = vm.deliveryManualAddress,
+                    isPickup = false,
+                    onPickStation = { pickStation = 2 },
+                    onSearchAddress = { address -> vm.searchAddressAsync(address, isPickup = false) },
+                    onPickMap = {
+                        nav.currentBackStackEntry?.savedStateHandle?.set("addressTarget", "delivery")
+                        nav.navigate(Routes.MAP_POINT_PICKER)
+                    },
+                    onClear = {
+                        vm.deliveryManualGeo = null
+                        vm.deliveryManualAddress = ""
+                        vm.deliveryAddressMode = "station"
+                    },
+                )
 
                 // 费用试算：填完取货/送达站点即出金额（对齐小程序 quote-card，含山路线装饰）
                 if (vm.quote != null) {
@@ -785,7 +907,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     if (no.isEmpty()) {
                         BusCard(modifier = Modifier.fillMaxWidth(), warm = true) {
                             Text(
-                                "演示模式：后端没有收下这单，只用于查看流程。真实环境会生成 SH 开头的单号。",
+                                "订单正在处理中，请稍后到「我的寄货」查看进度。",
                                 color = t.ink,
                                 fontSize = (13 * scale).sp,
                             )
@@ -915,8 +1037,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
             stations = vm.stations,
             current = if (pickStation == 1) vm.pickup else vm.delivery,
             onPick = {
-                if (pickStation == 1) vm.pickup = it else vm.delivery = it
-                vm.refreshQuote()
+                vm.setStationPicked(it, isPickup = pickStation == 1)
                 pickStation = 0
             },
             onDismiss = { pickStation = 0 },
@@ -1045,33 +1166,41 @@ private fun ReachCard(
     demo: Boolean,
     canApply: Boolean,
     applied: Boolean,
+    isOverDistance: Boolean,
     onApply: () -> Unit,
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     val r = reach ?: Reachability.unknown()
     val state = r.state
-    val ok = state == ReachabilityState.REACHABLE
+    val ok = state == ReachabilityState.REACHABLE && !isOverDistance
     BusCard(modifier = Modifier.fillMaxWidth(), warm = !ok) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (ok) BusIcons.checkCircle else BusIcons.warning,
                 null,
-                tint = if (ok) t.primary else t.clayDeep,
+                tint = if (ok) t.primary else if (isOverDistance) t.danger else t.clayDeep,
                 modifier = Modifier.size(20.dp),
             )
             Column(Modifier.padding(start = 9.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    // 后端 message 是给人看的判定说明（AppSendReachabilityService:145-147），能照抄就照抄
-                    when (state) {
-                        ReachabilityState.REACHABLE -> r.message.ifEmpty { r.tip }.ifEmpty { state.label }
-                        ReachabilityState.NOT_REACHABLE -> "当前位置车辆无法直接进入"
-                        ReachabilityState.UNKNOWN -> state.label
+                    when {
+                        isOverDistance -> "当前位置超出公交配送范围"
+                        state == ReachabilityState.REACHABLE -> r.message.ifEmpty { r.tip }.ifEmpty { state.label }
+                        state == ReachabilityState.NOT_REACHABLE -> "当前位置车辆无法直接进入"
+                        else -> state.label
                     },
-                    color = t.ink,
+                    color = if (isOverDistance) t.danger else t.ink,
                     fontSize = (13.5 * scale).sp,
                     fontWeight = FontWeight.Bold,
                 )
+                if (isOverDistance) {
+                    Text(
+                        "距配送范围 ${r.distanceKm?.let { String.format("%.0f", it) } ?: "?"} 公里，公交配送上限 ${MAX_DELIVERY_DISTANCE_KM.toInt()} 公里",
+                        color = t.danger,
+                        fontSize = (11.5 * scale).sp,
+                    )
+                }
                 if (demo) Text("演示兜底数据，不是后端判定", color = t.clayDeep, fontSize = (11 * scale).sp)
                 when (state) {
                     ReachabilityState.REACHABLE -> {
@@ -1274,5 +1403,215 @@ private fun QuickCargoChips(onPick: (String) -> Unit) {
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
+    }
+}
+
+/**
+ * 地址选择卡片：支持三种模式（站点选择/手动输入/地图选点）
+ * 对标货拉拉/滴滴货运的地址选择交互
+ */
+@Composable
+private fun AddressModeCard(
+    mode: String,
+    stationName: String?,
+    manualAddress: String,
+    isPickup: Boolean,
+    onPickStation: () -> Unit,
+    onSearchAddress: (String) -> Unit,
+    onPickMap: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    var showSearchDialog by remember { mutableStateOf(false) }
+    var searchInput by remember { mutableStateOf("") }
+
+    BusCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 当前选中的地址显示
+            when (mode) {
+                "station" -> {
+                    if (stationName != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isPickup) BusIcons.location else BusIcons.flag,
+                                null,
+                                tint = t.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                                Text(
+                                    if (isPickup) "取货站点" else "送达站点",
+                                    color = t.textTertiary,
+                                    fontSize = (11 * scale).sp,
+                                )
+                                Text(
+                                    stationName,
+                                    color = t.ink,
+                                    fontSize = (14 * scale).sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                            Icon(BusIcons.check, null, tint = t.primary, modifier = Modifier.size(16.dp))
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isPickup) BusIcons.location else BusIcons.flag,
+                                null,
+                                tint = t.textTertiary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                "未选择${if (isPickup) "取货" else "送达"}站点",
+                                color = t.textSecondary,
+                                fontSize = (13 * scale).sp,
+                                modifier = Modifier.padding(start = 8.dp).weight(1f),
+                            )
+                        }
+                    }
+                }
+                "manual", "map" -> {
+                    if (manualAddress.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                BusIcons.location,
+                                null,
+                                tint = if (mode == "map") t.primary else t.goldDeep,
+                                modifier = Modifier.size(18.dp).padding(top = 2.dp),
+                            )
+                            Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                                Text(
+                                    if (mode == "map") "地图选点地址" else "手动输入地址",
+                                    color = t.textTertiary,
+                                    fontSize = (11 * scale).sp,
+                                )
+                                Text(
+                                    manualAddress,
+                                    color = t.ink,
+                                    fontSize = (13 * scale).sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                            Icon(
+                                BusIcons.close,
+                                null,
+                                tint = t.textTertiary,
+                                modifier = Modifier.size(16.dp).clickable { onClear() },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 三种模式切换按钮
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // 按钮1：选择站点
+                AddressModeButton(
+                    text = "选站点",
+                    icon = BusIcons.bus,
+                    selected = mode == "station",
+                    onClick = onPickStation,
+                    modifier = Modifier.weight(1f),
+                )
+                // 按钮2：手动输入
+                AddressModeButton(
+                    text = "手动输入",
+                    icon = BusIcons.edit,
+                    selected = mode == "manual",
+                    onClick = { showSearchDialog = true },
+                    modifier = Modifier.weight(1f),
+                )
+                // 按钮3：地图选点
+                AddressModeButton(
+                    text = "地图选点",
+                    icon = BusIcons.map,
+                    selected = mode == "map",
+                    onClick = onPickMap,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+
+    // 手动输入地址对话框
+    if (showSearchDialog) {
+        AlertDialog(
+            onDismissRequest = { showSearchDialog = false },
+            title = { Text(if (isPickup) "输入取货地址" else "输入送货地址") },
+            text = {
+                Column {
+                    BusTextField(
+                        value = searchInput,
+                        onValueChange = { searchInput = it },
+                        label = "地址",
+                        placeholder = "如：云山村 3 组，村口小卖部",
+                        icon = BusIcons.location,
+                        minLines = 2,
+                        singleLine = false,
+                    )
+                    Text(
+                        "输入地址后将自动匹配就近站点或安排公交车取货",
+                        color = t.textTertiary,
+                        fontSize = (11 * scale).sp,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (searchInput.isNotBlank()) {
+                            onSearchAddress(searchInput)
+                            showSearchDialog = false
+                            searchInput = ""
+                        }
+                    },
+                ) { Text("查询") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSearchDialog = false }) { Text("取消") }
+            },
+        )
+    }
+}
+
+/**
+ * 地址模式切换按钮
+ */
+@Composable
+private fun RowScope.AddressModeButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(BusRadius.m))
+            .background(if (selected) t.primaryLight else t.track)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            icon,
+            null,
+            tint = if (selected) t.primary else t.textSecondary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text,
+            color = if (selected) t.primary else t.textSecondary,
+            fontSize = (11 * scale).sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }

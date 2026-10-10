@@ -833,6 +833,7 @@ fun SettingsScreen() {
     val elderly by AppState.elderly.collectAsStateWithLifecycle()
     var notify by remember { mutableStateOf(Prefs.notifyEnabled) }
     var arrival by remember { mutableStateOf(Prefs.arrivalAlertEnabled) }
+    var weatherAlert by remember { mutableStateOf(Prefs.weatherAlertEnabled) }
     var voice by remember { mutableStateOf(Prefs.voiceGuidance) }
     var lane by remember { mutableStateOf(Prefs.laneGuidance) }
     var approachVoice by remember { mutableStateOf(Prefs.approachVoice) }
@@ -891,6 +892,11 @@ fun SettingsScreen() {
                         Prefs.arrivalAlertEnabled = it
                     }
                     BusDivider()
+                    SettingRow("天气预警", "雨雪、大雾、高温等恶劣天气推送提醒", weatherAlert) {
+                        weatherAlert = it
+                        Prefs.weatherAlertEnabled = it
+                    }
+                    BusDivider()
                     InfoRow(
                         label = "系统通知权限",
                         value = "去开启",
@@ -932,15 +938,15 @@ fun SettingsScreen() {
                 Column {
                     InfoRow(label = "版本", value = BuildConfig.VERSION_NAME, icon = BusIcons.info)
                     InfoRow(
-                        label = "地图与开源许可",
-                        value = "OSM 署名与随包组件",
+                        label = "许可信息",
+                        value = "查看相关许可",
                         icon = BusIcons.info,
                         showNext = true,
                         onClick = { nav.navigate(Routes.OSS_LICENSES) },
                     )
                     InfoRow(
-                        label = "演示模式",
-                        value = if (Prefs.token.startsWith("demo-")) "当前使用演示会话" else "真实会话",
+                        label = "当前模式",
+                        value = if (Prefs.token.startsWith("demo-")) "体验模式" else "正常模式",
                         icon = BusIcons.info,
                         valueColor = if (Prefs.token.startsWith("demo-")) t.clayDeep else t.primaryOnLight,
                     )

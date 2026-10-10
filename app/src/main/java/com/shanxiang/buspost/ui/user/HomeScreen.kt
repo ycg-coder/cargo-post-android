@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -77,6 +78,7 @@ import com.shanxiang.buspost.data.model.BusVehicle
 import com.shanxiang.buspost.data.model.byUserDistance
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.model.Notice
+import com.shanxiang.buspost.data.model.NewsItem
 import com.shanxiang.buspost.data.model.NearbyResult
 import com.shanxiang.buspost.data.model.Product
 import com.shanxiang.buspost.data.model.Station
@@ -96,6 +98,7 @@ import com.shanxiang.buspost.ui.common.WeatherPill
 class HomeViewModel : ScreenViewModel() {
     var village by mutableStateOf(Prefs.currentVillage)
     var notices by mutableStateOf<List<Notice>>(emptyList())
+    var news by mutableStateOf<List<NewsItem>>(emptyList())
     var vehicles by mutableStateOf<List<BusVehicle>>(emptyList())
     var stations by mutableStateOf<List<Station>>(emptyList())
     var products by mutableStateOf<List<Product>>(emptyList())
@@ -162,6 +165,7 @@ class HomeViewModel : ScreenViewModel() {
         val nbDeferred = async { Repo.nearbyBuses(g) }
         if (!onlyBus) {
             val noticesDeferred = async { Repo.notices() }
+            val newsDeferred = async { Repo.news() }
             val productsDeferred = async { Repo.products() }
             val arrDeferred = async { if (Prefs.loggedIn) Repo.sendOrders() else Feed(emptyList()) }
             val weatherDeferred = async {
@@ -177,12 +181,14 @@ class HomeViewModel : ScreenViewModel() {
 
             val nb = nbDeferred.await()
             val n = noticesDeferred.await()
+            val newsResult = newsDeferred.await()
             val p = productsDeferred.await()
             val arr = arrDeferred.await()
             val (rg, w, time) = weatherDeferred.await()
 
             notices = n.items
             noticeError = n.error != null
+            news = newsResult.items
             products = p.items.take(8)
             arriving = arr.items.filter {
                 it.carrierEtaMinutes != null && it.carrierEtaMinutes in 1..45 &&
@@ -196,7 +202,7 @@ class HomeViewModel : ScreenViewModel() {
                 weather = w
                 weatherUpdateTime = time
             }
-            mergeDemo(n.demo, p.demo, nb.demo, arr.demo)
+            mergeDemo(n.demo, newsResult.demo, p.demo, nb.demo, arr.demo)
             nearby = nb.value
             vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
             stations = nb.value?.stations.orEmpty()
@@ -247,6 +253,7 @@ fun HomeScreen(
     val unread by AppState.unread.collectAsStateWithLifecycle()
     var showVillages by remember { mutableStateOf(false) }
     var showManualPick by remember { mutableStateOf(false) }
+    var showAddressBook by remember { mutableStateOf(false) }
     /** 天气详情卡是否展开（对应小程序 weatherExpanded） */
     var weatherExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -285,7 +292,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .clip(RoundedCornerShape(BusRadius.s))
-                        .clickable { showVillages = true }
+                        .clickable { showAddressBook = true }
                         .padding(horizontal = 5.dp, vertical = 2.dp),
                 )
                 Text("切换 ▾", color = t.onPrimary.copy(alpha = 0.72f), fontSize = (11 * scale).sp)
@@ -395,19 +402,45 @@ fun HomeScreen(
         }
         item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FeatureTile(BusIcons.location, "收货地址", FeatureBg.GREEN, {
-                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.ADDRESS)
+            FeatureTile(BusIcons.qr, "乘车码", FeatureBg.GREEN, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.BUS_QR)
             }, Modifier.weight(1f), 4)
             FeatureTile(BusIcons.bell, "消息通知", FeatureBg.GOLD, {
                 if (guest) onLoginClick?.invoke() else nav.navigate(Routes.NOTIFICATIONS)
             }, Modifier.weight(1f), 5)
-            FeatureTile(BusIcons.person, "个人中心", FeatureBg.DEEP, {
+            FeatureTile(BusIcons.wallet, "出行优惠", FeatureBg.DEEP, {
                 if (guest) onLoginClick?.invoke() else onSelectTab(3)
             }, Modifier.weight(1f), 6)
-            FeatureTile(BusIcons.next, "更多功能", FeatureBg.CLAY, {
-                if (guest) onLoginClick?.invoke() else onSelectTab(3)
+            FeatureTile(BusIcons.calendar, "我的订单", FeatureBg.CLAY, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.ORDERS)
             }, Modifier.weight(1f), 7)
         }
+        }
+
+        // ---------- 每日新闻：横向滚动新闻卡片（演示数据，页面须标注"演示"）----------
+        if (vm.news.isNotEmpty()) {
+            item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(BusIcons.bolt, null, tint = t.goldDeep, modifier = Modifier.size(17.dp))
+                Text(
+                    "每日新闻 · 乡村动态",
+                    color = t.ink,
+                    fontSize = (16 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+                if (vm.demo) {
+                    BusTag("演示", tone = BusTone.WARN, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+            }
+            item {
+            BusScrollRow(spacedBy = 10.dp) {
+                items(vm.news, key = { it.id }) { item ->
+                    NewsCard(item)
+                }
+            }
+            }
         }
 
         // ---------- 附近公交：区块头 + meta + 五态（loading/off/empty/error/data）----------
@@ -674,6 +707,22 @@ fun HomeScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showVillages = false }) { Text("关闭") } },
+        )
+    }
+
+    // 地址簿弹窗：点击"当前位置"打开，选择地址后跳转到该地的公交查询
+    if (showAddressBook) {
+        AddressBookDialog(
+            onDismiss = { showAddressBook = false },
+            onPickAddress = { address ->
+                showAddressBook = false
+                nav.currentBackStackEntry?.savedStateHandle?.set("initialAddress", address)
+                nav.navigate(Routes.ADDRESS_SEARCH)
+            },
+            onManualSearch = {
+                showAddressBook = false
+                nav.navigate(Routes.ADDRESS_SEARCH)
+            },
         )
     }
 }
@@ -1156,6 +1205,59 @@ private fun ProductMiniCard(p: Product, onClick: () -> Unit) {
     }
 }
 
+/**
+ * 新闻卡片：横向滚动，每张宽度 260dp。
+ * 分类标签 + 标题 + 摘要 + 来源/时间，无图时显示分类图标占位。
+ */
+@Composable
+private fun NewsCard(item: NewsItem) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    Column(
+        Modifier
+            .width(260.dp)
+            .clip(RoundedCornerShape(BusRadius.card))
+            .background(t.card)
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BusTag(item.category, tone = BusTone.PRIMARY)
+            Spacer(Modifier.weight(1f))
+            Text(
+                item.publishTime.substringAfter(" ").takeIf { it.isNotEmpty() } ?: item.publishTime,
+                color = t.textTertiary,
+                fontSize = (11 * scale).sp,
+            )
+        }
+        Text(
+            item.title,
+            color = t.ink,
+            fontSize = (14 * scale).sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Text(
+            item.summary,
+            color = t.textSecondary,
+            fontSize = (12 * scale).sp,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+            Icon(BusIcons.info, null, tint = t.textTertiary, modifier = Modifier.size(11.dp))
+            Text(
+                item.source,
+                color = t.textTertiary,
+                fontSize = (11 * scale).sp,
+                modifier = Modifier.padding(start = 3.dp),
+            )
+        }
+    }
+}
+
 fun formatPrice(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else String.format("%.2f", v)
 
 /** 功能入口底色：对齐 index.wxss .green-bg/.gold-bg/.deep-bg/.clay-bg（135° 渐变方块） */
@@ -1212,4 +1314,91 @@ private fun FeatureTile(
             )
         }
     }
+}
+
+/**
+ * 地址簿弹窗：点击首页"当前位置"打开，展示用户保存的地址列表。
+ * 选择某个地址后跳转到该地的公交查询页；也可以手动输入新地址。
+ */
+@Composable
+private fun AddressBookDialog(
+    onDismiss: () -> Unit,
+    onPickAddress: (String) -> Unit,
+    onManualSearch: () -> Unit,
+) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    var addresses by remember { mutableStateOf<List<com.shanxiang.buspost.data.model.AddressItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val result = com.shanxiang.buspost.data.repo.Repo.addresses()
+            addresses = result.items
+        } catch (_: Exception) { }
+        loading = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择地址") },
+        text = {
+            Column(
+                Modifier
+                    .height(320.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // 手动输入地址入口
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(BusRadius.m))
+                        .background(t.primaryLight)
+                        .clickable { onManualSearch() }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(BusIcons.search, null, tint = t.primary, modifier = Modifier.size(18.dp))
+                    Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                        Text("手动输入地址", color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Bold)
+                        Text("输入任意地址查看附近公交", color = t.textTertiary, fontSize = (11 * scale).sp)
+                    }
+                    Icon(BusIcons.next, null, tint = t.textTertiary, modifier = Modifier.size(16.dp))
+                }
+
+                if (loading) {
+                    Text("加载中…", color = t.textSecondary, fontSize = (12 * scale).sp, modifier = Modifier.padding(8.dp))
+                } else if (addresses.isEmpty()) {
+                    Text(
+                        "暂无保存的地址，可手动输入地址查询",
+                        color = t.textSecondary,
+                        fontSize = (12 * scale).sp,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                } else {
+                    addresses.forEach { addr ->
+                        val displayAddress = addr.regionLabel + addr.detail
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(BusRadius.m))
+                                .background(t.track.copy(alpha = 0.5f))
+                                .clickable { onPickAddress(displayAddress) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(BusIcons.location, null, tint = t.textSecondary, modifier = Modifier.size(16.dp))
+                            Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                                Text(addr.name, color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
+                                Text(displayAddress, color = t.textTertiary, fontSize = (11 * scale).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Icon(BusIcons.next, null, tint = t.textTertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+    )
 }

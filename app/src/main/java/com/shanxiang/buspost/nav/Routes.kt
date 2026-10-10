@@ -20,8 +20,16 @@ object Routes {
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val ADDRESS = "address"
+    /** 手动地址查公交（美团式）：输入地址 → 正向地理编码 → 查看该地公交/下单/寄货 */
+    const val ADDRESS_SEARCH = "addressSearch"
     /** 寄件页选收货地址：地址簿选择模式 */
     const val ADDRESS_SELECT = "addressSelect"
+    /** 寄货页地图选点：在地图上点击选择取货/送货位置 */
+    const val MAP_POINT_PICKER = "mapPointPicker"
+    /** 寄货页地址搜索：输入地址后匹配就近站点 */
+    const val SEND_ADDRESS_PICKER = "sendAddressPicker"
+    /** 乘车码：当地公交乘车二维码 */
+    const val BUS_QR = "busQr"
     const val FEEDBACK = "feedback"
     const val SETTINGS = "settings"
     /** 设置 → 关于 →「地图与开源许可」：OSM 署名与随包分发的第三方组件清单（指令 v2.1 ⑭） */

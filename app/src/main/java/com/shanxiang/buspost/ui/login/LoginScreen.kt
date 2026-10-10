@@ -232,7 +232,7 @@ fun LoginScreen(
             // 演示入口：release 构建（DEMO_ALLOWED=false）不出现这个按钮，也不存在演示会话
             if (vm.demoEntryAvailable) {
                 Text(
-                    "演示模式",
+                    "体验模式",
                     color = t.textTertiary,
                     fontSize = (12 * scale).sp,
                     modifier = Modifier

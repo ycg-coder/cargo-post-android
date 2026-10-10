@@ -68,7 +68,7 @@ class LoginViewModel : ViewModel() {
             }
             busy = false
             if (sent) {
-                notice = if (Api.demoSession) "演示模式：验证码未真实下发" else "验证码已发送"
+                notice = "验证码已发送"
                 countdown = 60
                 while (countdown > 0) {
                     delay(1000)

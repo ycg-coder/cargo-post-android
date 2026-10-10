@@ -44,6 +44,7 @@ import com.shanxiang.buspost.ui.driver.HandoverScreen
 import com.shanxiang.buspost.ui.login.LoginScreen
 import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
+import com.shanxiang.buspost.ui.user.AddressSearchScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
 import com.shanxiang.buspost.ui.user.OssLicensesScreen
@@ -56,6 +57,9 @@ import com.shanxiang.buspost.ui.user.OrdersScreen
 import com.shanxiang.buspost.ui.user.ParcelScreen
 import com.shanxiang.buspost.ui.user.ProfileScreen
 import com.shanxiang.buspost.ui.user.SendScreen
+import com.shanxiang.buspost.ui.user.MapPointPickerScreen
+import com.shanxiang.buspost.ui.user.SendAddressPickerScreen
+import com.shanxiang.buspost.ui.user.BusQrScreen
 import com.shanxiang.buspost.ui.user.SettingsScreen
 import com.shanxiang.buspost.ui.user.TraceScreen
 import com.shanxiang.buspost.ui.user.UserShell
@@ -152,6 +156,7 @@ fun BusPostRoot() {
         composable(Routes.PROFILE) { com.shanxiang.buspost.ui.common.BusRouteBody { ProfileScreen() } }
         composable(Routes.ADDRESS) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen() } }
         composable(Routes.ADDRESS_SELECT) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen(select = true) } }
+        composable(Routes.ADDRESS_SEARCH) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressSearchScreen() } }
         composable(Routes.FEEDBACK) { com.shanxiang.buspost.ui.common.BusRouteBody { FeedbackScreen() } }
         composable(Routes.SETTINGS) { com.shanxiang.buspost.ui.common.BusRouteBody { SettingsScreen() } }
         // 指令 v2.1 ⑭：OSM/ODbL 署名的最小入口，用户域，不加角色闸门
@@ -200,6 +205,13 @@ fun BusPostRoot() {
             Routes.BUS_DETAIL,
             arguments = listOf(navArgument("routeId") { type = NavType.StringType }),
         ) { com.shanxiang.buspost.ui.common.BusRouteBody { BusDetailScreen(it.arguments?.getString("routeId").orEmpty()) } }
+
+        // 寄货页地图选点：用户在地图上点击选择取货/送货位置
+        composable(Routes.MAP_POINT_PICKER) { com.shanxiang.buspost.ui.common.BusRouteBody { MapPointPickerScreen() } }
+        // 寄货页地址选择：支持手动输入/附近站点/地图选点三种模式
+        composable(Routes.SEND_ADDRESS_PICKER) { com.shanxiang.buspost.ui.common.BusRouteBody { SendAddressPickerScreen() } }
+        // 乘车码：当地公交乘车二维码
+        composable(Routes.BUS_QR) { com.shanxiang.buspost.ui.common.BusRouteBody { BusQrScreen() } }
     }
 
     // 闪屏压在导航图之上（含底部导航栏），与小程序"页面内 fixed 遮罩 + 隐藏 tabBar"等效

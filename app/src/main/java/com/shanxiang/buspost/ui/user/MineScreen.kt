@@ -276,6 +276,13 @@ fun MineScreen(vm: MineViewModel = viewModel()) {
                     showNext = true,
                 )
                 InfoRow(
+                    label = "天气预警",
+                    value = if (Prefs.weatherAlertEnabled) "雨雪高温自动提醒" else "未开启",
+                    icon = BusIcons.info,
+                    valueColor = if (Prefs.weatherAlertEnabled) t.primaryOnLight else t.textTertiary,
+                    showNext = true,
+                )
+                InfoRow(
                     label = "适老大字",
                     value = if (Prefs.elderlyMode) "已开启" else "标准字号",
                     icon = BusIcons.info,
