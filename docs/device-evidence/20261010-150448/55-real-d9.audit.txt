@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-150448\55-real-d9.txt (64 节点)
+== docs\device-evidence\20261010-150448\55-real-d9.xml: 64 节点 / 15 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0
