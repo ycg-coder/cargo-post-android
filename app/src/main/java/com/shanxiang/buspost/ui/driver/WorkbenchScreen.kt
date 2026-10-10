@@ -607,6 +607,25 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
     LaunchedEffect(Unit) { if (vm.shift == null) vm.load() }
 
     /**
+     * 司机进工作台就自动开始位置上报，不再要人去找那个开关（用户口径 v3「登录即上报」）。
+     * 没授予定位权限时**不自动弹系统框**：首屏就弹是骚扰，改成界面留一句引导、点了才走 [askLocation]。
+     * 走的是与手动开关完全同一条路径（含 shiftId 回落），所以"自动"不会带出第二份上报口径。
+     */
+    LaunchedEffect(vm.shift) {
+        if (vm.shift == null || reportOn) return@LaunchedEffect
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            if (Running.shiftId <= 0L) Running.shiftId = Prefs.driverShiftId
+            DriverLocationService.start(context)
+            reportOn = true
+            android.util.Log.i("BUS_UI", "auto_start_report shiftId=${Running.shiftId} role=DRIVER")
+        } else {
+            android.util.Log.i("BUS_UI", "auto_start_report skipped: fine location not granted")
+        }
+    }
+
+    /**
      * 后端**明确**说这账号没有司机档案（V-2b）：角色已经在 `syncFromServer` 里降回 USER，
      * 人就不能继续留在司机壳 —— 与 `DriverShell` 的「用户版」出口同一手法（改角色 + 导航，两件事缺一不可）。
      * 位置上报服务也在这里停：档案都没了还继续拿旧 `shiftId` 报点位，那就是假上报。
