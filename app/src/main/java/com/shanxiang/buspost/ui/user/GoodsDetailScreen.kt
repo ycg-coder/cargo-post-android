@@ -122,7 +122,7 @@ class GoodsDetailViewModel : ScreenViewModel() {
                     ?: page.items.firstOrNull()
                 val no = server?.orderNo?.ifEmpty { ack.orderNo }.orEmpty().ifEmpty { ack.orderNo }
                 if (no.isEmpty()) {
-                    error = page.error ?: "订单号未获取，请到「我的订单」核对后再试"
+                    error = page.error ?: "后端未回订单号，请到「我的订单」核对后再试"
                     return@work
                 }
                 submitted = no

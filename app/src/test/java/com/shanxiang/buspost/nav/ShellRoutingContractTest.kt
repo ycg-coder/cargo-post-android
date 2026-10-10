@@ -25,11 +25,11 @@ class ShellRoutingContractTest : ServerTest() {
 
     // ---------- 冷启动落哪个壳 ----------
 
-    /** 未登录永远是登录页：本机残留的 role=DRIVER 不得越过登录态把陌生人放进司机工作台 */
+    /** 未登录进游客模式（USER_SHELL），首页实时公交完整开放（对标主流 App 游客体验，Task #16） */
     @Test
-    fun `未登录永远进登录页`() {
-        assertEquals(Routes.LOGIN, startDestinationFor(loggedIn = false, role = Role.DRIVER))
-        assertEquals(Routes.LOGIN, startDestinationFor(loggedIn = false, role = Role.USER))
+    fun `未登录进游客模式壳`() {
+        assertEquals(Routes.USER_SHELL, startDestinationFor(loggedIn = false, role = Role.DRIVER))
+        assertEquals(Routes.USER_SHELL, startDestinationFor(loggedIn = false, role = Role.USER))
     }
 
     @Test
@@ -52,7 +52,7 @@ class ShellRoutingContractTest : ServerTest() {
         assertFalse(Prefs.loggedIn)
         assertEquals(Role.USER, Prefs.role)
         assertEquals(0L, Prefs.driverId)
-        assertEquals(Routes.LOGIN, startDestinationFor(Prefs.loggedIn, Prefs.role))
+        assertEquals(Routes.USER_SHELL, startDestinationFor(Prefs.loggedIn, Prefs.role))
     }
 
     // ---------- 通知深链的分域闸 ----------

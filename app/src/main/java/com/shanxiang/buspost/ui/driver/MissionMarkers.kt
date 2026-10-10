@@ -130,15 +130,15 @@ object MissionMarkers {
      */
     internal fun missionRouteReasonOf(phase: PolylinePhase, failure: String?, roadReason: String?): String = when {
         phase == PolylinePhase.Asking ->
-            "正在获取路线，请稍候。"
+            "正在向后端要这一班的路线，期间不画示意线。"
         phase == PolylinePhase.NotAsked ->
-            "路线尚未加载。"
+            "还没去问过路线，不是后端说没有路线，期间不画示意线。"
         failure != null ->
-            "路线加载失败：$failure"
+            "这次没问到：$failure（这不是后端说没有路线，不画示意线）"
         roadReason != null ->
-            roadReason
+            "$roadReason（站点与顺序仍按调度安排显示，不画示意线）"
         else ->
-            "暂无路线数据。"
+            "没有证据表明后端说过它有路线，暂无路线数据，不画示意线。"
     }
 
     /** 状态四态配色：失败单独一色，不能与"已完成"共用 */

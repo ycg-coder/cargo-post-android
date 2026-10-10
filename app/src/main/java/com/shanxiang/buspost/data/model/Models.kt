@@ -1866,10 +1866,10 @@ data class QuoteResult(
     val distanceKm: Double? = null,
 ) {
     /** 金额纯数字串（千位不带分隔，整数不补 .00，与 UI 侧 formatPrice 同口径）；缺键为"未给"而不是 0 */
-    val amountValueText: String get() = amount?.let { yuan(it) } ?: "暂未知"
+    val amountValueText: String get() = amount?.let { yuan(it) } ?: "未给"
 
     /** 带币符的整句：给核对页/车票副券用，缺键不许显示 ¥0 */
-    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额暂未知"
+    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额未给"
 
     /**
      * 件数费 + 里程费那一行，对齐小程序 send.wxml:287 的条件拼接：
@@ -1878,13 +1878,13 @@ data class QuoteResult(
      */
     val feeBreakdownText: String
         get() = buildString {
-            append(itemFee?.let { "件数费 ¥${yuan(it)}" } ?: "件数费暂未知")
+            append(itemFee?.let { "件数费 ¥${yuan(it)}" } ?: "件数费未给")
             when (distanceFee) {
-                null -> append(" · 里程费暂未知")
+                null -> append(" · 里程费未给")
                 0.0 -> Unit
                 else -> append(" + 里程费 ¥${yuan(distanceFee)}")
             }
-            append("（").append(itemCount?.let { "$it 件" } ?: "件数暂未知").append(" · ").append(distanceCaliberText).append("）")
+            append("（").append(itemCount?.let { "$it 件" } ?: "件数未给").append(" · ").append(distanceCaliberText).append("）")
         }
 
     /**
@@ -1894,7 +1894,7 @@ data class QuoteResult(
     val distanceCaliberText: String
         get() = distanceKm?.let {
             "计价里程 ${String.format(java.util.Locale.CHINA, "%.1f", it)} km（直线距离×路网系数，非道路里程）"
-        } ?: "计价里程暂未知"
+        } ?: "计价里程未给"
 
     companion object {
         fun parse(o: JSONObject): QuoteResult = QuoteResult(
@@ -2003,9 +2003,9 @@ data class Reachability(
     /** 距离文案：null 一律说"接口未给"，不出现"0 公里" */
     val distanceText: String
         get() = distanceKm?.let { "约 ${String.format(java.util.Locale.CHINA, "%.2f", it)} 公里$providerLabel" }
-            ?: "距离暂未知"
+            ?: "距离接口未给"
 
-    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间暂未知"
+    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间接口未给"
 
     /**
      * 不可达原因文案：只按后端 `reasonCode` 分支，本机不猜。
@@ -2121,9 +2121,9 @@ data class DriverTaskSegment(
     val windowText: String
         get() = when {
             windowStartText.isNotEmpty() && windowEndText.isNotEmpty() -> "任务窗口 $windowStartText ~ $windowEndText"
-            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻暂未知）"
-            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻暂未知）"
-            else -> "任务窗口暂未知"
+            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻接口未给）"
+            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻接口未给）"
+            else -> "任务窗口接口未给"
         }
 
     companion object {

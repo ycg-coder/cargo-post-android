@@ -404,7 +404,7 @@ class SendViewModel : ScreenViewModel() {
                 val server = page.items.firstOrNull { it.orderNo == ack.orderNo } ?: page.items.firstOrNull()
                 val no = ack.orderNo.ifEmpty { server?.orderNo.orEmpty() }
                 if (no.isEmpty()) {
-                    formError = page.error ?: "订单号未获取，请到「我的寄货」核对后再试"
+                    formError = page.error ?: "后端未回订单号，请到「我的寄货」核对后再试"
                     return@work
                 }
                 created = ack.copy(

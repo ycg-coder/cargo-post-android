@@ -530,7 +530,7 @@ class WorkbenchViewModel : ScreenViewModel() {
         val ack = block()
         syncFromServer()
         receipt = when {
-            ack.notSent -> "$label：操作正在处理中，显示的是当前状态"
+            ack.notSent -> "$label：未发给后端，显示的是当前状态"
             ack.demo -> "$label：演示模式，操作仅在本机显示"
             else -> "${label}已提交，状态已刷新"
         }
