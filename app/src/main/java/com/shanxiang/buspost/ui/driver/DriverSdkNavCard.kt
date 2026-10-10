@@ -128,11 +128,13 @@ fun DriverSdkNavCard(
      * 冷启动时班次本来就在途的不算"刚发车"（armed 初值 = !inTransit），
      * 否则司机只是重开 App 就被糊一脸全屏导航。缺任何一件就留在工作台，绝不拿假起点凑一次跳转。
      */
-    var autoGuideArmed by remember { mutableStateOf(!inTransit) }
+    // 一次性：进程内已经自动跳过一次，就再也不自动跳（手动按钮永远在）
+    var autoGuideArmed by remember { mutableStateOf(!inTransit && !AppState.autoGuideUsed) }
     LaunchedEffect(autoGuideArmed, gate.canNavigate, nextStop?.stationId) {
         val stop = nextStop ?: return@LaunchedEffect
         if (!autoGuideArmed || !gate.canNavigate) return@LaunchedEffect
         autoGuideArmed = false
+        AppState.autoGuideUsed = true
         android.util.Log.i("BUS_UI", "auto_open_guide stop=${stop.stationId} origin=${vehicleGeo?.lat},${vehicleGeo?.lng}")
         AppState.openGuide(
             AppState.GuideTarget(

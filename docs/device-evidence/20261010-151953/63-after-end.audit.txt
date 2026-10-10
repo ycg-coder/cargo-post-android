@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-151953\63-after-end.txt (108 节点)
+== docs\device-evidence\20261010-151953\63-after-end.xml: 108 节点 / 37 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

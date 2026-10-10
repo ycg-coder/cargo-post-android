@@ -123,6 +123,13 @@ object AppState {
      */
     data class GuideTarget(val lat: Double, val lng: Double, val name: String, val stationId: Long)
 
+    /**
+     * 自动进导航在**一个进程里只许发生一次**（用户口径 A：在途司机开 App 就给他导航）。
+     * 放在 AppState 而不是 remember：卡片随工作台重建，remember 会复位，
+     * 于是「结束导航」刚回到工作台就被再弹回导航页，司机再也出不去（真机实测 3 次连弹）。
+     */
+    var autoGuideUsed = false
+
     val guideTarget = MutableStateFlow<GuideTarget?>(null)
 
     fun openGuide(target: GuideTarget) {

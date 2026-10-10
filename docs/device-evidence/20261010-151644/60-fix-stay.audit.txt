@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-151644\60-fix-stay.txt (67 节点)
+== docs\device-evidence\20261010-151644\60-fix-stay.xml: 67 节点 / 23 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

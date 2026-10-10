@@ -1,0 +1,71 @@
+- | FrameLayout | 2136x3200 @ 0,0
+  - | LinearLayout | 2136x3200 @ 0,0
+    - | FrameLayout | 2136x3200 @ 0,0
+      - | ComposeView | 2136x3200 @ 0,0
+        - | View | 2136x3200 @ 0,0
+          - | View | 2136x3200 @ 0,0
+            - | View | 2136x3200 @ 0,0
+              - | ViewFactoryHolder | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | LinearLayout | 2136x2411 @ 0,529
+                - | RelativeLayout | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | FrameLayout | 2136x2411 @ 0,529
+                - | ViewGroup | 2136x2411 @ 0,529
+                - | TextureView | 2136x2411 @ 0,529
+                - | View | 2136x2411 @ 0,529
+                - | RelativeLayout | 2136x2235 @ 0,529
+                - | RelativeLayout C | 2136x61 @ 0,529
+                - | LinearLayout | 1026x61 @ 28,529
+                - | LinearLayout | 1026x61 @ 1082,529
+                - | RelativeLayout | 2108x313 @ 14,584
+                - | RelativeLayout | 2108x313 @ 14,584
+                - | RelativeLayout | 2080x291 @ 28,584
+                - | ImageView | 209x209 @ 61,625
+                - | RelativeLayout | 408x291 @ 298,584
+                145米 | TextView | 254x146 @ 298,617
+                进入 | TextView | 126x84 @ 580,666
+                无名道路 | TextView | 252x84 @ 312,750
+                - | RelativeLayout | 56x52 @ 2035,598
+                - | LinearLayout | 56x52 @ 2035,598
+                - | ImageView | 39x39 @ 2052,604
+                - | LinearLayout | 17x52 @ 2035,598
+                - | RelativeLayout | 2136x185 @ 0,897
+                - | RelativeLayout | 2136x2026 @ 0,914
+                - | FrameLayout | 146x146 @ 28,1661
+                - | FrameLayout | 179x369 @ 0,2571
+                - | LinearLayout | 165x165 @ 14,2571
+                - | LinearLayout | 2136x193 @ 0,2747
+                退出 | TextView C | 138x165 @ 14,2753
+                - | ImageView | 3x110 @ 152,2780
+                - | FrameLayout | 1964x165 @ 155,2753
+                - | LinearLayout | 1964x159 @ 155,2756
+                - | LinearLayout | 1964x85 @ 155,2756
+                9.1公里 | TextView | 155x85 @ 914,2756
+                18分钟 | TextView | 151x85 @ 1097,2756
+                - | ImageView | 49x49 @ 1270,2777
+                8 | TextView | 40x85 @ 1319,2756
+                - | LinearLayout | 1964x74 @ 155,2841
+                15:30到达 | TextView | 250x74 @ 1012,2841
+                - | ImageView | 3x110 @ 2119,2780
+                - | LinearLayout | 165x368 @ 1971,2572
+                - | ImageView C | 165x165 @ 1971,2572
+              - | View | 2058x383 @ 39,118
+                乡邮智联 · 车道级导航 | TextView | 334x66 @ 105,118
+                南坪站 | TextView | 123x66 @ 105,184
+                退出 | TextView C | 176x132 @ 1921,118
+                左转 | TextView | 120x80 @ 39,272
+                无名道路 · 下一段 无名道路 | TextView | 421x66 @ 39,352
+                9.1 公里 | TextView | 200x74 @ 1897,278
+                17 分钟 | TextView | 112x66 @ 1985,352
+                高德没给车道信息（这不等于这条路没有车道） | TextView | 2005x66 @ 92,435
+              - | View | 2058x138 @ 39,2990
+                - | View C | 668x138 @ 39,2990
+                - | View | 132x132 @ 208,2994
+                播报已关 | TextView | 182x66 @ 318,3026
+                - | View C | 667x138 @ 735,2990
+                - | View | 132x132 @ 904,2994
+                车头朝上 | TextView | 182x66 @ 1014,3026
+                - | View C | 667x138 @ 1430,2990
+                - | View | 132x132 @ 1599,2994
+                结束导航 | TextView | 182x66 @ 1709,3026

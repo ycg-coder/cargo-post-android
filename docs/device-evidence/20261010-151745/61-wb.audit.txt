@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-151745\61-wb.txt (108 节点)
+== docs\device-evidence\20261010-151745\61-wb.xml: 108 节点 / 37 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

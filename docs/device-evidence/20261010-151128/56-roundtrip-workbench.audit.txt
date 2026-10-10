@@ -1,0 +1,4 @@
+LISTING -> docs\device-evidence\20261010-151128\56-roundtrip-workbench.txt (71 节点)
+== docs\device-evidence\20261010-151128\56-roundtrip-workbench.xml: 71 节点 / 19 段文字 / 屏幕 2136x3200 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0
