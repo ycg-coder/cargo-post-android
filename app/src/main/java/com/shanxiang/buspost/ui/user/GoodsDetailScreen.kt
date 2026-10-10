@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
@@ -175,9 +175,11 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                         contentAlignment = Alignment.Center,
                     ) {
                         if (p.image.isNotEmpty()) {
-                            AsyncImage(
-                                model = p.image,
+                            NetworkImage(
+                                url = p.image,
                                 contentDescription = p.name,
+                                width = 400.dp,
+                                height = 230.dp,
                                 modifier = Modifier.fillMaxWidth().height(230.dp),
                                 contentScale = ContentScale.Crop,
                             )
@@ -348,9 +350,11 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                 Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.94f)).clickable { preview = false },
                 contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
-                    model = p.image,
+                NetworkImage(
+                    url = p.image,
                     contentDescription = p.name,
+                    width = 400.dp,
+                    height = 700.dp,
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.Fit,
                 )

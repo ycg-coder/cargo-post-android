@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -347,9 +347,11 @@ private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Uni
             // 凭证照片只画后端回读出来的 photoUrl（需求 §7 的"重新查询仍然能看到照片"），
             // 本机选过但没入库的照片不在这里冒充凭证。
             if (task.photoUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = task.photoUrl,
+                NetworkImage(
+                    url = task.photoUrl,
                     contentDescription = "交接凭证照片",
+                    width = 400.dp,
+                    height = 120.dp,
                     modifier = Modifier
                         .padding(top = 9.dp)
                         .fillMaxWidth()

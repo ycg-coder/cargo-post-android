@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
@@ -315,9 +315,11 @@ private fun GoodsCard(p: Product, modifier: Modifier = Modifier, onClick: () -> 
             contentAlignment = Alignment.Center,
         ) {
             if (p.image.isNotEmpty()) {
-                AsyncImage(
-                    model = p.image,
+                NetworkImage(
+                    url = p.image,
                     contentDescription = p.name,
+                    width = 400.dp,
+                    height = 112.dp,
                     modifier = Modifier.fillMaxWidth().height(112.dp),
                     contentScale = ContentScale.Crop,
                 )

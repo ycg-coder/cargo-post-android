@@ -25,6 +25,7 @@ class BusPostApp : Application() {
         AmapCompliance.apply(this)
         Prefs.init(this)
         Channels.ensure(this)
+        Api.initCache(this)
         Repo.restoreSession()
         Api.onUnauthorized = {
             Prefs.clearSession()
@@ -32,15 +33,13 @@ class BusPostApp : Application() {
         }
         // 后台：WorkManager 15 分钟一轮
         NotifyWorker.schedule(this)
-        // 前台：20 秒一轮，"车快到了"这类分钟级提醒只有这样才能落到实处
+        // 前台：30 秒一轮（原 20 秒，优化电池），"车快到了"这类分钟级提醒仍然及时
         scope.launch {
             while (true) {
                 if (AppState.foreground.value && AppState.hasUserSession) {
-                    // attempt 而非 runCatching：这个循环的 scope 被取消时，检查中途的 CancellationException
-                    // 必须原样穿出（吞掉它=进程已经不在了还继续 round），其余失败与旧行为一样不阻塞下一轮
                     attempt { AlertEngine.check(this@BusPostApp) }
                 }
-                delay(20_000L)
+                delay(30_000L)
             }
         }
     }

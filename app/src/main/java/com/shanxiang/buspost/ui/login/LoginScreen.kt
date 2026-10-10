@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -76,9 +76,11 @@ fun LoginScreen(
                 Modifier.fillMaxWidth().padding(top = 40.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                AsyncImage(
-                    model = "file:///android_asset/logo.png",
+                NetworkImage(
+                    url = "file:///android_asset/logo.png",
                     contentDescription = null,
+                    width = 64.dp,
+                    height = 64.dp,
                     modifier = Modifier.size(64.dp).clip(RoundedCornerShape(BusRadius.l)),
                     contentScale = ContentScale.Crop,
                 )

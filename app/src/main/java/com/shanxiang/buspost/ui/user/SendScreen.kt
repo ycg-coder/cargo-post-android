@@ -41,7 +41,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.net.Api
 import com.shanxiang.buspost.core.ui.BusButton
@@ -637,9 +637,11 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                 SectionTitle("货物照片")
                 BusCard(modifier = Modifier.fillMaxWidth()) {
                     if (vm.photoUri != null) {
-                        AsyncImage(
-                            model = vm.photoUri,
+                        NetworkImage(
+                            url = vm.photoUri,
                             contentDescription = null,
+                            width = 400.dp,
+                            height = 150.dp,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)

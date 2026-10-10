@@ -47,15 +47,60 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+
+/**
+ * 带尺寸约束的网络图片：显式告诉 Coil 目标像素尺寸，避免全分辨率解码。
+ * 缩略图/列表项场景务必用这个而不是裸 AsyncImage —— 否则一张 2000px 的图会被解码到内存里，
+ * 只为了显示 100dp 的缩略图。
+ */
+@Composable
+fun NetworkImage(
+    url: String?,
+    contentDescription: String?,
+    width: Dp,
+    height: Dp,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    placeholder: Painter? = null,
+) {
+    val ctx = LocalContext.current
+    val density = LocalDensity.current
+    val (wPx, hPx) = remember(width, height, density) {
+        with(density) { width.roundToPx() to height.roundToPx() }
+    }
+    val model = remember(url, wPx, hPx) {
+        ImageRequest.Builder(ctx)
+            .data(url)
+            .size(wPx, hPx)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .crossfade(true)
+            .build()
+    }
+    AsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale,
+        placeholder = placeholder,
+    )
+}
 
 /** 站牌式按钮：实板 + 顶部浅色落款横档，等价 .btn-primary / .btn-orange */
 enum class BusButtonVariant { PRIMARY, CLAY, GOLD, OUTLINE, GHOST, DANGER, TEXT }
@@ -748,9 +793,11 @@ fun BusAvatar(name: String, modifier: Modifier = Modifier, url: String? = null, 
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
-            AsyncImage(
-                model = url,
+            NetworkImage(
+                url = url,
                 contentDescription = null,
+                width = px,
+                height = px,
                 modifier = Modifier.fillMaxWidth().height(px),
             )
         } else {

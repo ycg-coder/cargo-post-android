@@ -43,7 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.loc.LocFix
 import com.shanxiang.buspost.core.loc.Locator
@@ -51,7 +52,8 @@ import com.shanxiang.buspost.core.ui.AnimatedEnter
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
 import com.shanxiang.buspost.core.ui.BusIcons
-import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.NetworkImage
+import com.shanxiang.buspost.core.ui.BusLazyPage
 import com.shanxiang.buspost.core.ui.BusPullRefresh
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusScrollRow
@@ -156,43 +158,57 @@ class HomeViewModel : ScreenViewModel() {
         fetchAll(context, target)
     }
 
-    private suspend fun fetchAll(context: android.content.Context, g: Geo?, onlyBus: Boolean = false) {
-        val nb = Repo.nearbyBuses(g)
+    private suspend fun fetchAll(context: android.content.Context, g: Geo?, onlyBus: Boolean = false) = coroutineScope {
+        val nbDeferred = async { Repo.nearbyBuses(g) }
         if (!onlyBus) {
-            val n = Repo.notices()
+            val noticesDeferred = async { Repo.notices() }
+            val productsDeferred = async { Repo.products() }
+            val arrDeferred = async { if (Prefs.loggedIn) Repo.sendOrders() else Feed(emptyList()) }
+            val weatherDeferred = async {
+                if (g == null) {
+                    Triple(null, null, "")
+                } else {
+                    val rg = Repo.reverseGeo(g)
+                    val w = Repo.weather(g, rg.adcode)
+                    val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(java.util.Date())
+                    Triple(rg, w, time)
+                }
+            }
+
+            val nb = nbDeferred.await()
+            val n = noticesDeferred.await()
+            val p = productsDeferred.await()
+            val arr = arrDeferred.await()
+            val (rg, w, time) = weatherDeferred.await()
+
             notices = n.items
             noticeError = n.error != null
-            val p = Repo.products()
             products = p.items.take(8)
-            // §68：到车提醒读 /send/page 的 carrierEtaMinutes。/send/arrangements 的 VO 里没有 ETA 键，
-            // /send/page 又只走 fillCarrierBatch（`etaMinutes` 只在 /send/track 的 fillEta 里填），
-            // 所以列表侧唯一真实可用的到站分钟就是承运车辆那个直线估算值。
-            val arr = if (Prefs.loggedIn) Repo.sendOrders() else Feed(emptyList())
             arriving = arr.items.filter {
                 it.carrierEtaMinutes != null && it.carrierEtaMinutes in 1..45 &&
                     it.carrierLocationSource != "REAL_STALE"
             }
-            // 先逆地理拿 adcode（天气按区县查更准），再取天气；逆地理失败则退回坐标级。
-            // 旧写法在 g==null 时兜死一个重庆中心点坐标去查天气：顶上明写「位置未取到」，
-            // 下面却报一个 15°C 多云 —— 那个温度是沙坪坝的，不是用户的（设备实拍 home_1 同一屏自相矛盾）。
-            // 没位置就不查、不显示天气卡，等定位回来那一栏再出现。
             if (g == null) {
                 weather = null
                 weatherUpdateTime = ""
             } else {
-                val rg = Repo.reverseGeo(g)
-                if (!locationManual) locationName = rg.displayName
-                weather = Repo.weather(g, rg.adcode)
-                weatherUpdateTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(java.util.Date())
+                if (rg != null && !locationManual) locationName = rg.displayName
+                weather = w
+                weatherUpdateTime = time
             }
             mergeDemo(n.demo, p.demo, nb.demo, arr.demo)
+            nearby = nb.value
+            vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
+            stations = nb.value?.stations.orEmpty()
+            error = nb.error
         } else {
+            val nb = nbDeferred.await()
             mergeDemo(nb.demo)
+            nearby = nb.value
+            vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
+            stations = nb.value?.stations.orEmpty()
+            error = nb.error
         }
-        nearby = nb.value
-        vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
-        stations = nb.value?.stations.orEmpty()
-        error = nb.error
         lastSync = System.currentTimeMillis()
     }
 
@@ -245,7 +261,8 @@ fun HomeScreen(
             vm.refresh(context)
         },
     ) {
-    BusPage(spacedBy = 10.dp) {
+    BusLazyPage(spacedBy = 10.dp) {
+        item {
         Signpost(
             title = "乡邮智联",
             subtitle = "客货邮 · 城乡直达",
@@ -305,9 +322,11 @@ fun HomeScreen(
                 NoticeCarouselStrip(vm.notices) { nav.navigate(Routes.NOTIFICATIONS) }
             }
         }
+        }
 
         // 天气详情卡（默认收起，点胶囊展开）：图标/湿度/风力/农事提示 + 4 日预报
         if (weatherExpanded) {
+            item {
             vm.weather?.let { w ->
                 WeatherDetailCard(
                     weather = w,
@@ -315,10 +334,12 @@ fun HomeScreen(
                     updateTime = vm.weatherUpdateTime,
                 )
             }
+            }
         }
 
         // 游客登录引导条：对标主流 App 顶部/底部轻量引导（不弹窗，降低打扰感）
         if (guest && onLoginClick != null) {
+            item {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -347,16 +368,18 @@ fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
             }
+            }
         }
 
-        DemoNote(vm.demo)
+        item { DemoNote(vm.demo) }
 
         // 到车提醒：紧凑横条，不再用完整 BusCard 占一整块
         if (vm.arriving.isNotEmpty()) {
-            ArrivingStrip(vm.arriving) { nav.navigate(Routes.trace(it.orderNo)) }
+            item { ArrivingStrip(vm.arriving) { nav.navigate(Routes.trace(it.orderNo)) } }
         }
 
         // 功能入口 · 两行四宫格（对齐主流 App 快捷入口密度）
+        item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FeatureTile(BusIcons.bus, "实时公交", FeatureBg.GREEN, { nav.navigate(Routes.BUS) }, Modifier.weight(1f), 0)
             FeatureTile(BusIcons.leaf, "农产品", FeatureBg.GOLD, {
@@ -369,6 +392,8 @@ fun HomeScreen(
                 if (guest) onLoginClick?.invoke() else nav.navigate(Routes.SEND)
             }, Modifier.weight(1f), 3)
         }
+        }
+        item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FeatureTile(BusIcons.location, "收货地址", FeatureBg.GREEN, {
                 if (guest) onLoginClick?.invoke() else nav.navigate(Routes.ADDRESS)
@@ -383,8 +408,10 @@ fun HomeScreen(
                 if (guest) onLoginClick?.invoke() else onSelectTab(3)
             }, Modifier.weight(1f), 7)
         }
+        }
 
         // ---------- 附近公交：区块头 + meta + 五态（loading/off/empty/error/data）----------
+        item {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // 实时脉冲点：对标车来了/高德的"实时"指示灯
             Box(
@@ -476,8 +503,8 @@ fun HomeScreen(
                     }
                     if (chips.isNotEmpty()) {
                         BusScrollRow(spacedBy = 6.dp) {
-                            items(chips.size) { i ->
-                                BusTag(chips[i], tone = BusTone.NEUTRAL)
+                            items(chips, key = { it }) { chip ->
+                                BusTag(chip, tone = BusTone.NEUTRAL)
                             }
                         }
                     }
@@ -512,8 +539,10 @@ fun HomeScreen(
                 }
             }
         }
+        }
 
         // ---------- 推荐农产品（对齐 index.wxml:236-282：标题「优质农产品 · 村里直发」+ 更多 + 骨架/空态/横滑） ----------
+        item {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(BusIcons.leaf, null, tint = t.primaryOnLight, modifier = Modifier.size(17.dp))
             Text(
@@ -557,16 +586,16 @@ fun HomeScreen(
                 icon = BusIcons.leaf,
             )
             else -> BusScrollRow {
-                items(vm.products.size) { i ->
-                    val p = vm.products[i]
+                items(vm.products, key = { it.id }) { p ->
                     ProductMiniCard(p) {
                         if (guest) onLoginClick?.invoke() else nav.navigate(Routes.goodsDetail(p.id))
                     }
                 }
             }
         }
+        }
 
-        Spacer(Modifier.height(8.dp))
+        item { Spacer(Modifier.height(8.dp)) }
     }
     }
 
@@ -1078,9 +1107,11 @@ private fun ProductMiniCard(p: Product, onClick: () -> Unit) {
             .padding(8.dp),
     ) {
         if (p.image.isNotEmpty()) {
-            AsyncImage(
-                model = p.image,
+            NetworkImage(
+                url = p.image,
                 contentDescription = null,
+                width = 400.dp,
+                height = 100.dp,
                 modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(BusRadius.m)),
                 contentScale = ContentScale.Crop,
             )

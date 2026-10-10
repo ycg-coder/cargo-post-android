@@ -29,7 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
@@ -239,9 +239,11 @@ private fun ItemRow(item: OrderItem) {
     val scale = LocalBusFontScale.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (item.image.isNotEmpty()) {
-            AsyncImage(
-                model = item.image,
+            NetworkImage(
+                url = item.image,
                 contentDescription = item.name,
+                width = 46.dp,
+                height = 46.dp,
                 modifier = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(BusRadius.m)),
@@ -343,9 +345,11 @@ fun GoodsTraceScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
                                             Text(time, color = t.textTertiary, fontSize = (11.5 * scale).sp)
                                         }
                                     }
-                                    AsyncImage(
-                                        model = url,
+                                    NetworkImage(
+                                        url = url,
                                         contentDescription = label,
+                                        width = 400.dp,
+                                        height = 170.dp,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .padding(top = 8.dp)

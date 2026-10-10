@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.loc.TrackFix
 import com.shanxiang.buspost.data.model.Geo
+import com.shanxiang.buspost.data.model.GeoMath
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.notify.Notifier
@@ -46,6 +47,16 @@ class DriverLocationService : Service() {
 
     /** 上一次写进前台通知的正文，相同就不重复 post */
     private var notifiedText: String = ""
+
+    /** 静止检测：上一次上报的坐标，用于判断车辆是否移动 */
+    @Volatile
+    private var lastReportedGeo: Geo? = null
+
+    /** 静止检测阈值：移动距离小于此值（米）且在静止窗口内，跳过上报 */
+    private companion object {
+        const val STATIONARY_THRESHOLD_M = 20.0
+        const val STATIONARY_WINDOW_MS = 60_000L
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -145,9 +156,19 @@ class DriverLocationService : Service() {
 
     private suspend fun send(step: LocationReportPolicy.Step.Send, baseSec: Int): Long {
         val fix = step.fix
+        val lastGeo = lastReportedGeo
+        if (lastGeo != null) {
+            val distanceM = GeoMath.distance(lastGeo, fix.geo)
+            if (distanceM < STATIONARY_THRESHOLD_M) {
+                Running.waiting.value = "车辆静止中（移动 ${distanceM.toInt()}m < ${STATIONARY_THRESHOLD_M.toInt()}m）"
+                notifyWaiting()
+                return LocationReportPolicy.intervalMs(baseSec, Running.failStreak)
+            }
+        }
         Running.shiftNote.value = LocationReportPolicy.shiftNote(step.shiftId ?: 0L)
         return try {
             Repo.reportLocation(step.shiftId, fix.geo, fix.speedKmh.toDouble())
+            lastReportedGeo = fix.geo
             Running.failStreak = 0
             Running.reported.value += 1
             Running.lastSuccessAt = System.currentTimeMillis()

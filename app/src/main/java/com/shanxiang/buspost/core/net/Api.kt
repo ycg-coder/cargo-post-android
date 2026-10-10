@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.core.net
 
+import android.content.Context
 import android.util.Log
 import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.data.repo.DemoData
@@ -8,11 +9,14 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Cache
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -188,9 +192,28 @@ internal object NetTestOverride {
     }
 }
 
+/**
+ * 网络拦截器：给 GET 响应加 Cache-Control，让 OkHttp 磁盘缓存生效。
+ * 后端没返回 Cache-Control 时，默认缓存 60 秒 —— 列表/详情类数据在这个时间窗口内不会变。
+ * POST/PUT/DELETE 不加缓存头（幂等性不保证，每次都该走网络）。
+ */
+private class CacheControlInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val response = chain.proceed(request)
+        if (request.method != "GET") return response
+        if (response.cacheControl.noStore) return response
+        return response.newBuilder()
+            .removeHeader("Pragma")
+            .header("Cache-Control", "max-age=60")
+            .build()
+    }
+}
+
 object Api {
     private const val TAG = "BUS_API"
     private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+    private const val CACHE_SIZE = 10L * 1024 * 1024 // 10 MB
 
     val baseUrl: String get() = NetTestOverride.baseUrl ?: BuildConfig.BASE_URL
 
@@ -215,12 +238,22 @@ object Api {
     @Volatile
     internal var last401At = 0L
 
+    private var httpCache: Cache? = null
+
+    fun initCache(context: Context) {
+        if (httpCache == null) {
+            httpCache = Cache(File(context.cacheDir, "http_cache"), CACHE_SIZE)
+        }
+    }
+
     private val http by lazy {
         OkHttpClient.Builder()
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .apply { httpCache?.let { cache(it) } }
+            .addNetworkInterceptor(CacheControlInterceptor())
             .build()
     }
 

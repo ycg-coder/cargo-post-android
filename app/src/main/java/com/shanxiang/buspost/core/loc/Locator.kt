@@ -87,6 +87,7 @@ data class TrackFix(
 object Locator {
 
     private const val TAG_SHIFT = "BUS_LOC"
+    private const val ACCURACY_FILTER_M = 200.0
 
     /**
      * 设备坐标 → 业务坐标的**唯一**换算入口（审计 §17）。
@@ -161,7 +162,11 @@ object Locator {
         }
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
-                trySend(location)
+                if (accuracyOf(location) > 0 && accuracyOf(location) < ACCURACY_FILTER_M) {
+                    trySend(location)
+                } else if (accuracyOf(location) <= 0) {
+                    trySend(location)
+                }
             }
 
             @Deprecated("LocationManager 旧接口")

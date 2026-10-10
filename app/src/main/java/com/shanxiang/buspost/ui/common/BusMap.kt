@@ -116,6 +116,11 @@ fun BusMap(
     val t = LocalBusTokens.current
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var unavailable by remember { mutableStateOf(false) }
+    var prevMarkersKey by remember { mutableStateOf(0) }
+    var prevPathsKey by remember { mutableStateOf(0) }
+
+    val currentMarkersKey = markers.hashCode()
+    val currentPathsKey = paths.hashCode()
 
     // MapView 生命周期必须与宿主对齐，否则会漏内存 / 黑屏
     DisposableEffect(lifecycleOwner) {
@@ -159,14 +164,18 @@ fun BusMap(
                     isCompassEnabled = true
                     isMyLocationButtonEnabled = true
                     isScaleControlsEnabled = true
-                    // 与小程序 `<map>` 一致：可拖动、可双指缩放
                     isRotateGesturesEnabled = false
-                    // 倾斜手势跟着倾斜角开：没要立体视角的页面不该多出一个能改变读图几何的手势
                     isTiltGesturesEnabled = tiltDegrees > 0f
                 }
-                aMap.clear()
+                val markersChanged = currentMarkersKey != prevMarkersKey
+                val pathsChanged = currentPathsKey != prevPathsKey
+                if (markersChanged || pathsChanged) {
+                    aMap.clear()
+                    prevMarkersKey = currentMarkersKey
+                    prevPathsKey = currentPathsKey
+                }
 
-                paths.forEach { p ->
+                if (pathsChanged) paths.forEach { p ->
                     // 来源不可信就不画：高德底图上的任何一条线都会被司机当成路
                     val pts = p.validated() ?: return@forEach
                     val color = when (p.colorRole) {
@@ -182,7 +191,7 @@ fun BusMap(
                     )
                 }
 
-                markers.forEach { m ->
+                if (markersChanged) markers.forEach { m ->
                     if (m.geo.lat == 0.0 && m.geo.lng == 0.0) return@forEach
                     // 3D 形状只认 Map3DVisual 这一个出口，页面侧不许再各自 setFlat / setAltitude / setRotateAngle
                     val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)

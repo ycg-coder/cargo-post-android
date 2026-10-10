@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.graphics.Color
 import com.shanxiang.buspost.core.ui.BusCard
@@ -368,9 +368,11 @@ private fun ProductOrderTicket(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (g.image.isNotEmpty()) {
-                            AsyncImage(
-                                model = g.image,
+                            NetworkImage(
+                                url = g.image,
                                 contentDescription = g.name,
+                                width = 46.dp,
+                                height = 46.dp,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
