@@ -32,3 +32,7 @@ release-keystore/
 *.bak-*
 *.r69bak
 _src-backups/
+
+# ⚠ 例外：VerificationFailureTest 的"真实失败样例"是测试证据，不是运行日志。
+# 早先 *.log 这条把它们一起挡在库外，Linux CI 上取到 0 份样例 ⇒ 三条用例直接红（本地有磁盘文件所以全绿，看不见这个洞）。
+!tools/fixtures/verification-failure/*.log

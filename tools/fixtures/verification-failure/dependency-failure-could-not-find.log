@@ -1,0 +1,34 @@
+
+> Configure project :app
+WARNING: The option setting 'android.overridePathCheck=true' is experimental.
+The current default is 'false'.
+⚠ 签名文件不存在：C:\Users\袁\Desktop\测试\buspost-signing-backup\release-keystore\buspost-release.jks —— release 将产出未签名 APK。
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:checkDebugAarMetadata'.
+> Could not resolve all files for configuration ':app:debugRuntimeClasspath'.
+   > Could not find com.vfcapture.absent:library:9.9.9.
+     Searched in the following locations:
+       - file:/C:/Users/%E8%A2%81/.m2/repository/com/vfcapture/absent/library/9.9.9/library-9.9.9.pom
+       - https://dl.google.com/dl/android/maven2/com/vfcapture/absent/library/9.9.9/library-9.9.9.pom
+       - https://maven.aliyun.com/repository/public/com/vfcapture/absent/library/9.9.9/library-9.9.9.pom
+     Required by:
+         project :app
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 5s
+2 actionable tasks: 1 executed, 1 up-to-date
+rc=1

@@ -1,0 +1,13 @@
+adb 版本: Android Debug Bridge version 1.0.41
+--- adb devices ---
+List of devices attached
+
+--- adb devices -l ---
+List of devices attached
+
+--- adb shell wm size（无设备时的真实报错）---
+adb.exe: no devices/emulators found
+rc=1
+--- adb install 无设备 ---
+adb.exe: no devices/emulators found
+rc=1
