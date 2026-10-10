@@ -98,9 +98,9 @@ fun DriverMineScreen() {
         SectionTitle("工作服务")
         BusCard(modifier = Modifier.fillMaxWidth(), padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
             Column {
-                MineRow(BusIcons.bell, "调度消息", if (unread > 0) "$unread 条未读" else "调度与到车通知", {
+                MineRow(BusIcons.bell, "调度消息", "调度与到车通知", {
                     nav.navigate(Routes.DRIVER_MESSAGES)
-                })
+                }, badgeCount = unread)
                 BusDivider()
                 MineRow(BusIcons.warning, "异常上报", "晚点 · 绕行 · 货损", {
                     nav.navigate(Routes.DRIVER_EXCEPTION)
@@ -166,6 +166,7 @@ private fun MineRow(
     subtitle: String,
     onClick: () -> Unit,
     danger: Boolean = false,
+    badgeCount: Int = 0,
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
@@ -192,6 +193,23 @@ private fun MineRow(
         Column(Modifier.weight(1f).padding(start = 11.dp)) {
             Text(title, color = t.ink, fontSize = (14.5f * scale).sp, fontWeight = FontWeight.Medium)
             Text(subtitle, color = t.textTertiary, fontSize = (11.5f * scale).sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        if (badgeCount > 0) {
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .padding(end = 6.dp)
+                    .clip(RoundedCornerShape(BusRadius.pill))
+                    .background(t.danger)
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (badgeCount > 99) "99+" else "$badgeCount",
+                    color = t.onPrimary,
+                    fontSize = (11 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
         androidx.compose.material3.Icon(BusIcons.next, null, tint = t.textTertiary, modifier = Modifier.size(17.dp))
     }

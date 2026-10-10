@@ -197,7 +197,7 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
     Column {
         BackTopBar(title = "个人资料", subtitle = Prefs.mobile)
         BusPage(spacedBy = 12.dp) {
-            DemoNote(vm.demo, text = "接口未返回资料时，这里显示的是本地会话里的信息。")
+            DemoNote(vm.demo, text = "当前显示本地会话信息。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
 
             SectionTitle("基本资料")

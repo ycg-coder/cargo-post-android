@@ -2,7 +2,6 @@ package com.shanxiang.buspost.core.ui
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -29,34 +28,41 @@ object BusSpace {
     val xl = 16.dp
     val xxl = 24.dp
     val xxxl = 32.dp
-}
-
-object BusRadius {
-    val s = 4.dp
-    val m = 8.dp
-    val l = 12.dp
-    val pill = 100.dp
-    /** 等价小程序 .card：18rpx = 9dp（比通用 l 更小） */
-    val card = 9.dp
-    /** 等价小程序 .signpost 站牌头：12rpx = 6dp */
-    val signpost = 6.dp
-    /** 等价小程序 .input-field：12rpx = 6dp */
-    val field = 6.dp
-    /** 等价小程序 .btn / .btn-ghost（10–14rpx 折中）：6dp */
-    val btn = 6.dp
+    val page = 40.dp
+    val section = 48.dp
 }
 
 /**
- * 卡片悬浮高度（dp）。此前全站 0 阴影：BusCard 的注释写着"圆角 + 阴影"，实现里只有圆角，
- * 于是卡片和米纸底糊成一片，用户口径「卡片没有悬浮效果」。三档就够：
- * 静态卡 [card]、可点卡 [raised]（抬起表示"能按"）、按下 [pressed]（压回去，配合 BusCard 的暗化层）。
- * 深色模式下阴影几乎不可见，BusCard 改用 1dp 描边做同一件事（分层），不额外抬高度。
+ * 圆角阶梯（2026 对标主流 App）：
+ * - card 16dp：货拉拉/滴滴货运/顺丰均用 16-20dp 卡片圆角
+ * - btn 12dp：主流 App 按钮 12-16dp，告别 2020 时代的 6dp 方角
+ * - field 12dp：输入框与按钮同口径
+ * - signpost 16dp：页头大卡片与 card 对齐
+ */
+object BusRadius {
+    val s = 6.dp
+    val m = 12.dp
+    val l = 16.dp
+    val xl = 20.dp
+    val pill = 100.dp
+    val card = 16.dp
+    val signpost = 16.dp
+    val field = 12.dp
+    val btn = 12.dp
+    val dialog = 28.dp
+}
+
+/**
+ * 卡片悬浮高度（dp）。2026 主流做法：轻阴影 + 表面色调分层（tonal elevation）。
+ * 三档：静态卡 [card]、可点卡 [raised]、按下 [pressed]。
+ * 深色模式下阴影几乎不可见，BusCard 改用 1dp 描边做同一件事。
  */
 object BusElevation {
     val none = 0.dp
-    val card = 2.dp
+    val card = 3.dp
     val raised = 6.dp
-    val pressed = 1.dp
+    val pressed = 0.dp
+    val floating = 10.dp
 }
 
 /**
@@ -75,12 +81,23 @@ data class BusTouch(val min: Dp = 48.dp, val gap: Dp = 8.dp) {
     }
 }
 
-/** 动效统一缓动 cubic-bezier(0.22, 0.61, 0.36, 1)，时长 200–400ms */
+/** 动效统一缓动 + 时长（对标 2026 主流 App 微交互） */
 object BusMotion {
+    /** 通用缓动：Material 3 Emphasized 曲线 */
     val easing = CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
-    fun <T> enter(durationMs: Int = 320) = tween<T>(durationMillis = durationMs, easing = easing)
+    /** 减速入场：元素出现时用 */
+    val decelerate = CubicBezierEasing(0f, 0f, 0f, 1f)
+    /** 加速离场：元素消失时用 */
+    val accelerate = CubicBezierEasing(0.3f, 0f, 1f, 1f)
+
+    fun <T> enter(durationMs: Int = 300) = tween<T>(durationMillis = durationMs, easing = easing)
+    fun <T> exit(durationMs: Int = 200) = tween<T>(durationMillis = durationMs, easing = accelerate)
+
     const val PAGE_MS = 250
-    const val PRESS_MS = 120
+    const val PRESS_MS = 100
+    const val SKELETON_MS = 1000
+    const val SHEET_MS = 300
+    const val TOGGLE_MS = 180
 }
 
 /** 字号阶梯：caption 仅用于票号/单位/时间戳等非关键信息 */
@@ -94,7 +111,7 @@ fun busTypography(scale: Float, ink: Color): Typography {
         color = ink,
     )
     return Typography(
-        displayLarge = ts(FontWeight.Black, 28, 36),
+        displayLarge = ts(FontWeight.Bold, 28, 36),
         displaySmall = ts(FontWeight.Bold, 22, 28),
         headlineMedium = ts(FontWeight.Bold, 20, 26),
         headlineSmall = ts(FontWeight.Bold, 18, 24),
@@ -111,11 +128,11 @@ fun busTypography(scale: Float, ink: Color): Typography {
 }
 
 private val busShapes = Shapes(
-    extraSmall = CircleShape,
+    extraSmall = RoundedCornerShape(4.dp),
     small = RoundedCornerShape(BusRadius.s),
     medium = RoundedCornerShape(BusRadius.m),
     large = RoundedCornerShape(BusRadius.l),
-    extraLarge = RoundedCornerShape(BusRadius.l),
+    extraLarge = RoundedCornerShape(BusRadius.xl),
 )
 
 /**

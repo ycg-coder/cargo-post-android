@@ -1,18 +1,24 @@
 package com.shanxiang.buspost.ui.user
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -31,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.net.ApiResult
 import com.shanxiang.buspost.core.net.safeApiCall
@@ -39,6 +46,7 @@ import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
+import com.shanxiang.buspost.core.ui.BusTextField
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
@@ -57,6 +65,11 @@ import com.shanxiang.buspost.data.model.byUserDistance
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.model.GeoMath
 import com.shanxiang.buspost.data.model.NearbyResult
+import com.shanxiang.buspost.data.model.ParcelTrace
+import com.shanxiang.buspost.data.model.ProductOrder
+import com.shanxiang.buspost.data.model.ProductOrderStatus
+import com.shanxiang.buspost.data.model.SendOrder
+import com.shanxiang.buspost.data.model.FreightOrderStatus
 import com.shanxiang.buspost.data.model.Station
 import com.shanxiang.buspost.data.model.VehicleStatus
 import com.shanxiang.buspost.core.ui.StopState
@@ -64,11 +77,15 @@ import com.shanxiang.buspost.core.map.polylineReasonOf
 import com.shanxiang.buspost.core.map.polylineSubtitleOf
 import com.shanxiang.buspost.core.map.PolylinePhase
 import com.shanxiang.buspost.core.map.shouldAskPolyline
+import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.ui.common.BackTopBar
+import com.shanxiang.buspost.ui.common.BusMap
 import com.shanxiang.buspost.ui.common.DemoNote
 import com.shanxiang.buspost.ui.common.LocalNavController
+import com.shanxiang.buspost.ui.common.MapMarker
+import com.shanxiang.buspost.ui.common.MapPath
 import com.shanxiang.buspost.ui.common.RouteMap
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 
@@ -77,6 +94,48 @@ class BusViewModel : ScreenViewModel() {
     var lines by mutableStateOf<List<BusLine>>(emptyList())
     var selected by mutableStateOf<BusLine?>(null)
     var polyline by mutableStateOf<List<Geo>>(emptyList())
+    /** 线路搜索关键词（对标车来了/高德的搜索框：按线路名过滤） */
+    var lineQuery by mutableStateOf("")
+
+    /** 按搜索词过滤后的线路列表（空串 = 不过滤） */
+    val filteredLines: List<BusLine>
+        get() = if (lineQuery.isBlank()) lines
+        else lines.filter { it.name.contains(lineQuery, ignoreCase = true) }
+
+    /** 用户正在运输中的商品订单（商城购买） */
+    var shippingProductOrders by mutableStateOf<List<ProductOrder>>(emptyList())
+        private set
+
+    /** 用户正在运输中的寄货单 */
+    var shippingSendOrders by mutableStateOf<List<SendOrder>>(emptyList())
+        private set
+
+    /** 运输中订单关联的车辆信息（车牌 → 订单摘要） */
+    val myTransportingVehicles: Map<String, List<String>>
+        get() {
+            val result = mutableMapOf<String, MutableList<String>>()
+            shippingProductOrders.forEach { order ->
+                if (order.vehiclePlate.isNotEmpty()) {
+                    result.getOrPut(order.vehiclePlate) { mutableListOf() }
+                        .add("商城·${order.items.firstOrNull()?.name ?: "商品"}")
+                }
+            }
+            shippingSendOrders.forEach { order ->
+                if (order.vehiclePlate.isNotEmpty()) {
+                    result.getOrPut(order.vehiclePlate) { mutableListOf() }
+                        .add("寄货·${order.goodsName}")
+                }
+            }
+            return result
+        }
+
+    /** 判断某辆车是否在运送用户的商品 */
+    fun isMyVehicle(vehicle: BusVehicle): Boolean =
+        vehicle.plate.isNotEmpty() && myTransportingVehicles.containsKey(vehicle.plate)
+
+    /** 获取车辆运送的用户商品描述 */
+    fun myGoodsDescription(vehicle: BusVehicle): String =
+        myTransportingVehicles[vehicle.plate]?.joinToString("、") ?: ""
 
     /**
      * "这次没问到折线"的说法：非 null 是失败分类文案；null 有两种，到底是哪一种由 [polylinePhase] 说
@@ -156,6 +215,23 @@ class BusViewModel : ScreenViewModel() {
             // 静默轮询失败保留旧数据 + 轻量错误条，不清空已看到的内容
             if (!silent) error = one.error ?: lf.error
             lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA).format(java.util.Date())
+        }
+    }
+
+    /** 加载用户正在运输中的订单（商城 + 寄货），用于在地图上高亮运送用户商品的车辆 */
+    fun loadMyShippingOrders() {
+        if (!AppState.hasUserSession) return
+        work(reset = false) {
+            // 商城订单：状态为 2（已发货/运输中）
+            runCatching {
+                val productFeed = Repo.productOrders(pageNo = 1, pageSize = 50, status = 2)
+                shippingProductOrders = productFeed.items.filter { it.vehiclePlate.isNotEmpty() }
+            }
+            // 寄货单：状态为 4（已发车/运输中）
+            runCatching {
+                val sendFeed = Repo.sendOrders(pageNo = 1, pageSize = 50, status = 4)
+                shippingSendOrders = sendFeed.items.filter { it.vehiclePlate.isNotEmpty() }
+            }
         }
     }
 
@@ -263,8 +339,20 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
     val context = LocalContext.current
     // 附近线路展开态：默认最多 6 条（对齐小程序 toggleAllLines）
     var showAllLines by remember { mutableStateOf(false) }
+    // 高德地图不可用时的回退标记（与 DriverMissionMap 同模式：onUnavailable 非 @Composable，
+    // 不能在里面直接调 RouteMap，改用状态变量让外层 if/else 切换）
+    var mapFailed by remember { mutableStateOf(false) }
+    // 收藏状态变化后触发重组（Prefs 不是 State，需要手动驱动 UI 刷新）
+    var favTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) { if (vm.nearby == null && vm.lines.isEmpty()) vm.load(context) }
+    LaunchedEffect(Unit) {
+        if (vm.nearby == null && vm.lines.isEmpty()) vm.load(context)
+    }
+
+    // 登录状态变化时重新加载运输订单（游客→登录后能看到运送自己商品的车辆）
+    LaunchedEffect(AppState.hasUserSession) {
+        vm.loadMyShippingOrders()
+    }
 
     // 15s 静默轮询（对齐小程序 pages/bus/index.js:113-127）：失败不弹提示、保留旧数据；
     // 页面离开自动取消（LaunchedEffect 随组合销毁），不需要手动清定时器。
@@ -278,23 +366,29 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
     val real = vm.nearby?.realTransit == true ||
         vm.lines.any { l -> l.vehicles.any { it.isReal } || l.dataSource.contains("REAL") }
 
-    BusPage(spacedBy = 12.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // 高德风格：地图为主视图 + 底部详情面板
+    Column(Modifier.fillMaxSize().background(t.paper)) {
+        // 顶部栏：标题 + 刷新
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(Modifier.weight(1f)) {
-                Text("实时公交", color = t.ink, fontSize = (21 * scale).sp, fontWeight = FontWeight.Black)
+                Text("实时公交", color = t.ink, fontSize = (20 * scale).sp, fontWeight = FontWeight.Black)
                 Text(
                     vm.locationHint.ifEmpty { "正在定位…" },
                     color = t.textSecondary,
-                    fontSize = (12 * scale).sp,
-                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = (11 * scale).sp,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            // 自动刷新节奏要让用户看得见，否则"每 15s 自动更新"等于没做
             if (vm.lastRefresh.isNotEmpty()) {
                 Text(
                     "${vm.lastRefresh} 更新",
                     color = t.textTertiary,
-                    fontSize = (11 * scale).sp,
+                    fontSize = (10 * scale).sp,
                     modifier = Modifier.padding(end = 8.dp),
                 )
             }
@@ -304,17 +398,47 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        // 搜索框
+        BusCard(
+            padding = PaddingValues(6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        ) {
+            BusTextField(
+                value = vm.lineQuery,
+                onValueChange = { vm.lineQuery = it },
+                placeholder = "搜索线路名称",
+                icon = BusIcons.search,
+                trailing = {
+                    if (vm.lineQuery.isNotEmpty()) {
+                        Icon(
+                            BusIcons.close, null,
+                            tint = t.textTertiary,
+                            modifier = Modifier.size(18.dp).clickable { vm.lineQuery = "" },
+                        )
+                    }
+                },
+            )
+        }
+
+        // 状态标签行（对标高德：实时状态 + 运营时段 + 站点数 + 线路数）
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
             BusTag(
                 if (real) "实时位置" else if (vm.demo) "演示线路" else "班次时刻",
                 tone = if (real) BusTone.OK else BusTone.WARN,
             )
+            // 运营时段（对标高德/车来了：首末班时间）
+            vm.nearby?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let {
+                BusTag("运营 $it", tone = BusTone.NEUTRAL)
+            }
             if (vm.nearby?.stations?.isNotEmpty() == true) {
                 BusTag("附近 ${vm.nearby!!.stations.size} 个站点", tone = BusTone.NEUTRAL)
             }
-            // 首屏没落地时 `lines` 是空表，念出来的「0 条线路」不是"这里没有线路"而是"还不知道有几条"，
-            // 而同一行下面的骨架屏正在表示"还在问"。与上一枚站点签（:312 只在有结果时出现）同口径，
-            // 也是 G-3b（快递页计数诚实化）那一族：没答案就不报数。
             if (vm.nearby != null) {
                 BusTag("${vm.lines.size} 条线路", tone = BusTone.PRIMARY)
             }
@@ -322,159 +446,390 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
 
         DemoNote(vm.demo, text = "该区域没有开通实时公交，下面是客货邮班车的演示线路与时刻。")
 
+        // 地图区域（对标高德：地图占主视图）
         when (vm.state()) {
-            "loading" -> SkeletonList(3)
+            "loading" -> Box(Modifier.fillMaxWidth().height(300.dp)) { SkeletonList(3) }
 
-            // 非运营时间：说明服务时段与下一班，不铺"待发车"卡片（MP-11）
-            "off" -> EmptyState(
-                title = "当前不在运营时间",
-                subtitle = listOfNotNull(
-                    vm.nearby?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let { "服务时段 $it" },
-                    vm.nearby?.nextDepartureTime?.takeIf { it.isNotEmpty() }?.let { "下一班 $it 发车" },
-                    vm.nearby?.lineCount?.takeIf { it > 0 }?.let { "附近共 $it 条公交线路" },
-                ).joinToString("；")
-                    .ifEmpty { "附近暂无运营中的班次，可稍后再来" },
-                icon = BusIcons.clock,
-            )
+            "off" -> Box(Modifier.fillMaxWidth().height(300.dp)) {
+                EmptyState(
+                    title = "当前不在运营时间",
+                    subtitle = listOfNotNull(
+                        vm.nearby?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let { "服务时段 $it" },
+                        vm.nearby?.nextDepartureTime?.takeIf { it.isNotEmpty() }?.let { "下一班 $it 发车" },
+                    ).joinToString("；").ifEmpty { "附近暂无运营中的班次" },
+                    icon = BusIcons.clock,
+                )
+            }
 
-            // 有站/有线路但无车：如实列出站点与线路，不能说"附近没有公交"
-            "empty" -> {
-                val st = vm.nearby?.stations.orEmpty()
-                Column {
-                    EmptyState(
-                        title = if (st.isNotEmpty()) "附近有 ${st.size} 个公交站点" else "附近暂无公交线路",
-                        subtitle = "当前暂无实时车辆数据",
-                        icon = BusIcons.bus,
+            "empty" -> Box(Modifier.fillMaxWidth().height(300.dp)) {
+                EmptyState(
+                    title = "附近暂无公交线路",
+                    subtitle = "当前暂无实时车辆数据",
+                    icon = BusIcons.bus,
+                )
+            }
+
+            "error" -> Box(Modifier.fillMaxWidth().height(300.dp)) {
+                EmptyState(
+                    title = "实时公交暂时不可用",
+                    subtitle = "网络不太好，稍后再试",
+                    icon = BusIcons.info,
+                    actionText = "重新加载",
+                    onAction = { vm.load(context) },
+                )
+            }
+
+            else -> {
+                // 高德风格地图：线路叠加 + 车辆标记 + 站点标记
+                val line = vm.selected
+                val markers = buildList {
+                    // 我的位置
+                    vm.me?.let { add(MapMarker(it, "我的位置", MapMarker.KIND_ME)) }
+                    // 站点
+                    (line?.stations ?: vm.nearby?.stations ?: emptyList()).forEach { s ->
+                        add(MapMarker(s.geo, s.name, MapMarker.KIND_STOP, "站点"))
+                    }
+                    // 车辆（高亮运送用户商品的车辆）
+                    vm.vehiclesOf(line).forEach { v ->
+                        v.geo?.let { geo ->
+                            val isMyVehicle = vm.isMyVehicle(v)
+                            add(
+                                MapMarker(
+                                    geo,
+                                    v.lineName.ifEmpty { "班车" },
+                                    if (v.isReal) MapMarker.KIND_BUS_REAL else MapMarker.KIND_BUS_SIM,
+                                    buildString {
+                                        append(v.plate.ifEmpty { "待派车" })
+                                        if (isMyVehicle) append(" · 运送您的商品")
+                                    },
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                val paths = if (vm.polyline.size >= 2) {
+                    listOf(MapPath(vm.polyline, MapPath.ROLE_MAIN, source = "amap"))
+                } else emptyList()
+
+                // 切线路时重置地图失败标记，让新高德有机会重新尝试
+                LaunchedEffect(line?.id) { mapFailed = false }
+
+                if (mapFailed) {
+                    // 高德不可用时回退到自绘地图（与 DriverMissionMap 同模式）
+                    RouteMap(
+                        polyline = vm.polyline,
+                        stations = line?.stations ?: vm.nearby?.stations ?: emptyList(),
+                        vehicles = vm.vehiclesOf(line),
+                        me = vm.me,
+                        height = 320.dp,
+                        reason = vm.polylineReason("地图服务不可用"),
                     )
-                    if (st.isNotEmpty()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            st.take(8).forEach { s ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(BusIcons.location, null, tint = t.textTertiary, modifier = Modifier.size(14.dp))
+                } else {
+                    BusMap(
+                        markers = markers,
+                        paths = paths,
+                        modifier = Modifier.fillMaxWidth().height(320.dp),
+                        fitAll = true,
+                        onUnavailable = { mapFailed = true },
+                    )
+                }
+            }
+        }
+
+        // 底部详情面板（对标高德：路线信息 + ETA + 车辆列表）
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            when (vm.state()) {
+                "loading", "off", "empty", "error" -> Unit // 已在地图区域显示
+
+                else -> {
+                    // 线路选择 chip（横滑）
+                    if (vm.filteredLines.size > 1) {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            vm.filteredLines.take(8).forEach { l ->
+                                val on = l.id == vm.selected?.id
+                                Column(
+                                    Modifier
+                                        .clip(RoundedCornerShape(BusRadius.m))
+                                        .background(if (on) t.primaryLight else t.card)
+                                        .clickable { vm.pick(l) }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                ) {
                                     Text(
-                                        s.name,
-                                        color = t.ink,
-                                        fontSize = (13 * scale).sp,
-                                        modifier = Modifier.padding(start = 6.dp).weight(1f),
+                                        l.name.ifEmpty { "未命名线路" },
+                                        color = if (on) t.primaryOnLight else t.ink,
+                                        fontSize = (12 * scale).sp,
+                                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
                                     )
-                                    if (s.distanceMeters > 0) {
-                                        Text("${"%.1f".format(s.distanceMeters / 1000)}km", color = t.textTertiary, fontSize = (11.5f * scale).sp)
-                                    }
-                                    if (s.isRealTransit) {
-                                        BusTag("现实公交", Modifier.padding(start = 6.dp), tone = BusTone.OK)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // 收藏线路（快速访问）
+                    val favIds = Prefs.favoriteLineIds
+                    val favLines = vm.lines.filter { it.id in favIds }
+                    if (favLines.isNotEmpty()) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                BusIcons.star,
+                                null,
+                                tint = t.goldDeep,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                " 收藏线路",
+                                color = t.textSecondary,
+                                fontSize = (11 * scale).sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            favLines.forEach { fl ->
+                                val on = fl.id == vm.selected?.id
+                                Column(
+                                    Modifier
+                                        .clip(RoundedCornerShape(BusRadius.m))
+                                        .background(if (on) t.goldLight else t.card)
+                                        .clickable { vm.pick(fl) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            fl.name.ifEmpty { "未命名线路" },
+                                            color = if (on) t.goldDeep else t.ink,
+                                            fontSize = (11 * scale).sp,
+                                            fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                        )
                                     }
                                 }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // 选中线路的 ETA 卡片（对标高德：大数字 ETA + 方向）
+                    val line = vm.selected
+                    val vehicles = vm.vehiclesOf(line).byUserDistance()
+                    if (vehicles.isNotEmpty()) {
+                        val nearest = vehicles.first()
+                        val lineId = line?.id ?: ""
+                        val isFav = lineId.isNotEmpty() && Prefs.isFavoriteLine(lineId)
+                        BusCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            line?.name?.ifEmpty { null } ?: "线路",
+                                            color = t.ink,
+                                            fontSize = (18 * scale).sp,
+                                            fontWeight = FontWeight.Black,
+                                        )
+                                        // 收藏按钮（星标）
+                                        if (lineId.isNotEmpty()) {
+                                            Icon(
+                                                BusIcons.star,
+                                                if (isFav) "已收藏" else "收藏",
+                                                tint = if (isFav) t.goldDeep else t.textTertiary,
+                                                modifier = Modifier
+                                                    .padding(start = 8.dp)
+                                                    .size((20 * scale).dp)
+                                                    .clickable {
+                                                        Prefs.toggleFavoriteLine(lineId)
+                                                        favTick++
+                                                    },
+                                            )
+                                        }
+                                    }
+                                    // 方向显示（对标高德/车来了："开往XX方向"）
+                                    Text(
+                                        "开往 ${line?.to ?: "终点站"} 方向",
+                                        color = t.textSecondary,
+                                        fontSize = (12 * scale).sp,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
+                                // ETA 大数字
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        nearest.etaValueText,
+                                        color = if (nearest.etaMinutes != null && nearest.etaMinutes <= 5) t.danger else t.primary,
+                                        fontSize = (28 * scale).sp,
+                                        fontWeight = FontWeight.Black,
+                                    )
+                                    Text(
+                                        nearest.etaUnitText,
+                                        color = t.textSecondary,
+                                        fontSize = (11 * scale).sp,
+                                    )
+                                }
+                            }
+                            // 运送用户商品的提示
+                            if (vm.isMyVehicle(nearest)) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                        .clip(RoundedCornerShape(BusRadius.s))
+                                        .background(t.goldLight)
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(BusIcons.parcel, null, tint = t.goldDeep, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        " 这辆车正在运送您的商品：${vm.myGoodsDescription(nearest)}",
+                                        color = t.goldDeep,
+                                        fontSize = (11 * scale).sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // 车辆列表
+                    if (vehicles.isNotEmpty()) {
+                        SectionTitle("正在运行", subtitle = "${vehicles.size} 辆")
+                        vehicles.take(5).forEachIndexed { i, v ->
+                            VehicleCard(
+                                v,
+                                isNearest = i == 0,
+                                lineId = vm.lineIdOf(v),
+                                isMyVehicle = vm.isMyVehicle(v),
+                                myGoodsDesc = vm.myGoodsDescription(v),
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // 经停站点
+                    val st = line?.stations?.takeIf { it.isNotEmpty() } ?: vm.nearby?.stations.orEmpty()
+                    if (st.isNotEmpty()) {
+                        SectionTitle("经停站点", subtitle = "共 ${st.size} 站")
+                        BusCard(modifier = Modifier.fillMaxWidth()) {
+                            StationTimeline(
+                                st.mapIndexed { i, s ->
+                                    val seqText = "第 ${i + 1} 站 / 共 ${st.size} 站"
+                                    val typeText = if (s.isRealTransit) "实时公交站" else "项目站点"
+                                    TimelineStop(
+                                        label = s.name,
+                                        time = if (s.plannedMinutes > 0) "${s.plannedMinutes} 分" else null,
+                                        hint = listOfNotNull(
+                                            seqText,
+                                            if (s.distanceMeters > 0) "距你 %.1f 公里".format(s.distanceMeters / 1000.0) else null,
+                                            if (s.orderCount > 0) "待取 ${s.orderCount} 件" else null,
+                                            if (s.routes.isNotEmpty()) "经停: ${s.routes.take(2).joinToString(", ")}" else null,
+                                        ).joinToString(" · "),
+                                        state = when {
+                                            i == 0 -> StopState.DONE
+                                            vm.me != null && s.distanceMeters > 0 && s.distanceMeters < 800 -> StopState.CURRENT
+                                            else -> StopState.PENDING
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                        // 步行导航到站点：找最近且有坐标的站（优先 CURRENT，其次距离最短）
+                        val walkTarget = st.firstOrNull { s ->
+                            vm.me != null && s.distanceMeters > 0 && s.distanceMeters < 800
+                        } ?: st.firstOrNull { s -> s.geo.lat != 0.0 || s.geo.lng != 0.0 }
+                        if (walkTarget != null && (walkTarget.geo.lat != 0.0 || walkTarget.geo.lng != 0.0)) {
+                            val ctx = LocalContext.current
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 8.dp)
+                                    .clip(RoundedCornerShape(BusRadius.m))
+                                    .background(LocalBusTokens.current.primaryLight)
+                                    .clickable {
+                                        val uri = Uri.parse(
+                                            "amapuri://route/plan/?dlat=${walkTarget.geo.lat}&dlon=${walkTarget.geo.lng}" +
+                                                    "&dname=${Uri.encode(walkTarget.name)}&dev=0&t=2"
+                                        )
+                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                            setPackage("com.autonavi.minimap")
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        try {
+                                            ctx.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            // 没装高德地图 → 用浏览器打开高德网页导航
+                                            val webUri = Uri.parse(
+                                                "https://uri.amap.com/navigation?to=${walkTarget.geo.lng},${walkTarget.geo.lat}," +
+                                                        "${Uri.encode(walkTarget.name)}&mode=walk&coordinate=gaode"
+                                            )
+                                            try {
+                                                ctx.startActivity(Intent(Intent.ACTION_VIEW, webUri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                            } catch (e2: Exception) {
+                                                Toast.makeText(ctx, "无法打开导航", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(BusIcons.navigation, null, tint = LocalBusTokens.current.primary, modifier = Modifier.size(16.dp))
+                                Text(
+                                    " 步行导航到「${walkTarget.name}」",
+                                    color = LocalBusTokens.current.primary,
+                                    fontSize = (13 * LocalBusFontScale.current).sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }
                 }
             }
-
-            "error" -> EmptyState(
-                title = "实时公交暂时不可用",
-                subtitle = "网络不太好，稍后再试",
-                icon = BusIcons.info,
-                actionText = "重新加载",
-                onAction = { vm.load(context) },
-            )
-
-            else -> {
-            if (vm.lines.size > 1) {
-                // 附近线路：横滑 chip（名称 + 来源标签），默认 6 条可展开（对齐小程序 line-chip）
-                SectionTitle(
-                    "附近线路",
-                    actionText = if (vm.lines.size > 6) (if (showAllLines) "收起" else "全部线路") else null,
-                    onAction = { showAllLines = !showAllLines },
-                )
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    (if (showAllLines) vm.lines else vm.lines.take(6)).forEach { l ->
-                        val on = l.id == vm.selected?.id
-                        Column(
-                            Modifier
-                                .clip(RoundedCornerShape(BusRadius.m))
-                                .background(if (on) t.primaryLight else t.card)
-                                .clickable { vm.pick(l) }
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                        ) {
-                            Text(
-                                l.name.ifEmpty { "未命名线路" },
-                                color = if (on) t.primaryOnLight else t.ink,
-                                fontSize = (13 * scale).sp,
-                                fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                            )
-                            Text(
-                                if (l.dataSource.contains("REAL")) "现实公交站点" else "真实公交线路",
-                                color = if (on) t.primaryOnLight else t.textTertiary,
-                                fontSize = (10.5 * scale).sp,
-                                modifier = Modifier.padding(top = 3.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            val line = vm.selected
-            SectionTitle(
-                line?.name?.ifEmpty { null } ?: "线路图",
-                subtitle = vm.polylineSubtitle(),
-                actionText = if (line != null && line.id.isNotEmpty()) "看详情" else null,
-                onAction = { if (line != null) nav.navigate(Routes.busDetail(line.id)) },
-            )
-            RouteMap(
-                polyline = vm.polyline,
-                stations = line?.stations ?: vm.nearby?.stations ?: emptyList(),
-                vehicles = vm.vehiclesOf(line),
-                me = vm.me,
-                height = 220.dp,
-                reason = if (vm.polyline.size >= 2) null else vm.polylineReason(
-                    "这条线路还没有真实道路折线：后端只在运营线路有轨迹数据时下发。站点顺序看下面的经停站列表。",
-                ),
-                onReplan = if (line != null) { { vm.replan() } } else null,
-            )
-
-            val vs = vm.vehiclesOf(line).byUserDistance()
-            if (vs.isNotEmpty()) {
-                SectionTitle("正在运行", subtitle = "${vs.size} 辆，按离你的远近排（后端给的距离，没给的排最后）")
-                vs.take(5).forEachIndexed { i, v -> VehicleCard(v, isNearest = i == 0, lineId = vm.lineIdOf(v)) }
-            }
-
-            val st = line?.stations?.takeIf { it.isNotEmpty() } ?: vm.nearby?.stations.orEmpty()
-            if (st.isNotEmpty()) {
-                SectionTitle("经停站点", subtitle = "共 ${st.size} 站")
-                BusCard(modifier = Modifier.fillMaxWidth()) {
-                    StationTimeline(
-                        st.mapIndexed { i, s ->
-                            TimelineStop(
-                                label = s.name,
-                                time = if (s.plannedMinutes > 0) "${s.plannedMinutes} 分" else null,
-                                hint = listOfNotNull(
-                                    if (s.distanceMeters > 0) "距你 %.1f 公里".format(s.distanceMeters / 1000.0) else null,
-                                    if (s.orderCount > 0) "待取 ${s.orderCount} 件" else null,
-                                ).joinToString(" · ").ifEmpty { if (i == 0) "起点" else if (i == st.size - 1) "终点" else "" },
-                                state = when {
-                                    i == 0 -> StopState.DONE
-                                    vm.me != null && s.distanceMeters > 0 && s.distanceMeters < 800 -> StopState.CURRENT
-                                    else -> StopState.PENDING
-                                },
-                            )
-                        },
-                    )
-                }
-            }
         }
-        }
-        Spacer(Modifier.height(6.dp))
+    }
+}
+
+/**
+ * 位置新鲜度文案：把后端给的 `lastLocationTime`（ISO 或 epoch millis）翻成"X 分钟前更新"。
+ * 超过 30 分钟返回 null（不显示，避免噪声）；解析失败也返回 null（不报"未知"这种假话）。
+ */
+private fun formatLocationFreshness(raw: String): String? {
+    if (raw.isEmpty()) return null
+    val millis = runCatching {
+        if (raw.all { it.isDigit() } && raw.length == 13) raw.toLong()
+        else java.time.LocalDateTime.parse(raw).atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+    }.getOrNull() ?: return null
+    val diffMin = ((System.currentTimeMillis() - millis) / 60_000).toInt()
+    return when {
+        diffMin < 1 -> "刚刚更新"
+        diffMin < 60 -> "$diffMin 分钟前更新"
+        diffMin < 1440 -> "${diffMin / 60} 小时前更新"
+        else -> null
     }
 }
 
 @Composable
-private fun VehicleCard(v: BusVehicle, isNearest: Boolean = false, lineId: String = "") {
+private fun VehicleCard(
+    v: BusVehicle,
+    isNearest: Boolean = false,
+    lineId: String = "",
+    isMyVehicle: Boolean = false,
+    myGoodsDesc: String = "",
+) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     val nav = LocalNavController.current
@@ -528,7 +883,39 @@ private fun VehicleCard(v: BusVehicle, isNearest: Boolean = false, lineId: Strin
                     fontWeight = FontWeight.Bold,
                 )
             }
-            // vehicle-plate-row：bus 图标 + 车牌 + 位置来源
+            // ETA 来源标识（对标车来了：实时计算 vs 按时刻表）
+            if (v.routeProvider.isNotEmpty()) {
+                Text(
+                    v.providerText,
+                    color = t.textTertiary,
+                    fontSize = (10 * scale).sp,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            // 运送用户商品的提示条
+            if (isMyVehicle && myGoodsDesc.isNotEmpty()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .clip(RoundedCornerShape(BusRadius.s))
+                        .background(t.goldLight)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(BusIcons.parcel, null, tint = t.goldDeep, modifier = Modifier.size(14.dp))
+                    Text(
+                        " 运送您的商品：$myGoodsDesc",
+                        color = t.goldDeep,
+                        fontSize = (11 * scale).sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            // vehicle-plate-row：bus 图标 + 车牌 + 速度 + 位置来源
             Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     BusIcons.bus, null,
@@ -542,7 +929,30 @@ private fun VehicleCard(v: BusVehicle, isNearest: Boolean = false, lineId: Strin
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(start = 6.dp),
                 )
+                // 实时速度（对标高德/车来了：显示当前行驶速度）
+                v.speedKmh?.let { speed ->
+                    if (speed > 0) {
+                        Text(
+                            " · $speed km/h",
+                            color = t.primary,
+                            fontSize = (11 * scale).sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
                 SourceTag(v.sourceText, Modifier.padding(start = 7.dp))
+            }
+            // 位置新鲜度（对标车来了：显示最后定位时间，让用户知道数据是否过时）
+            if (v.lastLocationTime.isNotEmpty()) {
+                val freshText = formatLocationFreshness(v.lastLocationTime)
+                if (freshText != null) {
+                    Text(
+                        "位置：$freshText",
+                        color = t.textTertiary,
+                        fontSize = (10 * scale).sp,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
             }
             // 山路线：进度只由后端 progress 驱动（nearby 不下发就画无进度虚线），旧写法用 1-eta/40 反推，
             // ETA 没给时会画成"车已经到终点"
@@ -608,7 +1018,7 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
             } else {
                 SectionTitle(
                     // 只认后端真实键 distanceKm（公里，AppBusLineRespVO:27-28）；没给就说"里程未给"，不写"全程 0.0 公里"
-                    "全程 " + (line.distanceKm?.let { "%.1f 公里".format(it) } ?: "里程未给"),
+                    "全程 " + (line.distanceKm?.let { "%.1f 公里".format(it) } ?: "里程暂未知"),
                     subtitle = "${line.from} → ${line.to} · ${line.stations.size} 站",
                 )
                 RouteMap(
@@ -618,7 +1028,7 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
                     me = vm.me,
                     height = 250.dp,
                     reason = vm.polylineReason(
-                        "后端没有这条线路的真实道路折线，这里不用站点连线顶替。经停站顺序看下面的时刻表。",
+                        "暂无该线路的真实道路折线，经停站顺序请看下方时刻表。",
                     ),
                     onReplan = { vm.replan() },
                 )
@@ -641,18 +1051,26 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
                         }
                     }
                 }
-                SectionTitle("经停时刻", subtitle = "以站点计划时间为准")
+                SectionTitle("经停时刻", subtitle = "共 ${line.stations.size} 站 · 以站点计划时间为准")
                 BusCard(modifier = Modifier.fillMaxWidth()) {
                     StationTimeline(
-                        line.stations.map { s ->
+                        line.stations.mapIndexed { i, s ->
+                            val seqText = "第 ${i + 1} 站 / 共 ${line.stations.size} 站"
+                            val typeText = if (s.isRealTransit) "实时公交站" else "项目站点"
                             TimelineStop(
-                                s.name,
-                                if (s.plannedMinutes > 0) "${s.plannedMinutes} 分" else null,
-                                listOfNotNull(
-                                    s.routes.firstOrNull(),
+                                label = s.name,
+                                time = if (s.plannedMinutes > 0) "${s.plannedMinutes} 分" else null,
+                                hint = listOfNotNull(
+                                    seqText,
+                                    if (s.distanceMeters > 0) "距你 %.1f 公里".format(s.distanceMeters / 1000.0) else null,
                                     if (s.orderCount > 0) "待取 ${s.orderCount} 件" else null,
+                                    if (s.routes.isNotEmpty()) "经停: ${s.routes.take(2).joinToString(", ")}" else null,
                                 ).joinToString(" · "),
-                                StopState.PENDING,
+                                state = when {
+                                    i == 0 -> StopState.DONE
+                                    vm.me != null && s.distanceMeters > 0 && s.distanceMeters < 800 -> StopState.CURRENT
+                                    else -> StopState.PENDING
+                                },
                             )
                         },
                     )

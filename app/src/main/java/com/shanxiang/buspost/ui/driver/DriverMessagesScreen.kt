@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +35,7 @@ import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.BusPullRefresh
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTone
@@ -41,7 +43,6 @@ import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
-import com.shanxiang.buspost.core.ui.SectionTitle
 import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.core.ui.Signpost
 import com.shanxiang.buspost.data.model.NotifyMsg
@@ -64,13 +65,27 @@ class DriverMessagesViewModel : ScreenViewModel() {
     var onlyUnread by mutableStateOf(false)
         private set
 
+    var refreshing by mutableStateOf(false)
+        private set
+
     val items: List<NotifyMsg> get() = pager.items
     val hasMore: Boolean get() = pager.hasMore
     val loadingMore: Boolean get() = pager.loadingMore
 
     val shown: List<NotifyMsg> get() = if (onlyUnread) items.filter { !it.read } else items
 
-    fun load(reset: Boolean = true) = work(reset = reset || !pager.initialized) { fetch(reset) }
+    fun reload() {
+        refreshing = true
+        load(reset = true)
+    }
+
+    fun load(reset: Boolean = true) = work(reset = reset || !pager.initialized) {
+        try {
+            fetch(reset)
+        } finally {
+            refreshing = false
+        }
+    }
 
     fun loadMore() = load(reset = false)
 
@@ -119,39 +134,82 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { if (vm.items.isEmpty()) vm.load() }
 
+    BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload() }) {
     BusPage(spacedBy = 12.dp) {
-        Signpost(
-            title = "调度消息",
-            subtitle = "派单、交接与异常都在这里，点击可直达对应包裹",
-            badge = "${vm.shown.count { !it.read }} 条未读",
+        // 紧凑页头：标题 + 未读数 + 状态标签一行排开
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                BusTag(if (Prefs.notifyEnabled) "系统通知已开" else "系统通知已关", tone = if (Prefs.notifyEnabled) BusTone.PRIMARY else BusTone.NEUTRAL)
-                BusTag("后台每 15 分钟同步", tone = BusTone.CLAY)
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(3.dp, 15.dp).clip(RoundedCornerShape(2.dp)).background(t.clay))
+                    Spacer(Modifier.width(8.dp))
+                    Text("调度消息", color = t.ink, fontSize = (18 * scale).sp, fontWeight = FontWeight.Bold)
+                    if (vm.shown.count { !it.read } > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(BusRadius.s))
+                                .background(t.danger.copy(alpha = 0.12f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                "${vm.shown.count { !it.read }} 条未读",
+                                color = t.danger,
+                                fontSize = (11 * scale).sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "派单、交接与异常都在这里",
+                    color = t.textTertiary,
+                    fontSize = (12 * scale).sp,
+                    modifier = Modifier.padding(top = 4.dp, start = 11.dp),
+                )
             }
         }
 
-        DemoNote(vm.demo, text = "后端未返回调度消息，当前为演示通知。")
+        // 状态标签行
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            BusTag(if (Prefs.notifyEnabled) "系统通知已开" else "系统通知已关", tone = if (Prefs.notifyEnabled) BusTone.PRIMARY else BusTone.NEUTRAL)
+            BusTag("后台每 15 分钟同步", tone = BusTone.CLAY)
+        }
+
+        DemoNote(vm.demo, text = "当前为演示通知。")
         vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            BusButton(
-                text = if (vm.onlyUnread) "查看全部" else "只看未读",
-                small = true,
-                variant = BusButtonVariant.OUTLINE,
-                modifier = Modifier.weight(1f),
-                onClick = { vm.toggleUnread() },
-            )
-            BusButton(
-                text = "刷新",
-                small = true,
-                variant = BusButtonVariant.OUTLINE,
-                modifier = Modifier.weight(1f),
-                onClick = { vm.load() },
+        // 筛选按钮 + 消息计数内联
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BusButton(
+                    text = if (vm.onlyUnread) "查看全部" else "只看未读",
+                    small = true,
+                    variant = BusButtonVariant.OUTLINE,
+                    onClick = { vm.toggleUnread() },
+                    fullWidth = false,
+                )
+                BusButton(
+                    text = "刷新",
+                    small = true,
+                    variant = BusButtonVariant.OUTLINE,
+                    onClick = { vm.load() },
+                    fullWidth = false,
+                )
+            }
+            Text(
+                "${vm.shown.size} 条",
+                color = t.textTertiary,
+                fontSize = (12 * scale).sp,
             )
         }
 
-        SectionTitle("消息", subtitle = "${vm.shown.size} 条")
         if (vm.loading && vm.items.isEmpty()) {
             SkeletonList(4)
         } else if (vm.shown.isEmpty()) {
@@ -181,12 +239,18 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
             )
         }
     }
+    }
 }
 
 @Composable
 private fun MsgCard(msg: NotifyMsg, onClick: () -> Unit) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val accentColor = when {
+        msg.type.contains("EXCEPTION") || msg.type.contains("异常") -> t.danger
+        msg.type.contains("HANDOVER") || msg.type.contains("交接") -> t.clay
+        else -> t.primary
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -196,6 +260,15 @@ private fun MsgCard(msg: NotifyMsg, onClick: () -> Unit) {
             .padding(horizontal = 13.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top,
     ) {
+        // 左侧色条：按消息类型着色，增强视觉区分
+        Box(
+            Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(2.dp))
+                .background(accentColor.copy(alpha = if (msg.read) 0.3f else 0.8f)),
+        )
+        Spacer(Modifier.width(10.dp))
         Box(
             Modifier
                 .padding(top = 5.dp)

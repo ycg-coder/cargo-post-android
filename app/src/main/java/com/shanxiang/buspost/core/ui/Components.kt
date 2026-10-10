@@ -1,6 +1,7 @@
 package com.shanxiang.buspost.core.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -94,10 +97,16 @@ fun BusButton(
     val pressed = remember { MutableInteractionSource() }
     val isPressed by pressed.collectIsPressedAsState()
     val dimmed = !enabled || loading
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed && !dimmed) 0.97f else 1f,
+        animationSpec = BusMotion.enter(BusMotion.PRESS_MS),
+        label = "btnPress",
+    )
     val shape = RoundedCornerShape(BusRadius.btn)
     Box(
         modifier
             .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .clip(shape)
             .background(if (filled) board else Color.Transparent, shape)
             .then(
@@ -156,21 +165,34 @@ fun BusCard(
     onClick: (() -> Unit)? = null,
     warm: Boolean = false,
     border: Boolean = false,
-    padding: PaddingValues = PaddingValues(14.dp),
+    padding: PaddingValues = PaddingValues(16.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val t = LocalBusTokens.current
     val shape = RoundedCornerShape(BusRadius.card)
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && onClick != null) 0.98f else 1f,
+        animationSpec = BusMotion.enter(BusMotion.PRESS_MS),
+        label = "cardPress",
+    )
     val bg = animateColorAsState(
         if (warm) t.cardWarm else t.card,
         BusMotion.enter(160),
         label = "cardBg",
     )
+    // 渐变叠层：主色 6% → 透明，从顶向下 fades out，让卡从纸底"浮"出来
+    val gradientOverlay = if (!t.isDark) {
+        Brush.verticalGradient(
+            colors = listOf(t.primary.copy(alpha = 0.06f), Color.Transparent),
+            startY = 0f,
+            endY = 200f,
+        )
+    } else null
     Column(
         modifier
-            // 阴影要在 clip 之前：先按 shape 投影，再把内容裁成圆角，顺序反了投影会被裁掉
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .shadow(
                 if (pressed) BusElevation.pressed else if (onClick != null) BusElevation.raised else BusElevation.card,
                 shape,
@@ -179,8 +201,9 @@ fun BusCard(
             )
             .clip(shape)
             .background(bg.value, shape)
-            // 深色下阴影看不见，用 1dp 描边做同一件事（把卡从纸底上分出来）
-            .then(if (border || t.isDark) Modifier.border(1.dp, t.line, shape) else Modifier)
+            .then(if (gradientOverlay != null) Modifier.background(gradientOverlay, shape) else Modifier)
+            .then(if (!t.isDark) Modifier.background(t.primary.copy(alpha = 0.02f)) else Modifier)
+            .then(if (border || t.isDark) Modifier.border(1.dp, t.line, shape) else Modifier.border(0.5.dp, t.line.copy(alpha = 0.4f), shape))
             .then(if (pressed) Modifier.background(Color.Black.copy(alpha = 0.04f)) else Modifier)
             .then(
                 if (onClick != null) {
@@ -318,7 +341,8 @@ fun BusTag(
     val t = LocalBusTokens.current
     val bg = tone.bg(t)
     val fg = tone.fg(t)
-    Box(modifier.clip(CircleShape).background(bg).padding(horizontal = 9.dp, vertical = 3.dp)) {
+    val chipShape = RoundedCornerShape(BusRadius.s)
+    Box(modifier.clip(chipShape).background(bg).padding(horizontal = 10.dp, vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (dot) {
                 Box(Modifier.size(6.dp).clip(CircleShape).background(fg))
@@ -355,12 +379,14 @@ fun BusSegmented(
     ) {
         options.forEachIndexed { i, label ->
             val active = i == selected
+            val segSrc = remember { MutableInteractionSource() }
             Box(
                 Modifier
                     .weight(1f)
+                    .pressFeedback(segSrc)
                     .clip(RoundedCornerShape(BusRadius.m))
                     .background(if (active) t.card else Color.Transparent)
-                    .clickable { onSelect(i) }
+                    .clickable(interactionSource = segSrc, indication = LocalIndication.current) { onSelect(i) }
                     .defaultMinSize(minHeight = LocalBusTouch.current.min)
                     .padding(vertical = (8 * scale).dp),
                 contentAlignment = Alignment.Center,
@@ -395,7 +421,7 @@ fun BusTopBar(
     Row(
         modifier
             .fillMaxWidth()
-            .background(if (tonal) t.primaryDark else t.card)
+            .glassmorphic(t, tint = if (tonal) t.primaryDark else t.card)
             // Edge-to-Edge（2026-10-09）：targetSdk 36 起系统强制全屏，状态栏是透明的、
             // 内容从 y=0 开始画。顶栏的底色要**先**画、再把内容压到状态栏之下 ——
             // 顺序反了（先 padding 后 background）会让状态栏那一条露出窗口底色。
@@ -459,7 +485,7 @@ fun SectionTitle(
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(3.dp, 15.dp).clip(CircleShape).background(t.clay).padding(end = 8.dp))
+                Box(Modifier.size(3.dp, 15.dp).clip(RoundedCornerShape(2.dp)).background(t.clay).padding(end = 8.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(title, color = t.ink, fontSize = (16 * scale).sp, fontWeight = FontWeight.Bold)
             }
@@ -476,7 +502,7 @@ fun SectionTitle(
                 fontSize = (13 * scale).sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(BusRadius.s))
                     .clickable(onClick = onAction)
                     .defaultMinSize(minHeight = LocalBusTouch.current.min)
                     .padding(horizontal = 8.dp),
@@ -501,7 +527,7 @@ fun PriceText(
             prefix + value,
             color = t.price,
             fontSize = (size * scale).sp,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.Bold,
         )
         if (origin != null) {
             Text(
@@ -528,10 +554,12 @@ fun InfoRow(
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val src = remember { MutableInteractionSource() }
     Row(
         modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .pressFeedback(src)
+            .then(if (onClick != null) Modifier.clickable(interactionSource = src, indication = LocalIndication.current, onClick = onClick) else Modifier)
             // 键值行既可能是纯展示、也可能是可点行（设置项/详情跳转），统一吃到触控下限：
             // 原 11dp 上下留白 ≈ 43dp，差一口气；驾驶模式下抬到 56dp，行车中扫行不会串行。
             .defaultMinSize(minHeight = LocalBusTouch.current.min)
@@ -588,7 +616,7 @@ fun EmptyState(
     ) {
         if (icon != null) {
             Box(
-                Modifier.size(56.dp).clip(CircleShape).background(t.track),
+                Modifier.size(56.dp).clip(RoundedCornerShape(BusRadius.m)).background(t.track),
                 contentAlignment = Alignment.Center,
             ) {
                 androidx.compose.foundation.Image(
@@ -621,7 +649,7 @@ fun EmptyState(
 fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalBusTokens.current
     Column(modifier.fillMaxWidth().padding(vertical = 26.dp, horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(52.dp).clip(CircleShape).background(t.clayLight), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(52.dp).clip(RoundedCornerShape(BusRadius.m)).background(t.clayLight), contentAlignment = Alignment.Center) {
             androidx.compose.foundation.Image(
                 imageVector = BusIcons.warning,
                 contentDescription = null,

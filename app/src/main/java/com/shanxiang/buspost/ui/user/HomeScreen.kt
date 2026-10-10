@@ -2,6 +2,7 @@ package com.shanxiang.buspost.ui.user
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -46,6 +49,7 @@ import com.shanxiang.buspost.core.loc.LocFix
 import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.ui.AnimatedEnter
 import com.shanxiang.buspost.core.ui.BusCard
+import com.shanxiang.buspost.core.ui.BusDivider
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusPullRefresh
@@ -217,6 +221,8 @@ class HomeViewModel : ScreenViewModel() {
 fun HomeScreen(
     onSelectTab: (Int) -> Unit,
     vm: HomeViewModel = viewModel(),
+    onLoginClick: (() -> Unit)? = null,
+    guest: Boolean = false,
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
@@ -294,6 +300,10 @@ fun HomeScreen(
                     onToggle = { weatherExpanded = !weatherExpanded },
                 )
             }
+            // 公告轮播融入站牌底部：不再单独占一整行，作为 Signpost 内的一条小滚动条
+            if (vm.notices.isNotEmpty()) {
+                NoticeCarouselStrip(vm.notices) { nav.navigate(Routes.NOTIFICATIONS) }
+            }
         }
 
         // 天气详情卡（默认收起，点胶囊展开）：图标/湿度/风力/农事提示 + 4 日预报
@@ -307,45 +317,98 @@ fun HomeScreen(
             }
         }
 
-        DemoNote(vm.demo)
-
-        // 公告轮播（自动播 3s + 环形），加载中/失败/空三态分离（对齐 index.wxml:87-103）
-        // 空/失败两支不带 56dp 圆托：公告只是首屏的一小节，用整页空态的体量会把「暂无」撑成半屏，
-        // 和下面「附近公交」那块抢同一屏（设备实拍 s_home2 量到两块空态合计约占首屏一半）
-        when {
-            vm.loading && vm.notices.isEmpty() -> SkeletonCard(rows = 1)
-            vm.noticeError && vm.notices.isEmpty() -> EmptyState(
-                title = "公告加载失败",
-                subtitle = "网络不太顺畅，试试重新加载",
-                actionText = "重新加载",
-                onAction = { vm.load(context) },
-            )
-            vm.notices.isEmpty() -> EmptyState(
-                title = "暂无公告",
-                subtitle = "村里的好消息上架后会在这里展示",
-            )
-            else -> NoticeCarousel(vm.notices) { nav.navigate(Routes.NOTIFICATIONS) }
+        // 游客登录引导条：对标主流 App 顶部/底部轻量引导（不弹窗，降低打扰感）
+        if (guest && onLoginClick != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(BusRadius.m))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(t.primary.copy(alpha = 0.12f), t.accent.copy(alpha = 0.08f))
+                        )
+                    )
+                    .clickable { onLoginClick() }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(BusIcons.person, null, tint = t.primaryOnLight, modifier = Modifier.size(16.dp))
+                Text(
+                    "登录后可买东西、寄货、收到车提醒",
+                    color = t.ink,
+                    fontSize = (13 * scale).sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 8.dp).weight(1f),
+                )
+                Text(
+                    "去登录",
+                    color = t.primaryOnLight,
+                    fontSize = (13 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
-        // 功能入口 · 一行四宫格（对齐 index.wxml:106-135：彩色渐变方块 + 名称，阶梯入场）
-        // fillMaxWidth 是这一行的承重墙：少了它，四个 weight(1f) 全部失效，格子退回按文字宽（实测右侧空 385 px）
+        DemoNote(vm.demo)
+
+        // 到车提醒：紧凑横条，不再用完整 BusCard 占一整块
+        if (vm.arriving.isNotEmpty()) {
+            ArrivingStrip(vm.arriving) { nav.navigate(Routes.trace(it.orderNo)) }
+        }
+
+        // 功能入口 · 两行四宫格（对齐主流 App 快捷入口密度）
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FeatureTile(BusIcons.bus, "实时公交", FeatureBg.GREEN, { nav.navigate(Routes.BUS) }, Modifier.weight(1f), 0)
-            FeatureTile(BusIcons.leaf, "农产品", FeatureBg.GOLD, { onSelectTab(1) }, Modifier.weight(1f), 1)
-            FeatureTile(BusIcons.parcel, "我的快递", FeatureBg.DEEP, { onSelectTab(2) }, Modifier.weight(1f), 2)
-            FeatureTile(BusIcons.send, "我要寄货", FeatureBg.CLAY, { nav.navigate(Routes.SEND) }, Modifier.weight(1f), 3)
+            FeatureTile(BusIcons.leaf, "农产品", FeatureBg.GOLD, {
+                if (guest) onLoginClick?.invoke() else onSelectTab(1)
+            }, Modifier.weight(1f), 1)
+            FeatureTile(BusIcons.parcel, "我的快递", FeatureBg.DEEP, {
+                if (guest) onLoginClick?.invoke() else onSelectTab(2)
+            }, Modifier.weight(1f), 2)
+            FeatureTile(BusIcons.send, "我要寄货", FeatureBg.CLAY, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.SEND)
+            }, Modifier.weight(1f), 3)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FeatureTile(BusIcons.location, "收货地址", FeatureBg.GREEN, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.ADDRESS)
+            }, Modifier.weight(1f), 4)
+            FeatureTile(BusIcons.bell, "消息通知", FeatureBg.GOLD, {
+                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.NOTIFICATIONS)
+            }, Modifier.weight(1f), 5)
+            FeatureTile(BusIcons.person, "个人中心", FeatureBg.DEEP, {
+                if (guest) onLoginClick?.invoke() else onSelectTab(3)
+            }, Modifier.weight(1f), 6)
+            FeatureTile(BusIcons.next, "更多功能", FeatureBg.CLAY, {
+                if (guest) onLoginClick?.invoke() else onSelectTab(3)
+            }, Modifier.weight(1f), 7)
         }
 
         // ---------- 附近公交：区块头 + meta + 五态（loading/off/empty/error/data）----------
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(BusIcons.bus, null, tint = t.primaryOnLight, modifier = Modifier.size(17.dp))
+            // 实时脉冲点：对标车来了/高德的"实时"指示灯
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (vm.busState() == "data") t.primary else t.textTertiary),
+            )
             Text(
                 "附近公交",
                 color = t.ink,
                 fontSize = (16 * scale).sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 6.dp),
+                modifier = Modifier.padding(start = 8.dp),
             )
+            // 车辆计数（对标车来了：标题旁显示在跑车辆数）
+            if (vm.busState() == "data" && vm.vehicles.isNotEmpty()) {
+                Text(
+                    " ${vm.vehicles.size} 辆在跑",
+                    color = t.primaryOnLight,
+                    fontSize = (12 * scale).sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             Spacer(Modifier.weight(1f))
             // 「文字 + 箭头」必须在同一个容器里，否则 space-between 会把中间项居中、箭头推到最右
             Row(
@@ -439,7 +502,7 @@ fun HomeScreen(
             )
 
             else -> {
-                vm.vehicles.take(3).forEach { v ->
+                vm.vehicles.take(5).forEach { v ->
                     // 真实 NearbyBus/AppBusRespVO 不带 routeId（只带 routeName，2026-09-29 逐字段核对，审计 §69）：
                     // 先按线路名回查附近线路列表，查不到就是空串 —— 不给「点了没反应」的假可点态
                     val lineId = vm.nearby?.lines
@@ -496,7 +559,9 @@ fun HomeScreen(
             else -> BusScrollRow {
                 items(vm.products.size) { i ->
                     val p = vm.products[i]
-                    ProductMiniCard(p) { nav.navigate(Routes.goodsDetail(p.id)) }
+                    ProductMiniCard(p) {
+                        if (guest) onLoginClick?.invoke() else nav.navigate(Routes.goodsDetail(p.id))
+                    }
                 }
             }
         }
@@ -555,7 +620,7 @@ fun HomeScreen(
                     // 撤掉硬编码填充表之后，后端没给站点时这里会真空着（设备复拍同形）：空态要说清是接口没给，不是没有村庄。
                     if (names.isEmpty()) {
                         Text(
-                            "暂无可选村庄：接口未返回站点",
+                            "暂无可选村庄",
                             color = t.textSecondary,
                             fontSize = (13 * scale).sp,
                             modifier = Modifier.padding(vertical = 10.dp),
@@ -759,6 +824,110 @@ private fun LocationHintBar(
             Icon(BusIcons.next, null, tint = textColor, modifier = Modifier.size(14.dp))
         }
         // 定位正常：不显示任何条，避免噪声
+    }
+}
+
+/**
+ * 紧凑公告条：放在 Signpost 底部，不单独占一整行。
+ * 白底半透明 + 单行滚动，点任意位置进公告详情。
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun NoticeCarouselStrip(notices: List<Notice>, onClick: () -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    if (notices.isEmpty()) return
+    val pager = androidx.compose.foundation.pager.rememberPagerState(pageCount = { notices.size })
+    LaunchedEffect(notices.size) {
+        if (notices.size <= 1) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(4000)
+            val next = (pager.currentPage + 1) % notices.size
+            try {
+                pager.animateScrollToPage(next)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                if (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isCancelled == true) throw e
+            } catch (e: Exception) {
+                android.util.Log.w("BUS_HOME_CAROUSEL_STRIP", e)
+            }
+        }
+    }
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pager,
+        modifier = Modifier.fillMaxWidth().height(28.dp),
+    ) { page ->
+        val n = notices[page]
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(BusIcons.bell, null, tint = t.onPrimary.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+            Text(
+                "  ${n.title}",
+                color = t.onPrimary.copy(alpha = 0.85f),
+                fontSize = (12 * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+            )
+        }
+    }
+}
+
+/**
+ * 到车提醒紧凑横条：横向滚动 ETA 芯片，不再用完整 BusCard。
+ * 每个芯片显示货物名 +  ETA 分钟数，点芯片进物流详情。
+ */
+@Composable
+private fun ArrivingStrip(arriving: List<SendOrder>, onTap: (SendOrder) -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val scrollState = rememberScrollState()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        arriving.take(5).forEach { order ->
+            val eta = order.carrierEtaMinutes
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(BusRadius.m))
+                    .background(t.card)
+                    .clickable { onTap(order) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(BusIcons.bus, null, tint = t.primary, modifier = Modifier.size(14.dp))
+                Text(
+                    " ${order.goodsName.ifEmpty { "货物" }}",
+                    color = t.ink,
+                    fontSize = (12.5 * scale).sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(BusRadius.pill))
+                        .background(if (eta != null && eta <= 5) t.danger.copy(alpha = 0.12f) else t.primaryLight)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        eta?.let { "${it}分" } ?: " Soon",
+                        color = if (eta != null && eta <= 5) t.danger else t.primary,
+                        fontSize = (12 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
     }
 }
 

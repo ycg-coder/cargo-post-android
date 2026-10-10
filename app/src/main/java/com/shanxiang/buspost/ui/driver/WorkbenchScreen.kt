@@ -530,9 +530,9 @@ class WorkbenchViewModel : ScreenViewModel() {
         val ack = block()
         syncFromServer()
         receipt = when {
-            ack.notSent -> "$label：本次请求未发给后端（同一个动作还在处理中），显示的是后端当前状态"
-            ack.demo -> "$label：演示模式，后端未接收本次操作，状态只在本机显示"
-            else -> "${label}已提交后端，班次与任务状态已按后端回读刷新"
+            ack.notSent -> "$label：操作正在处理中，显示的是当前状态"
+            ack.demo -> "$label：演示模式，操作仅在本机显示"
+            else -> "${label}已提交，状态已刷新"
         }
     }
 
@@ -693,14 +693,6 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                         badge = shift?.statusLabel ?: "今日班次",
                     ) {
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            // 载重只说后端真给的额定值（cargoCapacityKg）；"已装多少 kg"三方都没有口径，
-                            // 旧写法把 usedKg 缺键塌成 0.0，于是标签写"载重 0/200 kg"——那是个编出来的装载数。
-                            val cap = vm.profile?.capacityKg
-                            if (cap != null) {
-                                BusTag("额定载重 ${formatPrice(cap)} kg", tone = BusTone.GOLD)
-                            } else {
-                                BusTag("额定载重未给", tone = BusTone.NEUTRAL)
-                            }
                             // 认证状态：AppDriverProfileRespVO 七个键里没有任何审核位 ⇒ 没给就不出标签，
                             // 旧写法无条件写"未认证"，等于替后端下了一个负面结论。
                             val verified = vm.profile?.verified
@@ -719,7 +711,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                 }
 
                 if (vm.demo) item(key = "demo") {
-                    DemoNote(true, text = "后端没有返回司机数据，当前为演示班次与揽件任务，操作不会真正改变订单状态。")
+                    DemoNote(true, text = "当前为演示班次与揽件任务，操作不会真正改变订单状态。")
                 }
                 vm.error?.let { message ->
                     item(key = "error") { ErrorState(message, onRetry = { vm.load() }) }
@@ -931,7 +923,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                                             // 状态色只跟后端 status（TaskItemStatusEnum 那张表）：
                                             // 失败与已完成不同色，本机点击/GPS 都不参与这一格。
                                             BusTag(
-                                                station.head.statusLabel.ifEmpty { "状态未给" },
+                                                station.head.statusLabel.ifEmpty { "状态暂未知" },
                                                 tone = com.shanxiang.buspost.data.model.TaskItemStatus
                                                     .of(station.head.status)?.tone ?: BusTone.NEUTRAL,
                                             )
@@ -1185,10 +1177,10 @@ private fun WorkbenchActionBar(
 private fun workbenchBarHint(shift: ShiftTask?, viewState: ShiftState?, distanceText: String): String? {
     if (shift == null) return null
     return when (viewState) {
-        ShiftState.WAITING -> "本班待发车：确认后开始向村民端推送到车进度"
+        ShiftState.WAITING -> "待发车，确认后开始推送"
         ShiftState.RUNNING -> distanceText
-        ShiftState.STOPPED -> "已到站停靠（本机导航视图，班次后端仍为在途）：卸完货点「停靠完成」继续"
-        ShiftState.FINISHED -> "本班已收口，位置上报已停止"
+        ShiftState.STOPPED -> "已到站停靠，卸完货点「停靠完成」继续"
+        ShiftState.FINISHED -> "本班已收班"
         null -> null
     }
 }
@@ -1376,9 +1368,9 @@ private fun ReportCard(
                 )
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("位置上报（前台服务）", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
+                    Text("位置上报", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
                     Text(
-                        if (on) "每 $intervalSec 秒向后端上传一次车辆位置，村民端到车提醒依赖它"
+                        if (on) "每 $intervalSec 秒上传一次位置，村民端到车提醒依赖它"
                         else "关闭后村民只能看到线路预计，不会收到实时到车提醒",
                         color = t.textTertiary,
                         fontSize = (11.5 * scale).sp,
@@ -1412,7 +1404,7 @@ private fun ReportCard(
             // 旧屏是调试入口，正式包不显示这条跳转（本页下方就是正式导航面）
             if (BuildConfig.DEBUG) {
                 BusButton(
-                    text = "打开旧导航页（调试·非真实导航）",
+                    text = "调试导航页",
                     variant = BusButtonVariant.OUTLINE,
                     modifier = Modifier
                         .fillMaxWidth()

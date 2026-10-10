@@ -325,7 +325,7 @@ data class Product(
     /** 只有后端真给了 0/负数才叫售罄；缺键（stock=null）不许自动变成"已售罄"（F-3 ⑯：null/0 不许自己变成业务结论） */
     val soldOut: Boolean get() = stock != null && stock <= 0
     /** 库存角标：缺键时明说"库存未给"，不许渲染成"库存 0" */
-    val stockText: String get() = stock?.let { "库存 $it" } ?: "库存未给"
+    val stockText: String get() = stock?.let { "库存 $it" } ?: "库存暂未知"
     /** 原始字段值由 parse 填入，见下方伴生对象 */
     var rawFromVillage: String = ""
     var rawBadge: String = ""
@@ -640,7 +640,7 @@ data class BusVehicle(
             VehicleStatus.ARRIVED -> "已到站"
             VehicleStatus.NO_LOCATION -> "暂无定位"
             VehicleStatus.OFF_DUTY -> "停用"
-            VehicleStatus.UNKNOWN -> "状态未给"
+            VehicleStatus.UNKNOWN -> "状态暂未知"
         }
     /** 数据来源文案：与小程序 index.js 的车辆来源口径同值（实时/位置可能过期/位置推算/位置暂不可用） */
     val sourceText: String
@@ -659,7 +659,7 @@ data class BusVehicle(
      * 所以本机不许说"在途"、也不许拼一个空站名（§14 没有值不许有业务语义；审计 §72）。
      */
     val positionOnlyTag: String
-        get() = if (dataSource.isEmpty()) "位置来源未给" else "位置来源 $dataSource（未给状态）"
+        get() = if (dataSource.isEmpty()) "定位中" else "实时"
 
     /**
      * "到下一站"的分钟数（向上取整、至少 1，与小程序 `detail.js:132-136` 的 `Math.max(1, ceil())` 同口径）：
@@ -706,7 +706,7 @@ data class BusVehicle(
             status == VehicleStatus.ARRIVED -> "已到终点站"
             status == VehicleStatus.OFF_DUTY -> "车辆停用"
             status == VehicleStatus.NO_LOCATION -> "暂无定位，无法预估"
-            running -> remainingRouteMinutesText ?: "到站时间未给"
+            running -> remainingRouteMinutesText ?: "到站时间暂未知"
             else -> "暂无到站预估"
         }
     /** 站点行文案（对齐小程序 index.js:438-446）：后端按线路站点序算好的"你最方便的站"优先 */
@@ -724,7 +724,7 @@ data class BusVehicle(
     val nextDistanceShortText: String?
         get() = distanceToNextStationKm?.let { String.format(java.util.Locale.ROOT, "%.1f km", it) }
     val nextDistanceText: String
-        get() = nextDistanceShortText?.let { "距下一站 $it" } ?: "距下一站未给"
+        get() = nextDistanceShortText?.let { "距下一站 $it" } ?: "距下一站暂未知"
     /**
      * 山路线进度：只认后端 `progress`（AppBusRespVO:55-56）。
      * 旧实现用 `1 - eta/40` 反推，等于自己编一条 0-100 —— ETA 没给时会画成"已经到站"。
@@ -1550,8 +1550,8 @@ data class EarningItem(
     val type: String = "",
     val createTime: String = "",
 ) {
-    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额未给"
-    val weightText: String get() = weightKg?.let { "${yuan(it)} kg" } ?: "重量未给"
+    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额暂未知"
+    val weightText: String get() = weightKg?.let { "${yuan(it)} kg" } ?: "重量暂未知"
 }
 
 /**
@@ -1584,14 +1584,14 @@ data class Earnings(
     /** 今日订单数（后端 todayOrders，与累计 totalOrders 是两个口径） */
     val todayOrders: Int? = null,
 ) {
-    val todayText: String get() = today?.let { yuan(it) } ?: "未给"
-    val weekText: String get() = week?.let { yuan(it) } ?: "未给"
-    val monthText: String get() = month?.let { yuan(it) } ?: "未给"
-    val totalText: String get() = total?.let { "${yuan(it)} 元" } ?: "累计收益未给"
-    val todayBadgeText: String get() = today?.let { "今日 ${yuan(it)} 元" } ?: "今日收益未给"
-    val orderCountText: String get() = orderCount?.let { "$it 单" } ?: "累计单数未给"
-    val todayOrdersText: String get() = todayOrders?.let { "$it 单" } ?: "今日单数未给"
-    val totalWeightText: String get() = totalWeight?.let { "${yuan(it)} kg" } ?: "后端无此口径"
+    val todayText: String get() = today?.let { yuan(it) } ?: "暂未知"
+    val weekText: String get() = week?.let { yuan(it) } ?: "暂未知"
+    val monthText: String get() = month?.let { yuan(it) } ?: "暂未知"
+    val totalText: String get() = total?.let { "${yuan(it)} 元" } ?: "暂未知"
+    val todayBadgeText: String get() = today?.let { "今日 ${yuan(it)} 元" } ?: "今日 —"
+    val orderCountText: String get() = orderCount?.let { "$it 单" } ?: "暂未知"
+    val todayOrdersText: String get() = todayOrders?.let { "$it 单" } ?: "暂未知"
+    val totalWeightText: String get() = totalWeight?.let { "${yuan(it)} kg" } ?: "暂未知"
 }
 
 data class HandoverTask(
@@ -1866,10 +1866,10 @@ data class QuoteResult(
     val distanceKm: Double? = null,
 ) {
     /** 金额纯数字串（千位不带分隔，整数不补 .00，与 UI 侧 formatPrice 同口径）；缺键为"未给"而不是 0 */
-    val amountValueText: String get() = amount?.let { yuan(it) } ?: "未给"
+    val amountValueText: String get() = amount?.let { yuan(it) } ?: "暂未知"
 
     /** 带币符的整句：给核对页/车票副券用，缺键不许显示 ¥0 */
-    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额未给"
+    val amountText: String get() = amount?.let { "¥${yuan(it)}" } ?: "金额暂未知"
 
     /**
      * 件数费 + 里程费那一行，对齐小程序 send.wxml:287 的条件拼接：
@@ -1878,13 +1878,13 @@ data class QuoteResult(
      */
     val feeBreakdownText: String
         get() = buildString {
-            append(itemFee?.let { "件数费 ¥${yuan(it)}" } ?: "件数费未给")
+            append(itemFee?.let { "件数费 ¥${yuan(it)}" } ?: "件数费暂未知")
             when (distanceFee) {
-                null -> append(" · 里程费未给")
+                null -> append(" · 里程费暂未知")
                 0.0 -> Unit
                 else -> append(" + 里程费 ¥${yuan(distanceFee)}")
             }
-            append("（").append(itemCount?.let { "$it 件" } ?: "件数未给").append(" · ").append(distanceCaliberText).append("）")
+            append("（").append(itemCount?.let { "$it 件" } ?: "件数暂未知").append(" · ").append(distanceCaliberText).append("）")
         }
 
     /**
@@ -1894,7 +1894,7 @@ data class QuoteResult(
     val distanceCaliberText: String
         get() = distanceKm?.let {
             "计价里程 ${String.format(java.util.Locale.CHINA, "%.1f", it)} km（直线距离×路网系数，非道路里程）"
-        } ?: "计价里程未给"
+        } ?: "计价里程暂未知"
 
     companion object {
         fun parse(o: JSONObject): QuoteResult = QuoteResult(
@@ -2003,9 +2003,9 @@ data class Reachability(
     /** 距离文案：null 一律说"接口未给"，不出现"0 公里" */
     val distanceText: String
         get() = distanceKm?.let { "约 ${String.format(java.util.Locale.CHINA, "%.2f", it)} 公里$providerLabel" }
-            ?: "距离接口未给"
+            ?: "距离暂未知"
 
-    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间接口未给"
+    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间暂未知"
 
     /**
      * 不可达原因文案：只按后端 `reasonCode` 分支，本机不猜。
@@ -2121,9 +2121,9 @@ data class DriverTaskSegment(
     val windowText: String
         get() = when {
             windowStartText.isNotEmpty() && windowEndText.isNotEmpty() -> "任务窗口 $windowStartText ~ $windowEndText"
-            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻接口未给）"
-            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻接口未给）"
-            else -> "任务窗口接口未给"
+            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻暂未知）"
+            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻暂未知）"
+            else -> "任务窗口暂未知"
         }
 
     companion object {

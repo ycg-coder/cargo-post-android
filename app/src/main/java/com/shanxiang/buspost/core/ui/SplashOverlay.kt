@@ -1,8 +1,12 @@
 package com.shanxiang.buspost.core.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,17 +51,14 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 /**
- * 启动闪屏 —— 对应小程序 pages/index/index 的 .splash（品牌固定画布，13 节点）。
+ * 启动闪屏 —— 对标主流 App（高德/车来了/货拉拉/滴滴货运）的简洁品牌展示。
  *
- * 设计契约（与小程序注释同源，改版前请先读）：
- *  ① 只留品牌元素：柔光 · 远山 · 徽标盘面 · 原图插画 · 名称 · slogan ·
- *     进度线容器 · 进度线 · 进入胶囊 · 胶囊文字 · 箭头 · 状态文案 · 版本号 = 13 节点。
- *     纯装饰只允许「柔光 + 远山」两处。
- *  ② 版面 / 配色 / 文案固化，不随版本改动；唯一可变的是真实加载进度与状态文案。
- *  ③ 色相只用两种：品牌主色梯度（底）+ 稻谷金（点缀）。
- *  ④ 字号全部 ≥28rpx（=14sp），交互：整屏可点进入、500ms 防误触、6s 兜底自动进入。
- *  ⑤ 散场：品牌碎片各自四散（徽标上抛 / 名称左飞 / slogan 右飞 / 进度与胶囊下坠），
- *     幕布延迟 55% 再整屏退场。
+ * 设计契约（2026-10-10 改版，替代旧 13 节点散场动画）：
+ *  ① 品牌画布：柔光渐变底 + 中心徽标 + 名称 + slogan + 进度条 + 状态文案 + 版本号。
+ *  ② 入场动画：徽标从 0.85x 缩放至 1.0x + 淡入（350ms），名称/slogan 延迟入场（200ms stagger）。
+ *  ③ 就绪后：徽标轻微呼吸脉动（infinite transition），底部出现「轻触进入」胶囊。
+ *  ④ 退场：整屏淡出（300ms），不做碎片四散（主流 App 均为整屏退场）。
+ *  ⑤ 兜底：4s 自动进入（旧版 6s 偏慢，主流 App 1.5-3s）；500ms 防误触。
  */
 @Composable
 fun SplashOverlay(
@@ -71,47 +71,47 @@ fun SplashOverlay(
 ) {
     val t = LocalBusTokens.current
     var shownAt by remember { mutableStateOf(System.currentTimeMillis()) }
-    var scattering by remember { mutableStateOf(false) }
+    var dismissing by remember { mutableStateOf(false) }
     val veil = remember { Animatable(1f) }
 
-    // scatter 各碎片进度（0→1），用独立进度实现"各自四散"
-    val sc = remember { Animatable(0f) }
-
-    LaunchedEffect(Unit) { shownAt = System.currentTimeMillis() }
-
-    // 6s 兜底自动进入：用户不知道可以点时不会被卡住
+    // 入场进度（0→1）：驱动徽标缩放 + 淡入
+    val entrance = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        delay(6000)
-        if (!scattering) {
-            scattering = true
-        }
+        shownAt = System.currentTimeMillis()
+        entrance.animateTo(1f, tween(500, easing = LinearOutSlowInEasing))
     }
 
-    LaunchedEffect(scattering) {
-        if (!scattering) return@LaunchedEffect
-        sc.animateTo(1f, tween(460, easing = ScatterEase))
-        veil.animateTo(0f, tween(560, easing = ScatterEase))
+    // 徽标呼吸脉动（就绪后启用）
+    val infiniteTransition = rememberInfiniteTransition(label = "splash-pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+
+    // 4s 兜底自动进入（对标主流 App 1.5-3s 区间，取 4s 留余量给弱网）
+    LaunchedEffect(Unit) {
+        delay(4000)
+        if (!dismissing) dismissing = true
+    }
+
+    // 就绪 + 入场完成 → 允许点击进入
+    LaunchedEffect(dismissing) {
+        if (!dismissing) return@LaunchedEffect
+        veil.animateTo(0f, tween(300, easing = LinearOutSlowInEasing))
         onFinished()
     }
 
-    /** 碎片自定义散场：stagger 由各节点自己的 delay 表达，这里统一 ease-in */
-    fun scatterMod(
-        dx: Float = 0f,
-        dy: Float = 0f,
-        rotate: Float = 0f,
-        scaleTo: Float = 1f,
-        delayMs: Int = 0,
-    ): Modifier {
-        val p = ((sc.value * 460f - delayMs) / 460f).coerceIn(0f, 1f)
-        return Modifier.graphicsLayer {
-            translationX = dx * p
-            translationY = dy * p
-            rotationZ = rotate * p
-            scaleX = 1f + (scaleTo - 1f) * p
-            scaleY = 1f + (scaleTo - 1f) * p
-            alpha = 1f - p
-        }
-    }
+    // 入场 stagger：徽标 0ms → 名称 150ms → slogan 280ms → 进度条 380ms
+    val logoAlpha = (entrance.value * 2.5f).coerceIn(0f, 1f)
+    val logoScale = 0.85f + 0.15f * entrance.value
+    val nameAlpha = ((entrance.value - 0.15f) * 2.5f).coerceIn(0f, 1f)
+    val sloganAlpha = ((entrance.value - 0.28f) * 2.5f).coerceIn(0f, 1f)
+    val barAlpha = ((entrance.value - 0.38f) * 2.8f).coerceIn(0f, 1f)
 
     Box(
         Modifier
@@ -121,188 +121,168 @@ fun SplashOverlay(
                 Brush.radialGradient(
                     colorStops = arrayOf(
                         0f to t.accent,
-                        0.22f to t.primary,
+                        0.25f to t.primary,
                         1f to t.primaryDark,
                     ),
-                    center = Offset(0.5f, 0f),
-                    radius = 1400f,
+                    center = Offset(0.5f, 0.15f),
+                    radius = 1200f,
                 )
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
             ) {
-                // 500ms 内点击视为误触忽略
                 if (System.currentTimeMillis() - shownAt < 500) return@clickable
-                scattering = true
+                if (ready && !dismissing) dismissing = true
             },
         contentAlignment = Alignment.Center,
     ) {
-        // 节点 1：品牌柔光（唯一装饰之一）
+        // 品牌柔光（顶部大面积光晕）
         Box(
             Modifier
-                .size(540.dp)
-                .graphicsLayer { alpha = 1f - sc.value; scaleX = 1f + 0.5f * sc.value; scaleY = scaleX }
+                .size(500.dp)
                 .align(Alignment.TopCenter)
-                .padding(top = 0.dp)
+                .graphicsLayer { alpha = 0.6f * logoAlpha }
                 .drawBehind {
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colorStops = arrayOf(0f to Color.White.copy(alpha = 0.13f), 0.64f to Color.Transparent),
+                            colorStops = arrayOf(
+                                0f to Color.White.copy(alpha = 0.15f),
+                                0.5f to Color.White.copy(alpha = 0.05f),
+                                1f to Color.Transparent,
+                            ),
                         ),
                         radius = size.minDimension / 2,
                     )
                 },
         )
 
-        // 节点 2：远山剪影（唯一装饰之二）—— 单节点做"亮脊 + 暗身"
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(310.dp)
-                .padding(horizontal = 0.dp)
-                .graphicsLayer {
-                    alpha = 1f - sc.value
-                    translationY = size.height * 0.22f * sc.value
-                }
-                .drawBehind {
-                    drawOval(
-                        brush = Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.10f)),
-                        ),
-                        topLeft = Offset(-size.width * 0.24f, size.height * 0.10f),
-                        size = androidx.compose.ui.geometry.Size(size.width * 1.48f, size.height * 1.4f),
-                    )
-                },
-        )
-
         Column(
             Modifier
-                .fillMaxSize()
-                .padding(start = 32.dp, end = 32.dp, bottom = 70.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
         ) {
-            // 节点 3 + 4：徽标盘面（白底 + 稻谷金细环）+ 用户定稿原图插画
+            Spacer(Modifier.height(120.dp))
+
+            // 徽标盘面：白底 + 稻谷金细环 + 原图插画
             Box(
                 Modifier
-                    .size(94.dp)
-                    .scale(1f)
+                    .size(96.dp)
+                    .graphicsLayer {
+                        alpha = logoAlpha
+                        scaleX = logoScale * if (ready) pulseScale else 1f
+                        scaleY = logoScale * if (ready) pulseScale else 1f
+                    }
                     .clip(CircleShape)
-                    .background(t.onPrimary)
-                    .border(3.dp, t.gold, CircleShape)
-                    .then(scatterMod(dy = -130f, rotate = -8f, scaleTo = 0.92f)),
+                    .background(Color.White)
+                    .border(2.5.dp, t.gold, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
                     painter = coil.compose.rememberAsyncImagePainter(model = LOGO_ASSET),
                     contentDescription = "乡邮智联",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(80.dp),
+                    modifier = Modifier.size(82.dp),
                 )
             }
 
-            // 节点 5：品牌名称（字重 800 + 大字距 = 品牌字标记）
+            // 品牌名称
             Text(
                 "乡邮智联",
-                color = t.onPrimary,
-                fontSize = 24.sp,
+                color = Color.White,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 5.sp,
+                letterSpacing = 6.sp,
                 modifier = Modifier
-                    .padding(top = 24.dp)
-                    .then(scatterMod(dx = -100f, dy = 20f, rotate = -4f, delayMs = 40)),
+                    .padding(top = 28.dp)
+                    .graphicsLayer { alpha = nameAlpha },
             )
 
-            // 节点 6：slogan —— 一行楷体细体，nowrap（品牌页一行文案必须保单行）
+            // Slogan
             Text(
                 "公交带货 · 快递进村 · 农产品出山",
-                color = t.onPrimary,
-                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,
                 fontFamily = FontFamily.Serif,
-                letterSpacing = 3.sp,
+                letterSpacing = 2.sp,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier
                     .padding(top = 10.dp)
-                    .then(scatterMod(dx = 100f, dy = 20f, rotate = 4f, delayMs = 60)),
+                    .graphicsLayer { alpha = sloganAlpha },
             )
 
-            // 节点 7 + 8：进度线容器 + 进度线（唯一动态区）
+            // 进度条
             Box(
                 Modifier
-                    .padding(top = 34.dp)
-                    .width(130.dp)
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(Color.Black.copy(alpha = 0.30f))
-                    .then(scatterMod(dy = 70f, delayMs = 70)),
+                    .padding(top = 40.dp)
+                    .width(120.dp)
+                    .height(2.5.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(Color.White.copy(alpha = 0.20f))
+                    .graphicsLayer { alpha = barAlpha },
             ) {
                 Box(
                     Modifier
                         .fillMaxWidth(progress.coerceIn(0, 100) / 100f)
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
+                        .height(2.5.dp)
+                        .clip(RoundedCornerShape(1.5.dp))
                         .background(Color.White),
                 )
             }
 
-            // 节点 9/10/11：就绪胶囊（静态，无无限动画）；未就绪则 节点 12 状态文案
-            if (ready) {
-                Row(
-                    Modifier
-                        .padding(top = 20.dp)
-                        .clip(RoundedCornerShape(BusRadius.pill))
-                        .background(Color.Black.copy(alpha = 0.24f))
-                        .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(BusRadius.pill))
-                        .padding(start = 17.dp, end = 15.dp, top = 8.dp, bottom = 8.dp)
-                        .then(scatterMod(dy = 110f, delayMs = 80)),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            // 状态文案 / 就绪胶囊
+            Box(
+                Modifier
+                    .padding(top = 24.dp)
+                    .graphicsLayer { alpha = barAlpha },
+            ) {
+                if (ready) {
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(BusRadius.pill))
+                            .background(Color.White.copy(alpha = 0.18f))
+                            .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(BusRadius.pill))
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            "轻触屏幕进入",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("›", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
                     Text(
-                        "轻触屏幕进入",
-                        color = t.onPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.sp,
+                        statusText,
+                        color = Color.White.copy(alpha = 0.80f),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text("›", color = t.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-            } else {
-                Text(
-                    statusText,
-                    color = t.onPrimary,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(top = 20.dp)
-                        .then(scatterMod(dy = 110f, delayMs = 80)),
-                )
             }
         }
 
-        // 节点 13：版本号（黑 28% 票根底，保证白字达标）
+        // 版本号（底部）
         Text(
             version,
-            color = t.onPrimary,
-            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.60f),
+            fontSize = 11.sp,
             letterSpacing = 1.sp,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 30.dp)
-                .clip(RoundedCornerShape(BusRadius.s))
-                .background(Color.Black.copy(alpha = 0.28f))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
-                .then(scatterMod(dy = 55f, delayMs = 90)),
+                .padding(bottom = 32.dp)
+                .graphicsLayer { alpha = barAlpha },
         )
     }
 }
-
-/** ease-in：碎片加速离场（对应小程序 cubic-bezier(0.55,0,0.85,0.36) 的加速感） */
-private val ScatterEase = Easing { fraction -> fraction * fraction * (3f - 2f * fraction) * 0.35f + fraction * fraction * 0.65f }
 
 /**
  * 品牌 Logo：assets/logo.png —— 与小程序 images/logo.png 同一张定稿原图

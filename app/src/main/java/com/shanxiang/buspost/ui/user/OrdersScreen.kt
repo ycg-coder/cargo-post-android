@@ -416,8 +416,43 @@ private fun ProductOrderTicket(
                         else "已送达 · 点「产地溯源」看交付凭证",
                         color = t.primaryOnLight,
                         fontSize = (11.5 * scale).sp,
-                        modifier = Modifier.padding(start = 6.dp),
+                        modifier = Modifier.padding(start = 6.dp).weight(1f),
                     )
+                }
+                // 车辆与司机信息（对标货拉拉/滴滴货运：运输中显示车牌和司机）
+                if (order.onTheWay && (order.vehiclePlate.isNotEmpty() || order.driverName.isNotEmpty())) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 6.dp)
+                            .clip(RoundedCornerShape(BusRadius.m)).background(t.goldLight)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Icon(
+                            BusIcons.location, null, tint = t.goldDeep, modifier = Modifier.size(13.dp),
+                        )
+                        Column(Modifier.padding(start = 6.dp).weight(1f)) {
+                            if (order.vehiclePlate.isNotEmpty()) {
+                                Text(
+                                    "承运车辆：${order.vehiclePlate}",
+                                    color = t.goldDeep,
+                                    fontSize = (11.5 * scale).sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                            if (order.driverName.isNotEmpty()) {
+                                Text(
+                                    "司机：${order.driverName}" +
+                                        if (order.driverArrived) " · 已到站" else "",
+                                    color = t.textSecondary,
+                                    fontSize = (10.5 * scale).sp,
+                                    modifier = Modifier.padding(top = 1.dp),
+                                )
+                            }
+                        }
+                        if (order.routeName.isNotEmpty()) {
+                            BusTag(order.routeName, tone = BusTone.NEUTRAL)
+                        }
+                    }
                 }
             }
 
@@ -514,6 +549,48 @@ private fun SendOrderTicket(order: SendOrder, onOpen: () -> Unit) {
                     "${order.itemCount} 件",
                     color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Bold,
                 )
+            }
+
+            // 承运车辆信息（运输中才显示，对标快递100/菜鸟：实时车牌+ETA）
+            if (order.onTheWay && order.vehiclePlate.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp)
+                        .clip(RoundedCornerShape(BusRadius.m)).background(t.goldLight)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Icon(
+                        BusIcons.bus, null, tint = t.goldDeep, modifier = Modifier.size(13.dp),
+                    )
+                    Column(Modifier.padding(start = 6.dp).weight(1f)) {
+                        Text(
+                            "承运车辆：${order.vehiclePlate}" +
+                                if (order.driverName.isNotEmpty()) " · ${order.driverName}" else "",
+                            color = t.goldDeep,
+                            fontSize = (11.5 * scale).sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        val eta = order.carrierEtaMinutes
+                        if (eta != null && eta > 0) {
+                            Text(
+                                if (order.carrierArrived) "已到站 ${order.carrierArrivedStation}"
+                                else if (eta <= 5) "即将到达 · 约 $eta 分钟"
+                                else "距到达约 $eta 分钟",
+                                color = if (eta <= 5) t.danger else t.textSecondary,
+                                fontSize = (10.5 * scale).sp,
+                                fontWeight = if (eta <= 5) FontWeight.Medium else FontWeight.Normal,
+                                modifier = Modifier.padding(top = 1.dp),
+                            )
+                        } else if (order.carrierArrivedStation.isNotEmpty()) {
+                            Text(
+                                "司机已到达 ${order.carrierArrivedStation}",
+                                color = t.textSecondary,
+                                fontSize = (10.5 * scale).sp,
+                                modifier = Modifier.padding(top = 1.dp),
+                            )
+                        }
+                    }
+                }
             }
 
             BusDivider(Modifier.padding(top = 10.dp))

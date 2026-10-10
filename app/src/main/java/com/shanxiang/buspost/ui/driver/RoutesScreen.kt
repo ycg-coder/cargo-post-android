@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -152,12 +154,16 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
                 }
             }
 
-            DemoNote(vm.demo, text = "后端未返回分段运单，当前是演示分段。")
+            DemoNote(vm.demo, text = "当前为演示分段任务。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
             // 回执条统一走 DriverBits.ReceiptBar（本页此前内联了一份同形实现，样式已与工作台漂移）
             vm.receipt?.let { ReceiptBar(it) }
 
             vm.vehicle?.let { VehicleCard(it) }
+
+            if (vm.legs.isNotEmpty()) {
+                ProgressSummary(vm.legs, vm.current)
+            }
 
             // 途经站点时间线：把今日班次摊成一条站点链（等价小程序「途经站点时间线」）
             if (vm.legs.isNotEmpty()) {
@@ -165,12 +171,14 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
                 BusCard(modifier = Modifier.fillMaxWidth()) {
                     StationTimeline(
                         stops = vm.legs.map { leg ->
-                            // 完成只认后端 COMPLETED(11)：旧写法 `status >= 4` 把"前往起点"当成已跑完
                             val done = leg.done
                             val isCur = leg.legId == vm.current?.legId
                             TimelineStop(
                                 label = "${leg.fromStation} → ${leg.toStation}",
-                                hint = if (isCur) "进行中" else if (done) "已完成" else "待执行",
+                                hint = buildString {
+                                    append(if (isCur) "进行中" else if (done) "已完成" else "待执行")
+                                    leg.legPlanText?.let { if (isNotEmpty()) append(" · "); append(it) }
+                                },
                                 state = when {
                                     done -> StopState.DONE
                                     isCur -> StopState.CURRENT
@@ -182,7 +190,7 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
                 }
             }
 
-            SectionTitle("分段任务", subtitle = "点击推进状态")
+            SectionTitle("分段任务", subtitle = "查看各段运输状态")
             if (vm.legs.isEmpty() && !vm.loading) {
                 Text("今天没有被分配运输分段", color = t.textTertiary, fontSize = (13 * scale).sp)
             }
@@ -238,6 +246,57 @@ private fun VehicleCard(v: BusVehicle) {
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressSummary(legs: List<TransportLeg>, current: TransportLeg?) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val doneCount = legs.count { it.done }
+    val total = legs.size
+    val progress = if (total > 0) doneCount.toFloat() / total else 0f
+    BusCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("班次进度", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "已完成 $doneCount / $total 段",
+                        color = t.textSecondary,
+                        fontSize = (12 * scale).sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(BusRadius.pill))
+                        .background(t.primaryLight)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        "${(progress * 100).toInt()}%",
+                        color = t.primary,
+                        fontSize = (15 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(6.dp).padding(top = 10.dp),
+                color = t.primary,
+                trackColor = t.track,
+            )
+            current?.let {
+                Text(
+                    "当前：${it.fromStation} → ${it.toStation} · ${it.statusLabel}",
+                    color = t.textTertiary,
+                    fontSize = (11.5 * scale).sp,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }
@@ -312,6 +371,14 @@ private fun LegRow(
             if (leg.transferStation.isNotEmpty()) {
                 BusTag("换乘 ${leg.transferStation}", tone = BusTone.GOLD, modifier = Modifier.padding(top = 9.dp))
             }
+            leg.legPlanText?.let {
+                Text(
+                    it,
+                    color = t.textTertiary,
+                    fontSize = (11.5 * scale).sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             val next = flow.next
             if (next == null) {
                 flow.waitingReason?.let {
@@ -337,7 +404,7 @@ private fun LegRow(
                 // 正式包不在这里跳导航 —— 就近导航请到工作台那张任务地图（目的地来自 /driver/route 的 stops）。
                 if (BuildConfig.DEBUG) {
                     BusButton(
-                        text = "旧导航页（调试）",
+                        text = "调试导航",
                         small = true,
                         variant = BusButtonVariant.OUTLINE,
                         modifier = Modifier.weight(1f),

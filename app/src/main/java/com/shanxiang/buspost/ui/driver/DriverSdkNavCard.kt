@@ -188,7 +188,7 @@ fun DriverSdkNavCard(
             // 打开真实高德导航视图（转向大图 / 车道放大图 / 路口放大图 / 实时路况），
             // 而不是在本页读十几行实时回执。下面那些行留给"路上出问题时对账"用。
             BusButton(
-                text = if (nextStop == null) "车道级导航（调度未给目的地）" else "开始车道级导航",
+                text = if (nextStop == null) "车道级导航（暂未指定目的地）" else "开始车道级导航",
                 icon = BusIcons.navigation,
                 variant = BusButtonVariant.CLAY,
                 enabled = gate.canNavigate,

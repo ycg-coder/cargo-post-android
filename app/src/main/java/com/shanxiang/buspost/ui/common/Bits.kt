@@ -1,7 +1,10 @@
 package com.shanxiang.buspost.ui.common
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +31,7 @@ import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusText
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
+import com.shanxiang.buspost.core.ui.pressFeedback
 
 /** 详情级页面随处可跳：根导航注入，页面不必层层传 lambda */
 val LocalNavController = compositionLocalOf<NavHostController> {
@@ -40,7 +46,7 @@ val LocalNavController = compositionLocalOf<NavHostController> {
  * 如需重新启用，取消下方return语句即可。
  */
 @Composable
-fun DemoNote(demo: Boolean, label: String = "演示数据", text: String = "后端未返回内容，当前展示本地演示线路与订单，仅用于查看交互效果。") {
+fun DemoNote(demo: Boolean, label: String = "演示数据", text: String = "当前为演示模式，展示本地演示数据，仅用于查看交互效果。") {
     // UI复刻方案要求：移除黄色警告横幅，改为静默降级
     // 演示数据仍在后台使用，但不向用户展示提示
     return
@@ -88,11 +94,13 @@ fun EntryTile(
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val src = remember { MutableInteractionSource() }
     Column(
         modifier
+            .pressFeedback(src)
             .clip(RoundedCornerShape(BusRadius.l))
             .background(t.card)
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = src, indication = androidx.compose.foundation.LocalIndication.current, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp),
     ) {
         Box {

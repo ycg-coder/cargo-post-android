@@ -116,7 +116,7 @@ fun TraceView(
             me = trace.vehicleGeo,
             highlightStationId = trace.stations.firstOrNull { it.name == trace.targetStation }?.id ?: 0L,
             height = 190.dp,
-            reason = if (trace.polyline.size >= 2) null else "这一单还没有真实道路轨迹，可能是班车尚未发车或后端未回传折线。",
+            reason = if (trace.polyline.size >= 2) null else "暂无路线轨迹。",
             onReplan = onReplan,
         )
         // 承运车辆位置：后端没给坐标就直说"暂无实时位置"，不许用固定点/0,0/随机点顶一个位置上来。
@@ -124,8 +124,8 @@ fun TraceView(
         // 后端没发新鲜度键（/product-order/trace 就是）时只能说"新鲜度未给"，不许升格成"实时"。
         Text(
             text = if (trace.vehicleGeo != null) {
-                "车辆位置：" + (trace.locationSource.knownLabel ?: "新鲜度未给") +
-                    if (trace.lastReportTime.isEmpty()) "，上报时间未给" else "，上报时间 ${trace.lastReportTime}"
+                "车辆位置：" + (trace.locationSource.knownLabel ?: "暂未知") +
+                    if (trace.lastReportTime.isEmpty()) "，上报时间暂未知" else "，上报时间 ${trace.lastReportTime}"
             } else {
                 "暂无实时位置"
             },
@@ -140,7 +140,7 @@ fun TraceView(
                 "当前任务：" + trace.carrierTaskStatus +
                     if (trace.carrierTaskTime.isEmpty()) "" else "（更新于 ${trace.carrierTaskTime}）"
             } else {
-                "当前任务：暂无数据（尚未派单，或无权查看明细）"
+                "当前任务：暂未知"
             },
             color = t.textTertiary,
             fontSize = (12.5 * scale).sp,
@@ -220,10 +220,10 @@ private fun LegCard(leg: TransportLeg) {
             }
             RoadLine(progress = if (done) 1f else if (running) 0.55f else -1f, modifier = Modifier.padding(top = 9.dp))
             if (!done) {
-                val actionText = leg.action.ifEmpty { "下一步未下发" }
+                val actionText = leg.action.ifEmpty { "暂未知" }
                 Text(
                     if (leg.etaMinutes != null) "预计 ${leg.etaMinutes} 分钟 · $actionText"
-                    else "后端未给到站分钟 · $actionText",
+                    else "到站时间暂未知 · $actionText",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 6.dp),

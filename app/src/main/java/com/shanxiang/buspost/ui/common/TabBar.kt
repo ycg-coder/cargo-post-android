@@ -2,6 +2,8 @@ package com.shanxiang.buspost.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,15 +24,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shanxiang.buspost.core.ui.FluidBackground
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
+import com.shanxiang.buspost.core.ui.glassmorphic
+import com.shanxiang.buspost.core.ui.pressFeedback
 
 data class TabItem(val label: String, val icon: ImageVector, val badge: Int = 0)
 
@@ -81,10 +89,26 @@ private fun BusBottomBar(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(t.card)
+            .glassmorphic(t)
             .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(t.lineDeep))
+        // 玻璃拟态顶部光线：主色微光，增强悬浮感
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            t.primary.copy(alpha = 0.25f),
+                            t.accent.copy(alpha = 0.18f),
+                            t.primary.copy(alpha = 0.25f),
+                            Color.Transparent,
+                        )
+                    )
+                )
+        )
         // 背景与那条横梁仍是全宽（它是一条"栏"），只有格子本身收进与内容列同一把尺子并居中：
         // 平板上四格摊到 2136px 会让图标与文字之间出现无意义的空旷，也让人怀疑点不点得到。
         Row(
@@ -94,10 +118,12 @@ private fun BusBottomBar(
         ) {
             items.forEachIndexed { i, item ->
                 val active = i == selected
+                val tabSrc = remember { MutableInteractionSource() }
                 Column(
                     Modifier
                         .weight(1f)
-                        .clickable { onSelect(i) }
+                        .pressFeedback(tabSrc)
+                        .clickable(interactionSource = tabSrc, indication = androidx.compose.foundation.LocalIndication.current) { onSelect(i) }
                         .padding(vertical = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -144,25 +170,15 @@ fun BusScaffold(
 ) {
     val t = LocalBusTokens.current
     Scaffold(
-        containerColor = t.paper,
+        containerColor = Color.Transparent,
         contentColor = t.ink,
         bottomBar = bottomBar,
     ) { insets ->
-        // consumeWindowInsets（2026-10-09 Edge-to-Edge 适配）：`padding(insets)` 只是留白，
-        // **不消费** —— 子孙再写 `statusBarsPadding()` 会把状态栏高度再叠一遍，壳内页面顶部多出一条空白。
-        // 消费之后，Signpost/BusTopBar 里的 statusBarsPadding 在壳内恒为 0（Scaffold 已避让）、
-        // 在 BusScaffold 之外的全屏路由恒为真实值 —— 同一个组件两种宿主都正确，不用传参区分。
-        // 内容列统一收进居中限宽（理由见 BusContentMaxWidth 那段）：两个 Shell 都走这一条，
-        // 所以"用户端首页宫格左堆 35%、司机端卡片值跑到屏幕另一头"这类平板形变一次改掉，页面内部一字不动。
         Box(
             Modifier.padding(insets).consumeWindowInsets(insets).fillMaxSize(),
             contentAlignment = Alignment.TopCenter,
         ) {
-            // ⚠ `widthIn` 必须写在 `fillMaxWidth` **之前**（这里干脆不写 fillMaxWidth）：
-            //   反过来写会先被撑到父级满宽、限宽失效 —— 真机实测第二版就是这样（内容仍从 x=88 起、底栏没动）。
-            // ⚠ 限宽必须落在**这一层容器**上，不能塞进传给 content 的 Modifier 里：
-            //   两个 Shell 拿到 modifier 后都写 `Column(modifier.fillMaxSize())`，
-            //   `widthIn` 被后面的 `fillMaxSize` 顶掉 —— 真机实测第一版就是这样，底栏收住了、内容仍从 x=50 起。
+            FluidBackground(Modifier.matchParentSize())
             Box(Modifier.widthIn(max = BusContentMaxWidth)) {
                 content(Modifier.fillMaxSize())
             }
@@ -200,7 +216,7 @@ fun BusRouteBody(content: @Composable () -> Unit) {
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
         contentAlignment = Alignment.TopCenter,
     ) {
-        // 与 BusScaffold 同一把尺子：详情/表单路由在平板上也不许全幅拉伸，两端共用一个常量。
+        FluidBackground(Modifier.matchParentSize())
         Box(Modifier.widthIn(max = BusContentMaxWidth)) { content() }
     }
 }

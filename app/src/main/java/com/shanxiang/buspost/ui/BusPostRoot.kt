@@ -25,6 +25,7 @@ import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.core.AppDomain
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.net.attempt
+import com.shanxiang.buspost.core.ui.BusMotion
 import com.shanxiang.buspost.core.ui.SplashOverlay
 import com.shanxiang.buspost.data.model.Role
 import com.shanxiang.buspost.data.repo.Repo
@@ -117,13 +118,13 @@ fun BusPostRoot() {
     NavHost(
         navController = nav,
         startDestination = start,
-        // 转场（2026-10-09 现代化改造）：进入轻微右移 + 淡入，返回轻微左移 + 淡出。
-        // 位移只取屏宽 1/16 —— 宁可"几乎看不见"，也不要整屏横飞：根级路由（登录 ↔ 壳）
-        // 如果按满屏滑动，看起来像另一个 App 在抢屏；而列表 → 详情这类层级感由这 1/16 提供。
-        enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 16 } },
-        exitTransition = { fadeOut(tween(170)) },
-        popEnterTransition = { fadeIn(tween(200)) },
-        popExitTransition = { fadeOut(tween(170)) + slideOutHorizontally(tween(170)) { it / 16 } },
+        // 转场（2026-10-10 丝滑化）：位移从 1/16 抬到 1/8，时长微调到 240/180ms，
+        // 用项目统一缓动曲线（BusMotion.easing = Material 3 Emphasized）代替默认线性。
+        // 1/16 在真机（小米平板 6）上几乎看不见位移，像"闪切"而非"滑入"；1/8 保留层级感又不喧宾夺主。
+        enterTransition = { fadeIn(tween(240, easing = BusMotion.easing)) + slideInHorizontally(tween(240, easing = BusMotion.easing)) { it / 8 } },
+        exitTransition = { fadeOut(tween(180, easing = BusMotion.easing)) },
+        popEnterTransition = { fadeIn(tween(220, easing = BusMotion.easing)) },
+        popExitTransition = { fadeOut(tween(180, easing = BusMotion.easing)) + slideOutHorizontally(tween(180, easing = BusMotion.easing)) { it / 8 } },
     ) {
         composable(Routes.LOGIN) {
             // 登录页必须走同一个吃 ime 的壳：它是全工程输入最密的一屏，而此前只有它没套
@@ -134,7 +135,8 @@ fun BusPostRoot() {
                     // 还留着上一段"我已切回用户版"的覆写，就成了看着司机壳、后台按用户域轮询（F-3 ③）。
                     AppState.setActiveDomain(AppDomain.of(role))
                     nav.navigate(if (role == Role.DRIVER) Routes.DRIVER_SHELL else Routes.USER_SHELL) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
                     }
                 })
             }

@@ -40,6 +40,7 @@ import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.BusPullRefresh
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTone
@@ -68,8 +69,23 @@ class MineViewModel : ScreenViewModel() {
     var sendCount by mutableStateOf<Int?>(null)
     var orderCount by mutableStateOf<Int?>(null)
     var addressCount by mutableStateOf<Int?>(null)
+    var refreshing by mutableStateOf(false)
+        private set
 
     fun load() = work {
+        try {
+            fetchStats()
+        } finally {
+            refreshing = false
+        }
+    }
+
+    fun reload() {
+        refreshing = true
+        load()
+    }
+
+    private suspend fun fetchStats() {
         val s = Repo.sendOrders(pageSize = 1)
         val o = Repo.productOrders(pageSize = 1)
         val a = Repo.addresses()
@@ -117,6 +133,7 @@ fun MineScreen(vm: MineViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { vm.load() }
 
+    BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload() }) {
     BusPage(spacedBy = 12.dp) {
         BusCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -274,6 +291,7 @@ fun MineScreen(vm: MineViewModel = viewModel()) {
             }, danger = true)
         }
         Spacer(Modifier.height(8.dp))
+    }
     }
 
     if (confirmLogout) {

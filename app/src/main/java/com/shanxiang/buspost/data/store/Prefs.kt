@@ -214,4 +214,32 @@ object Prefs {
             .remove("lastSeenDriverMsgId")
             .apply()
     }
+
+    // ---------- 收藏线路（本地 DataStore，不依赖后端） ----------
+
+    /**
+     * 收藏的线路 ID 列表：逗号分隔的字符串，空串表示无收藏。
+     * 为什么不用 JSON：只有 ID 一个维度，逗号分隔够用，解析也简单。
+     */
+    private var favoriteLineIdsRaw: String
+        get() = str("favoriteLineIds")
+        set(v) = put("favoriteLineIds", v)
+
+    /** 收藏的线路 ID 集合（读时解析，写时回写） */
+    val favoriteLineIds: Set<String>
+        get() = favoriteLineIdsRaw.split(",").filter { it.isNotEmpty() }.toSet()
+
+    /** 切换收藏状态：已收藏则取消，未收藏则加入 */
+    fun toggleFavoriteLine(lineId: String) {
+        val current = favoriteLineIds.toMutableSet()
+        if (lineId in current) {
+            current.remove(lineId)
+        } else {
+            current.add(lineId)
+        }
+        favoriteLineIdsRaw = current.joinToString(",")
+    }
+
+    /** 查询是否已收藏 */
+    fun isFavoriteLine(lineId: String): Boolean = lineId in favoriteLineIds
 }

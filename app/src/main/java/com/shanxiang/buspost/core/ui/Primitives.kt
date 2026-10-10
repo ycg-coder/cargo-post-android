@@ -14,6 +14,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -119,7 +120,7 @@ fun Signpost(
                     title,
                     color = Color.White,
                     fontSize = if (compact) 17.sp else 20.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -127,7 +128,7 @@ fun Signpost(
                     Box(
                         Modifier
                             .padding(start = 8.dp)
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(BusRadius.s))
                             .background(Color.White.copy(alpha = 0.16f))
                             .padding(horizontal = 10.dp, vertical = 3.dp)
                     ) {
@@ -398,7 +399,7 @@ fun StationTimeline(
 fun SkeletonLine(modifier: Modifier = Modifier, height: Dp = 12.dp, width: Dp? = null) {
     val t = LocalBusTokens.current
     val tr = rememberInfiniteTransition(label = "skeleton")
-    val slide by tr.animateFloat(-1f, 2.4f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "slide")
+    val slide by tr.animateFloat(-1f, 2.4f, infiniteRepeatable(tween(BusMotion.SKELETON_MS, easing = LinearEasing), RepeatMode.Restart), label = "slide")
     val sized = if (width != null) modifier.width(width) else modifier.fillMaxWidth()
     Box(
         sized
@@ -423,9 +424,9 @@ fun SkeletonCard(modifier: Modifier = Modifier, rows: Int = 3, leading: Boolean 
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(BusRadius.l))
+            .clip(RoundedCornerShape(BusRadius.card))
             .background(t.card)
-            .padding(14.dp)
+            .padding(16.dp)
     ) {
         if (leading) SkeletonLine(Modifier.padding(end = 12.dp), height = 48.dp, width = 48.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -490,15 +491,17 @@ fun FilterChipRow(
     ) {
         itemsIndexed(options) { i, label ->
             val active = i == selected
+            val chipShape = RoundedCornerShape(BusRadius.btn)
+            val chipSrc = remember { MutableInteractionSource() }
             Box(
                 Modifier
-                    .clip(CircleShape)
+                    .pressFeedback(chipSrc)
+                    .clip(chipShape)
                     .background(if (active) t.primary else t.card)
-                    .clickable { onSelect(i) }
-                    // 胶囊原为 7dp 上下留白 ≈ 40dp，低于 48dp 下限。司机端（异常上报/筛选）用同一颗胶囊，
-                    // 撑到令牌下限；横排靠 LazyRow 的 8dp 间距防误触，不靠压高度。
+                    .then(if (!active) Modifier.border(1.dp, t.line, chipShape) else Modifier)
+                    .clickable(interactionSource = chipSrc, indication = LocalIndication.current) { onSelect(i) }
                     .defaultMinSize(minHeight = LocalBusTouch.current.min)
-                    .padding(horizontal = 15.dp),
+                    .padding(horizontal = 16.dp),
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
                 Text(

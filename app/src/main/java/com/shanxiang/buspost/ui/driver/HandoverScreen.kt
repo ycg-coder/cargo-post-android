@@ -44,6 +44,7 @@ import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.BusPullRefresh
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusSegmented
 import com.shanxiang.buspost.core.ui.BusTag
@@ -84,16 +85,28 @@ class HandoverViewModel : ScreenViewModel() {
     var legBusy by mutableStateOf(false)
         private set
 
+    var refreshing by mutableStateOf(false)
+        private set
+
     val pending: List<HandoverTask> get() = items.filter { !isDone(it) }
+
+    fun reload() {
+        refreshing = true
+        load()
+    }
 
     fun load() {
         work(reset = items.isEmpty()) {
-            val feed = Repo.driverHandovers()
-            items = feed.items
-            demo = feed.demo
-            val c = Repo.currentLeg()
-            currentLeg = c.value
-            mergeDemo(feed.demo, c.demo)
+            try {
+                val feed = Repo.driverHandovers()
+                items = feed.items
+                demo = feed.demo
+                val c = Repo.currentLeg()
+                currentLeg = c.value
+                mergeDemo(feed.demo, c.demo)
+            } finally {
+                refreshing = false
+            }
         }
     }
 
@@ -196,13 +209,14 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
 
     val list = if (tab == 0) vm.pending else vm.items
 
+    BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload() }) {
     BusPage(spacedBy = 12.dp) {
         Signpost(
             title = "货物交接",
             subtitle = "换乘站把货交给下一班车，拍照留证后可追溯责任段",
             badge = if (vm.pending.isEmpty()) "无待办" else "${vm.pending.size} 笔待办",
         )
-        DemoNote(vm.demo, text = "后端未返回交接单，当前为演示交接任务。")
+        DemoNote(vm.demo, text = "当前为演示交接任务。")
         vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
         vm.currentLeg?.let { leg ->
             CurrentLegCard(
@@ -267,6 +281,7 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
             },
             dismissButton = { TextButton(onClick = { target = null }) { Text("取消") } },
         )
+    }
     }
 }
 

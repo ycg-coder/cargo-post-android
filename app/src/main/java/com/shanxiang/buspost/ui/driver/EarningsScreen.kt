@@ -76,13 +76,14 @@ fun EarningsScreen(vm: EarningsViewModel = viewModel()) {
             badge = e?.todayBadgeText ?: "今日 —",
         ) {
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                // 今日单数用 todayOrders，累计单数用 totalOrders：后端是两个字段，旧代码把 totalOrders 标成"今日"
                 e?.todayOrders?.let { if (it > 0) BusTag("今日 $it 单", tone = BusTone.PRIMARY) }
                 e?.totalWeight?.let { if (it > 0) BusTag("今日 ${formatPrice(it)} kg", tone = BusTone.CLAY) }
+                e?.shiftCount?.let { if (it > 0) BusTag("$it 个班次", tone = BusTone.GOLD) }
+                e?.pendingCount?.let { if (it > 0) BusTag("待装车 $it", tone = BusTone.WARN) }
             }
         }
 
-        DemoNote(vm.demo, text = "后端未返回收益，当前为演示金额，不代表真实结算。")
+        DemoNote(vm.demo, text = "当前为演示金额，不代表真实结算。")
         vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
 
         if (e != null) {
@@ -120,6 +121,13 @@ private fun TicketCardRow(e: Earnings) {
             InfoRow("累计收益", e.totalText, valueColor = t.price)
             InfoRow("累计件数", e.orderCountText)
             InfoRow("累计载重", e.totalWeightText)
+            val avgDaily = e.month?.let { m ->
+                val days = e.items.map { it.date }.distinct().size
+                if (days > 0) m / days else null
+            }
+            if (avgDaily != null) {
+                InfoRow("月日均", formatPrice(avgDaily) + " 元/天", valueColor = t.price)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 4.dp)) {
                 BusTag("按件计费", tone = BusTone.GOLD)
                 BusTag("T+1 结算", tone = BusTone.NEUTRAL)
@@ -145,9 +153,9 @@ private fun MoneyCell(label: String, value: Double?, modifier: Modifier = Modifi
             .padding(horizontal = 12.dp, vertical = 13.dp),
     ) {
         Text(label, color = if (highlight) t.primaryOnLight else t.textTertiary, fontSize = (11.5 * scale).sp)
-        // 后端没给这一格时显示"未给"，不许塌成 0（F-2 §五：缺字段 ≠ 真零值）
+        // 后端没给这一格时显示"暂未知"，不许塌成 0（F-2 §五：缺字段 ≠ 真零值）
         Text(
-            if (value == null) "未给" else formatPrice(value),
+            if (value == null) "暂未知" else formatPrice(value),
             color = if (highlight) t.primary else t.ink,
             fontSize = (20 * scale).sp,
             fontWeight = FontWeight.Bold,
@@ -171,7 +179,7 @@ private fun DayChart(items: List<EarningItem>) {
         Column {
             Text("按日收益", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
             Text(
-                if (skipped > 0) "近 ${byDay.size} 天，单位元（$skipped 笔金额未给，未计入）"
+                if (skipped > 0) "近 ${byDay.size} 天，单位元（$skipped 笔金额暂未知，未计入）"
                 else "近 ${byDay.size} 天，单位元",
                 color = t.textTertiary,
                 fontSize = (11.5 * scale).sp,

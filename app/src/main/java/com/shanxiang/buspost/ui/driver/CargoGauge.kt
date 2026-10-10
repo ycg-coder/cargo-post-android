@@ -77,7 +77,7 @@ fun CargoGauge(
                 verticalArrangement = Arrangement.spacedBy(BusSpace.s),
             ) {
                 Text(
-                    text = capacityPercent?.let { "${it.toInt()}%" } ?: "未给",
+                    text = capacityPercent?.let { "${it.toInt()}%" } ?: "暂未知",
                     style = androidx.compose.material3.MaterialTheme.typography.displaySmall.copy(
                         fontWeight = FontWeight.Black,
                         color = if (capacityPercent == null) t.textTertiary else t.primary,
@@ -85,7 +85,7 @@ fun CargoGauge(
                     ),
                 )
                 Text(
-                    text = if (capacityPercent == null) "空余仓位（件数未给）" else "当前空余仓位",
+                    text = if (capacityPercent == null) "空余仓位（件数暂未知）" else "当前空余仓位",
                     style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
                         color = t.textSecondary,
                         fontSize = (13 * scale).sp,

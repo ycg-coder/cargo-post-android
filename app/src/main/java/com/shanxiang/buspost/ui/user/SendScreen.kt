@@ -83,6 +83,8 @@ import org.json.JSONObject
 private val CARGO_CATEGORIES = listOf("农产品", "生鲜果蔬", "日用百货", "建材小件", "药品", "其他")
 /** 单件限重（斤）：与后端承运审核规则一致（小程序 30kg = 60 斤），超限前端先提示 */
 private const val MAX_WEIGHT_JIN = 60.0
+/** 常见货物名快捷填入：对齐小程序 placeholder 里提到的品名，点击即填 */
+private val QUICK_CARGO_NAMES = listOf("脆李", "土鸡蛋", "红薯粉", "蔬菜", "水果", "药材", "快递包裹", "其他")
 
 /**
  * 寄货表单：草稿自动存本地（退出重进不丢），件数/重量/体积实时试算运费。
@@ -268,8 +270,8 @@ class SendViewModel : ScreenViewModel() {
     fun serviceModeText(): String {
         val r = reach ?: return if (reachError.isEmpty()) "未做可达性判定（按自选站点寄货）" else "未做可达性判定：$reachError"
         return when (r.state) {
-            ReachabilityState.REACHABLE -> "车辆可就近上门（${r.serviceModeLabel.ifEmpty { "后端未给服务方式" }}）"
-            ReachabilityState.NOT_REACHABLE -> "送到服务站点交接（${r.serviceModeLabel.ifEmpty { "后端未给服务方式" }}）"
+            ReachabilityState.REACHABLE -> "车辆可就近上门（${r.serviceModeLabel.ifEmpty { "服务方式暂未知" }}）"
+            ReachabilityState.NOT_REACHABLE -> "送到服务站点交接（${r.serviceModeLabel.ifEmpty { "服务方式暂未知" }}）"
             ReachabilityState.UNKNOWN -> "可达性未判定${r.reasonText("").let { if (it.isEmpty()) "" else "：$it" }}"
         }
     }
@@ -402,7 +404,7 @@ class SendViewModel : ScreenViewModel() {
                 val server = page.items.firstOrNull { it.orderNo == ack.orderNo } ?: page.items.firstOrNull()
                 val no = ack.orderNo.ifEmpty { server?.orderNo.orEmpty() }
                 if (no.isEmpty()) {
-                    formError = page.error ?: "后端未回订单号，本次寄货未确认，请到「我的寄货」核对后再试"
+                    formError = page.error ?: "订单号未获取，请到「我的寄货」核对后再试"
                     return@work
                 }
                 created = ack.copy(
@@ -442,6 +444,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
         when (vm.step) {
             // ── Step 1：填写货物信息（对齐小程序 send.wxml step 1）──
             1 -> {
+                StepProgressBar(currentStep = 1)
                 Signpost(
                     badge = "第 1 步 · 共 3 步",
                     title = "填写货物信息",
@@ -471,6 +474,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                             placeholder = "如：脆李、土鸡蛋、红薯粉",
                             icon = BusIcons.parcel,
                         )
+                        if (vm.goodsName.isEmpty()) QuickCargoChips(onPick = { vm.goodsName = it })
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             BusTextField(
                                 value = vm.weight,
@@ -491,6 +495,15 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                                     modifier = Modifier.padding(top = 6.dp),
                                 )
                             }
+                        }
+                        if (vm.weightJin > 0) {
+                            Text(
+                                "= ${String.format(java.util.Locale.CHINA, "%.1f", vm.weightKg)} kg" +
+                                    if (vm.weightJin > MAX_WEIGHT_JIN) " · 超出单件限重 ${MAX_WEIGHT_JIN.toInt()} 斤" else "",
+                                color = if (vm.weightJin > MAX_WEIGHT_JIN) t.danger else t.textTertiary,
+                                fontSize = (11.5 * scale).sp,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
                         }
                         CategoryChips(vm.category) { vm.category = it }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -583,8 +596,8 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                                 Text(
                                     // 后端不可用时这两个键都是 null（RoutePreviewRespVO:15-19），显示"未给"而不是 0 km / 0 分钟
                                     "取货站 → 送达站 " +
-                                        (r.distanceKm?.let { "约 ${String.format("%.1f", it)} km" } ?: "里程未给") +
-                                        " · " + (r.durationMinutes?.let { "$it 分钟" } ?: "时长未给"),
+                                        (r.distanceKm?.let { "约 ${String.format("%.1f", it)} km" } ?: "里程暂未知") +
+                                        " · " + (r.durationMinutes?.let { "$it 分钟" } ?: "时长暂未知"),
                                     color = t.ink,
                                     fontSize = (13.5 * scale).sp,
                                     fontWeight = FontWeight.Bold,
@@ -613,6 +626,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
 
             // ── Step 2：拍照确认（对齐小程序 send.wxml step 2）──
             2 -> {
+                StepProgressBar(currentStep = 2)
                 Signpost(
                     badge = "第 2 步 · 共 3 步",
                     title = "拍照确认货物",
@@ -745,6 +759,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
 
             // ── Step 3：提交成功（对齐小程序 send.wxml step 3 票券页）──
             else -> {
+                StepProgressBar(currentStep = 3)
                 Signpost(
                     badge = "寄货单已受理",
                     title = "寄货已提交！",
@@ -1077,7 +1092,7 @@ private fun ReachCard(
                             Text("推荐送站：${r.stationLabel}", color = t.textSecondary, fontSize = (12 * scale).sp)
                             Text("${r.distanceText} · ${r.walkText}", color = t.textSecondary, fontSize = (12 * scale).sp)
                         } else {
-                            Text("后端未给出推荐站点，请手动选择取货站点", color = t.textSecondary, fontSize = (12 * scale).sp)
+                            Text("暂未获取推荐站点，请手动选择取货站点", color = t.textSecondary, fontSize = (12 * scale).sp)
                         }
                         Text(
                             r.reasonText(r.message.ifEmpty { "请送到服务站点交接" }),
@@ -1102,9 +1117,9 @@ private fun ReachCard(
                     ReachabilityState.UNKNOWN -> {
                         Text(
                             when {
-                                errorText.isNotEmpty() -> "可达性接口未取得：$errorText"
-                                r.reasonCode.isNotEmpty() -> r.reasonText("后端没有返回可达性判定（不代表车辆能到）")
-                                else -> "后端没有返回可达性判定（不代表车辆能到）"
+                                errorText.isNotEmpty() -> "可达性暂未知：$errorText"
+                                r.reasonCode.isNotEmpty() -> r.reasonText("可达性暂未知")
+                                else -> "可达性暂未知"
                             },
                             color = t.textSecondary,
                             fontSize = (12 * scale).sp,
@@ -1166,4 +1181,96 @@ private fun StationPicker(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
+}
+
+/**
+ * 三步进度条：圆点 + 连线，当前步高亮、已完成步填实。
+ * 对标货拉拉/滴滴货运下单页的顶部分步指示。
+ */
+@Composable
+private fun StepProgressBar(currentStep: Int) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val labels = listOf("填货物", "拍照确认", "提交完成")
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        labels.forEachIndexed { i, label ->
+            val step = i + 1
+            val done = step < currentStep
+            val active = step == currentStep
+            val dotColor = when {
+                done -> t.primary
+                active -> t.primary
+                else -> t.textTertiary
+            }
+            val textColor = when {
+                done -> t.primary
+                active -> t.ink
+                else -> t.textTertiary
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size((22 * scale).dp)
+                        .clip(RoundedCornerShape(BusRadius.pill))
+                        .background(if (done || active) t.primaryLight else t.track),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (done) {
+                        Icon(BusIcons.check, null, tint = t.primary, modifier = Modifier.size((14 * scale).dp))
+                    } else {
+                        Text(
+                            "$step",
+                            color = dotColor,
+                            fontSize = (12 * scale).sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                Text(
+                    label,
+                    color = textColor,
+                    fontSize = (11.5 * scale).sp,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(start = 5.dp),
+                )
+            }
+            if (i < labels.size - 1) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .padding(horizontal = 6.dp)
+                        .clip(RoundedCornerShape(BusRadius.pill))
+                        .background(if (step < currentStep) t.primary else t.track),
+                )
+            }
+        }
+    }
+}
+
+/** 常见货物名快捷填入芯片行 */
+@Composable
+private fun QuickCargoChips(onPick: (String) -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    ) {
+        QUICK_CARGO_NAMES.take(4).forEach { name ->
+            Text(
+                name,
+                color = t.textSecondary,
+                fontSize = (11.5 * scale).sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(BusRadius.pill))
+                    .background(t.track)
+                    .clickable { onPick(name) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
 }

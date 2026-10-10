@@ -1,6 +1,7 @@
 package com.shanxiang.buspost.ui.user
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -35,6 +37,7 @@ import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusSwitch
 import com.shanxiang.buspost.core.ui.BusTag
+import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.InfoRow
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
@@ -92,7 +95,7 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
     Column {
         BackTopBar(title = "包裹追踪", subtitle = no)
         BusPage(spacedBy = 12.dp) {
-            DemoNote(vm.demo, text = "后端没有这单的实时数据，下面是演示轨迹，仅用于查看交互。")
+            DemoNote(vm.demo, text = "当前为演示轨迹，仅用于查看交互。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load(no) }) }
 
             if (vm.loading && vm.trace == null) {
@@ -109,6 +112,101 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                         onReplan = { vm.load(no) },
                     )
 
+                    // 承运信息卡（对标快递100/菜鸟：车牌+司机+ETA 一目了然）
+                    if (tr.vehiclePlate.isNotEmpty() || tr.driverName.isNotEmpty()) {
+                        BusCard(modifier = Modifier.fillMaxWidth()) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.foundation.layout.Box(
+                                        Modifier.size(40.dp)
+                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(com.shanxiang.buspost.core.ui.BusRadius.m))
+                                            .background(t.goldLight),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(BusIcons.bus, null, tint = t.goldDeep, modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                                        Text(
+                                            tr.vehiclePlate.ifEmpty { "承运车辆" },
+                                            color = t.ink,
+                                            fontSize = (15 * scale).sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        if (tr.driverName.isNotEmpty()) {
+                                            Text(
+                                                "司机：${tr.driverName}",
+                                                color = t.textSecondary,
+                                                fontSize = (12 * scale).sp,
+                                                modifier = Modifier.padding(top = 2.dp),
+                                            )
+                                        }
+                                    }
+                                    val eta = tr.etaMinutes
+                                    if (eta != null && eta > 0) {
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                "$eta",
+                                                color = if (eta <= 5) t.danger else t.primary,
+                                                fontSize = (26 * scale).sp,
+                                                fontWeight = FontWeight.Black,
+                                            )
+                                            Text(
+                                                "分钟后到",
+                                                color = t.textSecondary,
+                                                fontSize = (10.5 * scale).sp,
+                                            )
+                                        }
+                                    }
+                                }
+                                // 路线摘要
+                                if (tr.startStation.isNotEmpty() && tr.endStation.isNotEmpty()) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top = 8.dp)
+                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(com.shanxiang.buspost.core.ui.BusRadius.m))
+                                            .background(t.primaryLight)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(BusIcons.location, null, tint = t.primaryOnLight, modifier = Modifier.size(13.dp))
+                                        Text(
+                                            "${tr.startStation} → ${tr.endStation}" +
+                                                (if (tr.targetStation.isNotEmpty() && tr.targetStation != tr.endStation) " · 到 ${tr.targetStation}" else ""),
+                                            color = t.primaryOnLight,
+                                            fontSize = (11.5 * scale).sp,
+                                            modifier = Modifier.padding(start = 5.dp).weight(1f),
+                                        )
+                                        if (tr.routeName.isNotEmpty()) {
+                                            BusTag(tr.routeName, tone = BusTone.NEUTRAL)
+                                        }
+                                    }
+                                }
+                                // 司机电话（可拨打）
+                                if (tr.driverMobile.isNotEmpty()) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(BusIcons.phone, null, tint = t.primary, modifier = Modifier.size(15.dp))
+                                        Text(
+                                            "联系司机：${tr.driverMobile}",
+                                            color = t.primary,
+                                            fontSize = (12.5 * scale).sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier
+                                                .padding(start = 5.dp)
+                                                .clickable {
+                                                    val dial = Intent(Intent.ACTION_DIAL).apply {
+                                                        data = android.net.Uri.parse("tel:${tr.driverMobile}")
+                                                    }
+                                                    context.startActivity(dial)
+                                                },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     SectionTitle("单号与操作")
                     BusCard(modifier = Modifier.fillMaxWidth()) {
                         Column {
@@ -121,7 +219,7 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                             InfoRow(
                                 label = "最近更新",
                                 value = "${((System.currentTimeMillis() - vm.updatedAgo) / 1000).coerceAtLeast(0)} 秒前" +
-                                    if (vm.autoRefresh) " · 每 30 秒自动刷新" else "",
+                                    (if (vm.autoRefresh) " · 每 30 秒自动刷新" else ""),
                                 icon = BusIcons.clock,
                             )
                         }
@@ -200,12 +298,36 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                                             fontWeight = FontWeight.Bold,
                                         )
                                         Text(
-                                            listOfNotNull(leg.plate.ifEmpty { null }, leg.driverName.ifEmpty { null })
-                                                .joinToString(" · ").ifEmpty { "承运待定" },
+                                            buildString {
+                                                if (leg.plate.isNotEmpty()) append(leg.plate)
+                                                if (leg.driverName.isNotEmpty()) {
+                                                    if (isNotEmpty()) append(" · ")
+                                                    append("司机 ${leg.driverName}")
+                                                }
+                                                if (isEmpty()) append("承运待定")
+                                                val dist = leg.distanceKm
+                                                if (dist != null && dist > 0) {
+                                                    append(" · %.1fkm".format(dist))
+                                                }
+                                                val dur = leg.durationMinutes
+                                                if (dur != null && dur > 0) {
+                                                    append(" · 约${dur}分钟")
+                                                }
+                                            },
                                             color = t.textSecondary,
                                             fontSize = (12 * scale).sp,
                                             modifier = Modifier.padding(top = 3.dp),
                                         )
+                                    }
+                                    val legEta = leg.etaMinutes
+                                    if (legEta != null && legEta > 0 && leg.statusTone != com.shanxiang.buspost.core.ui.BusTone.OK) {
+                                        Text(
+                                            "${legEta}分",
+                                            color = if (legEta <= 5) t.danger else t.primary,
+                                            fontSize = (16 * scale).sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Spacer(Modifier.size(4.dp))
                                     }
                                     BusTag(leg.statusLabel, tone = leg.statusTone)
                                 }

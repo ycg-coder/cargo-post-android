@@ -35,6 +35,7 @@ import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.BusPullRefresh
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.ErrorState
@@ -61,14 +62,25 @@ class OrderDetailViewModel : ScreenViewModel() {
     var trace by mutableStateOf<ParcelTrace?>(null)
     var cancelled by mutableStateOf(false)
     var confirmCancel by mutableStateOf(false)
+    var refreshing by mutableStateOf(false)
+        private set
+
+    fun reload(id: Long) {
+        refreshing = true
+        load(id)
+    }
 
     fun load(id: Long) = work {
-        val list = Repo.productOrders(pageSize = 50)
-        order = list.items.firstOrNull { it.id == id } ?: list.items.firstOrNull()
-        val tr = Repo.productOrderTrace(id)
-        trace = tr.value
-        mergeDemo(list.demo, tr.demo)
-        error = list.error ?: tr.error
+        try {
+            val list = Repo.productOrders(pageSize = 50)
+            order = list.items.firstOrNull { it.id == id } ?: list.items.firstOrNull()
+            val tr = Repo.productOrderTrace(id)
+            trace = tr.value
+            mergeDemo(list.demo, tr.demo)
+            error = list.error ?: tr.error
+        } finally {
+            refreshing = false
+        }
     }
 
     /** 取消之后重新读后端：状态与时间线都以后端回读为唯一真值，不在本机把订单改成"已取消" */
@@ -93,6 +105,7 @@ fun OrderDetailScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
 
     Column {
         BackTopBar(title = vm.order?.statusLabel ?: "订单详情", subtitle = vm.order?.orderNo)
+        BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload(id) }) {
         BusPage(spacedBy = 12.dp) {
             DemoNote(vm.demo, text = "这单来自本地演示集，取消与追踪只在演示数据里生效。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load(id) }) }
@@ -172,6 +185,7 @@ fun OrderDetailScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
             }
             Spacer(Modifier.height(8.dp))
         }
+    }
     }
 
     if (vm.confirmCancel) {

@@ -364,7 +364,7 @@ fun DriverNavScreen(vm: DriverNavViewModel = viewModel()) {
         if (roadOk) {
             SectionTitle("全程指引", subtitle = "共 ${g.steps.size} 条")
             if (g.steps.isEmpty()) {
-                Text("后端未返回指引步骤", color = t.textTertiary, fontSize = (13 * scale).sp)
+                Text("暂无指引步骤", color = t.textTertiary, fontSize = (13 * scale).sp)
             }
             g.steps.forEachIndexed { i, s ->
                 StepRow(
@@ -438,7 +438,7 @@ private fun NavHud(
                 Text("第 ${index + 1}/${total} 段", color = Color.White.copy(alpha = 0.65f), fontSize = (11.5 * scale).sp)
                 Text(
                     // 只有通过真实道路校验的 roadEtaSeconds 才会是非 null；没有就是没有，不写"约 0 分钟"
-                    etaMinutes?.let { "全程约 $it 分钟" } ?: "全程时长未给",
+                    etaMinutes?.let { "全程约 $it 分钟" } ?: "全程时长暂未知",
                     color = t.gold,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 3.dp),

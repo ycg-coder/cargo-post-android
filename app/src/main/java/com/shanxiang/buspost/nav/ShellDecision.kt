@@ -15,12 +15,14 @@ import com.shanxiang.buspost.data.model.Role
  */
 
 /**
- * 冷启动的起点：**未登录永远进登录页**，即使本机还残留着上一位用户的 `role=DRIVER`。
- * 原来这里就是 `when { !loggedIn -> LOGIN; role == DRIVER -> DRIVER_SHELL; else -> USER_SHELL }`，
- * 抽出来是为了把"残留角色不得越过登录态"这条钉成用例（清会话见 `Prefs.clearSession`）。
+ * 冷启动的起点：**未登录进游客模式（USER_SHELL）**，首页实时公交完整开放，
+ * 商城/快递/寄货等交易动作弹登录窗（2026-10-10 对标主流 App 游客体验）。
+ * 旧写法 `!loggedIn -> LOGIN` 强制先登录才能看任何内容，等于把"看看附近有没有公交"
+ * 这种零成本动作挡在注册墙后面 —— 主流 App（高德/车来了/货拉拉）全部先展示再引导注册。
+ * 司机角色仍走 DRIVER_SHELL（不变）；残留角色在 `reconcileRole` 里降级。
  */
 internal fun startDestinationFor(loggedIn: Boolean, role: Role): String = when {
-    !loggedIn -> Routes.LOGIN
+    !loggedIn -> Routes.USER_SHELL
     role == Role.DRIVER -> Routes.DRIVER_SHELL
     else -> Routes.USER_SHELL
 }

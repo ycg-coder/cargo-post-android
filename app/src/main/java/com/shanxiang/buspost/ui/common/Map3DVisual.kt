@@ -141,7 +141,7 @@ object Map3DVisual {
     /** 朝向的可读形式：未给就明说未给，不写"正北" */
     fun headingText(headingDegrees: Double?): String {
         val normalized = rotateOf(headingDegrees)
-            ?: return "朝向未给（定位源没有给出 bearing）"
+            ?: return "朝向暂未知"
         // 四舍五入可能把 359.6° 抬成 360°，而 360° 与 0° 是同一个方向：显示上收回来，别写出一个不存在的角
         val shown = normalized.roundToInt().let { if (it == 360) 0 else it }
         return "朝向 $shown°（GPS）"

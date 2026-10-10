@@ -84,6 +84,7 @@ class GoodsViewModel : ScreenViewModel() {
     var allProducts by mutableStateOf<List<Product>>(emptyList())
     var categoryIndex by mutableStateOf(0)
     var query by mutableStateOf("")
+    var sortIndex by mutableStateOf(0)
     var pageNo by mutableStateOf(1)
     var total by mutableStateOf(0)
     var refreshing by mutableStateOf(false)
@@ -91,11 +92,20 @@ class GoodsViewModel : ScreenViewModel() {
     var loadError by mutableStateOf(false)
 
     val categories: List<String> = listOf("全部", "水果", "蔬菜", "禽蛋", "茶叶", "干货")
+    val sortOptions: List<String> = listOf("综合", "价格↑", "价格↓", "销量")
     val hasMore: Boolean get() = allProducts.size < total
 
-    val shown: List<Product> get() = allProducts.filter { p ->
-        (categoryIndex == 0 || matchCategory(p) == categoryIndex) &&
-            (query.isBlank() || p.name.contains(query) || p.subtitle.contains(query) || p.village.contains(query))
+    val shown: List<Product> get() {
+        val filtered = allProducts.filter { p ->
+            (categoryIndex == 0 || matchCategory(p) == categoryIndex) &&
+                (query.isBlank() || p.name.contains(query) || p.subtitle.contains(query) || p.village.contains(query))
+        }
+        return when (sortIndex) {
+            1 -> filtered.sortedBy { it.price }
+            2 -> filtered.sortedByDescending { it.price }
+            3 -> filtered.sortedByDescending { it.sales ?: 0 }
+            else -> filtered
+        }
     }
 
     fun reload() {
@@ -193,6 +203,36 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                 item {
                     // 分类横滑胶囊（对齐 goods.wxml:22-32 .category-scroll）
                     FilterChipRow(vm.categories, vm.categoryIndex, onSelect = { vm.categoryIndex = it })
+                }
+
+                item {
+                    // 排序条（对标主流电商：综合/价格/销量）
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        vm.sortOptions.forEachIndexed { i, label ->
+                            val on = i == vm.sortIndex
+                            Text(
+                                label,
+                                color = if (on) t.primaryOnLight else t.textSecondary,
+                                fontSize = (12 * scale).sp,
+                                fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(BusRadius.pill))
+                                    .background(if (on) t.primaryLight else Color.Transparent)
+                                    .clickable { vm.sortIndex = i }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "共 ${vm.shown.size} 件",
+                            color = t.textTertiary,
+                            fontSize = (11 * scale).sp,
+                        )
+                    }
                 }
 
                 item { DemoNote(vm.demo) }
@@ -313,18 +353,38 @@ private fun GoodsCard(p: Product, modifier: Modifier = Modifier, onClick: () -> 
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 8.dp),
         )
-        // 产地村 + 价格行（对齐 goods.wxml:79-89：pin + 村名 → ¥价 / 单位）
+        // 副标题（商品卖点）
+        if (p.subtitle.isNotEmpty()) {
+            Text(
+                p.subtitle,
+                color = t.textTertiary,
+                fontSize = (10.5 * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        // 产地村 + 销量行
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(BusIcons.location, null, tint = t.goldDeep, modifier = Modifier.size(11.dp))
             Text(
-                p.fromVillage,
+                p.village.ifEmpty { p.fromVillage },
                 color = t.textSecondary,
                 fontSize = (11 * scale).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 2.dp),
+                modifier = Modifier.padding(start = 2.dp).weight(1f),
             )
+            val sales = p.sales
+            if (sales != null && sales > 0) {
+                Text(
+                    "已售 ${if (sales >= 1000) "${sales / 1000}k" else sales}",
+                    color = t.textTertiary,
+                    fontSize = (10 * scale).sp,
+                )
+            }
         }
+        // 价格行（有原价时显示划线价）
         Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.Bottom) {
             PriceText(formatPrice(p.price), size = 16)
             Text(
@@ -332,6 +392,27 @@ private fun GoodsCard(p: Product, modifier: Modifier = Modifier, onClick: () -> 
                 color = t.textTertiary,
                 fontSize = (11 * scale).sp,
                 modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
+            )
+            val orig = p.originPrice
+            if (orig != null && orig > p.price) {
+                Text(
+                    "¥${formatPrice(orig)}",
+                    color = t.textTertiary,
+                    fontSize = (10 * scale).sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
+                )
+            }
+        }
+        // 库存提示（低库存营造紧迫感，对标主流电商）
+        val stock = p.stock
+        if (stock != null && stock in 1..5) {
+            Text(
+                "仅剩 $stock ${p.unit}",
+                color = t.danger,
+                fontSize = (10 * scale).sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 3.dp),
             )
         }
     }

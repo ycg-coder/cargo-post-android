@@ -230,51 +230,91 @@ private fun ArrivalAlertBlock(arrivals: List<SendOrder>, onOpen: (String) -> Uni
     val scale = LocalBusFontScale.current
     val context = LocalContext.current
     var notifyOn by remember { mutableStateOf(Prefs.arrivalAlertEnabled) }
+    var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        BusCard(modifier = Modifier.fillMaxWidth(), warm = arrivals.isNotEmpty()) {
+        BusCard(
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+            warm = arrivals.isNotEmpty(),
+            padding = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(BusIcons.bell, null, tint = if (notifyOn) t.primary else t.textTertiary, modifier = Modifier.size(20.dp))
-                Column(Modifier.weight(1f).padding(start = 9.dp)) {
-                    Text("到车提醒", color = t.ink, fontSize = (14.5 * scale).sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        // 换行点写死在语义边界：这一格只有 236dp 宽，让系统按宽度断会把「通知栏」劈成两半
-                        if (notifyOn) "后台每 15 分钟检查一次\n车到站前 10 分钟系统通知栏提醒"
-                        else "开启后即使没打开 App\n也会在通知栏提醒（安卓专属能力）",
-                        color = t.textSecondary,
-                        fontSize = (11.5 * scale).sp,
-                        modifier = Modifier.padding(top = 3.dp),
-                    )
+                Icon(BusIcons.bell, null, tint = if (notifyOn) t.primary else t.textTertiary, modifier = Modifier.size(18.dp))
+                Text(
+                    "到车提醒",
+                    color = t.ink,
+                    fontSize = (14 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp).weight(1f),
+                )
+                if (arrivals.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(BusRadius.pill))
+                            .background(t.primaryLight)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            "${arrivals.size} 辆",
+                            color = t.primary,
+                            fontSize = (11.5 * scale).sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
-                BusSwitch(
-                    checked = notifyOn,
-                    onCheckedChange = {
-                        notifyOn = it
-                        Prefs.arrivalAlertEnabled = it
-                        NotifyWorker.runNow(context)
-                    },
+                Icon(
+                    if (expanded) BusIcons.expandLess else BusIcons.expandMore,
+                    null,
+                    tint = t.textSecondary,
+                    modifier = Modifier.size(18.dp).padding(start = 8.dp),
                 )
             }
-        }
-        arrivals.take(2).forEach { a ->
-            val eta = a.carrierEtaMinutes
-            TicketCard(
-                serial = a.orderNo,
-                stubValue = eta?.toString() ?: "—",
-                // 后端 `/send/page` 的 carrierEtaMinutes 是直线估算，标签写死口径（§68 + 硬规则）
-                // 副券只有 92dp 宽，让它按语义换行而不是按宽度断行（"分钟到站（直 / 线估算）"）
-                stubLabel = if (eta != null) "分钟到站\n（直线估算）" else "到站时间未给",
-                stubColor = if (eta != null && eta <= 5) t.danger else t.primary,
-                onClick = { onOpen(a.orderNo) },
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(a.targetStation.ifEmpty { "目标站点" }, color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        listOf(a.vehiclePlate, a.shiftCode, a.statusLabel).filter { it.isNotEmpty() }.joinToString(" · ").ifEmpty { "已排班" },
-                        color = t.textSecondary,
-                        fontSize = (12 * scale).sp,
-                        modifier = Modifier.padding(top = 3.dp),
+            // 展开后显示说明文字和开关
+            if (expanded) {
+                Text(
+                    if (notifyOn) "后台每 15 分钟检查一次，车到站前 10 分钟系统通知栏提醒"
+                    else "开启后即使没打开 App 也会在通知栏提醒（安卓专属能力）",
+                    color = t.textSecondary,
+                    fontSize = (11.5 * scale).sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Row(
+                    Modifier.padding(top = 8.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("通知开关", color = t.textSecondary, fontSize = (12.5 * scale).sp)
+                    BusSwitch(
+                        checked = notifyOn,
+                        onCheckedChange = {
+                            notifyOn = it
+                            Prefs.arrivalAlertEnabled = it
+                            NotifyWorker.runNow(context)
+                        },
                     )
-                    SourceTag(a.dataSource, Modifier.padding(top = 5.dp))
+                }
+            }
+        }
+        // 展开时才显示到车列表
+        if (expanded) {
+            arrivals.take(2).forEach { a ->
+                val eta = a.carrierEtaMinutes
+                TicketCard(
+                    serial = a.orderNo,
+                    stubValue = eta?.toString() ?: "—",
+                    stubLabel = if (eta != null) "分钟到站\n（直线估算）" else "暂未知",
+                    stubColor = if (eta != null && eta <= 5) t.danger else t.primary,
+                    onClick = { onOpen(a.orderNo) },
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(a.targetStation.ifEmpty { "目标站点" }, color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            listOf(a.vehiclePlate, a.shiftCode, a.statusLabel).filter { it.isNotEmpty() }.joinToString(" · ").ifEmpty { "已排班" },
+                            color = t.textSecondary,
+                            fontSize = (12 * scale).sp,
+                            modifier = Modifier.padding(top = 3.dp),
+                        )
+                        SourceTag(a.dataSource, Modifier.padding(top = 5.dp))
+                    }
                 }
             }
         }
@@ -350,7 +390,7 @@ private fun SendCard(s: SendOrder, onConfirmStation: () -> Unit, onClick: () -> 
                     Text(
                         // carrierEtaMinutes = Haversine 直线公里 ÷ 25km/h（后端 GeoDistanceUtil），不是道路 ETA，文案必须带口径
                         "车快到了 · 距${s.targetStation.ifEmpty { "目标站" }}" +
-                            (s.carrierEtaMinutes?.let { "约 $it 分钟（直线估算）" } ?: "到站分钟未下发") +
+                            (s.carrierEtaMinutes?.let { "约 $it 分钟（直线估算）" } ?: "时间暂未知") +
                             "，请提前到站点等候",
                         color = t.primaryOnLight,
                         fontSize = (11.5 * scale).sp,

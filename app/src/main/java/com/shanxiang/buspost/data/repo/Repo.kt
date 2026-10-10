@@ -1125,7 +1125,7 @@ object Repo {
         val accepted = if (serverAvailable) (check as? RouteCheck.Accepted)?.route else null
         val unavailable = (check as? RouteCheck.Rejected)?.reason
             ?: if (!serverAvailable) {
-                o.multiStr("routeUnavailableReason").ifEmpty { "后端没有可用的真实道路路线" }
+                o.multiStr("routeUnavailableReason").ifEmpty { "暂无可用路线" }
             } else null
 
         val nextIdx = (current + 1).coerceAtMost(steps.size - 1)
