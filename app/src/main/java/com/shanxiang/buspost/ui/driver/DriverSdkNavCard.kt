@@ -71,6 +71,7 @@ fun DriverSdkNavCard(
     vehicleGeo: Geo?,
     onToast: (String) -> Unit,
     onOpenLaneGuide: () -> Unit = {},
+    inTransit: Boolean = false,
 ) {
     val context = LocalContext.current
     val t = LocalBusTokens.current
@@ -120,6 +121,29 @@ fun DriverSdkNavCard(
         hasOrigin = vehicleGeo != null,
         hasNavigableDestination = nextStop != null,
     )
+
+    /**
+     * 用户口径 v3「发车之后开始导航」：本次运行里班次从"没在跑"翻成"在跑"，
+     * 且三件齐了（引擎可用 + 有真实起点 + 调度给了未完成且有坐标的任务点）就自己进导航页。
+     * 冷启动时班次本来就在途的不算"刚发车"（armed 初值 = !inTransit），
+     * 否则司机只是重开 App 就被糊一脸全屏导航。缺任何一件就留在工作台，绝不拿假起点凑一次跳转。
+     */
+    var autoGuideArmed by remember { mutableStateOf(!inTransit) }
+    LaunchedEffect(autoGuideArmed, gate.canNavigate, nextStop?.stationId) {
+        val stop = nextStop ?: return@LaunchedEffect
+        if (!autoGuideArmed || !gate.canNavigate) return@LaunchedEffect
+        autoGuideArmed = false
+        android.util.Log.i("BUS_UI", "auto_open_guide stop=${stop.stationId} origin=${vehicleGeo?.lat},${vehicleGeo?.lng}")
+        AppState.openGuide(
+            AppState.GuideTarget(
+                lat = stop.geo.lat,
+                lng = stop.geo.lng,
+                name = stop.name.ifEmpty { "任务点#${stop.stationId}" },
+                stationId = stop.stationId,
+            ),
+        )
+        onOpenLaneGuide()
+    }
 
     // 界面上不再念诊断原文（引擎 / 算路 / 回执 / 字段名一律不进界面），
     // 但这些读数排障时必须有 —— 全部字段化进 logcat：adb logcat -s BUS_UI BUS_NAV
