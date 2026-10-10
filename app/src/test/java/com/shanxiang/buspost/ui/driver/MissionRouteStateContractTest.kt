@@ -99,7 +99,7 @@ class MissionRouteStateContractTest : ServerTest() {
         val roadReason = "第 2 段（共 3 段）暂无真实道路，折线已在此截断"
         val text = MissionMarkers.missionRouteReasonOf(PolylinePhase.Asked, null, roadReason)
         assertTrue(text, text.startsWith(roadReason))
-        assertTrue(text, text.contains("任务点的位置与顺序仍按后端下发"))
+        assertTrue(text, text.contains("站点与顺序仍按调度安排显示"))
     }
 
     /** 问过、没失败、后端也没给原因 = 本机手里没有任何结论，兜底那格谁都不指责 */
@@ -230,7 +230,7 @@ class MissionRouteStateContractTest : ServerTest() {
         assertEquals("重庆 OSM · GraphHopper没有返回道路折线", vm.guide!!.routeUnavailableReason)
         val text = MissionMarkers.missionRouteReasonOf(vm.routePhase, vm.routeFailure, vm.guide!!.routeUnavailableReason)
         assertTrue(text, text.startsWith("重庆 OSM · GraphHopper没有返回道路折线"))
-        assertTrue(text, text.contains("任务点的位置与顺序仍按后端下发"))
+        assertTrue(text, text.contains("站点与顺序仍按调度安排显示"))
         assertTrue(MissionMarkers.paths(vm.guide!!).isEmpty())
     }
 

@@ -136,7 +136,7 @@ object MissionMarkers {
         failure != null ->
             "这一班的路线这次没问到：$failure。这不是后端说没有路线，这里也不画任何示意线。"
         roadReason != null ->
-            "$roadReason；这里不画任何示意线，任务点的位置与顺序仍按后端下发。"
+            "$roadReason；这里不画任何示意线，站点与顺序仍按调度安排显示。"
         else ->
             "现在没有可画的真实道路折线（没有证据表明后端说过它有），这里不画任何示意线。"
     }
