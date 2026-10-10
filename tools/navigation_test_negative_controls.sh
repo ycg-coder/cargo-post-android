@@ -27,7 +27,7 @@ JVMARGS='-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK'
 # 注意：这一本只跑 CLS 里列出的类。新增用例本若忘了加进来，针对它的注入会报「用例仍然全绿」，
 #   看着像负控失效，其实是根本没跑到（M37 第一次就是这么假失败的）。
 CLS='--tests com.shanxiang.buspost.core.navigation.NavigationContractTest --tests com.shanxiang.buspost.core.navigation.AutoGuideDecisionTest'
-XML=app/build/test-results/testDebugUnitTest/TEST-com.shanxiang.buspost.core.navigation.NavigationContractTest.xml
+XML="app/build/test-results/testDebugUnitTest/TEST-com.shanxiang.buspost.core.navigation.NavigationContractTest.xml app/build/test-results/testDebugUnitTest/TEST-com.shanxiang.buspost.core.navigation.AutoGuideDecisionTest.xml"
 BAK=/tmp/nav_neg_bak.$$
 mkdir -p "$BAK"; cp "$NE" "$BAK/"
 trap 'cp "$BAK/NavigationEngine.kt" "$NE"; rm -rf "$BAK"; negctl_release' EXIT
@@ -54,11 +54,17 @@ PY
 fails() { # 失败数只从测试产物读，不读 gradle 的措辞
   python - "$1" <<'PY'
 import sys, os, xml.etree.ElementTree as ET
-p = sys.argv[1]
-if not os.path.exists(p):
+# 汇总 CLS 里跑到的**所有**用例本：只看一份 XML 会让新加的测试本看不见，
+# 于是注入明明把 gradle 打红了（exit=1），计数却还是 0/58，整条负控被报成「两者不一致」。
+files = [f for f in sys.argv[1:] if os.path.exists(f)]
+if not files:
     print("NOXML"); raise SystemExit
-r = ET.parse(p).getroot()
-print("%s/%s" % (int(r.get("failures")) + int(r.get("errors")), r.get("tests")))
+bad = tot = 0
+for f in files:
+    r = ET.parse(f).getroot()
+    bad += int(r.get("failures") or 0) + int(r.get("errors") or 0)
+    tot += int(r.get("tests") or 0)
+print("%s/%s" % (bad, tot))
 PY
 }
 
@@ -72,10 +78,10 @@ case_run() { # $1=编号 $2=破口说明
   # red 那条命令根本没执行、源码还是基线；这时 gradle 跑的是没改过的代码，全绿会被记成
   # 「✘ 用例仍然全绿，这条判据证明不了任何东西」——一条假发现。red 里的字节比对挡不住这种，因为比对压根没跑到。
   cmp -s "$BAK/NavigationEngine.kt" "$NE" && { echo "✘ $1 注入没落地：源码与基线逐字节相同（空跑），拒绝跑 gradle，更拒绝记成判据失效"; exit 5; }
-  rm -f "$XML"
+  rm -f $XML
   ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > "/tmp/nav_neg_$1.log" 2>&1
   code=$?
-  n=$(fails "$XML")
+  n=$(fails $XML)
   if [ "$n" = "NOXML" ]; then
     echo "✘ $1  $2 → 没有测试产物（多半是编译破了而不是语义破了），这条不算证词"
   elif [ "$code" != 0 ] && [ "${n%/*}" != "0" ]; then
@@ -91,7 +97,7 @@ case_run() { # $1=编号 $2=破口说明
 echo "[基线]"; ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > /tmp/nav_neg_baseline.log 2>&1
 BASE=$?
 if [ "$BASE" != 0 ]; then echo "✘ 基线就红（exit=$BASE），下面每条都失去意义"; exit 1; fi
-echo "  ✔ 基线 exit=0 failures=$(fails "$XML")"
+echo "  ✔ 基线 exit=0 failures=$(fails $XML)"
 echo
 
 # M1 把"高德没给步骤号"伪造成本机推进的起点（-1 → 0）
@@ -485,5 +491,5 @@ echo
 cmp -s "$BAK/NavigationEngine.kt" "$NE" && echo "✔ 恢复核对：与改前基线逐字节相同" || echo "✘ 恢复失败：源码与基线不一致"
 ./gradlew $JVMARGS :app:testDebugUnitTest $CLS > /tmp/nav_neg_after.log 2>&1
 AFTER=$?
-echo "[恢复后复跑] exit=$AFTER failures=$(fails "$XML")"
+echo "[恢复后复跑] exit=$AFTER failures=$(fails $XML)"
 [ "$AFTER" = 0 ] && echo "✔ 全部破口已回滚，用例重新全绿" || { echo "✘ 恢复后仍红，本轮未收口"; exit 1; }
