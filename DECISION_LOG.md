@@ -5527,3 +5527,14 @@ canonical 仍是 D-070 §3 那一发。
 - 今天 master 上与 App 直接相关的三条（已逐条核）：① `sql/incremental/V027__idempotency_unique_keys.sql` 给 `transport_leg(plan_id, order_id, leg_sequence)` 加唯一键 + `snapshot_hash` ⇒ **可能推翻台账里"后端无可复用幂等键 ⇒ 客户端 ActionGate"的前提**，对齐后要重验 V-1 那族判据；② `fix(web)` 把监控车辆状态改成 `0 空闲 / 1 在途 / 2 停用` 映射 ⇒ 与 App 的 `check_status_probes.sh` 状态映射族同口径，要对照 App 侧是否也错过这一档；③ 新加的 `graph_version` 经远端检索**只住在 Python `algorithm/`（routing models / geometry cache / road OD cache）**，Java 侧 `AppDriverRouteRespVO` 仍不发给 App ⇒ 本轮"App 面没有新鲜度键、graphVersion 有意不做"那条结论**仍然成立，不改**。
 - **本机不能重打后端**：`mvn` 不在 PATH、仓库**没有 maven wrapper**（`~/.m2/repository` 有 504 MB 缓存但没有构建器）。⇒ "把后端对齐到 master 并跑 V027"这一步需要装 Maven 或用远端 CI 产物；"连真实云上后端"则需要用户给 https 地址与可用账号（共享机 1.15.29.107 按用户口径只读）。
 - 待用户定的三件：A Android 推到哪（新建 `cgp-team/cargo-post-android` 还是先放私有暂存库）；B 后端是否先对齐 master（含 V027 迁移与重打 jar）；C 真实云后端 https 地址 + 账号。
+
+
+## D-073 · Android 工程 git 化并推到远端；CI 第一次跑就抓出 Windows 丢可执行位（2026-10-10 12:4x）
+
+- 用户给出目标仓 `cgp-team/cargo-post-platform`（**后端仓**）。org 内只有 3 个库、**没有 Android 库**，而 `ycg-coder` 在 org 无 admin ⇒ 建 `cgp-team/cargo-post-android` 被 403 挡；实测对 `cgp-team/cargo-post-platform` 的权限是 `push=true / admin=false`（可以开分支提 PR，不能建库）。经用户选 **方案 A**：先落个人私有库，等管理员配合 transfer。
+- **git 化是真实起点，不是伪造历史**：`cargo-post-android` 此前不是 git 仓库（回滚靠工程根 `*.bak-*`）。`git init -b main` + 首个提交 `d12b419`（1088 文件）。入库前逐条核：暂存区内 `local.properties` / `*.jks` / `*.keystore` / `keystore.properties` / `app/build` / `.gradle` **0 命中**；`*.bak-*`、`*.r69bak`、`_src-backups/` 写进 `.gitignore`（**磁盘上的副本一个没删**，转移完成前它们仍是唯一回滚点）；`docs/device-evidence`（83 MB）按原样入库，因为判据与台账按路径引用这些真机截图/节点树/logcat，证据链必须跟着代码走。
+- Secrets 6 项按用户授权注入（值只走 stdin，不进任何文件与日志）：`SIGNING_KEYSTORE_B64`（工程外 `buspost-release.jks` 的 base64）、`SIGNING_STOREPASSWORD`、`SIGNING_KEYALIAS`、`SIGNING_KEYPASSWORD`、`AMAP_ANDROID_KEY`、`AMAP_WEB_KEY`。注意 `gh secret set` 会把名字**规范成大写**（`SIGNING_STOREPASSWORD` 而非 `SIGNING_STOREPassword`），工作流里必须按实际名字引用。
+- 新工作流 `.github/workflows/build-and-release.yml`：`verify` 跑用例 + 24 本判据 + 台账表格自检 + debug 包；`release` **只 `workflow_dispatch`**，缺签名项或非 https baseUrl 直接 `exit 1`（**不许静默出未签名包冒充成品**），出包后扫 dex 断言"给定 baseUrl 命中 > 0 且 `127.0.0.1/localhost/10.0.2.2/1.15.29.107` 全 0"。签名材料还原到**工程之外**的 `../buspost-signing-backup/`，并断言源码树内 jks 命中数为 0 —— 红线在 CI 里也守。
+- **CI 第一次跑就红，而且是真缺陷**：`单元测试` 步骤 `exit 126` = 命令存在但**不可执行**。根因是 Windows 上提交时 `gradlew` 记成了 `100644`，Linux runner 上 `./gradlew` 直接 permission denied。修法 `git update-index --chmod=+x gradlew`（复验 `git ls-files -s gradlew` = **100755**）。⚠ durable：**本机（Windows）git 化后，任何要在 Linux CI 里直接 `./xxx` 跑的脚本都得补 +x**，本地能跑不代表远端能跑；这一族和"我的命令行给了什么 ≠ 包里是什么"是同一类错误。
+- 交接文档落 `docs/GITHUB_DEPLOY_HANDOFF.md`（转移两步、出包命令、以及"云上账号未解决 + 源仓 DEMO_GUIDE 口令已过期 + 本机后端落后 master"三条实测事实）。
+- NEXT：① 等这次重推后的 CI 变绿（126 修完还有 SDK/判据在 Linux 上能不能跑这两关没验）；② #7 界面话术收口；③ #8 拍照上传真机闭环；④ 管理员配合 transfer 后手动触发 release。

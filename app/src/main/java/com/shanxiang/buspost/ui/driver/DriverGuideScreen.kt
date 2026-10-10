@@ -279,7 +279,7 @@ private fun guidePhaseDetail(p: GuidePhase, destination: String): String = when 
     is GuidePhase.NoFix ->
         "本机还没有定位点，算不出起点。请先在工作台打开「位置上报（前台服务）」，等坐标出现后再进这一页。"
     is GuidePhase.Calculating -> "正在向高德请求真实道路…"
-    is GuidePhase.EngineBlocked -> "本机导航引擎不可用：${p.reason}"
+    is GuidePhase.EngineBlocked -> "导航组件不可用：${p.reason}"
     is GuidePhase.Refused -> "高德没能给出可用道路：${p.reason}"
     is GuidePhase.Ready ->
         "已就绪：前往${destination.ifEmpty { "任务点" }}（高德道路 ${p.roadMeters} 米 / " +

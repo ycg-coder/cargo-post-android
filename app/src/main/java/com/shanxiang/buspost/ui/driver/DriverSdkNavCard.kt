@@ -125,7 +125,7 @@ fun DriverSdkNavCard(
         Column {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text(
-                    "本机导航引擎（高德路网）",
+                    "导航状态（高德）",
                     color = t.ink,
                     fontSize = (14.5 * scale).sp,
                     fontWeight = FontWeight.Bold,
@@ -141,10 +141,10 @@ fun DriverSdkNavCard(
             }
             // 不可用时**不再在副标题重复状态**：上面那颗 chip 已经带了具体原因，
             // 而 `gate.detail` 是诊断原文（形如 `hasOrigin=false（…）`），摆在主面上等于把内部字段名给司机看。
-            // 原文没删，挪到下面「展开本机引擎详情」里那一格（诊断信息该待的地方）。
+            // 原文没删，挪到下面「展开更多」里那一格（诊断信息该待的地方）。
             if (gate.canNavigate) {
                 Text(
-                    "后端线路之外的备用算路：把车当前位置交给高德，取回真实道路折线与剩余里程。",
+                    "调度没给线路时，按当前车位让高德重新规划，给出剩余里程和预计到达。",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 4.dp),
@@ -181,7 +181,7 @@ fun DriverSdkNavCard(
             // 把"怎么走"这件正事的注意力全吃掉了 —— 工作台首屏因此永远看不到底下真正要按的东西。
             // 现在默认只留两行摘要，需要时再展开；信息一条都没删，只是从"一直占着屏"变成"要的时候在"。
             BusButton(
-                text = if (detailExpanded) "收起本机引擎详情" else "展开本机引擎详情（定位 · 算路 · 实时回执 · 车道）",
+                text = if (detailExpanded) "收起更多" else "展开更多（定位 · 路线 · 里程 · 车道）",
                 variant = BusButtonVariant.TEXT,
                 icon = if (detailExpanded) BusIcons.expandLess else BusIcons.expandMore,
                 small = true,
@@ -191,7 +191,7 @@ fun DriverSdkNavCard(
             if (!detailExpanded) {
                 // 收起态也必须回答"现在到底在不在导 / 还差多远"这两问，否则整张卡等于什么都没说
                 // 收起态这行只说"差在哪"，不再把 chip 那句前缀复读一遍
-                InfoRow("本机引擎", if (gate.canNavigate) gate.userText else gate.reason)
+                InfoRow("导航", if (gate.canNavigate) gate.userText else gate.reason)
                 InfoRow(
                     "剩余里程",
                     sdkFrame?.let { if (it.hasRemainDistance) formatSdkMeters(it.remainMeters) else "高德没给" }
