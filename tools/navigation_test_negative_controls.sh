@@ -24,7 +24,9 @@ negctl_lock "$(basename "$0")" || exit 3
 cd "$ROOT" || exit 2
 NE=app/src/main/java/com/shanxiang/buspost/core/navigation/NavigationEngine.kt
 JVMARGS='-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK'
-CLS='--tests com.shanxiang.buspost.core.navigation.NavigationContractTest'
+# 注意：这一本只跑 CLS 里列出的类。新增用例本若忘了加进来，针对它的注入会报「用例仍然全绿」，
+#   看着像负控失效，其实是根本没跑到（M37 第一次就是这么假失败的）。
+CLS='--tests com.shanxiang.buspost.core.navigation.NavigationContractTest --tests com.shanxiang.buspost.core.navigation.AutoGuideDecisionTest'
 XML=app/build/test-results/testDebugUnitTest/TEST-com.shanxiang.buspost.core.navigation.NavigationContractTest.xml
 BAK=/tmp/nav_neg_bak.$$
 mkdir -p "$BAK"; cp "$NE" "$BAK/"
