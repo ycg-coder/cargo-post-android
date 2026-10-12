@@ -25,6 +25,8 @@ object Routes {
     const val PARCEL = "parcel"
     /** #54：`Repo.myArrangements()`（`GET /send/arrangements`）此前零消费者，这一页把它接上 */
     const val ARRANGEMENTS = "arrangements"
+    /** #56：钱包余额与交易记录，**只读**（写口的三个理由见 `Repo.walletTransactions()` 注释与台账 D-086） */
+    const val WALLET = "wallet"
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val ADDRESS = "address"

@@ -46,6 +46,7 @@ import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
 import com.shanxiang.buspost.ui.user.ArrangementsScreen
 import com.shanxiang.buspost.ui.user.ParcelTicketScreen
+import com.shanxiang.buspost.ui.user.WalletScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
 import com.shanxiang.buspost.core.about.PolicyKind
@@ -154,6 +155,8 @@ fun BusPostRoot() {
         composable(Routes.PARCEL) { com.shanxiang.buspost.ui.common.BusRouteBody { ParcelScreen(standalone = true) } }
         composable(Routes.NOTIFICATIONS) { com.shanxiang.buspost.ui.common.BusRouteBody { NotificationScreen() } }
         composable(Routes.ARRANGEMENTS) { com.shanxiang.buspost.ui.common.BusRouteBody { ArrangementsScreen() } }
+        // #56 钱包：只读余额与流水。写口（充值/余额支付）这一版不开，理由写在页面上而不是藏起来
+        composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }
         composable(Routes.PROFILE) { com.shanxiang.buspost.ui.common.BusRouteBody { ProfileScreen() } }
         composable(Routes.ADDRESS) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen() } }
         composable(Routes.ADDRESS_SELECT) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen(select = true) } }

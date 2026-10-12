@@ -1660,6 +1660,81 @@ data class Earnings(
     val totalWeightText: String get() = totalWeight?.let { "${yuan(it)} kg" } ?: "后端无此口径"
 }
 
+/**
+ * 用户钱包余额（`AppWalletController.balance():32-43`）。四个键都是 DO 上的 `BigDecimal`
+ * （`transport_wallet_account`：`balance/frozen_amount/total_recharge/total_spent`），
+ * 后端每次都 put 四个键，但值本身可空 ⇒ 一律可空读法：金额缺席绝不许显示 `¥0.00`
+ * （"真零"与"没给"是两格，与 [Earnings] 同一口径，F-2 §五）。
+ */
+data class WalletBalance(
+    val balance: Double? = null,
+    val frozenAmount: Double? = null,
+    val totalRecharge: Double? = null,
+    val totalSpent: Double? = null,
+) {
+    companion object {
+        fun parse(o: JSONObject) = WalletBalance(
+            balance = o.multiNumOrNull("balance"),
+            frozenAmount = o.multiNumOrNull("frozenAmount"),
+            totalRecharge = o.multiNumOrNull("totalRecharge"),
+            totalSpent = o.multiNumOrNull("totalSpent"),
+        )
+    }
+}
+
+/**
+ * 一条钱包流水（`AppWalletController.transactions():81-103`）。
+ *
+ * ⚠ 三条如实性约束（都是读后端读出来的，不是猜的）：
+ * · `payMethod` 是后端**写进去的那个词**（`WalletServiceImpl:53-58` 的 `/recharge` 那一支把渠道写成 `"alipay"`），
+ *   表里**没有"是否模拟/来源"列**（`V028__wallet_tables.sql:21-41`）⇒ 页面只照抄这个词，
+ *   不许补一句"已通过该渠道扣款"——那正是后端没能区分的那件事（台账 D-086 的后端缺口那格）。
+ * · `status` 是**数字**（`0=处理中 1=成功 2=失败`，含义只存在于建表注释里，`J/enums` 无 wallet/pay 枚举类）
+ *   ⇒ 码→文案在纯层照抄注释，未知码原样带出，缺席念"后端没给"。
+ * · `createTime` 来自 `BaseDO`，`LocalDateTime` 被注册成 Epoch 毫秒（本文件 `ts()` 那条取证）⇒ 必须过 `ts()` 归一。
+ */
+data class WalletTx(
+    val transactionNo: String = "",
+    val type: String = "",
+    val amount: Double? = null,
+    val balanceAfter: Double? = null,
+    val title: String = "",
+    val payMethod: String = "",
+    /** 后端给的是 Integer 码；null = 这一格没给，不许塌成 0（0 的含义是"处理中"） */
+    val statusCode: Int? = null,
+    val time: String = "",
+) {
+    companion object {
+        fun parse(o: JSONObject) = WalletTx(
+            transactionNo = o.multiStr("transactionNo"),
+            type = o.multiStr("type"),
+            amount = o.multiNumOrNull("amount"),
+            balanceAfter = o.multiNumOrNull("balanceAfter"),
+            title = o.multiStr("title"),
+            payMethod = o.multiStr("payMethod"),
+            statusCode = o.multiNumOrNull("status")?.toInt(),
+            time = o.reportTimeOf("createTime"),
+        )
+    }
+}
+
+/**
+ * 一页流水。⚠ `total` 后端就是 `items.size()`（`AppWalletController:101`），**不是全量条数**：
+ * 请求带 `limit`（默认 20），超过的部分根本没查。所以页面只能念"本次返回几条"，
+ * 念"共 N 条"就是替后端宣布了一个它没算过的数。
+ */
+data class WalletTxPage(val items: List<WalletTx> = emptyList(), val returnedCount: Int = 0) {
+    companion object {
+        fun parse(o: JSONObject): WalletTxPage {
+            val arr = o.optJSONArray("items") ?: JSONArray()
+            return WalletTxPage(
+                items = (0 until arr.length()).map { WalletTx.parse(arr.getJSONObject(it)) },
+                returnedCount = o.multiNumOrNull("total")?.toInt() ?: arr.length(),
+            )
+        }
+    }
+}
+
 data class HandoverTask(
     val id: Long,
     val orderNo: String,

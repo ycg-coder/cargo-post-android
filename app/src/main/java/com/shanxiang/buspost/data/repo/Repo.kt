@@ -694,6 +694,39 @@ object Repo {
     }
 
     /**
+     * 钱包余额（`GET /app-api/transport/wallet/balance`，`AppWalletController:32-43`）。只读。
+     * 失败返回 `One(null, error)` —— 页面那一格必须能说"没取到"，不许退回显示 ¥0.00。
+     */
+    suspend fun walletBalance(): One<WalletBalance> = try {
+        val p = Api.get("$T/wallet/balance")
+        One(WalletBalance.parse(p.obj ?: JSONObject()), p.demo)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        One(null, error = errorTextOf(e))
+    }
+
+    /**
+     * 钱包流水（`GET /app-api/transport/wallet/transactions`，`AppWalletController:81-103`）。只读。
+     *
+     * ⚠ 刻意**不接**充值与余额支付两个写口（`/recharge:65-79`、`/pay:105-126`），理由记在台账 D-086：
+     * · `/recharge` 无幂等键（`V028:39` 的唯一索引只盖住流水号，不盖住请求），重复点击会**重复加余额**；
+     * · 它写入的流水与真实到账在字段上不可区分（渠道被写死 `"alipay"`、状态写死成功，
+     *   `WalletServiceImpl:53-58`；表里没有"来源/是否模拟"列）⇒ 界面无法如实标注；
+     * · `query-pay-order:59-63` 只按 orderNo 查、不校验归属人（`PayService:182`），
+     *   且在 `status=0` 时会触发放款（`:190-200`）——这是别人的单子也能被查到并推进的那一格。
+     * 展示侧只读这两条通路，写口等后端补上幂等键与来源列之后再接。
+     */
+    suspend fun walletTransactions(limit: Int = 20): One<WalletTxPage> = try {
+        val p = Api.get("$T/wallet/transactions", mapOf("limit" to limit.toString()))
+        One(WalletTxPage.parse(p.obj ?: JSONObject()), p.demo)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        One(null, error = errorTextOf(e))
+    }
+
+    /**
      * 客户确认"已按替代交接送到指定站点"。
      * 后端 `AppSendController:129` 是 `@RequestParam("orderId")`，参数必须在 query ——
      * 旧写法放进 JSON body 会稳定 400（审计 §39），而且失败被吞成演示回执，没人发现。
