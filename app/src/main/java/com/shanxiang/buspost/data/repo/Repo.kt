@@ -125,6 +125,33 @@ object Repo {
         Api.demoSession = Api.demoAllowed && stored.startsWith("demo-")
     }
 
+    /**
+     * 静默续期（任务：登录态）。由 `Api.refresher` 在业务请求 401 时调用，也可供冷启动临期检查复用。
+     *
+     * 成功条件写死成"后端真的给了新的 accessToken"：拿不到新 token 就返回 false，
+     * 让上层按原路走"清盘跳登录" —— 带着旧 token 假装续期成功，比让用户重登更坏。
+     * 没有 refreshToken（老会话/清过盘）也直接 false，不发无意义的请求。
+     */
+    suspend fun refreshTokenOnce(): Boolean {
+        val refresh = Prefs.refreshToken
+        if (refresh.isEmpty()) return false
+        // 后端是 `@RequestParam String refreshToken` ⇒ 必须在 query，塞进 JSON body 会直接 400
+        // （同审计 §39 记的 `/send/confirm-station-action` 那条形态坑）
+        val p = attempt { Api.post("$M/auth/refresh-token", query = mapOf("refreshToken" to refresh)) }
+            .getOrNull() ?: return false
+        // 演示构建里失败的请求会回落到 DemoData —— 那种"token"是编出来的，
+        // 拿它续期等于给一个并不存在的会话续命（宁可就让用户重登）。
+        if (p.demo) return false
+        val token = p.str("accessToken").ifEmpty { p.str("token") }
+        if (token.isEmpty()) return false
+        Api.token = token
+        Prefs.token = token
+        // 后端会轮换 refreshToken；没给就沿用旧的，别把它清成空
+        Prefs.refreshToken = p.str("refreshToken").ifEmpty { refresh }
+        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
+        return true
+    }
+
     suspend fun login(mobile: String, password: String, role: Role): Account {
         val p = Api.post("$M/auth/login", mapOf("mobile" to mobile, "password" to password))
         return saveSession(p, role, mobile)
@@ -163,6 +190,10 @@ object Repo {
         Api.token = token
         Api.demoSession = p.demo
         Prefs.token = token
+        // 会话续期用的两件套：后端一直在回，此前被直接丢弃 ⇒ 30 分钟到期只能重新登录（任务：登录态）。
+        // expiresTime 只服务"临期主动续"，读不到也不影响正确性 —— 真正的兜底路径是 401 时静默续期重试。
+        Prefs.refreshToken = p.str("refreshToken")
+        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
         Prefs.userId = account.id
         Prefs.mobile = account.mobile
         Prefs.nickname = account.nickname
@@ -330,6 +361,7 @@ object Repo {
             // 界面已经明写来源"高德天气"，所以这里保持 orEmpty()，不新开一条错误通路。
             }.getOrNull().orEmpty()
             val temp = l.optString("temperature").toIntOrNull() ?: 0
+            val (userTip, driverTip) = weatherTipsFor(l.optString("weather"), temp)
             WeatherInfo(
                 text = l.optString("weather"),
                 temperature = temp,
@@ -338,7 +370,8 @@ object Repo {
                 source = "高德天气",
                 icon = l.optString("weather"),
                 humidity = l.optString("humidity").let { if (it.isEmpty()) "" else "湿度 $it%" },
-                tips = farmTips(l.optString("weather"), temp),
+                tips = userTip,
+                driverTips = driverTip,
                 forecast = forecast,
             )
         } catch (e: CancellationException) {
@@ -375,30 +408,23 @@ object Repo {
             }
         }.getOrDefault(emptyList())
         val temp = cw.optDouble("temperature", 0.0).toInt()
+        val cond = weatherText(cw.optInt("weathercode"))
+        val (userTip, driverTip) = weatherTipsFor(cond, temp)
         WeatherInfo(
-            text = weatherText(cw.optInt("weathercode")),
+            text = cond,
             temperature = temp,
             feel = temp,
             wind = "风 ${cw.optDouble("windspeed", 0.0).toInt()} km/h",
             source = "open-meteo",
-            icon = weatherText(cw.optInt("weathercode")),
-            tips = farmTips(weatherText(cw.optInt("weathercode")), temp),
+            icon = cond,
+            tips = userTip,
+            driverTips = driverTip,
             forecast = forecast,
         )
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         null
-    }
-
-    /** 农事提示：与小程序 weather.js farmTips 同口径（按现象 + 气温给建议） */
-    private fun farmTips(condition: String, temp: Int): String = when {
-        condition.contains("雨") || condition.contains("雪") -> "有降水，装车前请给山货加盖苫布"
-        condition.contains("晴") && temp >= 30 -> "气温偏高，生鲜件尽量走早班车"
-        condition.contains("晴") -> "晴好天气，适合发车与晾晒"
-        condition.contains("云") || condition.contains("阴") -> "多云，适合当日运输"
-        condition.contains("雾") -> "有雾，山路发车请减速慢行"
-        else -> "出行前留意山区路况"
     }
 
     private fun weatherText(code: Int): String = when (code) {
@@ -1351,4 +1377,30 @@ object Repo {
         s.length > 5 -> s.takeLast(5)
         else -> s
     }
+}
+
+/**
+ * 天气提示按角色分档（纯函数，JVM 用例可断言）：返回 `用户/寄件人说法 to 司机说法`。
+ *
+ * 分工的依据是**谁能改什么**：用户能改的是"什么时候把件送到站点、要不要加苫布"，
+ * 司机能改的是"怎么开"（跟车距离、雾灯、是否延后发车）。以前全工程只有一份
+ * `farmTips`（六条清一色货运口径），而司机端一处都不显示天气
+ * （`Repo.weather` 唯一的调用点在首页）⇒ 那句话实际上是"对着司机说寄件人的话"。
+ *
+ * 司机侧只写"因天气而变的操作动作"，**不声称知道路面实际状况**（我们没有路况传感，
+ * 说"路面湿滑"就是造第二条真相）；`condition` 为空（天气没取到）时两份都给空串，
+ * 页面据此不显示，而不是兜一句万能提示。
+ */
+internal fun weatherTipsFor(condition: String, temp: Int): Pair<String, String> = when {
+    condition.isEmpty() -> "" to ""
+    condition.contains("雨") || condition.contains("雪") ->
+        "有降水，装车前请给山货加盖苫布" to "降水：出发前检查苫布与刹车，山路减速、拉大跟车距离"
+    condition.contains("雾") || condition.contains("霾") ->
+        "能见度偏低，山路发车请减速慢行" to "能见度偏低：使用雾灯并降速；能见度过低时延后发车，并通知候车乘客"
+    condition.contains("晴") && temp >= 30 ->
+        "气温偏高，生鲜件尽量走早班车" to "高温：车厢通风，生鲜件尽量安排早班车"
+    condition.contains("晴") -> "晴好天气，适合发车与晾晒" to "天气晴好，按班次正常发车间"
+    condition.contains("云") || condition.contains("阴") -> "多云，适合当日运输" to "多云，按班次正常发车间"
+    temp <= 0 -> "低温，怕冻货品请提前告知" to "低温：起步放缓，留意背阴路段结冰"
+    else -> "出行前留意山区路况" to "出行前留意山区路况变化"
 }

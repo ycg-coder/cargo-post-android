@@ -1,6 +1,9 @@
 package com.shanxiang.buspost.ui.user
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +60,7 @@ import com.shanxiang.buspost.core.ui.busTokens
 import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.InfoRow
+import com.shanxiang.buspost.core.ui.BusAvatar
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.SectionTitle
@@ -76,12 +80,29 @@ import com.shanxiang.buspost.ui.common.ScreenViewModel
 
 // ---------- 个人资料 ----------
 
+/**
+ * 头像上传结果 → 界面口径（纯函数，JVM 用例可断言）。
+ *
+ * 返回 `提示文案 to 新头像URL`；**URL 为 null 表示"不许动现有头像"** —— 这一格是全部风险所在：
+ * 失败时清空 avatar 会让用户下次进来看到首字头像，等于一次失败的上传擦掉了已有数据
+ * （审计 §22 那一族的另一种犯法姿势）。演示模式回落的 URL 也不许当真实地址存下来。
+ */
+internal fun avatarUploadNotice(url: String, demo: Boolean): Pair<String, String?> = when {
+    // 演示回落也非空串：那是 DemoData 编的地址，存进资料就等于让头像指向一个不存在的东西
+    demo -> "演示模式：头像未真实上传" to null
+    url.isNotEmpty() -> "头像已更新，点保存后生效" to url
+    else -> "头像上传失败，请重试" to null
+}
+
 class ProfileViewModel : ScreenViewModel() {
     var nickname by mutableStateOf(Prefs.nickname)
     var mobile by mutableStateOf(Prefs.mobile)
     /** 0 未知 / 1 男 / 2 女（与小程序 profile.js:20 同源） */
     var sex by mutableStateOf(Prefs.sex)
     var avatar by mutableStateOf(Prefs.avatar)
+
+    /** 头像上传中：不许再点第二次（两次上传并发会留下一个谁都不认识的 URL） */
+    var uploadingAvatar by mutableStateOf(false)
 
     // 改密：短信验证码 scene=3（MEMBER_UPDATE_PASSWORD），不是旧密码
     var password by mutableStateOf("")
@@ -104,6 +125,39 @@ class ProfileViewModel : ScreenViewModel() {
         }
         demo = one.demo
         error = one.error
+    }
+
+    /**
+     * 换头像：选图 → 上传拿**真实** URL → 写进表单（点保存时才随 `/member/user/update` 落库）。
+     *
+     * 与装车照片那条链路同形（`SendScreen.uploadPhoto`），但故意**不在开始时清空 avatar**：
+     * 那条是"新单必须重拍"，这一条是"上传失败就该保持原样"。先清空再失败 = 一次失败的上传
+     * 把用户已有的头像擦掉（审计 §22 那一族的另一种犯法姿势）。
+     * 后端 `AppFileController.java:34-43` 回的是裸 URL；`ack.url` 为空就是"没拿到地址"，
+     * 不许提示已更新（同 `Repo.uploadPhoto` 的注释口径）。
+     */
+    fun uploadAvatar(context: android.content.Context, uri: android.net.Uri) {
+        if (uploadingAvatar) return
+        uploadingAvatar = true
+        work(reset = false) {
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("读取图片失败，请重新选择")
+                val ack = Repo.uploadPhoto(bytes, "avatar-${Prefs.userId}-${System.currentTimeMillis()}.jpg")
+                val (notice, nextAvatar) = avatarUploadNotice(ack.url, ack.demo)
+                saved = notice
+                if (nextAvatar != null) {
+                    avatar = nextAvatar
+                    Prefs.avatar = nextAvatar
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saved = "头像上传失败：${e.message ?: "未知错误"}"
+            } finally {
+                uploadingAvatar = false
+            }
+        }
     }
 
     fun saveProfile() {
@@ -185,6 +239,12 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
 
+    val context = LocalContext.current
+    // 换头像的选图入口：系统相册选择器（与寄货拍照同一条 PickVisualMedia 通路，不申请存储权限）
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.uploadAvatar(context, uri)
+    }
+
     LaunchedEffect(Unit) { vm.load() }
     // 倒计时按秒刷新（页面侧驱动，逻辑在 VM 内按时间戳校准）
     LaunchedEffect(vm.countdown) {
@@ -203,6 +263,36 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
             SectionTitle("基本资料")
             BusCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // 头像：这一格以前根本没有 —— 后端与上传通路都是现成的，缺的是入口
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BusAvatar(name = vm.nickname.ifEmpty { Prefs.nickname }, url = vm.avatar, size = 52)
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text("头像", color = t.textSecondary, fontSize = (13 * scale).sp)
+                            Text(
+                                when {
+                                    vm.uploadingAvatar -> "上传中…"
+                                    vm.avatar.isNotEmpty() -> "已选择新头像，点保存后生效"
+                                    else -> "未设置头像"
+                                },
+                                color = t.textTertiary,
+                                fontSize = (11.5 * scale).sp,
+                            )
+                        }
+                        TextButton(
+                            enabled = !vm.uploadingAvatar,
+                            onClick = {
+                                avatarPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                        ) {
+                            Text(
+                                if (vm.uploadingAvatar) "上传中" else "更换头像",
+                                color = t.primary,
+                                fontSize = (13 * scale).sp,
+                            )
+                        }
+                    }
                     BusTextField(
                         value = vm.nickname,
                         onValueChange = { vm.nickname = it },

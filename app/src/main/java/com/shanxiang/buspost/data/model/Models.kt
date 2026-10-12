@@ -267,6 +267,13 @@ data class WeatherInfo(    val text: String,
     val icon: String = "",
     val humidity: String = "",
     val tips: String = "",
+    /**
+     * 司机侧提示（与 `tips` 同源同刻，但说法按角色分）。
+     * 以前只有一份货运口径的 `farmTips`（"给山货加盖苫布"），
+     * 而司机要的是"因天气而变的操作动作"（车距/雾灯/是否延后发车）。
+     * 空串 = 这一路天气没拿到 ⇒ 页面不许编一句安全提示。
+     */
+    val driverTips: String = "",
     val forecast: List<WeatherDay> = emptyList(),
     val mock: Boolean = false,
 ) {

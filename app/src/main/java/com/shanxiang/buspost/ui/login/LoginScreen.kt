@@ -147,7 +147,11 @@ fun LoginScreen(
                     // 留 8 位等于允许用户输入后端永远发不出来的长度。
                     onValueChange = { v -> vm.code = v.filter { it.isDigit() }.take(6) },
                     label = "验证码",
-                    placeholder = "6位数字",
+                    // 写"6位数字"曾经是个假承诺：local/dev 的固定码是 4 位（8888），真机上就是
+                    // "界面说 6 位、后端发 4 位"。现在后端把非生产固定码也统一成 6 位（888888），
+                    // 但文案仍按契约的**区间**写（AppAuthSmsLoginReqVO `@Length(min=4,max=6)`），
+                    // 免得下一次换部署把区间改了，UI 又是一句没人核对的断言。
+                    placeholder = "4-6 位数字",
                     icon = BusIcons.shield,
                     keyboardType = KeyboardType.Number,
                     trailing = {

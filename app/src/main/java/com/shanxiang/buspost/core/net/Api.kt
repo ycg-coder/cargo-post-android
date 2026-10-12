@@ -207,6 +207,16 @@ object Api {
     @Volatile
     var onUnauthorized: (() -> Unit)? = null
 
+    /**
+     * 会话续期回调，由 App 层注入（`Repo.refreshTokenOnce()`）。
+     *
+     * 为什么要有它：后端 access token 只有 1800 秒，而 `/member/auth/refresh-token` 一直存在却从没被调用过
+     * ⇒ 30 分钟后的第一条业务请求必然 401，然后清盘、跳登录 —— 用户看到的是"每次进 App 都要重新登录"，
+     * 实际上他根本没退出过。返回 true 表示已换到新 token（本层直接重试原请求，用户无感）。
+     */
+    @Volatile
+    var refresher: (suspend () -> Boolean)? = null
+
     /** 登录走的是演示通道时为 true：演示会话下的 401 不踢回登录页（仅 demoAllowed 构建可能出现） */
     @Volatile
     var demoSession: Boolean = false
@@ -274,11 +284,12 @@ object Api {
         }
     }
 
-    private fun rawExecute(
+    private suspend fun rawExecute(
         path: String,
         method: String,
         query: Map<String, Any?>,
         body: Map<String, Any?>?,
+        attempt: Int = 0,
     ): Payload {
         if (baseUrl.isEmpty()) throw NetworkException("未配置后端地址（local.properties 的 buspost.baseUrl）")
         val url = buildString {
@@ -330,7 +341,15 @@ object Api {
             if (resp.code == 401 || bizCode == 401) {
                 // 认证接口的 401 是"账号密码/验证码不对"，不是"会话失效"：
                 // 抛普通 ApiException 把后端原因原样交给登录页，绝不广播踢人回登录页
-                throw if (path.contains("/auth/")) ApiException(401, reason401) else kick(path, reason401)
+                if (path.contains("/auth/")) throw ApiException(401, reason401)
+                // 会话到期 ≠ 用户要重新登录：先静默续一次，成功就重试本次请求（用户无感）。
+                // 只试一次（attempt < 1）；续期接口自身命中上面的 /auth/ 分支，不会递归。
+                val refreshed = if (attempt < 1) refresher?.invoke() else false
+                if (refreshed == true) {
+                    Log.i(TAG, "$path 401 —— 已静默续期，重试一次")
+                    return rawExecute(path, method, query, body, attempt + 1)
+                }
+                throw kick(path, reason401)
             }
             if (root == null) {
                 if (resp.isSuccessful) throw NetworkException("响应格式异常（HTTP ${resp.code}）")

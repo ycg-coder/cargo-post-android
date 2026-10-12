@@ -394,12 +394,25 @@ if (now - last401At > 2000) {
 - 自适应图标: mipmap-anydpi-v26/ic_launcher.xml
 - 各密度: mdpi(48x48), hdpi(72x72), xhdpi(96x96), xxhdpi(144x144), xxxhdpi(192x192)
 
-**当前状态**: ✅ 已配置 (`@mipmap/ic_launcher`)
+**当前状态（2026-10-12 实测，替换此前那句"✅ 已配置"）**: ⚠ **自适应图标已配、位图一套都没有**
+- `res/mipmap-anydpi-v26/ic_launcher.xml` = 唯一的启动图标资源，内容 `<background=@color/bus_launcher_bg>`
+  + `<foreground=@drawable/ic_launcher_foreground>` + `<monochrome=@drawable/ic_launcher_foreground>`（ themed icon 那一层是**复用**前景，不是独立设计）；
+- `mipmap-mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi` **目录不存在**（`ls res | grep mipmap` 只有 anydpi-v26 一行）。
+  `minSdk = 26`（`app/build.gradle.kts:74`）⇒ 这在本项目里**不是崩溃点**：API 26+ 只认 adaptive icon。
+  但"各密度 PNG"那一栏的要求并未满足，且商店截图/对外素材需要一张真位图；
+- `AndroidManifest.xml:55/57` 的 `android:icon` 与 `android:roundIcon` 都指向同一个 `@mipmap/ic_launcher`
+  （没有单独的 `ic_launcher_round` 资源； adaptive icon 由系统按机型形状裁切，这是正常做法，不算缺件）。
+
+**未收口（队列 #43，等用户给设计稿）**：图标美术本身、`monochrome` 需要单独一层才能出正确的主题图标灰度版、
+以及启动页/登录页仍在用第二套标志 `app/src/main/assets/logo.png`
+（消费点 `core/ui/SplashOverlay.kt:291` 的 `LOGO_ASSET` 与 `ui/login/LoginScreen.kt:80` 的硬写串），
+换图标时这两处要与 mipmap 收敛成一套，否则桌面是新标、开屏是旧标。
 
 ### 6.2 启动屏
 
-**文件**: `res/drawable/splash_background.xml`  
-**设计**: 品牌Logo居中 + 渐变色背景 (#1e5a96 → #2d7bc4)
+**文件**: ~~`res/drawable/splash_background.xml`~~ — 该文件不存在（`ls res/drawable | grep splash` 零命中）。
+**实际实现**: Compose 的 `core/ui/SplashOverlay.kt`，品牌位图为 `assets/logo.png`，
+即 §6.1 说的第二套标志；渐变色背景那句描述对应的是代码里的 brush，不是一个 drawable 资源。
 
 ### 6.3 应用截图
 

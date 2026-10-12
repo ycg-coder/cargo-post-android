@@ -89,6 +89,37 @@ import com.shanxiang.buspost.ui.common.MapPath
 import com.shanxiang.buspost.ui.common.RouteMap
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 
+/**
+ * 实时公交页定位提示的**唯一出口**（纯函数，JVM 用例可断言）。
+ *
+ * 为什么单独拎出来：旧写法把"没授权"和"授权了但这一次没定到位"压成同一句话
+ * （`geo == null → "没拿到定位，展示全部线路。去系统设置里允许定位后刷新更准"`），
+ * 于是用户在系统里明明已经允许了，界面还在教他去开权限 —— 这正是 §51 在册的
+ * "定位三态被折叠成 me==null"。三态各有各的下一步动作，就不许共用一个号。
+ */
+internal fun locationHintFor(granted: Boolean, fix: com.shanxiang.buspost.data.model.Geo?): String = when {
+    !granted -> "未允许定位：地图不显示你的位置，已展示全部线路。点右上角可再次申请。"
+    fix == null -> "已允许定位，这次没定到（室内/冷启动常见）：先展示全部线路，稍后自动重试。"
+    else -> "已按你的位置排序"
+}
+
+/**
+ * 页头"位置口径"标签的唯一映射点（§8 同族：页面不许各自拼码）。
+ *
+ * 关键那一格是**混档**：现网一趟车里有 GPS 上报的只有本平台派出去的那几辆，其余是时刻表推算
+ * （后端优先级 `REAL > OFFLINE`，另有一层 SIMULATED 插值；`VehicleLocationProvider.java:16-20`）。
+ * 旧写法 `if (real) "实时位置"` 用的是整页 OR ⇒ 只要有一辆实时，整页顶盖都写成"实时位置"，
+ * 用户就把推算的那几辆也按实时读 —— 卡片级文案是对的（`BusVehicle.sourceText`），页头在说大话。
+ */
+internal fun positionSourceTag(realCount: Int, otherCount: Int, demo: Boolean): Pair<String, BusTone> = when {
+    realCount > 0 && otherCount == 0 -> "实时位置" to BusTone.OK
+    realCount > 0 -> "$realCount 辆实时 · 其余按时刻推算" to BusTone.WARN
+    demo -> "演示线路" to BusTone.WARN
+    otherCount > 0 -> "班次时刻（无实时位置）" to BusTone.WARN
+    // 一辆车都没显示时不许留个"班次时刻"暗示有时刻表：那是"没有可显示的位置"
+    else -> "暂无车辆位置" to BusTone.NEUTRAL
+}
+
 class BusViewModel : ScreenViewModel() {
     var nearby by mutableStateOf<NearbyResult?>(null)
     var lines by mutableStateOf<List<BusLine>>(emptyList())
@@ -180,16 +211,25 @@ class BusViewModel : ScreenViewModel() {
      */
     private var polylineSeq = 0
 
+    /**
+     * 运行时定位授权。用户端以前**从没申请过**（`RequestPermission` 只出现在司机端工作台），
+     * 而未授权时高德既不会有蓝点、`Locator.once` 也拿不到点 ⇒ "不显示我的位置"是两件事叠出来的。
+     */
+    var locationGranted by mutableStateOf(false)
+
+    /** 三态提示的唯一出口（纯函数 [locationHintFor]，JVM 用例可断言） */
+    fun onLocationPermission(granted: Boolean) {
+        locationGranted = granted
+        locationHint = locationHintFor(granted, me)
+    }
+
     fun load(context: android.content.Context, silent: Boolean = false) {
         val mySeq = ++reqSeq
         work(reset = !silent) {
             val geo = Locator.once(context)
             me = geo
             if (!silent) {
-                locationHint = when {
-                    geo == null -> "没拿到定位，展示全部线路。去系统设置里允许定位后刷新更准。"
-                    else -> "已按你的位置排序"
-                }
+                locationHint = locationHintFor(locationGranted, geo)
             }
             val one = Repo.nearbyBuses(geo, Repo.nearbyRadius(0.0))
             if (mySeq != reqSeq) return@work
@@ -248,7 +288,12 @@ class BusViewModel : ScreenViewModel() {
 
     /** 运营时段态：off 非运营 / empty 有站无车 / error 接口失败 / data 有车 */
     fun state(): String {
-        val r = nearby ?: return if (loading) "loading" else "error"
+        // "没拿到数据"不等于"接口失败"：失败必须有真实原因在册才允许报 error。
+        // 真机上"每次点进实时公交都显示网络不好、点重新加载才有数据"的病根是并发的
+        // `loadMyShippingOrders()` 走 `work(reset = false)`，基类在 finally 里把 loading 抢先写成 false
+        // （`ScreenViewModel.kt:42`），而主请求还在飞 ⇒ 这一刻既无数据也无失败原因，
+        // 正确的读法是"还在加载"，不是把没发生过的事说成发生过。
+        val r = nearby ?: return if (loading || error == null) "loading" else "error"
         if (error != null && r.vehicles.isEmpty() && lines.isEmpty()) return "error"
         // 只有后端真给 false 才算非运营（F-2 §四）：缺键走 empty 那一支，与小程序 index.js:554 同口径；
         // 再叠一层"必须拿到服务时段"，服务区外的空报文就不再被说成"不在运营时间"
@@ -345,6 +390,23 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
     // 收藏状态变化后触发重组（Prefs 不是 State，需要手动驱动 UI 刷新）
     var favTick by remember { mutableStateOf(0) }
 
+    // 运行时定位授权 —— 用户端以前**从没申请过**（`RequestPermission` 只在司机端工作台出现），
+    // 而未授权时高德画不出蓝点、`Locator.once` 也拿不到点 ⇒ "地图不显示我的位置"是两件事叠出来的。
+    // 进页问一次；被拒不追弹，改由 locationHintFor 说实话（"未允许定位"），线路照常给全。
+    val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        vm.onLocationPermission(granted)
+        if (granted && vm.me == null) vm.load(context)
+    }
+    LaunchedEffect(Unit) {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        vm.locationGranted = granted
+        if (!granted) askLocation.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
     LaunchedEffect(Unit) {
         if (vm.nearby == null && vm.lines.isEmpty()) vm.load(context)
     }
@@ -363,8 +425,12 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
         }
     }
 
-    val real = vm.nearby?.realTransit == true ||
-        vm.lines.any { l -> l.vehicles.any { it.isReal } || l.dataSource.contains("REAL") }
+    // 页头口径只描述**当前显示的这几辆车**（旧写法是整批 OR，见 positionSourceTag）
+    val shownVehicles = vm.vehiclesOf(vm.selected)
+    val realVehicles = shownVehicles.count { it.isReal }
+    val (sourceTag, sourceTone) = positionSourceTag(
+        realVehicles, shownVehicles.size - realVehicles, vm.demo,
+    )
 
     // 高德风格：地图为主视图 + 底部详情面板
     Column(Modifier.fillMaxSize().background(t.paper)) {
@@ -428,10 +494,7 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            BusTag(
-                if (real) "实时位置" else if (vm.demo) "演示线路" else "班次时刻",
-                tone = if (real) BusTone.OK else BusTone.WARN,
-            )
+            BusTag(sourceTag, tone = sourceTone)
             // 运营时段（对标高德/车来了：首末班时间）
             vm.nearby?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let {
                 BusTag("运营 $it", tone = BusTone.NEUTRAL)
@@ -531,6 +594,8 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         paths = paths,
                         modifier = Modifier.fillMaxWidth().height(320.dp),
                         fitAll = true,
+                        // 蓝点只在真拿到授权后开：没授权时开图层等于承诺一个永远不来的位置
+                        showMyLocation = vm.locationGranted,
                         onUnavailable = { mapFailed = true },
                     )
                 }

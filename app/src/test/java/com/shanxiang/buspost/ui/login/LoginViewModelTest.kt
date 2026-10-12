@@ -99,6 +99,42 @@ class LoginViewModelTest : ServerTest() {
     }
 
     @Test
+    fun `验证码长度按后端契约 4-6 位收`() {
+        // 契约出处：`AppAuthSmsLoginReqVO.code` = @Length(min = 4, max = 6) + 全数字。
+        // 旧 `canSubmit` 放行 4..8：上半段既到不了（输入框 take(6)）也不被后端收 ⇒ 校验里的一句空话；
+        // 而 local/dev 曾把固定码配成 4 位（8888）、UI 却写"6位数字" ⇒ 两边都没守约，用户看到的
+        // 就是真机那句"说六位、实际 8888"。
+        val vm = LoginViewModel().apply {
+            mobile = "13800004021"
+            agreed = true
+            mode = 1
+        }
+        vm.code = "123"
+        assertFalse("3 位后端必拒，不许放行", vm.canSubmit)
+        vm.code = "1234"
+        assertTrue("4 位是非生产固定码曾经的长度，必须能提交", vm.canSubmit)
+        vm.code = "888888"
+        assertTrue("6 位是生产随机区间的位数，必须能提交", vm.canSubmit)
+        // 这条才是"4..8 → 4..6"的锚点：7 位今天靠输入框 take(6) 到不了，但 canSubmit 是公开闸，
+        // 别的地方（自动填充 / 以后换输入组件）一放开，就会把一个后端必拒的码当成"可以提交"递给用户。
+        vm.code = "1234567"
+        assertFalse("7 位后端必拒（@Length(max=6)），校验不许比契约宽", vm.canSubmit)
+    }
+
+    @Test
+    fun `码长不合规要说出区间而不是只说没填`() {
+        val vm = LoginViewModel().apply {
+            mobile = "13800004021"
+            agreed = true
+            mode = 1
+        }
+        vm.code = "12"
+        vm.submit { fail("码长不合规不该回调成功") }
+        assertEquals("请输入 4-6 位短信验证码", vm.error)
+        assertEquals("本地就能判的错不该发到后端", 0, server.requestCount)
+    }
+
+    @Test
     fun `连不上后端说的是网络而不是账号问题`() {
         TestHost.strictBackend()
         NetTestOverride.baseUrl = "http://127.0.0.1:1"

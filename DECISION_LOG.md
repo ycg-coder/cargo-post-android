@@ -5561,3 +5561,207 @@ canonical 仍是 D-070 §3 那一发。
 - 本轮 App 侧另收两处：① 无路线态那句改口（四处锁步：2 处用例断言 / 判据精确式与提示 / 负控锚点与标签），并逐字复核簿内 4 条含「示意线」的注入锚点全部命中源码；② 「自动进导航」提成纯函数 `shouldAutoOpenGuide` + 新用例本 4 条，`SU-b` 的 test 源集目标数 55→56 同轮改对，并做了能红证明（删掉进程内一次性那一项 → 从 XML 读出红的是「一个进程只自动跳一次否则司机结束导航后出不去」）。
 - 现在把那条一次性证明**固化成负控 M37**（`navigation_test_negative_controls.sh`，注入 = 从纯函数里删掉 `!alreadyOpenedThisProcess`），簿内 `case_run` 计数 36→37。整本在后台跑，基线读数 `exit=0 failures=0/58`；批内结果本轮未收，**下一轮必须回来读 `/c/temp/m37-negctl.log` 的 M37 那一行与"恢复核对/恢复后复跑"两行**，不许凭"加上了"就当通过。
 - ⚠ 本轮我自己撞的两次：Kotlin 里用了单引号字符串（Char 字面量）、按 `kotlin.test` 的参数顺序写 JUnit4 断言（`message` 在前）⇒ 两轮编译失败。都是"没先照抄本仓库既有测试文件的写法"。
+
+## D-076 · 用户报的三条"用不了"落到三个不同病根：会话没续期、状态机把"没测到"读成"失败"、失败态是死代码（2026-10-12 13:0x）
+
+用户 2026-10-12 一次性报了 10+ 条 App 侧问题（登录态 / 验证码 / 首页附近公交 / 实时公交"网络不好" / 地图我的位置 / 实时车辆 / 天气文案 / 图标 / 头像 / 推送与更新 / 灵动岛）。本轮只做前**三**条，其余逐条登记为在册任务并附取证。顺序取自用户答复："先 App 这批"。
+
+三条都不是"界面少个按钮"，逐条先把**代码形状**读清楚再动手（用户口径"一切结论要有依据"）：
+
+1. **"下次进 App 还要重新登录"** —— ⚠ 病根**不是**"会话没持久化"。落盘与恢复两条路本来是通的（`Repo.kt:148-172` 写、`Repo.kt:121-126` ← `BusPostApp.kt:28` 读，`Prefs.kt:19-25`）。真因是 access token 只有 1800 秒（`ruoyi-vue-pro.sql:3526`，运行时 `OAuth2TokenServiceImpl.java:64,185`），而 App **不存 `expiresTime`、也从不调后端一直存在的 `/member/auth/refresh-token`**（`AppAuthController.java:66-70`；`Prefs.refreshToken` 只有 getter/setter，`saveSession` 从不写它）⇒ 30 分钟后第一条业务请求 401 → `Api.kt:330-333` → 清盘跳登录。
+   落点：`saveSession` 同轮落 `refreshToken`/`expiresAt`（`Prefs.expiresAt` 新列，`clearSession` 一并 remove）；`Api.rawExecute` 在 401 分支里**先静默续一次再重试**（`attempt < 1` 只试一次；续期接口自身命中 `/auth/` 那支 ⇒ 结构上不可能递归）；`Repo.refreshTokenOnce()` 参数走 **query**（后端是 `@RequestParam`，塞 body 直接 400，同审计 §39 那条形状坑）；`BusPostApp.kt` 注入 `Api.refresher`。
+   ⚠ 故意加的一条闸：`if (p.demo) return false` —— 演示构建里失败的请求会回落 `DemoData`，那种 accessToken 是编出来的，拿它"续期成功"= 给一个不存在的会话续命，**比让用户重登更坏**。
+2. **"实时公交每次点进去都是网络不好"** —— 并发的 `loadMyShippingOrders()`（`BusScreen.kt:224`）走 `work(reset = false)`，而基类 `ScreenViewModel.kt:38-42` 无条件 `error = null` 并在 finally 写 `loading = false` ⇒ 主请求还在飞时 `state()` 读到 `nearby==null && loading==false` 就报"失败"。游客不进那条 work（`AppState.hasUserSession`），所以**只在已登录时复现**，这也是它一直没被抓出来的原因。
+3. **"首页没有附近公交卡片"** —— 首页那张「网络不太好 / 重新加载」卡是**死代码**：`HomeScreen.kt:205` 先 `nearby ?: return "loading"`，而 `Repo.kt:837` 失败时回 `One(null, error=…)` ⇒ 有 error 必然没 nearby ⇒ `:206` 的 error 判定与 `:496-502` 的卡一起不可达，失败只表现为永远转圈的骨架屏。
+
+**没有动的地方（以及为什么）**：`work(reset=false)` 的基类语义**原样保留** —— 全仓 30 个 `work(reset = false)` 调用点里多数是用户动作（取消订单、全部已读、地址删除/默认、传照、进司机模式…），它们**依赖**"动作开始即清错误、结束即停 loading"。把基类改成引用计数会一次牵动十几屏的骨架/错误条形状，而真正的错处是**状态机把"还没拿到"读成"失败了"**，所以修在判据那一层：`state()` 要求有真实失败原因才许报 error、`busState()` 让失败态可达。
+
+**读数（只认结尾汇总行与 XML 产物）**：
+- 新用例两本：`SessionRefreshContractTest` **6 例**、`BusStateContractTest` **5 例**。
+- 全量 `:app:testDebugUnitTest --rerun-tasks`：**56 个类 / 578 例 / 0 失败 / 0 错误**，`BUILD SUCCESSFUL`，`GRADLE_EXIT=0`（本轮改动前是 55 类 / 573 例，差值正好是新增的 5 条 bus 状态用例 + 前一批的 6 条会话用例已计入 573）。
+- 能红证明：① 会话那本在"没落 refreshToken/expiresAt"的形态下先红过（首跑 2 红即修复前的真实读数，红因是 `assertEquals` 参数顺序写错——见下面撞车那条，不算判据证据）；② 状态那本把两处判据**逐字还原成改前**后 `5 tests completed, 2 failed`，红的是「首页 有失败原因时不得压在骨架屏里」与「实时公交页 没有失败原因时不得报 error」两条，`RESTORE_DIFF=0` 两份源文件都已核回。
+
+**本轮撞的两次车（记下来是因为都是重复形状）**：
+- ⚠ **JUnit4 的参数顺序**：本仓库用 `org.junit.Assert`，三参形式是 `assertEquals(message, expected, actual)`。我按 `kotlin.test` 的 `(expected, actual, message)` 写了两次，导致"红"的现场里 expected/actual 互换，**差点把记账错误读成生产缺陷**。DECISION_LOG 末尾 D-075 那条已经记过同一个坑（"按 kotlin.test 的参数顺序写 JUnit4 断言 ⇒ 两轮编译失败"），这是第三次 ⇒ 写断言前先抄本仓库现成用例的写法，不靠记忆。
+- ⚠ **gradle 测试子进程起不来时先看 daemon jvmargs**：本轮 `Could not write standard input to Gradle Test Executor` + `ClassNotFoundException: GradleWorkerMain` 连撞 4 次，`-Dfile.encoding=GBK` 单加在命令行**没用**，因为 `gradle.properties` 里 `org.gradle.jvmargs` 写死 `-Dfile.encoding=UTF-8`。可用配方在 `tools/after_negctl_run_full_tests.sh:55-56`（连 `-Dorg.gradle.jvmargs=…GBK` 一起给）。中间有一次 `BUILD FAILED` 其实**没有产出新 XML**，我差点把 12:45 那份旧产物的计数当本轮读数——是靠 `timestamp` 属性 + `class` 文件 mtime 与用例文案比对发现跑的是旧字节码的。⇒ 认产物必须连时间戳一起认。
+
+**明确未验（不许当已完成写）**：
+- **无设备在环 ⇒ 三条修复一律 `NOT VERIFIED ON DEVICE`**：`adb` 不在这台机器的 PATH（设备读数只能走 `tools/verify_device.sh`），本轮没有真机复拍，也没有验证"30 分钟后不重新登录"的实际体验（单元层证的是请求序列与 token 落盘）。
+- **判据簿与负控批本轮未跑**（`tools/check_*.sh`、`tools/run_all_negative_controls_batch.sh`）：本轮只跑了 `:app:testDebugUnitTest`。按 §八 ㉗ 与 D-075 的口径，这属于**在册欠账**，下一轮必须补跑并回来读结果；不许把"578 例全绿"写成"本轮判据全绿"。
+- 首页收藏入口（`favoriteLine` 只在实时公交页有引用）本轮**未做**，与 #39 同一任务里登记。
+
+**其余 7 条已登记取证、待用户或外部条件**：`#40` 我的位置（`isMyLocationEnabled` 全仓 0 命中，用户端无运行时定位申请）、`#41` 实时车辆（高德 API 0 段，现只有自家司机 GPS；用户已定"高德没有就算了，自家的用司机端实时位置"⇒ 待做数据等级标注）、`#42` 天气（后端 0 通路、文案只有一份 `farmTips`、司机端根本不显示天气）、`#43` 图标（只有 anydpi 一套、无 round、启动/登录页另有 `assets/logo.png` 第二套标志；用户已定"我出 3 个候选给他挑"）、`#44` 头像（后端与上传通路齐、App 无入口、`infra_file_config` master 是占位假 key）、`#45` 验证码（8888 在后端 profile 不在 App；App 硬写"6位数字"+`take(6)`；且演示回落会"没发请求也报已发送"）、`#47` 通知（纯本地 NotificationCompat，无厂商通道；"灵动岛"是 iOS 能力，Android 等价物要逐厂商 SDK+资质）、`#48` 更新通路（完全不存在；用户已定走 GitHub Release + App 内检查更新自装 ⇒ 要动 workflow `contents: write` 与新增版本表）。
+
+### D-076 续（同日 13:3x）· 验证码位数那条不是文案问题，是"两边都没守约"
+
+用户报"说六位、实际 8888"。逐条核到源头后的形状：
+- 固定码**只在非生产 profile**：`application-local.yaml` / `application-dev.yaml` 的 `yudao.sms-code.begin-code=end-code: 8888`；生产 `application.yaml:197-202` 保持随机区间 `100000–999999`。⇒ **不是"任何人拿 8888 能登别人号"那种洞**，这条先给结论（用户可能会担心这个）。
+- 位数由 `SmsCodeServiceImpl.java:70-71` 按 `endCode` 长度补零决定 ⇒ dev 出 4 位。
+- 后端契约本身是**区间**：`AppAuthSmsLoginReqVO.java:32` `@Length(min = 4, max = 6)` + 全数字。
+- App 侧两处不守约：`LoginScreen.kt:150` 硬写 `placeholder = "6位数字"`（对 dev 是假话），而 `LoginViewModel.canSubmit` 放行 `code.length in 4..8` —— 上限那半段是**空话**：输入框 `take(6)` 让 7-8 位根本打不进来，后端又必拒 ⇒ 校验比契约宽，却没有任何一条路径能触发它。
+
+改法（三处，都是"让断言可核对"）：① 非生产固定码统一成 **6 位**（`888888`，两个 yaml 同改，并写明"位数与生产一致"的理由 —— 固定值可以背，但位数分成两套就会逼上层各自写死）；② 文案按契约区间写 `4-6 位数字`，不再断言"6"；③ `canSubmit`/`submit` 收成 `4..6`，错误文案说清区间（`请输入 4-6 位短信验证码`）。
+
+读数：`LoginViewModelTest` 新增 2 例（4 位可提交 / 6 位可提交 / 7 位**不可**提交 / 码长不合规说区间），全量 `--rerun-tasks` = **56 类 / 580 例 / 0 失败**。能红证明：把校验还原成 `4..8` + `< 4` + 旧文案 ⇒ `8 tests completed, 2 failed`，两条都红 ⇒ `RESTORE_DIFF=0`。
+⚠ 这条锚点是**第二次才成立的**：第一版用例只断言"4/6 位能提交"，在旧的 `4..8` 下同样绿（旧代码只是多放行了打不进来的长度）⇒ 补了"7 位必须不可提交"才有牙齿。记下来是因为形状与 §19.4/§20.1 同一族：**只断言"允许"的用例钉不住"收紧"**。
+仍属未验：无设备在环 ⇒ 真机上输入框拿到 6 位固定码的体验未复拍（`NOT VERIFIED ON DEVICE`）；判据簿与负控批本轮仍未跑。
+
+### D-076 续二（同日 13:5x）· #40 地图"我的位置"：图层从未开启 + 用户端从没申请过权限，两件事叠成一个现象
+
+实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：清单声明了 `ACCESS_FINE_LOCATION`（`AndroidManifest.xml:15-17`），但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:573/887`。未授权时 `Locator.once` 也拿不到点，所以页面连"按位置排序"都是空的。
+
+改法三处：① `BusMap` 新增 `showMyLocation` 参数并真的开图层（**由调用方按授权状态传值** —— SDK 不会替我们弹框，未授权开图层等于承诺一个永远不来的位置）；② 实时公交页进页读一次授权、未授权申请一次，被拒不追弹；授权回来若还没有点就重跑 `load`；③ 定位提示收成**纯函数 `locationHintFor(granted, fix)`** 三态各说各话，顺手收掉 §51 在册那条"定位三态被折叠成 `me==null`"——旧文案在用户已经允许之后还教他去"系统设置里允许定位"。
+
+⚠ 一个 SDK 事实记下来免得后人重踩：本 SDK 版本的 `MyLocationStyle.LOCATE_TYPE_LOCATION_CENTER_MAP` **不可解析**（编译报 Unresolved reference），所以没有覆盖样式，用默认（默认已是"定位并把地图居中"）。
+
+读数：新用例 1 条（三态）+ 图层/授权接线；全量 `--rerun-tasks` = **56 类 / 581 例 / 0 失败**。能红证明：把三态折回旧的两态写法 ⇒ `6 tests completed, 1 failed`，`RESTORE_DIFF=0`。
+仍属未验：**蓝点与授权弹窗是真机行为，JVM 用例覆盖不到 ⇒ `NOT VERIFIED ON DEVICE`**；这一格长期该有的锚点是判据簿里加一条"`BusMap.kt` 必须同时出现 `isMyLocationEnabled` 且 `isMyLocationButtonEnabled` 不许单独存在"，配能红的负控 —— 本轮未加簿（在册）。
+
+### D-076 续三（同日 14:0x）· #41 实时车辆数据等级：卡片级本来就诚实，说大话的是页头
+
+先纠我自己任务描述里的一处预设：**"SIMULATED 混在实时里没标注"在卡片级是不成立的** ——
+`BusVehicle.sourceText`（`Models.kt:646-656`，与小程序同口径的"实时/位置可能过期/位置推算/位置暂不可用"）
+已经在每辆车那一行渲染（`BusScreen.kt:990 SourceTag(v.sourceText)`），新鲜度另有一行
+`位置：${formatLocationFreshness(...)}`；地图 marker 也按 `isReal` 分 `KIND_BUS_REAL` / `KIND_BUS_SIM`。
+⇒ 这一半无需改，改了就是重复造第二个真相。
+
+真正的洞只有一格：页头 `if (real) "实时位置"`，而 `real` 是**整批 OR**
+（`vm.nearby.realTransit == true || 任一条线路的任一车辆 isReal || dataSource 含 REAL`）
+⇒ 现网一趟里只有本平台派出的那几辆车有 GPS 上报（后端优先级 `REAL > OFFLINE`，`VehicleLocationProvider.java:16-20`），
+只要有一辆实时，整页顶盖就写成"实时位置"绿标，用户会把时刻表推算的那几辆也当实时读。
+
+改法：口径收成纯函数 `positionSourceTag(realCount, otherCount, demo)`（§8"单一映射点，页面不得自己拼码"同族），
+只描述**当前显示的那几辆车**：全实时才给"实时位置/OK"；混档给"N 辆实时 · 其余按时刻推算/WARN"；
+无实时有推算给"班次时刻（无实时位置）"；演示给"演示线路"；**一辆车都没显示时不许留"班次时刻"暗示有时刻表**，改说"暂无车辆位置"。
+
+读数：新用例 1 条（五格各说各话），全量 `--rerun-tasks` = **56 类 / 582 例 / 0 失败**。
+能红证明：把混档那格改回"实时位置/OK" ⇒ `7 tests completed, 1 failed`，`RESTORE_DIFF=0`。
+仍未验：marker 实际颜色/图标与页头标签的真机观感（`NOT VERIFIED ON DEVICE`）；
+"接高德实时公交"这一路按用户决策**不做**（高德没有就算了，自家的用司机端实时位置）。
+
+### D-076 续四（同日 14:1x）· #44 换头像：通路本来就是齐的，缺的只是入口；先把"文件存储是假 key"这条预设验掉
+
+**先纠一条我自己抄来的前提**：任务描述里写着"`infra_file_config` master 是占位 S3 假 key（会上传成功但取不回图）"。
+连本机库只读核过 ⇒ **不成立**：`select ... cast(master as unsigned)` 显示 master 是 **id=29 本地存储（storage=10，domain `http://127.0.0.1:48080`）**；
+而 10-10 上传的那张 `probe.png` 现在 `GET /admin-api/infra/file/29/get/20261010/probe.png` 回 **200 / 70 字节 / PNG 魔数 `89504e47`** ⇒ 上传与回读是真通路。
+id=35 那个 `endpoint=http://www.baidu.com` 的假配置确实存在，但**没当 master**。
+⚠ 两个附带结论：① 后端仓 `docs/internal/slimming-plan.md:152` 那句"0 文件上传过"已过期（库里 1 条 + 可回读）；
+② 这是**本机**结论，云上必须另核（"本地 ≠ 云上"那条老规矩），换云上环境前不能拿它当已验。
+顺带记一次工具坑：`bit(1)` 列经 pymysql 回来是 `b'\x01'/b'\x00'`，**两者都是 truthy** ⇒ 第一版判断把 11 行全印成 MASTER；改用 `cast(master as unsigned)` 才读对。这属于"读数形状错了会自造一条假缺陷"。
+
+改动（App 侧）：`ProfileScreen` 加头像行（`BusAvatar` + "更换头像"）走系统相册 `PickVisualMedia`（与寄货拍照同一条通路，不申请存储权限）→ `Repo.uploadPhoto(bytes, "avatar-<uid>-<ts>.jpg")` → 只有拿到真实 URL 才写 `avatar`/`Prefs.avatar`，`saveProfile` 原有的"avatar 非空才带"负责落库。VM 新增 `uploadingAvatar` 防并发双击。
+决策点是那格纯函数 `avatarUploadNotice(url, demo)`：**演示回落即使带回地址也不许存进资料**（那是 DemoData 编的、指向不存在的东西），**失败一律返回 null = 不动现有头像** —— 先清空再失败 = 用一次失败的上传把用户已有头像擦掉（审计 §22 一族的另一种犯法姿势）。
+
+读数：新用例 `ProfileAvatarContractTest` 3 例；全量 `--rerun-tasks` = **57 类 / 585 例 / 0 失败**。能红证明：把纯函数改回"非空就存 / 失败清空"那种朴素写法 ⇒ `3 tests completed, 2 failed`，`RESTORE_DIFF=0`。
+仍属未验：相册选图 → 上传 → 保存 → 重启 App 头像是新那张，这条整链是真机 + 真后端行为，JVM 覆盖不到 ⇒ `NOT VERIFIED ON DEVICE`；`member_user.avatar` 有 `@URL` 校验，所以"后端回的不是合法 URL"这一格还得在真机上确认一次。
+
+### D-076 续五（同日 14:2x）· #47 通知：先收"锁屏摊开行程"这一格，分组与厂商实况窗不做半吊子
+
+实测形状：4 个渠道（`Notifier.kt:22-45`），构建处（`:79-95`）有 smallIcon/BigText/autoCancel/deeplink/振动，
+**没有** setColor、setLargeIcon、setVisibility、setPublicVersion、group/summary、任何 Progress/Inbox 样式；
+依赖表里无任何厂商推送（huawei/xiaomi/mipush/opush/vivo/honor 全 0），源码 grep `灵动岛|实况窗|焦点通知|LiveView` 0 命中
+⇒ **现状是纯本地 NotificationCompat + 轮询（前台 20s + WorkManager 15min）**。
+
+本轮只落"与厂商无关、现在就该对"的两格：
+1. **锁屏不再摊开行程**：`AlertEngine` 拼的正文含站名与"几分钟到"（`AlertEngine.kt:69/90/118`），而以前从没设过可见性
+   ⇒ 手机不解锁就能被旁人读出"某村 3 分钟"。现在由纯函数 `lockScreenTextFor(channel)` 决定：
+   **白名单只放"正文确认不含个人信息"的 SERVICE 一条，其余（含以后新增、忘了登记的渠道）默认遮掩**
+   —— 反过来写会埋雷：加新渠道时忘了改这里，默认就是"锁屏摊开正文"。遮掩句固定为
+   "乡邮智联有新提醒，解锁查看详情"，并断言它不含数字、不含"村/站"用字。
+2. `setColor(bus_primary)`：Android 8+ 小图标是单色蒙版，不给 color 就永远灰白一片。
+
+**故意不做的两格（写了比不写更坏）**：
+- `setGroup` 单独加=**机制接了没上岗**：Android 7+ 没有 `setGroupSummary` 那条 hub 通知时分组无效果，
+  而要做 hub 就得带"本进程内已发几条"的计数 —— 进程重启后计数归零、旧通知还在，`setNumber` 会显示一个错的数。
+  要么按"每条通知自带 inbox 行 + 每轮一条 hub"重新设计，要么不做；本轮选后者并登记。
+- 厂商实况窗/焦点通知（华为 Live View、小米焦点通知等）**每套都要单独 SDK + 厂商侧场景资质**，
+  且通常要求推送通道（现在一条都没有）；"灵动岛"是 iOS/iPadOS 能力，本 App 是 Android，做不了。
+  与厂商无关、能立刻替代"常驻可见"的两条其实已经存在：桌面插件 `NextBusWidgetProvider.kt:74` 与 QS 磁贴
+  `ArrivalAlertTileService.kt:19-53` —— 下一条该做的是把它们的数据接稳，而不是先许诺实况窗。
+
+读数：新用例 `NotificationPrivacyContractTest` 3 例；全量 `--rerun-tasks` = **58 类 / 588 例 / 0 失败**。
+能红证明：把策略从"默认遮掩"翻回"默认放行" ⇒ `3 tests completed, 1 failed`（红的正是"未知渠道按最保守的处理"那条，
+即策略点本身），`RESTORE_DIFF=0`。⚠ 同轮我自己写错过一次方向：先写的用例标题是"最保守"、断言却是 `assertNull`
+（=默认放行），当场发现是断言与标题相反而不是实现错 —— 实现改成默认遮掩后断言才配得上标题。
+仍未验：真机上锁屏/横幅的实际渲染（`VISIBILITY_PRIVATE` 与 publicVersion 生效与否属系统绘制，JVM 测不到）
+⇒ `NOT VERIFIED ON DEVICE`。
+
+### D-076 续六（10-12 14:4x）· #42 天气：一份文案拆成两份说法，并把司机端那一栏接上
+
+**取证到的原状（不是推测）**：全工程只有**一条**天气文案 `farmTips`（六条清一色货运口径，"给山货加盖苫布"那种），
+两个天气生产者（高德实况那一路、open-meteo 那一路）各自调它一次；
+**改后**这两处填两份说法的落点是 `Repo.kt:372`（高德）与 `Repo.kt:419`（open-meteo），本轮实测；
+`WeatherInfo` 只有一个 `tips` 字段 ⇒ 结构上就没有"第二份说法"的位置。
+而 `Repo.weather` 的唯一调用点在用户端首页（`HomeScreen.kt:185`）⇒ **司机工作台既不取也不显示天气**。
+所以用户那句"天气提醒司机和用户应该文案不一样"实际缺两样：第二份说法 + 司机端那一栏。
+
+**改了什么**
+1. `WeatherInfo` 加 `driverTips`（默认空串）；`farmTips` 换成顶层纯函数 `weatherTipsFor(condition, temp): Pair<用户说法, 司机说法>`（8 档），
+   两个生产者同时填两份。**新增一档**：`霾` 与 `雾` 并进"能见度偏低"（`BusIcons.weatherOf` 早就是这么归类的，文案却漏了霾）。
+2. 分工依据写进函数头注释：**谁能改什么**——用户改"什么时候送件、要不要苫布"，司机改"怎么开"（车距/雾灯/是否延后发车）。
+   司机侧只写因天气而变的操作动作，**不声称知道路面实际状况**（本机没有任何路面观测量，写"路面湿滑"就是造第二条真相）。
+3. 新簿 `ui/driver/DriverWeatherTip.kt`：`shouldFetch`（15 分钟，单调时钟 `Locator.elapsed()`）+ `lineOf`（`mock` 与 `null` 一律空串 ⇒ 那一栏不出现）。
+4. `WorkbenchScreen`：取数接在 `syncFromServer()` **尾部**，不另开一条 `work()` —— `work()` 进门先清 `error`（`ScreenViewModel.kt:38`），
+   另起一轮就会把本班真正的失败原因抹掉（与 #38"状态位被后到的一轮覆写"同形）。取数点用 `Running.geo`（司机自己上报的那个点），
+   **没有位置就不发请求、那一栏就不出现**；旧的那种"兜一个重庆中心坐标去查天气"在用户端已经红过一次（§14）。
+5. UI：`item(key = "weather")` 挂在导航卡与仓位表之间，读数只列真给到的 `text/temperature`，来源标签照实给（`高德天气` / `open-meteo`），不写"实时"。
+
+**读数**：新用例 `DriverWeatherContractTest` 8 例；全量 `--rerun-tasks` = **59 类 / 596 例 / 0 失败**
+（59 份 XML 的 timestamp 全部 `2026-10-12T06:41`，没有上一遍残留可被当成本轮读数）。判据簿 `tools/check_weather_probes.sh` 14 项基线全绿（rc=0）。
+
+**能红证明（两侧都跑了）**
+- 行为侧（本轮手工注入，5 处 ⇒ 7 条具名红，原因逐条对得上）：
+  晴档两侧改成同一句 ⇒ `同一场天气的两份说法必须不同` **且** `司机侧每条都要落一个可执行动作` 双红；
+  空条件兜一句"出行前留意山区路况" ⇒ `天气没取到时两份说法都为空` 红（`expected:<("","")> but was:<("", "…")>`）；
+  低温档写"路面湿滑" ⇒ `司机侧不得声称知道路面实际状况` 红；
+  `shouldFetch` 恒真 ⇒ 两条闸门用例红（14 分钟那条 + 时间戳倒挂那条）；
+  `lineOf` 在 mock 时兜"注意行车安全" ⇒ `没取到天气时司机端那一栏不出现` 红（`expected:<[]> but was:<[注意行车安全]>`）。
+  注入的 5 处原样恢复（`.mut` 备份 + `cp` 还原 + grep 逐行核对）。
+- 结构侧（新簿 `tools/weather_negative_controls.sh`，7 条破口 ⇒ **7/7 红且原因对得上**，收尾 `[恢复] 判据簿重新通过` + 三份文件 `cmp` 一致）。
+  注意 `EXPECTED_BOOKS` 是按 glob 推的，本书自动进批次（负控全批因此从 28 本变 29 本，仍欠一次整批）。
+
+**两处判据自身被负控证伪（诚实记录，都是"看起来绿"的那一类）**
+- WS-3 第一版**注入后判据仍绿**：`W-d` 用 `grep -c 'item(key = "weather")'`，把那一栏整行注释掉之后**文本还在文件里** ⇒
+  判据读成"这一栏还在场"。改成滤注释行后同一注入才真的红。形状与 §八 那条同族：**0 命中/计数型判据必须能对被注释掉的代码变红**。
+- 第一次写注释行过滤把 regex 写成 `:[0-9]+: *(//|\*)` —— 那是 `grep -rn` 的 `file:line:content` 形状；单文件 `grep -n` 只有一处冒号，
+  永不匹配 ⇒ 改了个"看起来对"的过滤器，负控照旧绿。改成 `^[0-9]+: *(//|\*)` 才咬住（实测 RC 从 1→0）。
+
+**有意不做的那一格**：后端仍然没有天气通路（#42 标题里那半句），本轮**不新增后端天气接口**——
+App 直连高德 Web key REST 与 open-meteo，10-10 真机已实测 `infocode=10000`、`22°C 雾` 出数；把天气绕进后端只会多一跳、
+并把"这一句来自哪一路"的来源标签抹平（与 #41 那本判据同一条理由）。登记为决定，不是遗漏。
+
+**仍未验**：真机工作台那一栏的实际渲染、以及"15 分钟内不发第二次 REST"（要 logcat/抓包才算证）⇒ `NOT VERIFIED ON DEVICE`。
+
+**续六 补（同日，判据读数自纠 —— 这一格比代码本身重要）**
+
+跑 `tools/check_*.sh` 全批时我用的是：
+
+```bash
+for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; done
+```
+
+它把 **25 本全读成 rc=0**，而我照着写了"14 本绿"。原因不是判据，是我这行读数写法：
+`$(basename $f)` 是命令替换，它在 `$?` 展开**之前**执行并把 `$?` 改成自己的退出码（恒 0）⇒
+`rc=$?` 打的永远是 `basename` 的码，不是判据簿的码。改成先 `rc=$?` 再拼字符串后，真实读数是 **10 本红**。
+教训与 §八 那条同源：**判成败只认汇总行**，而汇总行本身也要先证明它数得动。
+
+为了分清"哪几本是我这轮弄红的"，用 `git worktree add ../_wt-head --detach HEAD` 开了一个 HEAD 只读副本
+（不动工作树、不 stash），同一批判据在两处各跑一遍，逐本比对红行集合：
+
+| 判据簿 | HEAD 基线 | 本轮工作树 | 归因 |
+|---|---|---|---|
+| doc_anchor | 红（ID-MISS **329**） | 红（ID-MISS **374**） | 本轮源码位移贡献 +45（#42 把 `weatherTipsFor` 挪到 Repo.kt 末尾，Repo/Workbench 之下所有历史 `path:line` 锚点整体错位）⇒ 归 #159 |
+| eta / mission_route / navigation / reachability / runcatching / throwable / safe_call(2 条) | 红 | 红行集合与 HEAD **逐字相同** | 本轮前既有欠账 |
+| envelope | **绿**（E-b=3） | 红（E-b=5） | 本轮 #46 新增两处合法标量读法 ⇒ 已按"口径只抬不降 + 逐处点名"抬到 5 并注明后端 `TimestampLocalDateTimeSerializer`（`YudaoJacksonAutoConfiguration.java:62`）⇒ **绿** |
+| test_suite_hygiene | **绿**（SU-b=56/2） | 红（SU-b=61/2） | 本轮新增五本测试类 ⇒ 按"恰好 N 的摩擦设计"补注释并重测：SU-a 59/0、SU-c 0/**596**（596 与全量产物用例总数一致）⇒ **绿** |
+| safe_call | 红 2 条 | 一度红 3 条 | SA-d 的"Repo 只许 1 处 attempt"被 #46 续期那一处顶到 2 ⇒ 没有只改数字，而是**新增第二处整行字面量点名** `D_ATTEMPT_REFRESH`（那处落 `?: return false`，不是 ⑨ 禁的"失败洗成空值"；`Attempt.kt:20-21` 仍 rethrow 取消）⇒ 红行集合回到与 HEAD 逐字相同 |
+
+**顺带量出来的一条仪器缺陷（未修，等用户点头才装）**：CI 的"判据簿"那一步是
+`bash "$s" | tail -20 || rc=1`（`.github/workflows/build-and-release.yml:46`），GitHub Actions 的 `run:` 默认**不开** `pipefail`
+⇒ 管道退出码取 `tail` 的 0，`|| rc=1` 永远不触发。本机同形实测：`set -u; false | tail -1 || echo FIRED` 不打印，
+加 `-o pipefail` 才打印。也就是说**CI 从来没被这批判据簿拦住过**：上表里 HEAD 就已经红的 8 本，
+在 actions 上一路显示绿。修法是一行（`run: |` 里加 `set -o pipefail`），但装上它的那次 push 会立刻红 8 本
+——那是真话浮出来，不是新破口，所以要先决定"先清账再装"还是"装了让它红"。
+
+**另一处自查**：我给本轮台账写的两处行号引用（`Repo.kt:371`/`415`）指的是**改前**的位置，改后是 372/419；
+已就地改成"改前用函数名指认、改后给实测行号"的写法。DA-e 的聚合读数不受这句影响（实测：删掉整段续六，374 一字不变）。

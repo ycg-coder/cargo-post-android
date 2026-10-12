@@ -202,6 +202,11 @@ class HomeViewModel : ScreenViewModel() {
         // 旧写法让它落到 empty 那一支，念出「附近暂无公交线路」，
         // 而同一时刻实时公交页写着 80 条线路、1192 个站点（设备实拍 home_1 与 bus_1 前后脚）—— 两屏互相打脸。
         if (geo == null) return "noloc"
+        // 有失败原因就必须报 error：旧写法先 `nearby ?: return "loading"`，而 `Repo.kt:837` 失败时回的是
+        // One(null, error=…) ⇒ `error != null` 必然 `nearby == null` ⇒ 下面那行 error 判定与
+        // 「网络不太好 / 重新加载」那张卡（:496-502）一起变成**死代码**，失败只表现为永远转圈的骨架屏
+        // —— 真机反馈"首页没有附近公交卡片"读到的就是这一格。
+        if (nearby == null && error != null) return "error"
         val r = nearby ?: return "loading"
         if (error != null && r.vehicles.isEmpty()) return "error"
         // 同上：inService 缺失不许当成"运营中"的反面（F-2 §四）；

@@ -9,6 +9,7 @@ import android.net.Uri
 import android.app.PendingIntent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import com.shanxiang.buspost.MainActivity
 import com.shanxiang.buspost.R
@@ -54,6 +55,24 @@ object Channels {
     }
 }
 
+/**
+ * 锁屏可见性口径（纯函数，JVM 用例可断言）。
+ *
+ * 返回非 null = 这条通知的正文含"你在等哪班车 / 寄到哪 / 几分钟到"这类**看一眼就能反推行程**的信息，
+ * 锁屏必须换成这句不含内容的话（并配 publicVersion）；返回 null = 该渠道正文不含个人信息（如后台服务提示），
+ * 保持系统默认可见，不多这一道遮掩。
+ *
+ * 为什么现在才收：`Notifier.push` 从来没设过 `setVisibility`/`setPublicVersion`，
+ * 而通知正文由 `AlertEngine` 直接拼站名与分钟数（`AlertEngine.kt:69/90/118`）——
+ * 锁屏未解锁就能看到"XX 村 3 分钟"，与任务 #36 记的"PII 无脱敏"同一族。
+ */
+internal fun lockScreenTextFor(channel: String): String? = when (channel) {
+    // 白名单只放"正文确认不含个人信息"的那一条；其余（含以后新增、忘了登记的渠道）默认遮掩。
+    // 反过来写会埋雷：加一条新渠道时忘了改这里，默认就是"锁屏摊开正文"。
+    Channels.SERVICE -> null
+    else -> "乡邮智联有新提醒，解锁查看详情"
+}
+
 object Notifier {
 
     // 没授权时那次 `notify()` 抛 SecurityException，下面那段捕获已经把它收成一条
@@ -85,6 +104,18 @@ object Notifier {
             .setAutoCancel(true)
             .setContentIntent(pending)
             .setWhen(System.currentTimeMillis())
+            // 品牌色着色：Android 8+ 小图标是单色蒙版，不给 color 就只能灰白一片
+            .setColor(ContextCompat.getColor(context, R.color.bus_primary))
+        lockScreenTextFor(channel)?.let { pub ->
+            builder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(
+                    NotificationCompat.Builder(context, channel)
+                        .setSmallIcon(R.drawable.ic_notification)
+                        .setContentTitle("乡邮智联")
+                        .setContentText(pub)
+                        .build(),
+                )
+        }
         if (channel == Channels.ARRIVAL) {
             builder.setPriority(NotificationCompat.PRIORITY_HIGH).setDefaults(NotificationCompat.DEFAULT_VIBRATE)
         }

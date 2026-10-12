@@ -79,6 +79,7 @@ import com.shanxiang.buspost.data.model.PickupTask
 import com.shanxiang.buspost.data.model.ShiftState
 import com.shanxiang.buspost.data.model.ShiftTask
 import com.shanxiang.buspost.data.model.stopStateOf
+import com.shanxiang.buspost.data.model.WeatherInfo
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.core.AppState
@@ -114,6 +115,17 @@ class WorkbenchViewModel : ScreenViewModel() {
     var tasks by mutableStateOf<List<com.shanxiang.buspost.data.model.DriverTask>>(emptyList())
         private set
     var guide by mutableStateOf<com.shanxiang.buspost.data.model.RouteGuide?>(null)
+        private set
+
+    /**
+     * 司机端天气（#42）：与用户端**同一条取数通路**（`Repo.weather`：高德 → open-meteo → 两路都空则 mock=true），
+     * 显示的是 `WeatherInfo.driverTips` 那一份说法。null = 这一轮没取（没位置时永远停在 null，那一栏就不出现）。
+     */
+    var driverWeather by mutableStateOf<WeatherInfo?>(null)
+        private set
+
+    /** 上一次取天气的单调时刻（`Locator.elapsed()` 口径）；0 = 从未取过。15 分钟闸门由 [DriverWeatherTip] 判 */
+    internal var weatherAtElapsed = 0L
         private set
 
     /**
@@ -260,6 +272,17 @@ class WorkbenchViewModel : ScreenViewModel() {
         error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()
         p.value?.name?.let { Prefs.driverName = it }
         p.value?.plate?.let { if (it.isNotEmpty()) Prefs.vehiclePlate = it }
+        // 司机端天气（#42）跟着这一轮回读走，**不另开一条 `work()`**：`work()` 进门先把 error 清空
+        // （ScreenViewModel.kt:38），另起一轮就会把本班真正的失败原因抹掉 —— 与 #38 那条"状态被后到的一轮覆写"同形。
+        // 15 分钟闸门在这里生效而不是在页面里：下拉刷新、每次作业动作后的回读都会走到这一行，没有闸门就是一刷一次 REST。
+        val wxGeo = Running.geo.value
+        val nowMs = Locator.elapsed()
+        if (wxGeo != null && DriverWeatherTip.shouldFetch(weatherAtElapsed, nowMs)) {
+            // 与用户端同一优先级：先逆地理拿 adcode（高德天气是区县级），adcode 空时 Repo 自己退到坐标级。
+            val rg = Repo.reverseGeo(wxGeo)
+            driverWeather = Repo.weather(wxGeo, rg.adcode)
+            weatherAtElapsed = nowMs
+        }
     }
 
     fun depart() {
@@ -795,6 +818,14 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                             onOpenLaneGuide = { nav.navigate(Routes.DRIVER_GUIDE) },
                         )
                     }
+                }
+
+                // 司机端天气（#42）：与用户端同源同刻取数，说法换成 `driverTips` 那一份。
+                // 出现条件就是 `lineOf` 非空——没取到（null 或 mock）整栏不占屏，不兜一句"注意行车安全"。
+                val driverWx = vm.driverWeather
+                val driverWxLine = DriverWeatherTip.lineOf(driverWx)
+                if (driverWx != null && driverWxLine.isNotEmpty()) {
+                    item(key = "weather") { DriverWeatherNotice(driverWx, driverWxLine) }
                 }
 
                 // 待发车状态：显示大巴车行李舱容量可视化（对齐小程序 workbench.wxml:153-187）
@@ -1541,6 +1572,43 @@ private fun PickupCard(
             }
             SourceTag(if (task.orderNo.isNotEmpty()) task.orderNo else null, Modifier.padding(top = 8.dp))
         }
+    }
+}
+
+/**
+ * 司机端天气那一栏（#42）：说的是"因天气而变的操作动作"，不是寄件人的装车建议。
+ * 与用户端 `WeatherCard` 同源同刻（走的是同一条 `Repo.weather` 通路），
+ * 两份说法的分工写在 `Repo.kt` 末尾的 `weatherTipsFor` 上；来源标签照实给（高德天气 / open-meteo），
+ * 不写"实时"也不写"本班天气"——那一格只知道自己来自哪一路。
+ */
+@Composable
+private fun DriverWeatherNotice(w: WeatherInfo, line: String) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    BusCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                BusIcons.weatherOf(w.text),
+                contentDescription = w.text,
+                tint = t.goldDeep,
+                modifier = Modifier.size((18 * scale).dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "${w.text} ${w.temperature}°C",
+                color = t.ink,
+                fontWeight = FontWeight.Bold,
+                fontSize = (14 * scale).sp,
+            )
+            Spacer(Modifier.weight(1f))
+            BusTag(w.source.ifEmpty { "天气" }, tone = BusTone.NEUTRAL)
+        }
+        Text(
+            line,
+            color = t.textSecondary,
+            fontSize = (12 * scale).sp,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 

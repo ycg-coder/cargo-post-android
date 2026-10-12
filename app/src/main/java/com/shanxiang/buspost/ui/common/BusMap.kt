@@ -109,6 +109,12 @@ fun BusMap(
      * 只有任务地图这类需要立体感的场景才显式传值，其他页面保持与小程序 `<map>` 一致。
      */
     tiltDegrees: Float = 0f,
+    /**
+     * 是否画"我的位置"蓝点（真机反馈"实时公交地图不显示自己位置"的那一格）。
+     * 由调用方按**运行时权限**传值：高德的按钮开关与图层开关是两个独立设置，
+     * 以前只开了 `isMyLocationButtonEnabled`（`BusMap.kt:157-166`），于是按钮在、点了没蓝点。
+     */
+    showMyLocation: Boolean = false,
     onUnavailable: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -164,6 +170,11 @@ fun BusMap(
                     // 倾斜手势跟着倾斜角开：没要立体视角的页面不该多出一个能改变读图几何的手势
                     isTiltGesturesEnabled = tiltDegrees > 0f
                 }
+                // 蓝点图层（与上面那个按钮是两回事）：只有调用方确认已授权才开 ——
+                // SDK 不会替我们弹权限框，未授权时开图层等于画一个永远不来位置的点。
+                // 不另设 MyLocationStyle：本 SDK 版本的样式常量名与文档不一致（实测
+                // `LOCATE_TYPE_LOCATION_CENTER_MAP` 不可解析），默认样式已是"定位到并把地图居中"。
+                aMap.isMyLocationEnabled = showMyLocation
                 aMap.clear()
 
                 paths.forEach { p ->

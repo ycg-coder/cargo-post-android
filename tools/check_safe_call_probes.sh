@@ -81,6 +81,13 @@ D_EMPTY_PROOF=$(grep -c 'emptyList()' "$REPO")
 D_ATTEMPT_REPO=$(grep -rn 'attempt {' "$REPO" | grep -vE "$NC" | wc -l | tr -d ' ')
 D_ATTEMPT_FORECAST=$(grep -cF 'val forecast = attempt {' "$REPO")
 D_ATTEMPT_MAIN=$(grep -rn 'attempt {' "$S" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
+# 基数 1 → 2 的增量 = D-076 #46 的续期那一处（`Repo.kt:140`）。形状与 ⑨ 禁的那种不同：
+#   它落到 `?: return false`（续期失败就说失败，调用方照原路把 401 交给上层清盘），
+#   不是 ⑨ 点名的"失败洗成空列表/空数据"那一类；`attempt` 本身 rethrow CancellationException
+#   （`core/net/Attempt.kt:20-21`），所以取消也不会被吞。
+#   豁免面照旧**按整行字面量点名**（D_ATTEMPT_REFRESH），只数个数不算数。
+D_ATTEMPT_REFRESH=$(grep -cF 'Api.post("$M/auth/refresh-token"' "$REPO")
+
 D_THROW=$(grep -rn 'getOrThrow()' "$REPO" | grep -vE "$NC" | wc -l | tr -d ' ')
 D_SIG=$(grep -cF 'suspend fun linePolyline(routeId: String): List<Geo> {' "$REPO")
 
@@ -153,7 +160,7 @@ echo "SA-c 使用点合计                            = $USE （目标 6：Repo 
 echo "SA-c 五个迁移点点名                        = logout/weather/linePolyline/unread/driverUnread = $C_LOGOUT/$C_WEATHER/$C_POLY/$C_UNREAD/$C_DUNREAD （目标各 1）"
 echo "SA-c 页面消费点                            = $C_VM （目标 1）"
 echo "SA-d 伪装形状 ?: return emptyList()        = $D_EMPTY （目标 0）/ 反证 emptyList() 在 Repo = $D_EMPTY_PROOF"
-echo "SA-d Repo 的 attempt 残留 / 预报解析点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_MAIN （目标 1/1/≥11）"
+echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/≥11）"
 echo "SA-d linePolyline 出口 getOrThrow / 签名    = $D_THROW/$D_SIG （目标 1/1）"
 echo "SA-e 页面状态：声明/复位/分类/文案        = $E_DECL/$E_RESET/$E_CLASS/$E_REASON/$E_SUB （目标 1/2/1/2/1）"
 echo "SA-e 旧形状三处（必须归零）                = $E_OLD_CALL/$E_OLD_SUB/$E_OLD_REASON （目标 0/0/0）"
@@ -184,7 +191,8 @@ fail=0
 [ "$C_VM" = 1 ] || { echo "× SA-c 页面的折线消费点不再走 helper：抛出的失败会直冲 work()，页面从此说不出「这次没问到」"; fail=1; }
 [ "$D_EMPTY" = 0 ] || { echo "× SA-d 长出 $D_EMPTY 处 \`?: return emptyList()\`：失败被洗成「没有内容」，空态会说假话"; fail=1; }
 [ "$D_EMPTY_PROOF" -gt 0 ] || { echo "× SA-d 反证失败：emptyList() 在 Repo 都数不出来，上面那个 0 不可信"; fail=1; }
-[ "$D_ATTEMPT_REPO" = 1 ] || { echo "× SA-d Repo 的 attempt 是 $D_ATTEMPT_REPO 处（⑨ 之后实测 1）：多出来的是网络读退回旧 helper（分类丢失），少掉的是预报解析那处取消出口被换形"; fail=1; }
+[ "$D_ATTEMPT_REPO" = 2 ] || { echo "× SA-d Repo 的 attempt 是 $D_ATTEMPT_REPO 处（D-076 之后实测 2 = 预报解析 + 续期）：多出来的是网络读退回旧 helper（分类丢失），少掉的是那两处点名被换形"; fail=1; }
+[ "$D_ATTEMPT_REFRESH" = 1 ] || { echo "× SA-d 续期那处 attempt 的字面量不见了（=$D_ATTEMPT_REFRESH≠1）：第二格豁免要么被扩大，要么已被换形"; fail=1; }
 [ "$D_ATTEMPT_FORECAST" = 1 ] || { echo "× SA-d Repo 唯一的 attempt 不是 ⑨ 点名的预报解析段（整行字面量不见了）：豁免面必须点名，否则'有 1 处'会被用来藏任意 1 处"; fail=1; }
 [ "$D_ATTEMPT_MAIN" -ge 11 ] || { echo "× SA-d 全 main 的 attempt 只剩 $D_ATTEMPT_MAIN（下限 11 = F-2 ⑧ 的 7 处 + ⑨ 迁入的 4 处，逐点归因见 docs/android/RUNCATCHING_AUDIT.md 第二节）：Worker/定位/引擎那几处被顺手删了"; fail=1; }
 [ "$D_THROW" = 1 ] || { echo "× SA-d linePolyline 的出口不是 getOrThrow（Repo 内 $D_THROW 处）：失败与后端回空又混成一个值"; fail=1; }
