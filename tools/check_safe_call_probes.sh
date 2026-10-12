@@ -77,7 +77,17 @@ D_EMPTY_PROOF=$(grep -c 'emptyList()' "$REPO")
 #   那一处被改名或被删掉也会红——safe_call_negative_controls.sh 第 7 条与第 7b 条各打破一次。
 # 全 main 的下限同轮从 7 抬到 11：11 = ⑧ 的 7 处 + ⑨ 迁进取消可达作用域的 4 处
 #   （Repo 预报解析 / 算路受理 / 深链跳转 / TTS 设语种，逐点归因见 docs/android/RUNCATCHING_AUDIT.md 第二节）。
-#   这是**实测抬高**，不是把下限放松：抬完之后"顺手删掉一处"照样红（负控第 10 条）。
+# ⚠ **11 已经不是今天的数**（D-082 的 SA-d 空转闸门就是这个）：那句"抬完之后'顺手删掉一处'照样红"当时写在
+#   第 76 行的注释里，而负控第 10 条实测**没红** —— 因为下限离实测差着 3 处，删一到三处都不咬。
+#   现在改成**恰好 14**，并把 14 处逐点列在下面（正面枚举就是归因）：
+#     BusPostApp.kt:43 开屏预取 / Locator.kt:214 定位取点 / AmapNavigationEngine.kt:447 算路受理
+#     Repo.kt:140 续期（dd7d6093 2026-10-12）/ Repo.kt:394 预报解析 / NotifyWorker.kt:34 后台轮询
+#     BusPostRoot.kt:97 深链跳转 / BusPostRoot.kt:111 公告 / BusPostRoot.kt:112 附近公交
+#     UpdateSection.kt:86 装包申请权限（3687211c 2026-10-12）/ DriverGuideScreen.kt:136 算路
+#     DriverNavScreen.kt:718 TTS 设语种 / DriverSdkNavCard.kt:266 算路 / HandoverScreen.kt:160 交接照片
+#   11→14 这一段里只有 2 处能指到具名提交（续期、装包）；本仓 git 历史起点是 2026-10-10，
+#   更早那部分**无法再归因**，所以这里不写"另外两处是谁加的"，只写"当前实测 14、逐点如上"。
+#   再加/再删一处都要同轮改这个数并把该点列进上面这张表（与 TH-f 同一条数，两本不许各说一套）。
 D_ATTEMPT_REPO=$(grep -rn 'attempt {' "$REPO" | grep -vE "$NC" | wc -l | tr -d ' ')
 D_ATTEMPT_FORECAST=$(grep -cF 'val forecast = attempt {' "$REPO")
 D_ATTEMPT_MAIN=$(grep -rn 'attempt {' "$S" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
@@ -166,7 +176,7 @@ echo "SA-c 使用点合计                            = $USE （目标 6：Repo 
 echo "SA-c 五个迁移点点名                        = logout/weather/linePolyline/unread/driverUnread = $C_LOGOUT/$C_WEATHER/$C_POLY/$C_UNREAD/$C_DUNREAD （目标各 1）"
 echo "SA-c 页面消费点                            = $C_VM （目标 1）"
 echo "SA-d 伪装形状 ?: return emptyList()        = $D_EMPTY （目标 0）/ 反证 emptyList() 在 Repo = $D_EMPTY_PROOF"
-echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/≥11）"
+echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/恰好 14）"
 echo "SA-d linePolyline 出口 getOrThrow / 签名    = $D_THROW/$D_SIG （目标 1/1）"
 echo "SA-e 页面状态：声明/复位/分类/文案        = $E_DECL/$E_RESET/$E_CLASS/$E_REASON/$E_SUB （目标 1/2/1/2/1）"
 echo "SA-e 旧形状三处（必须归零）                = $E_OLD_CALL/$E_OLD_SUB/$E_OLD_REASON （目标 0/0/0）"
@@ -200,7 +210,7 @@ fail=0
 [ "$D_ATTEMPT_REPO" = 2 ] || { echo "× SA-d Repo 的 attempt 是 $D_ATTEMPT_REPO 处（D-076 之后实测 2 = 预报解析 + 续期）：多出来的是网络读退回旧 helper（分类丢失），少掉的是那两处点名被换形"; fail=1; }
 [ "$D_ATTEMPT_REFRESH" = 1 ] || { echo "× SA-d 续期那处 attempt 的字面量不见了（=$D_ATTEMPT_REFRESH≠1）：第二格豁免要么被扩大，要么已被换形"; fail=1; }
 [ "$D_ATTEMPT_FORECAST" = 1 ] || { echo "× SA-d Repo 唯一的 attempt 不是 ⑨ 点名的预报解析段（整行字面量不见了）：豁免面必须点名，否则'有 1 处'会被用来藏任意 1 处"; fail=1; }
-[ "$D_ATTEMPT_MAIN" -ge 11 ] || { echo "× SA-d 全 main 的 attempt 只剩 $D_ATTEMPT_MAIN（下限 11 = F-2 ⑧ 的 7 处 + ⑨ 迁入的 4 处，逐点归因见 docs/android/RUNCATCHING_AUDIT.md 第二节）：Worker/定位/引擎那几处被顺手删了"; fail=1; }
+[ "$D_ATTEMPT_MAIN" = 14 ] || { echo "× SA-d 全 main 的 attempt 是 $D_ATTEMPT_MAIN 处（**恰好 14**，2026-10-12 实测逐点枚举见本簿上方 SA-d 注释；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删掉一~三处都不红 = D-082 的空转闸门）：少一处就是 Worker/定位/引擎那几处被顺手改回 runCatching（取消被吞），多一处就是有人新开了第六个不走 safeApiCall 的网络读"; fail=1; }
 [ "$D_THROW" = 1 ] || { echo "× SA-d linePolyline 的出口不是 getOrThrow（Repo 内 $D_THROW 处）：失败与后端回空又混成一个值"; fail=1; }
 [ "$D_SIG" = 1 ] || { echo "× SA-d linePolyline 的签名被改成「不抛」的形状（$D_SIG）：这一处修复的前提没了"; fail=1; }
 [ "$E_DECL" = 1 ] || { echo "× SA-e 页面没有独立的折线状态字段：失败又要去挤共享的 vm.error，别的接口失败会被说成「这条线路没轨迹」"; fail=1; }

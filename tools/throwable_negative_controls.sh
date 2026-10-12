@@ -131,7 +131,7 @@ swap "$ATT" '} catch (e: CancellationException) {' '} catch (e: TimeoutCancellat
 ctl TH-f "attempt 只穿透超时取消：其余取消被收进 Result，helper 退化成 runCatching"
 
 swap "$APP" 'attempt { AlertEngine.check(this@BusPostApp) }' 'runCatching { AlertEngine.check(this@BusPostApp) }'
-ctl TH-f "前台轮询退回 runCatching：attempt 调用点 11→10（F-2 ⑨ 迁了 4 处取消可达作用域后的实测基线，判据下限同为 11）"
+ctl TH-f "前台轮询退回 runCatching：attempt 调用点恰好 14→13（判据与 SA-d 同钉 14；旧写法 -ge 11 时这一条只被 TH-g 抓到、记成 △，数量那条腿根本不咬 = D-082）"
 
 # ── TH-g 挂起形状 runCatching 残留 ──────────────────────────────────────────
 swap "$LOC" 'attempt { locations(context).first() }' 'runCatching { locations(context).first() }'

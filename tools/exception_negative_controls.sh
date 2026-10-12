@@ -112,7 +112,10 @@ ctl EX-e "截断路径被删（超长 remark 直接出网）"
 swap "$RQ" 'const val DRIVER_EXCEPTION = "driverException"' 'const val DRIVER_EXCEPTION = "driverException/{legId}"'
 ctl EX-f "路由常量字面量被改动（带参数会绕过精确匹配的分域闸）"
 
-drop "$RT" 'composable(Routes.DRIVER_EXCEPTION) { DriverExceptionScreen() }'
+# ⚠ D-082 之后重锚：这一行现在是 `composable(Routes.DRIVER_EXCEPTION) { … BusRouteBody { DriverExceptionScreen() } }`
+#   （D-076 那轮把注册包进了 BusRouteBody），旧锚点整句匹配不上 ⇒ drop 静默落空、EX-f 根本不判。
+#   锚点只指到 `{` 为止：里面套什么由 BusRouteBody 说，这里钉的是"导航图那一行还在不在生效行里"。
+drop "$RT" 'composable(Routes.DRIVER_EXCEPTION) {'
 ctl EX-f "异常页没注册进导航图"
 
 drop "$RS" 'onException = { AppState.openException(leg.legId); nav.navigate(Routes.DRIVER_EXCEPTION) },'
@@ -124,7 +127,10 @@ ctl EX-f "段号进入意图的函数被删"
 swap "$DS" 'receipt = "没有可选中的运输段，本次未发给后端"' 'receipt = "上报成功"'
 swap "$DS" 'receipt = if (reason == null) "先选一项异常情况，本次未发给后端"' 'receipt = if (reason == null) "上报成功"'
 swap "$DS" 'else "选「其他」必须写清具体情况，本次未发给后端"' 'else "上报成功"'
-swap "$DS" '"同一个异常上报还在处理中，本次点击未发给后端，以下为后端当前状态"' '"同一个异常上报还在处理中，已提交后端，以下为后端当前状态"'
+# ⚠ D-082 之后重锚 + 判据随动（EG4/EG5）：这句在 10-12 话术收紧时改短了，旧锚点带着
+#   「本次点击未发给后端」那半句 ⇒ swap 静默落空。就算把锚点对上，EG 那条腿也看不见这一格
+#   （它数的是"未发给后端"四个字，而这一格现在说的是"以下为当前状态"），所以判据改成按 **分支** 钉。
+swap "$DS" 'ack.notSent -> "同一个异常上报还在处理中，以下为当前状态"' 'ack.notSent -> "同一个异常上报已提交后端，以下为当前状态"'
 ctl EX-g "把没发出去的说成已提交（假上报）"
 
 swap "$DS" '"异常已提交，但后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"' '"异常已提交后端，状态已更新"'

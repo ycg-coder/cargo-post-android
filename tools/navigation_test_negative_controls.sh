@@ -52,7 +52,7 @@ PY
 }
 
 fails() { # 失败数只从测试产物读，不读 gradle 的措辞
-  python - "$1" <<'PY'
+  python - "$@" <<'PY'
 import sys, os, xml.etree.ElementTree as ET
 # 汇总 CLS 里跑到的**所有**用例本：只看一份 XML 会让新加的测试本看不见，
 # 于是注入明明把 gradle 打红了（exit=1），计数却还是 0/58，整条负控被报成「两者不一致」。
@@ -253,9 +253,11 @@ s = s.replace(old, new, 1)
 case_run M13 "没有 accepted 记录也判成同一条"
 
 # M14 三种成因并成一句话：现场只看到"不能导航"，查不出该重新算还是该等高德回路径
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这两句改短成了「没有路径几何」/「还没有一次通过验证的算路」，
+#   旧锚点那两串长句整条都不在树里 ⇒ 这本在 M14 就 exit 2，M15 之后一条都没跑到。
 red "$NE" "
-old = '        reason = \"高德当前没有路径几何，本机无法确认要导哪一条\",'
-new = '        reason = \"本机还没有一次通过验证的算路，不能开始导航\",'
+old = '        reason = \"没有路径几何\",'
+new = '        reason = \"还没有一次通过验证的算路\",'
 assert old in s, 'ANCHOR-MISS M14'
 s = s.replace(old, new, 1)
 "
@@ -350,7 +352,9 @@ case_run M23 "frontLane 被按 laneCount 补齐"
 
 # M24 「高德没给车道」被念成「这条路没有车道」：四格里最要紧的那一格并错了对象
 red "$NE" "
-old = '    null -> \"高德没给车道信息（这不等于这条路没有车道）\"'
+
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这几句面向司机的话术改短了
+old = '    null -> \"暂时没拿到车道信息\"'
 new = '    null -> \"这条路没有车道\"'
 assert old in s, 'ANCHOR-MISS M24'
 s = s.replace(old, new, 1)
@@ -359,8 +363,10 @@ case_run M24 "没给过被念成高德说没有"
 
 # M25 数组重载那两个 byte[] 被解释成"推荐车道"：javap 只给了类型，语义没有任何来源
 red "$NE" "
-old = '组车道（数组重载）；它附带的两个 byte[] 语义本机没核过，不替你挑哪一组'
-new = '组车道（数组重载），第一个 byte[] 就是推荐车道，走它'
+
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这几句面向司机的话术改短了
+old = '组车道信息\"'
+new = '组车道信息，第一组就是推荐车道\"'
 assert old in s, 'ANCHOR-MISS M25'
 s = s.replace(old, new, 1)
 "
@@ -382,8 +388,10 @@ case_run M26 "countsAgree 被改成恒真"
 
 # M27 拥堵那句被换成偏航那句（两格并成一格：司机去检查一条根本没走过的错）
 red "$NE" "
-old = '        \"高德说前方拥堵，它要重新算路（拥堵在哪一段、多重，高德没说）\"'
-new = '        \"高德说车辆偏离了它给的这条路线，它要重新算路（回调无入参：偏了多少米、往哪偏，高德没说）\"'
+
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这几句面向司机的话术改短了
+old = '        \"高德说前方拥堵，它要重新算路\"'
+new = '        \"高德说车辆偏离路线，它要重新算路\"'
 assert old in s, 'ANCHOR-MISS M27'
 s = s.replace(old, new, 1)
 "
@@ -391,7 +399,9 @@ case_run M27 "拥堵那一格被念成偏航（两格并成一格）"
 
 # M28 "高德没说过"被念成"当前没有偏航"：本机替高德宣布了一个它没说过的否定结论
 red "$NE" "
-old = '    null -> \"高德没说过它在重新算路（偏航与拥堵都由高德自己说，本机不拿距离卡阈值判偏航）\"'
+
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这几句面向司机的话术改短了
+old = '    null -> \"高德没有说过重算（本机不拿距离卡阈值判偏航）\"'
 new = '    null -> \"当前没有偏航\"'
 assert old in s, 'ANCHOR-MISS M28'
 s = s.replace(old, new, 1)
@@ -400,30 +410,39 @@ case_run M28 "没给过被念成高德说没有偏航"
 
 # M29 广播那一格被补上结局（高德只说"它要重新算路"，成没成走的是不带原因的回执）
 red "$NE" "
-old = '它要重新算路（回调无入参：偏了多少米、往哪偏，高德没说）\"'
-new = '它要重新算路，这次会重算完成（回调无入参：偏了多少米、往哪偏，高德没说）\"'
+
+# ⚠ D-082 之后重锚：8387929（清除界面技术术语）把这几句面向司机的话术改短了
+old = '高德说车辆偏离路线，它要重新算路\"'
+new = '高德说车辆偏离路线，它要重新算路，这次已经重算完成\"'
 assert old in s, 'ANCHOR-MISS M29'
 s = s.replace(old, new, 1)
 "
 case_run M29 "偏航广播那一格被宣布重算完成"
 
 # M30 不带原因的回执被配成因果（AMapNavi 是进程单例，那次成功未必是这次广播的成功）
+# ⚠ D-082 之后改成**按行前缀定位**：中间那一版用 `，回执不带原因）"` 当锚点，全文件命中**两行**
+#   （成功格与失败格同尾），`replace(...,1)` 只是碰巧先命中成功格 —— 行序一变就打到失败格，
+#   那是"看起来对、其实靠运气"的注入。锚点里一个 `$` 都不能有（bash 双引号会吃掉 `${display.code}`），
+#   所以整行重写、`$` 走 chr(36)。
 red "$NE" "
-old = '；这条回执不带原因，本机不说它就是刚才那次偏航或拥堵的结果\"'
-new = '；它就是刚才那次偏航重算成功的结果\"'
-assert old in s, 'ANCHOR-MISS M30'
-s = s.replace(old, new, 1)
+lines = s.split('\n')
+hit = [n for n, x in enumerate(lines) if x.strip().startswith('\"高德回了算路结果（errorCode=')]
+assert len(hit) == 1, 'ANCHOR-NOT-UNIQUE M30：前缀命中 %d 行，应为 1' % len(hit)
+lines[hit[0]] = '        \"高德回了算路结果（errorCode=' + chr(36) + '{display.code}），它就是刚才那次偏航重算成功的结果\"'
+s = '\n'.join(lines)
 "
 case_run M30 "算路成功回执被配成那次偏航的结果"
 
 # M31 高德的 errorCode 被本机改成固定分档（句子里那个数不再是高德给的）
 # ⚠ 这段锚点里一个 `$` 都不能有：它是 bash **双引号**串，源码那句本来带 `${display.code}`，
 #   照抄进锚点会在展开阶段就死（第一轮 M31 正是这样假报了一条 ✘）。改按行前缀定位、整行换成一个写死的数。
+#   D-082 之后重锚：那句现在写作「高德回了算路失败（errorCode=…）」，旧前缀「高德自己回了一次算路失败」不在树里
+#   ⇒ 这本在 M31 又 exit 2 一次，M32–M36 当时连跑都没跑到（与 M14 同一个形状，第二次）。
 red "$NE" "
 lines = s.split('\n')
-hit = [n for n, x in enumerate(lines) if x.strip().startswith('\"高德自己回了一次算路失败（errorCode=')]
+hit = [n for n, x in enumerate(lines) if x.strip().startswith('\"高德回了算路失败（errorCode=')]
 assert len(hit) == 1, 'ANCHOR-MISS M31：前缀命中 %d 行，应为 1' % len(hit)
-lines[hit[0]] = '        \"高德自己回了一次算路失败（errorCode=0）；这条回执不带原因，本机不猜它要重算的那条成没成\"'
+lines[hit[0]] = '        \"高德回了算路失败（errorCode=0，回执不带原因）\"'
 s = '\n'.join(lines)
 "
 case_run M31 "失败回执里的 errorCode 被本机写死成 0"

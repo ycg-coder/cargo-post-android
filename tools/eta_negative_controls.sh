@@ -27,26 +27,18 @@ TSS="$TSD/SendEtaContractTest.kt"
 TDC="$TSD/DistanceCaliberContractTest.kt"
 
 rm -rf "$SC"
-mkdir -p "$A/data/model" "$A/data/repo" "$A/notify" "$A/widget" "$A/ui/user" "$A/ui/driver" "$A/ui/common" "$TSD"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/data/model/Models.kt" "$MD"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/data/repo/Repo.kt" "$RP"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/data/repo/DemoData.kt" "$DM"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/notify/AlertEngine.kt" "$AL"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/widget/NextBusWidgetProvider.kt" "$WG"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/user/BusScreen.kt" "$BS"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/user/HomeScreen.kt" "$HS"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/user/ParcelScreen.kt" "$PS"
-# ⑫ 货运侧新动的文件也要进沙盒：T-z/T-l/T-v2 这几条扫的是 ui/ 全域，少了它们基线就凑不齐
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/user/SendScreen.kt" "$SS"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/driver/RoutesScreen.kt" "$RS"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/driver/DriverNavScreen.kt" "$DN"
-cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/common/TraceView.kt" "$TV"
-cp "$SRC/app/src/test/java/com/shanxiang/buspost/data/BusEtaContractTest.kt" "$TS"
-cp "$SRC/app/src/test/java/com/shanxiang/buspost/data/SendEtaContractTest.kt" "$TSS"
-# ⑬ 里程口径的判据扫的是这个新文件，不 copy 进沙盒就没有基线可言
-cp "$SRC/app/src/test/java/com/shanxiang/buspost/data/DistanceCaliberContractTest.kt" "$TDC"
-# F-2 步 2：T-aj6/T-aj GUARD 都扫这个新文件，漏 copy 会让基线直接红（脚本自带 exit 2 拦截）
-cp "$SRC/app/src/test/java/com/shanxiang/buspost/data/MinutesContractTest.kt" "$TSD/MinutesContractTest.kt"
+# ⚠ D-082 之后改成**整目录 copy**（原来这里逐文件 cp，共 12 个文件 + 3 本 test）。
+#   后果实测在 10-12 那批：`T-z` 数的是 `ui/` 全域那七处如实文案，而 10-12 补进去的
+#   `ui/user/TraceScreen.kt`（里程/时长 各一处）**不在这张清单里** ⇒ 沙盒只读 5、真身读 7 ⇒
+#   基线当场红、整本"结果一律不采信"。这不是判据坏，是沙盒没照到判据的扫描面 ——
+#   本仓老规矩的原话是"沙盒必须整目录 copy，只拷两三个文件的负控会在你新增第四个文件时让基线先红"。
+mkdir -p "$SC/app/src/main" "$SC/app/src/test"
+cp -r "$SRC/app/src/main/java" "$SC/app/src/main/java"
+cp -r "$SRC/app/src/test/java" "$SC/app/src/test/java"
+for need in "$MD" "$RP" "$DM" "$AL" "$WG" "$BS" "$HS" "$PS" "$SS" "$RS" "$DN" "$TV" \
+            "$TS" "$TSS" "$TDC" "$TSD/MinutesContractTest.kt" "$A/ui/user/TraceScreen.kt"; do
+    [ -f "$need" ] || { echo "✘ 沙盒缺 $need（判据扫得到、副本没有 ⇒ 基线的数不是真数）"; exit 2; }
+done
 CLEAN=/tmp/eta_neg_clean.$$; cp -r "$SC" "$CLEAN"
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
 
@@ -160,7 +152,11 @@ i = s.find('\n    @Test'); open(p, 'w', encoding='utf-8').write(s[:i] + '\n    /
 PY
                                                                                                                        ctl T-x "货运侧契约测试被注释掉"
 sed -i 's/carrierLocationSource != "REAL_STALE"/carrierLocationSource == "REAL_STALE"/' "$PS";                         ctl T-y "位置过期的单又被当成可信到站提醒"
-find "$A" -name '*.kt' -print0 | xargs -0 sed -ri 's/到站分钟未下发|未给到站分钟|里程未给|时长未给/已到达/g';            ctl T-z "货运侧『没给』的如实文案被删（缺失又变静默）"
+# ⚠ D-082 之后重锚（这条是第 21 格，当时被"基线红"挡在下面没暴露）：破口替换的那四个词是 10-12 之前的旧话术
+#   （到站分钟未下发 / 未给到站分钟 / 里程未给 / 时长未给），今天树里是 时间暂未知 / 里程暂未知 / 时长暂未知 /
+#   全程时长暂未知 ⇒ sed 一个都没换 = **空跑**，而空跑在日志上的表现与"判据不判"同形（✘ 负控制失效 exit 0）。
+#   多条并列时把长的排前面：`时长暂未知` 是 `全程时长暂未知` 的子串，顺序反了会留下半句"全程已到达"。
+find "$A" -name '*.kt' -print0 | xargs -0 sed -ri 's/全程时长暂未知|时间暂未知|里程暂未知|时长暂未知/已到达/g';            ctl T-z "货运侧『没给』的如实文案被删（缺失又变静默）"
 echo "--- ⑬ 精确到站分钟 + 三个 distanceKm 口径新增判据的负控制 ---"
 sbysed "$MD" BusVehicle "val etaToNextStationMinutes: Double? = null" "val etaToNextStationMinutes: Double = 0.0";      ctl T-aa "精确到站分钟退回非空默认值（没给会说成约 0 分钟到下一站）"
 sed -i 's/Math.max(1, kotlin.math.ceil(/kotlin.math.ceil(/' "$MD";                                                   ctl T-ab "丢掉『至少 1 分钟』的向上取整口径（0.2 分钟会显示成 0）"

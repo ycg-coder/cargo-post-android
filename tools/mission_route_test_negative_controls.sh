@@ -97,7 +97,9 @@ mb=$(md5sum < "$MM")
 python - "$MM" <<'PY'
 import sys
 p = sys.argv[1]; s = open(p, encoding='utf-8', newline='').read()
-old = '            "这一班的路线还没去问过（不是后端说没有路线），这里不画任何示意线。"\n'
+# ⚠ D-082 之后重锚：这句在 10-12 话术收紧时改短了（判据 MR_C2 同轮跟上、这本破口没跟上），
+#   旧锚点带着「（不是后端说没有路线），这里不画任何示意线」那一大串 ⇒ 静默落空、整本 exit 2。
+old = '            "还没去问过路线，不是后端说没有路线，期间不画示意线。"\n'
 assert s.count(old) == 1, "ANCHOR-NOT-UNIQUE: %d" % s.count(old)
 open(p, 'w', encoding='utf-8', newline='').write(
     s.replace(old, '            "后端没有下发这一班的真实道路折线。"\n', 1))

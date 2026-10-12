@@ -95,38 +95,41 @@ s = s.replace(n, '        val negExtra = MissionMarkers.missionRouteReasonOf(vm.
 ctl MR-b "页面读唯一出口的点变成三处"
 
 # ---------- MR-c 五格说法 ----------
+# ⚠ D-082 之后整族重锚：8387929（清除界面技术术语）把那五句各自改短了，判据 MR_C1…C5 当时已经
+#   逐句跟着重锚，而这本破口没有 ⇒ 五条注入全部静默落空（第一条就把整本带走，后面四条连跑都没跑到）。
+#   教训写进锚点本身：破口的锚点与判据的锚点是**同一处源码文本**，必须同轮换。
 red "$MM" "
-n = '\"正在向后端要这一班的路线（这次的结果还没回来），这里不画任何示意线。\"'
+n = '\"正在向后端要这一班的路线，期间不画示意线。\"'
 assert n in s, 'ANCHOR-MISS'
 s = s.replace(n, '\"正在加载…\"', 1)
 "
-ctl MR-c "'在问'那一格丢掉'不画任何示意线'的承诺"
+ctl MR-c "'在问'那一格丢掉'不画示意线'的承诺"
 
 red "$MM" "
-n = '\"这一班的路线还没去问过（不是后端说没有路线），这里不画任何示意线。\"'
+n = '\"还没去问过路线，不是后端说没有路线，期间不画示意线。\"'
 assert n in s, 'ANCHOR-MISS'
-s = s.replace(n, '\"这一班的路线还没去问过，这里不画任何示意线。\"', 1)
+s = s.replace(n, '\"还没去问过路线，期间不画示意线。\"', 1)
 "
 ctl MR-c "'没问过'那一格不再声明这不是后端的结论"
 
 red "$MM" "
-n = '\"这一班的路线这次没问到：'
+n = '\"这次没问到：\$failure'
 assert n in s, 'ANCHOR-MISS'
-s = s.replace(n, '\"后端没有可用路线，', 1)
+s = s.replace(n, '\"后端没有可用路线，\$failure', 1)
 "
 ctl MR-c "'这次没问到'被升格成'后端没有'"
 
 red "$MM" "
-n = '；这里不画任何示意线，站点与顺序仍按调度安排显示。\"'
+n = '（站点与顺序仍按调度安排显示，不画示意线）'
 assert n in s, 'ANCHOR-MISS'
-s = s.replace(n, '；这里不画任何示意线。\"', 1)
+s = s.replace(n, '（不画示意线）', 1)
 "
 ctl MR-c "转述来源原因那一格丢掉'站点顺序仍按调度安排显示'"
 
 red "$MM" "
-n = '\"现在没有可画的真实道路折线（没有证据表明后端说过它有），这里不画任何示意线。\"'
+n = '\"没有证据表明后端说过它有路线，暂无路线数据，不画示意线。\"'
 assert n in s, 'ANCHOR-MISS'
-s = s.replace(n, '\"后端没有下发这一班的真实道路折线，这里不画任何示意线。\"', 1)
+s = s.replace(n, '\"后端没有下发这一班的真实道路折线，不画示意线。\"', 1)
 "
 ctl MR-c "无证据兜底那一格开始替后端下结论"
 
@@ -147,17 +150,19 @@ s = s.replace(n, '    noRouteReason: String = \"后端没有下发这一班的�
 ctl MR-e "noRouteReason 被加上默认值（页面不带出口也能画）"
 
 red "$WB" "
-n = '                noRouteReason = MissionMarkers.missionRouteReasonOf(\n                    vm.routePhase,\n                    vm.routeFailure,\n                    missionGuide.routeUnavailableReason,\n                ),'
-assert n in s, 'ANCHOR-MISS'
-s = s.replace(n, '                noRouteReason = \"这一班没有路线，请以下方列表为准\",', 1)
+n = '                                noRouteReason = MissionMarkers.missionRouteReasonOf('
+assert s.count(n) == 1, 'ANCHOR-NOT-UNIQUE: %d' % s.count(n)
+s = s.replace(n, '                                noRouteReason = \"这一班没有路线，请以下方列表为准\",', 1)
 "
 ctl MR-e "画地图那一支绕过唯一出口自己编句子"
 
+# ⚠ D-082 之后重锚：7d8b819 卡片重排把这段右移了一级、参数换成逐行写，旧锚点（同一行带 guide=）不在了。
+#   这里只需要一个"任务地图调用点长在第二处"的形状，插在哪一行不重要，钉的是 MRE_CALL 那一处。
 red "$WB" "
-n = '            DriverSdkNavCard(guide = missionGuide'
-assert n in s, 'ANCHOR-MISS'
+n = '                        DriverSdkNavCard(\n'
+assert s.count(n) == 1, 'ANCHOR-NOT-UNIQUE: %d' % s.count(n)
 i = s.index(n)
-s = s[:i] + '            DriverMissionMap(guide = missionGuide, noRouteReason = MissionMarkers.missionRouteReasonOf(vm.routePhase, vm.routeFailure, null))\n' + s[i:]
+s = s[:i] + '                        DriverMissionMap(guide = missionGuide, noRouteReason = MissionMarkers.missionRouteReasonOf(vm.routePhase, vm.routeFailure, null))\n' + s[i:]
 "
 ctl MR-e "任务地图出现第二个调用点"
 
@@ -238,10 +243,21 @@ s = s.replace(n, '        } else if (vm.guide == null) {', 1)
 "
 ctl MR-i "失败支的条件不再看这次问到的结果"
 
+# ⚠ D-082 之后重锚：7d8b819 把这段整体右移（旧锚点那三级缩进对不上了），而且现在有**两条**
+#   一模一样的 `onReplan = { vm.load() },`（有路线支 813 / 失败支 828）—— 按"第一处"删会删错支，
+#   MRI_RETRY 数的是失败支那 12 行，删错就等于空跑。所以改成**定位到 RouteUnavailableState 之后**再删。
 red "$WB" "
-n = '                onReplan = { vm.load() },\n            )\n        }'
+n = 'RouteUnavailableState('
 assert s.count(n) == 1, 'ANCHOR-NOT-UNIQUE: %d' % s.count(n)
-s = s.replace(n, '            )\n        }', 1)
+k = s.index(n)
+r = 'onReplan = { vm.load() },'
+assert s.count(r) == 2, 'ANCHOR-NOT-UNIQUE: %d' % s.count(r)
+j = s.index(r, k)
+ls = s.split('\n')
+li = s[:j].count('\n')
+assert r in ls[li], 'ANCHOR-MISS'
+del ls[li]
+s = '\n'.join(ls)
 "
 ctl MR-i "失败支没有重试入口"
 

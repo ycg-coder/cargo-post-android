@@ -128,18 +128,25 @@ echo "[基线] $(printf '%s\n' "$out" | tail -2 | tr '\n' ' ')"
 # 基线不绿就立刻收工：否则每条都会因为"文件本来就不在"打出 ✔，整轮负控是假的
 # （判据簿只读不写，所以基线跑完不需要恢复；恢复只发生在每次注入之后）
 [ "$code" = 0 ] || { echo "✘ 基线未通过，负控结果一律不采信"; exit 2; }
+# ⚠ D-082 那条"空跑"的根因在这里：反向负控（ctl_keep）原来要拿一个**写死的** SUMMARY 字面量去比对
+#   （`sites=32|violations=0|candidates=0`），而 2026-10-10 那片收口把扫描面抬到 39 ⇒ 字面永远对不上，
+#   "必须不红"这一族就变成"永远报空跑"。现在把基线那一行原样留着当期望值：它仍然要求
+#   violations=0 且 candidates=0 且 sites 没被这条注入动过，但不会再因为别处的正常增长而失效。
+BASE_SUMMARY=$(printf '%s\n' "$out" | grep -m1 'SUMMARY|sites=')
+[ -n "$BASE_SUMMARY" ] || { echo "✘ 基线输出里没有 SUMMARY 行，反向负控失去期望值（这条不能空跑）"; exit 2; }
+echo "[基线 SUMMARY] $BASE_SUMMARY"
 
 # ── RC-a 基数：在册面动了必须红（三套口径各钉一个数）───────────────────────
 append_line "$REPO" 'private val negCtlRcExtra: Int = runCatching { 1 }.getOrDefault(0)'
-ctl RC-a "多出一处生效 runCatching：基数 32→33（纯同步块，RC-b 照样 0，所以只有基数能抓）"
+ctl RC-a "多出一处生效 runCatching：基数 39→40（纯同步块，RC-b 照样 0，所以只有基数能抓）"
 
 # ── RC-a 前两轮各新增的那一处：它们必须真在扫描面里，而不是只活在注释里 ──────
 swap "$NAV" 'val currentPath = runCatching { navi.naviPath }' 'val currentPath = attempt { navi.naviPath }'
-ctl RC-a "F-3 ⑭ 新增点 AmapNavigationEngine.kt:357 换成 attempt：基数 32→31 且出现次数 49→48 必须红（不红就是那个 +1 没被数到）"
+ctl RC-a "F-3 ⑭ 新增点 AmapNavigationEngine.kt:512（读回 SDK 当前路径）换成 attempt：基数 39→38 必须红（不红就是那个 +1 没被数到）"
 
 # N-2（赛道 ⑨）新增的那一处：`attempt` 是 suspend，非挂起的 startGpsNavi 用不了它，所以它必须留在 runCatching 面里
 swap "$NAV" 'runCatching { navi.setUseInnerVoice(voiceOn) }' 'attempt { navi.setUseInnerVoice(voiceOn) }'
-ctl RC-a "N-2 新增点 AmapNavigationEngine.kt:367 换成 attempt：基数 32→31 同样必须红"
+ctl RC-a "N-2 新增点 AmapNavigationEngine.kt:522（setUseInnerVoice）换成 attempt：基数 39→38 同样必须红"
 
 # ── RC-b 闭包判定：块内挂起调用必须抓到 ────────────────────────────────────
 swap "$API" 'runCatching { JSONObject(text) }' 'runCatching { delay(1); JSONObject(text) }'
@@ -150,7 +157,7 @@ ctl RC-b "块内塞项目内挂起函数 Api.get：violations 0→1（Owner.name
 
 # ── RC-b 反向：两条区分规则不许退化成名字交集 ───────────────────────────────
 pre "$API" 'runCatching { JSONObject(text) }' 'withTimeoutOrNull(1) { null } ?: runCatching { JSONObject(text) }'
-ctl_keep "挂起名出现在 runCatching 的**同行前缀**：块体从 { 之后取，这类点不该算 violation（历史上就是这里报的假阳性）" 'sites=32|violations=0|candidates=0'
+ctl_keep "挂起名出现在 runCatching 的**同行前缀**：块体从 { 之后取，这类点不该算 violation（历史上就是这里报的假阳性）" "$BASE_SUMMARY"
 
 swap "$API" 'runCatching { JSONObject(text) }' 'runCatching { Other.openMeteoWeather(g) }'
 ctl_keep "同名挂起函数挂在**不匹配的接收者**上（真身是 Repo.openMeteoWeather）：只进 CANDIDATE，不进 VIOLATION" 'violations=0|candidates=1'
@@ -167,25 +174,25 @@ swap "$DNS" 'if (ready.value) attempt { engine?.setLanguage(Locale.CHINESE) }' \
             'if (ready.value) runCatching { engine?.setLanguage(Locale.CHINESE) }'
 ctl RC-c "TTS 设语种退回 runCatching：CC_BACK2 必须从 0 变 1"
 
-# ── RC-d 免疫前提：那两条"结构免疫"的腿一旦非 0，32 点分类整表作废 ──────────
+# ── RC-d 免疫前提：那两条"结构免疫"的腿一旦非 0，39 点分类整表作废 ──────────
 append_line "$API" 'private fun negCtlRcRb(): Int = runBlocking { 1 }'
-ctl RC-d "出现 runBlocking：非 suspend 函数也能挂起，'保持'那 32 点的前提不再成立"
+ctl RC-d "出现 runBlocking：非 suspend 函数也能挂起，'保持'那 39 点的前提不再成立"
 
 append_line "$API" 'private suspend fun negCtlRcScc(): Int = suspendCancellableCoroutine { }'
 ctl RC-d "出现 suspendCancellableCoroutine：同上，桥接函数会把取消送进非 suspend 调用栈"
 
 # ── RC-e 分类表：在册面与"本轮动作"列都要独立判红 ───────────────────────────
 drop_line "$DOC" '| MainActivity.kt:68 | A/D | 否 | 否 | 保持 |'
-ctl RC-e "删掉一行分类表：在册面 36→35（逐点审计少了一个人）"
+ctl RC-e "删掉一行分类表：在册面 42→41（逐点审计少了一个人）"
 
-drop_line "$DOC" '| core/navigation/AmapNavigationEngine.kt:357 | E | 否 | 否 | 保持 |'
-ctl RC-e "删掉 F-3 ⑭ 新增的那一行分类表：在册 36→35 必须红 —— 判据数到 32 处，逐点账只有 31 行就说明有一处没人认领"
+drop_line "$DOC" '| core/navigation/AmapNavigationEngine.kt:512 | E | 否 | 否 | 保持 |'
+ctl RC-e "删掉 F-3 ⑭ 新增的那一行分类表（docs 里重锚到 AmapNavigationEngine.kt:512）：在册 42→41 必须红 —— 判据数到 39 处，逐点账只有 41 行就说明有一处没人认领"
 
-drop_line "$DOC" '| core/navigation/AmapNavigationEngine.kt:367 | E | 否 | 否 | 保持 |'
-ctl RC-e "删掉 N-2（赛道 ⑨）新增的那一行：在册 36→35 同样必须红 —— 这一处正是'用不了 attempt 所以留在 runCatching'的那个形状，没人认领就等于它不存在"
+drop_line "$DOC" '| core/navigation/AmapNavigationEngine.kt:522 | E | 否 | 否 | 保持 |'
+ctl RC-e "删掉 N-2（赛道 ⑨）新增的那一行（docs 里重锚到 AmapNavigationEngine.kt:522）：在册 42→41 同样必须红 —— 这一处正是'用不了 attempt 所以留在 runCatching'的那个形状，没人认领就等于它不存在"
 
 swap "$DOC" '| core/code/QrCode.kt:33 | A | 否 | 否 | 保持 |' '| core/code/QrCode.kt:33 | A | 否 | 否 | 已迁 attempt |'
-ctl RC-e "把一行 保持 改写成 已迁 attempt：总行 36 不变，但已迁列 4→5 必须单独抓"
+ctl RC-e "把一行 保持 改写成 已迁 attempt：总行 42 不变，但已迁列 4→5 必须单独抓"
 
 # ── RC-a2 反证的反证：同一套管道若数不出 attempt，32 就不能信 ───────────────
 python - "$A" <<'PY' || { echo "✘ attempt 扫描没找到任何 attempt {（这条负控不成立）"; exit 2; }
