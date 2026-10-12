@@ -26,6 +26,14 @@ object Routes {
     const val SETTINGS = "settings"
     /** 设置 → 关于 →「地图与开源许可」：OSM 署名与随包分发的第三方组件清单（指令 v2.1 ⑭） */
     const val OSS_LICENSES = "ossLicenses"
+    /**
+     * 隐私政策 / 用户协议正文页。
+     *
+     * 与 OSS_LICENSES 同属"无角色闸门"的公开页：登录页那行勾选要能点开它 ——
+     * **用户在还没有会话的时候就必须能看到自己同意的是什么**，所以这两条路由不加登录/角色闸。
+     */
+    const val PRIVACY = "privacy"
+    const val TERMS = "terms"
     const val DRIVER_NAV = "driverNav"
     /**
      * 车道级导航页（正式，非调试）。

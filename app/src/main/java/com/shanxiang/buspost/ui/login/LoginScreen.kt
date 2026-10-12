@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import com.shanxiang.buspost.nav.Routes
+import com.shanxiang.buspost.ui.common.LocalNavController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -211,14 +213,22 @@ fun LoginScreen(
                     onCheckedChange = { vm.agreed = it },
                     modifier = Modifier.size(28.dp),
                 )
-                Text(
-                    "我已阅读并同意《服务协议》",
-                    color = t.textSecondary,
-                    fontSize = (12 * scale).sp,
-                    modifier = Modifier
-                        .padding(start = 2.dp)
-                        .clickable { vm.agreed = !vm.agreed },
-                )
+                // 三个可点区域分开：勾选框本身、《服务协议》、《隐私政策》。
+                // 旧写法是整行一起切勾选 —— 点了书名号只会把勾去掉，正文一个字都没出现，
+                // 而当时这两份正文在 App 里根本不存在（现在由 `PolicyScreen` + `AppPolicies` 承接）。
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 2.dp),
+                ) {
+                    Text(
+                        "我已阅读并同意",
+                        color = t.textSecondary,
+                        fontSize = (12 * scale).sp,
+                        modifier = Modifier.clickable { vm.agreed = !vm.agreed },
+                    )
+                    PolicyLink("《服务协议》", Routes.TERMS)
+                    PolicyLink("《隐私政策》", Routes.PRIVACY)
+                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -321,4 +331,22 @@ private fun RoleCardSimple(
             }
         }
     }
+}
+
+
+/** 协议名就是一段可点的文字：点了真的导航到正文页，不是把勾选切一下冒充"已阅读" */
+@Composable
+private fun PolicyLink(name: String, route: String) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val nav = LocalNavController.current
+    Text(
+        name,
+        color = t.primaryOnLight,
+        fontSize = (12 * scale).sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .padding(start = 2.dp)
+            .clickable { nav.navigate(route) },
+    )
 }

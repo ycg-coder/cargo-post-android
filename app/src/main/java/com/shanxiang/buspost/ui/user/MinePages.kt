@@ -1025,6 +1025,20 @@ fun SettingsScreen() {
                     // #48：检查更新走 GitHub Releases（用户 2026-10-12 定的通路），判定与文案都在纯函数里
                     UpdateCheckRow()
                     InfoRow(
+                        label = "隐私政策",
+                        value = "本应用实际收集什么、存在哪",
+                        icon = BusIcons.info,
+                        showNext = true,
+                        onClick = { nav.navigate(Routes.PRIVACY) },
+                    )
+                    InfoRow(
+                        label = "用户协议",
+                        value = "提供什么服务、不提供什么服务",
+                        icon = BusIcons.info,
+                        showNext = true,
+                        onClick = { nav.navigate(Routes.TERMS) },
+                    )
+                    InfoRow(
                         label = "地图与开源许可",
                         value = "OSM 署名与随包组件",
                         icon = BusIcons.info,

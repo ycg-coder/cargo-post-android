@@ -46,7 +46,9 @@ import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
+import com.shanxiang.buspost.core.about.PolicyKind
 import com.shanxiang.buspost.ui.user.OssLicensesScreen
+import com.shanxiang.buspost.ui.user.PolicyScreen
 import com.shanxiang.buspost.ui.user.FeedbackScreen
 import com.shanxiang.buspost.ui.user.GoodsDetailScreen
 import com.shanxiang.buspost.ui.user.GoodsTraceScreen
@@ -156,6 +158,9 @@ fun BusPostRoot() {
         composable(Routes.SETTINGS) { com.shanxiang.buspost.ui.common.BusRouteBody { SettingsScreen() } }
         // 指令 v2.1 ⑭：OSM/ODbL 署名的最小入口，用户域，不加角色闸门
         composable(Routes.OSS_LICENSES) { com.shanxiang.buspost.ui.common.BusRouteBody { OssLicensesScreen() } }
+        // 登录页的《服务协议》勾选行要能点开正文 ⇒ 这两条路由不设角色/登录闸门（内容全在 AppPolicies，页面只渲染）
+        composable(Routes.PRIVACY) { com.shanxiang.buspost.ui.common.BusRouteBody { PolicyScreen(PolicyKind.PRIVACY) } }
+        composable(Routes.TERMS) { com.shanxiang.buspost.ui.common.BusRouteBody { PolicyScreen(PolicyKind.TERMS) } }
         composable(Routes.HANDOVER) { com.shanxiang.buspost.ui.common.BusRouteBody { HandoverScreen() } }
         composable(Routes.DRIVER_MESSAGES) { com.shanxiang.buspost.ui.common.BusRouteBody { DriverMessagesScreen() } }
         // 旧 DriverNavScreen 转 DEBUG ONLY（DECISION_LOG D-003 / 任务 #51）：正式包连路由都没有，
