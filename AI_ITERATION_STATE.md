@@ -3,6 +3,29 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:780`，
+`GET /app-api/transport/send/topology`）此前全仓 0 消费者 ⇒ 补的是读它的那一页（判定全在纯层 `ui/user/ParcelTicket.kt`，
+页面 `ParcelTicketScreen.kt` 只渲染，入口是追踪页那一行「看联运票面」、全工程恰好一个导航调用点）。
+逐字段读生产者读出**三处真接口下永远念空/念错**：交接的车牌与时刻认的是自造键（后端发 `fromPlateNo`/`toPlateNo`/
+`handoverCompletedAt`）、时间线认 `label/title`（后端发 `eventTypeName`/`detail`）、时刻裸切串把 Epoch 毫秒切成
+"17590" 上屏。口径四条：总时长含"每次换乘 +20 分钟"（@Schema 没写）、里程必须随段 `navigationSource` 标估算、
+`candidates` 缺失只说"没给"、**非归属人后端返回全 null 空结构而不是错误码** ⇒ 页面第四格 `Absent` 只说"这次没给内容"，
+绝不念成"包裹不存在"；`Failed`/`Absent`/`Shown` 三格都留「回追踪页」出口（判据钉恰好 3 处，这是用户要求的
+"任务出岔子必须有东西兜底"的落点）。
+读数：新簿 `check_parcel_ticket_probes.sh`（PT-a…PT-l）rc=0 + 新负控 `parcel_ticket_negative_controls.sh`
+**✔=41 ✘=0 △=0**；`ParcelTicketContractTest` 15 例；判据全批现读 **30 本 = 29 绿 / 1 红**（红的仍是
+`check_doc_anchor_probes.sh`，#51 三条路等用户定）；受本轮源码文本影响的 4 本旧负控逐本复跑全绿
+（`contract_defaults` 22✔、`eta` 61✔、`test_suite_hygiene` 7✔、`reach` 由 ✘=1 转 ✘=0 —— 顺手把 D-082 那三笔
+未归因 ✘ 里的一笔归了因：它的 `sed` 落空了一整轮、被记成"判据不判"，登记 `D-CE-2`）；
+全量 `--rerun-tasks` **rc=0 / 45 tasks executed / 64 类 652 例 0 失败**（637→652 唯一增量 = 新增 15 条用例）。
+同轮重登：`SU-a` 63→64、`SU-b` 65→66、`T-ad1` 6→7；`DemoData` 交接段改发真键、拓扑信封只挂 topology 分支。
+⚠ 本轮写新簿时**又踩了 D-084 刚记过的两条**（注入器 `|| MISS=1` 之后仍返回 0；`PT-l` 下限写 ≥14 而实测 15），
+两次都是被自己写的负控当场抓出来的 ⇒ §八 **㊾** 补三条新形状（别名要白名单不要黑名单 / enum 声明行要单独钉 /
+布尔闸门要钉整句）。仍欠：没有一条真接口回包（票面"看到 n 段真交接"未被演示）、一律 `NOT VERIFIED ON DEVICE`、
+负控全批 34 本只重跑了 5 本、`default_value`/`idempotency` 两笔 ✘ 仍未归因、本地已提交**未 push**。
+NEXT：① 钱包/交易记录（必须标"模拟模式"）② `earliestPickupTime` 取件时间窗 ③ #39 收藏首页入口
+④ #47 分组 hub ⑤ #43 图标（我出 3 个候选给用户挑）⑥ App 这批之后才是 web 后台管理平台的完善。
+<!-- 上一条 D-084（负控 20 格）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（凌晨，D-084 · **D-082 那 20 格全部消化 + 新增 3 格**：13 道"空转闸门"回查后只有 1 道真是判据弱，
 其余 12 道是**刀没落下去**——6 道因为 `NavigationEngine.kt` 工作树是 CRLF 而 `drop` 只找 `"\n}\n"`（`git ls-files --eol` =
 `i/lf w/crlf`，"全仓 LF"这个前提作废），6 道是判据同轮重锚了、负控锚点没人跟（8387929 话术 + `onOpenNav` + `BusRouteBody`）。

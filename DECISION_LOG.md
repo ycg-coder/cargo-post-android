@@ -6269,3 +6269,86 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 2. `check_doc_anchor_probes.sh` 那本在册红（#51 的三条路：逐条人工重锚 / 83 条进在册表 / 闸门改比率）**仍等用户定**。
 3. 本轮全是判据/负控侧，**没有任何真机读数**；`NOT VERIFIED ON DEVICE` 那一格一字未动。
 4. 本地已提交**未 push**（用户口径：所有任务完成后一起推，推之前把 diff 给他看；后端仓要单独点名提醒）。
+
+### D-085（10-13 03:4x）· #55 查件票面：`/send/topology` 那条零消费者通路接回用户端，读契约时顺手收掉三处"真接口下整行念空"
+
+**做什么**：NEXT 首项（用户 10-12 定）。`Repo.parcelTopology(no)`（`Repo.kt:780`）自写进来全仓 **0 消费者** ⇒
+补的是**读它的那一页**，不新造第二套来源。顺序照 D-081：先逐字段读生产者
+（`OrderTopologyRespVO.java:16-139` + `TransportTopologyServiceImpl.java:92-176` + `AppSendController.java:208-215`），
+再定口径，最后写代码；取证全表在 `docs/android/CONTRACT_EVIDENCE.md` 第十七节。
+
+**读契约读出来的三处真缺陷**（不是"页面少画一格"，是**真接口下永远念空 / 念错**）
+1. 交接的车牌与时刻：App 认 `fromPlate`/`toPlate`/`handoverTime`/`confirmTime`，后端 `Handover:118-125` 发的是
+   `fromPlateNo`/`toPlateNo`/`arrivedAt`/`handoverStartedAt`/`handoverCompletedAt` ⇒ "谁交给谁、什么时候交的"
+   三行在真机上恒为"后端没给"；只有演示包念得出台词（`DemoData` 发的正是那批自造键 = 第四个真相源互证）。
+2. 时间线：App 认 `label/title/nodeName` + `time/createTime` + `hint/description`，后端 `Timeline:133-135` 发
+   `eventTypeName`/`eventTime`/`detail` ⇒ 拓扑那列事件名与说明整体念空。
+3. 时刻归一：旧写法 `multiStr(...).substringAfter(' ').take(5)` 直接切原始串，而后端把 `LocalDateTime` 注册成
+   **Epoch 毫秒** ⇒ 13 位数字里没有空格，切出 `"17590"` 直接上屏。新增 `nodeTimeOf()`（先过 `ts()` 归一再取 `HH:mm`）。
+   ⚠ `Models.kt` 里另有两处裸切串是**对的**（班次起讫时刻本来就是空格/ISO 串），所以 `PT-g` 只钉 `Repo.kt` 归零、
+   同时钉住归一函数内部那一处（0/1 成对）——整文件一刀切会把对的东西判成错。
+
+**口径四条**（生产者说过什么就只说什么）
+- `totalDurationMinutes`（`:44`）除各段之和外**每次换乘另加 20 分钟**（`ServiceImpl:134`，@Schema 未提）⇒ 票面那句必须带
+  "含 N 次换乘、每次 20 分钟"；换乘次数没给就写"是否已计入未知"，不替后端宣布。
+- `totalDistanceKm`（`:42`）是各段相加，段里程可能是 `MultiLegPlanner.java:187` 的直线估算
+  （`transport-schema.sql:257` Haversine）⇒ 里程必须随段 `navigationSource` 标口径，含估算段就明说"不是真实道路里程"。
+- `candidates`（`:49`）在 `multiLegService.preview` 抛异常时保持 null（`:172-174`）⇒ 只说"方案对比没给"，不说"只有一个方案"。
+- **非归属人**访问时 Controller `:214-215` 返回 `new OrderTopologyRespVO()`（全字段 null 的空结构，**不是错误码**）
+  ⇒ 页面四格 `Loading / Failed / Absent / Shown`，`Absent` 只说"后端这次没给这张单的票面内容"，
+  绝不念成"包裹不存在"（用户手里那张单号是真的）。
+
+**兜底**（用户 10-13 明确要求"任务出岔子必须有东西兜底"）：票面页三格都留「回追踪页」出口，
+判据 `PT-i` 把出口数钉**恰好 3**（负控 PT-i3 / PT-l2 各拆一处验过）；`Failed` 格还留着"重试"。
+
+**做法**：判定全在纯层 `ui/user/ParcelTicket.kt`（`ticketHeaderRows` 11 行、`legTicketRows`、`handoverRows`、`planRows`、
+`ticketEventRows`、两个口径函数、`ticketContentAbsent`、`parcelTicketPage`）；页面 `ui/user/ParcelTicketScreen.kt` 只渲染；
+`Routes.PARCEL_TICKET` 注册走 `BusRouteBody`；入口是追踪页那一行「看联运票面」，全工程**恰好一个**导航调用点。
+
+**数据层随动**（可空不塌成结论）：`TransitPlan.minutes` `Int→Int?`、`LegHandover.itemCount` `Int→Int?`，
+新增 `transfers`/`distanceKm`；`ParcelTrace` 加拓扑信封 8 格（全带默认值 ⇒ 另两条链路零影响）。
+⚠ 改的是**被别的簿子钉住的读法**，所以同轮：`MinutesContractTest` 三条断言与 `NoProducerKeyFamilyContractTest`
+第⑤条从"塌成 0"改成"缺席是 null"（原来那几条钉住的正是缺陷本身）；`T-ad1` 可空声明基数 **6→7**
+（增量就是 `TransitPlan.distanceKm`）；`SU-a` **63→64**、`SU-b` 源集文件数 **65→66**（唯一增量 = 新增票面用例簿，
+0 空壳仍为 0）；`DemoData.handoversJson` 改发真键，拓扑信封 10 格只挂在 `/send/topology` 分支
+（`if (!topo) return@let it`）⇒ 演示包的 `/send/track` 不会凭空多出真接口从不下发的内容。
+
+**新写的判据与负控自纠了五条**（这几条比功能值钱，因为是工具本身的洞）
+1. 注入器 `|| MISS=1` 之后**函数返回 0** ⇒ 落空与成功同形，本书的 `check_miss` 自检当场揭了它
+   （**D-084 第 ① 条第二次兑现，这次栽在我按 D-084 刚写的簿子上**）；修成 `|| { MISS=1; return 1; }`。
+2. `PT-l` 下限写 `≥14` 而实测 15 ⇒ 注释掉一条用例照样绿（D-084 第 ③ 条第二次兑现）；改成 `≥15`＝现读。
+3. 别名判据原来是**黑名单**（数几个已知别名没回来）：`nextDriver` 这种没见过的自造键照样绿 ⇒ 改成**白名单**
+   （那段解析里每个键名必须是 `Handover:115-126` 的真键）＋ 基数钉恰好 11。
+4. `PT-i` 原来只数四个"产出点"，把 `enum` 摘掉一个值照样绿（文本判据看不见编译错误）⇒ enum 声明行单独钉。
+5. `PT-k` 原来数"有没有 `return@let`"，把闸门写成 `if (false)` 照样绿 ⇒ 整句 `if (!topo) return@let it` 钉住。
+
+**顺带把 D-082 那三笔没归因的 ✘ 收掉一笔**：`reach` 的 `R-n3` 从写下那天起就在 sed 一句不存在的
+「不代表车辆能到」（10-12 话术收紧时改写了，现全仓 0 命中），`sed -i` 不落刀也不报错 ⇒ 被记成"判据不判"。
+补 `R-n4`（钉现存那句免责话恰好 4 处：`可达性未判定` 1 + `可达性暂未知` 3）+ 换成会报落空的 `swap1`
+⇒ `reach` 由 `✘=1` 转 `✘=0`。登记为判据缺口 **`D-CE-2`**（`CONTRACT_EVIDENCE.md` 第十七节末）。
+另两笔（`default_value ✘=3`、`idempotency ✘=1`）本轮**没碰**，仍在册。
+
+**读数（本轮实测）**
+- 新簿 `check_parcel_ticket_probes.sh` rc=0（PT-f 键基数 11 / 白名单外 0、PT-l 用例 15、PT-i 出口 3+1）；
+  新负控 `parcel_ticket_negative_controls.sh` **rc=0 ✔=41 ✘=0 △=0**（基线绿，41 条破口全部被自己那条点名）。
+- 受本轮源码文本影响的旧负控逐本复跑（日志 `/tmp/d085_negbatch.log`、全文 `/tmp/d085_neg_*.log`）：
+  `contract_defaults` rc=0 ✔=22 ✘=0、`eta` rc=0 ✔=61 ✘=0、`test_suite_hygiene` rc=0 ✔=7 ✘=0、
+  `reach` 修前 rc=0 ✔=20 ✘=1 → 修后 rc=0 ✔=20 ✘=0。
+  ⚠ 选这四本不是猜的：grep 实测把本轮改过的字面（`multiNumOrNull("itemCount")`、`multiNum("durationMinutes")`、
+  `nodeTimeOf`、`fromPlateNo`、`eventTypeName`、`orderStatusName`、`distanceKm`）当锚点的簿子只有这些。
+- 判据全批（现读 **30** 本）：**29 绿 / 1 红**，红的仍是 `check_doc_anchor_probes.sh`（#51 三条路等用户定）。
+- 全量：`./gradlew -Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK :app:testDebugUnitTest :app:assembleDebug --rerun-tasks`
+  **rc=0、BUILD SUCCESSFUL in 52s、45 actionable tasks: 45 executed**；产物聚合 **64 类 / 652 例 / failures 0 / errors 0 /
+  skipped 0**，64 份 XML 的 timestamp 64 个唯一值 ⇒ 不是上一遍残留。用例数 637→**652** 的唯一增量 = 新增的 15 条票面用例。
+- 产物指纹（跨轮可比必须连命令一起抄）：`app/build/outputs/apk/debug/app-debug.apk` **117,176,514 B** /
+  mtime `2026-10-13 03:36:21` / sha256 `870d23c6384db5d908ea3000890f508197f0e396b67afd59bbc7b9e694880cc3`；
+  树指纹命令 `find app/src -type f \( -name '*.kt' -o -name '*.xml' -o -name '*.png' \) | sort | xargs sha256sum | sha256sum`
+  ⇒ files=**196** / sha256 `e865ae74d6afb8b69f0f490f5ad2922b8d9eab0242ea95a9f3dc57ffa3ee4682`。
+  对 D-084 那轮包（117,160,130 B / 01:14）差 **+16,384 B**，本轮没做类数差集 ⇒ 登记为**增量未归因**，
+  既不写"新页面值多少"，也不写回归。
+
+**仍欠（四格都不许当已完成）**
+1. **没有一条真接口回包**：票面"看到 n 段真交接"这一格仍未被演示（本机后端未起这张单的登录态），与 #54 同形。
+2. `NOT VERIFIED ON DEVICE`：四格实际渲染、92dp 标签列宽、11 行换行在 440dpi 平板上都没复拍。
+3. 本轮**没有重跑负控全批 34 本**（现读 `ls tools/*_negative_controls.sh | wc -l`），只重跑引用到改动字面的 5 本。
+4. `check_doc_anchor_probes.sh` 在册红等用户定；`default_value`/`idempotency` 那两笔 ✘ 仍未归因。
