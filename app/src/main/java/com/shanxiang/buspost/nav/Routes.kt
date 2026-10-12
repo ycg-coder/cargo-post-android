@@ -8,6 +8,12 @@ object Routes {
 
     const val GOODS_DETAIL = "goods/{id}"
     const val TRACE = "trace/{no}"
+    /**
+     * #55 查件票面：`Repo.parcelTopology()`（`GET /send/topology`，`Repo.kt:780`）此前全仓零消费者，
+     * 这一页是它唯一的读方。与 `TRACE` 是两个问题：追踪页答"走到哪了"，票面答"几段、在哪交接、为什么是这个方案"，
+     * 后三问只有拓扑端点会发（`OrderTopologyRespVO:32-53`），所以不并进 `TRACE` 也不共用它的报文。
+     */
+    const val PARCEL_TICKET = "parcelTicket/{no}"
     const val ORDER_DETAIL = "order/{id}"
     const val BUS_DETAIL = "bus/{routeId}"
     const val ADDRESS_EDIT = "addressEdit/{id}"
@@ -84,6 +90,7 @@ object Routes {
     fun goodsTrace(id: Long) = "goodsTrace/$id"
     fun orderDetail(id: Long) = "order/$id"
     fun trace(no: String) = "trace/" + encodeSegment(no)
+    fun parcelTicket(no: String) = "parcelTicket/" + encodeSegment(no)
     fun busDetail(routeId: String) = "bus/" + encodeSegment(routeId)
     fun addressEdit(id: Long) = "addressEdit/$id"
 

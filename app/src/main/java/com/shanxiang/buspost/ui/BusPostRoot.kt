@@ -45,6 +45,7 @@ import com.shanxiang.buspost.ui.login.LoginScreen
 import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
 import com.shanxiang.buspost.ui.user.ArrangementsScreen
+import com.shanxiang.buspost.ui.user.ParcelTicketScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
 import com.shanxiang.buspost.core.about.PolicyKind
@@ -202,6 +203,13 @@ fun BusPostRoot() {
             Routes.TRACE,
             arguments = listOf(navArgument("no") { type = NavType.StringType }),
         ) { com.shanxiang.buspost.ui.common.BusRouteBody { TraceScreen(it.arguments?.getString("no").orEmpty()) } }
+
+        // #55 查件票面：`/send/topology` 那条零消费者通路的唯一读方。用户域，不加角色闸门；
+        // 页内自带"回追踪页"的出口（票面取不到时不能把人关在门外）。
+        composable(
+            Routes.PARCEL_TICKET,
+            arguments = listOf(navArgument("no") { type = NavType.StringType }),
+        ) { com.shanxiang.buspost.ui.common.BusRouteBody { ParcelTicketScreen(it.arguments?.getString("no").orEmpty()) } }
 
         composable(
             Routes.BUS_DETAIL,

@@ -124,6 +124,15 @@ private fun yuan(v: Double): String =
 fun JSONObject.timeOf(vararg keys: String): String = ts(multiStr(*keys, "createTime", "create_time"))
 
 /**
+ * 轨迹/时间线那一列的时刻：先按 [ts] 的口径归一（后端把 LocalDateTime 注册成 Epoch 毫秒，ISO 串也吃），
+ * 再只取 `HH:mm`。
+ * ⚠ 旧写法是直接对原始串 `substringAfter(' ').take(5)` —— 13 位毫秒串里没有空格，切出来是 "17590" 这种数字
+ *   直接进 UI（D-085 读 `OrderTopologyRespVO.Timeline:134` 时撞出来的）。
+ * 仍只显"时分"：跨天的事件靠 detail 说明，这一格不替后端编日期。
+ */
+fun JSONObject.nodeTimeOf(vararg keys: String): String = ts(multiStr(*keys)).substringAfter(' ').take(5)
+
+/**
  * 事件时刻：与 [timeOf] 同一套 epoch 毫秒/ISO 口径，但**不回落 `createTime`**。
  * 位置上报时间、装货时间这类"某件事什么时候发生"的字段，回落成订单创建时间就是编了一个没发生过的时刻。
  */
@@ -1179,7 +1188,15 @@ data class TransportLeg(
     }
 }
 
-/** 换乘交接点（多段联运：上一段与下一段在换乘站交接） */
+/**
+ * 换乘交接点（多段联运：上一段与下一段在换乘站交接）。
+ *
+ * 键名逐个抄 `OrderTopologyRespVO.Handover:113-127`：车牌是 `fromPlateNo`/`toPlateNo`（不是 `fromPlate`/`toPlate`），
+ * 时刻是三格 `arrivedAt`/`handoverStartedAt`/`handoverCompletedAt`（后端没有 `handoverTime`/`confirmTime` 这两个键）。
+ * 旧读法只认后一对自造键 ⇒ 真接口下"谁交给谁、什么时候交的"整格念空，只有演示包看得见（D-085）。
+ * `itemCount` 是 `Integer:120`，可缺席；塌成 0 会被念成"这件单没货"，所以是 `Int?`。
+ * `count` 不是本 VO 的键（`QuoteNullSafetyTest:86` 已证它属于 dashboard/bigscreen），不在这里续命。
+ */
 data class LegHandover(
     val station: String,
     val fromPlate: String,
@@ -1187,17 +1204,25 @@ data class LegHandover(
     val fromDriver: String,
     val toDriver: String,
     val time: String,
-    val itemCount: Int,
+    val itemCount: Int?,
+    val statusName: String = "",
+    val exceptionReason: String = "",
 ) {
     companion object {
         fun parse(o: JSONObject) = LegHandover(
-            station = o.multiStr("stationName", "transferStation", "handoverStation"),
-            fromPlate = o.multiStr("fromPlate", "vehiclePlate"),
-            toPlate = o.multiStr("toPlate", "nextPlate"),
-            fromDriver = o.multiStr("fromDriverName", "fromDriver"),
-            toDriver = o.multiStr("toDriverName", "toDriver"),
-            time = o.timeOf("handoverTime", "confirmTime", "createTime"),
-            itemCount = o.multiNum("itemCount", "count").toInt(),
+            station = o.multiStr("stationName"),
+            // ⚠ 只认 `Handover` 的真键：`fromPlate`/`toPlate`/`handoverTime`/`confirmTime` 三个面 0 生产者
+            //   （后端 `:116-124` 给的是 fromPlateNo/toPlateNo/arrivedAt/handoverStartedAt/handoverCompletedAt，
+            //   小程序也没读过），留着别名就等于给"自造键"续命（E-1 那一族刚删过同类，判据 DA/CE 会数）。
+            fromPlate = o.multiStr("fromPlateNo"),
+            toPlate = o.multiStr("toPlateNo"),
+            fromDriver = o.multiStr("fromDriverName"),
+            toDriver = o.multiStr("toDriverName"),
+            // 交接"完成"优先，其次"开始"，再次"到达"；三个都没有才算没给。
+            time = o.reportTimeOf("handoverCompletedAt", "handoverStartedAt", "arrivedAt"),
+            itemCount = o.multiNumOrNull("itemCount")?.toInt(),
+            statusName = o.multiStr("statusName"),
+            exceptionReason = o.multiStr("exceptionReason"),
         )
     }
 }
@@ -1212,8 +1237,10 @@ data class TransitPlan(
     val name: String,
     val recommended: Boolean? = null,
     val legs: Int? = null,
-    val minutes: Int,
+    val minutes: Int?,
     val reason: String,
+    val transfers: Int? = null,
+    val distanceKm: Double? = null,
 ) {
     companion object {
         fun parse(o: JSONObject) = TransitPlan(
@@ -1227,8 +1254,13 @@ data class TransitPlan(
             // 时长只认 durationMinutes:65（F-2 ⑤ 已收口：totalMinutes/minutes 都无生产者，
             // 原先只有 DemoData 在发 totalMinutes，跟着一起改成真实键名，不改就会在演示包里读成 0 分钟）。
             // ⚠ 别拿信封上那个 `totalDurationMinutes`:44 来补这里：它是整单的总时长（另一个对象、另一个口径）。
-            minutes = o.multiNum("durationMinutes").toInt(),
+            // ⚠ 它是 `Integer` 可缺席（`:65`），塌成 0 会被票面念成"这个方案 0 分钟"⇒ 改可空（D-085）。
+            minutes = o.multiNumOrNull("durationMinutes")?.toInt(),
             reason = o.multiStr("reason"),
+            transfers = o.multiNumOrNull("transferCount")?.toInt(),
+            // `distanceKm` 是 `Double:64`，而 MultiLegPlanner:187 明写"距离/时长先用直线估算，后续由路网回填"
+            // ⇒ 票面用这一格时必须标口径，不许把它当真实道路里程念。
+            distanceKm = o.multiNumOrNull("distanceKm"),
         )
     }
 }
@@ -1289,6 +1321,29 @@ data class ParcelTrace(
     val points: List<Station> = emptyList(),
     val handovers: List<LegHandover> = emptyList(),
     val plans: List<TransitPlan> = emptyList(),
+    // ---- `/send/topology` 信封（OrderTopologyRespVO:18-46）----
+    // 这些键**只有拓扑端点会发**，`/send/track` 与 `/product-order/trace` 一个都没有 ⇒ 那两条链路上全是默认值，
+    // 票面必须把"这条链路根本不带这一格"念成"后端没给"，不许留空白行（D-081/#54 同一条底线）。
+    /** DIRECT / MULTI_LEG 原码（`:32`） */
+    val planningMode: String = "",
+    /** 组织方式名（`:34`），后端没给就空 */
+    val planningModeName: String = "",
+    /** 方案号（`:36`） */
+    val planNo: String = "",
+    /** 总段数（`:38` Integer 可空）：缺 ≠ 0 段 */
+    val totalLegs: Int? = null,
+    /** 换乘次数（`:40` Integer 可空） */
+    val transferCount: Int? = null,
+    /** 总里程 km（`:42` BigDecimal 可空）。⚠ 口径是"各段里程相加"，而段的里程可能是经停坐标 Haversine 估算 ⇒ 用它的地方必须标口径 */
+    val totalDistanceKm: Double? = null,
+    /**
+     * 总时长分钟（`:44` Integer 可空）。
+     * ⚠ 后端 `TransportTopologyServiceImpl:134` 在按段求和之外**每次换乘另加 20 分钟**，而 @Schema 只写"总时长(分钟)"
+     *   ⇒ 这一格不是"路上时间"，票面措辞必须带上换乘等待口径，不能与段的 `durationMinutes` 混成一句话。
+     */
+    val totalDurationMinutes: Int? = null,
+    /** 方案解释（`:46`：为什么直达 / 为什么联运） */
+    val planReason: String = "",
     /**
      * 这份轨迹来自哪个状态空间。`ParcelTrace` 同时承载 `/send/track`（寄货，`TransportOrderStatusEnum` 0..13）
      * 和 `/product-order/trace`（商城，`ProductOrderStatusEnum` 0..3）——**同一个码在两边意思相反**：

@@ -48,9 +48,11 @@ import com.shanxiang.buspost.data.model.ParcelTrace
 import com.shanxiang.buspost.data.model.TransportLeg
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
+import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.notify.NotifyWorker
 import com.shanxiang.buspost.ui.common.BackTopBar
 import com.shanxiang.buspost.ui.common.DemoNote
+import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 import com.shanxiang.buspost.ui.common.TraceView
 import kotlinx.coroutines.delay
@@ -82,6 +84,7 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
     val scale = LocalBusFontScale.current
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val nav = LocalNavController.current
     var alertOn by remember { mutableStateOf(Prefs.arrivalAlertEnabled) }
 
     LaunchedEffect(no) { vm.load(no) }
@@ -110,6 +113,16 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                         statusLabel = tr.statusLabel,
                         tone = tr.tone,
                         onReplan = { vm.load(no) },
+                    )
+
+                    // #55：`/send/topology` 那条零消费者通路在这里接上 —— 票面答的是"分几段、在哪交接、
+                    // 为什么是这个方案"，这三问追踪页的报文（`/send/track`）里根本没有，
+                    // 所以不并卡、不共用数据，只给一个明确的跳转（全工程**恰好这一个** `Routes.parcelTicket` 调用点）。
+                    BusButton(
+                        text = "看联运票面（几段 · 在哪交接 · 为什么这个方案）",
+                        variant = BusButtonVariant.OUTLINE,
+                        onClick = { nav.navigate(Routes.parcelTicket(no)) },
+                        fullWidth = true,
                     )
 
                     // 承运信息卡（对标快递100/菜鸟：车牌+司机+ETA 一目了然）

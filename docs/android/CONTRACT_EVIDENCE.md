@@ -426,3 +426,36 @@ JVM 里从没渲染过，不许因为表格里有"缺失处理"这一列就读�
 ⇒ 登记为判据缺口 **`D-CE-1`**：`createProductOrder` 的别名撤读没有结构判据，只有一条具名行为用例
 `商城单回执只认 orderNo（后端那个 VO 就只有 id 与 orderNo）` 钉住（先红后绿：改前那条会拿到 `SC-DEAD` / `66.0`）。
 
+## 十七、`/send/topology`「查件票面」逐字段取证（D-085，2026-10-13 实测）
+
+判据簿：`tools/check_parcel_ticket_probes.sh`（PT-a…PT-l）；负控：`tools/parcel_ticket_negative_controls.sh`（41 条破口）；
+行为用例：`app/src/test/java/com/shanxiang/buspost/ui/user/ParcelTicketContractTest.kt`（15 条）。
+生产者：`AppSendController.java:208-215`（路由与非归属分支）、`TransportTopologyServiceImpl.java:92-176`（逐段赋值条件）、
+`OrderTopologyRespVO.java:16-139`（字段与可空性）。**这一整页此前是死代码**：`Repo.parcelTopology()`（`Repo.kt:780`）全仓 0 消费者。
+
+| 键 | 后端 producer（VO 行） | 只有这些条件才非空 | 小程序 consumer | App 读法与缺失行为 |
+|---|---|---|---|---|
+| `orderNo` `orderStatus` `orderStatusName` | `:21/:23/:25` | `order != null`（`ServiceImpl:92-99`） | `parcel.js:439` 只读 legs/handovers | 新增读 `orderStatusName`；空 ⇒ 票面念「后端没给」 |
+| `originStationName` `destinationStationName` | `:27/:29` | 站点档案查不到就是 null（`:97-98`） | 不读 | 新增读法（此前 App 只认自造的 `startStation`/`endStation`）；null ⇒ 念「后端没给」，不兜站名 |
+| `planningMode` `planningModeName` `planNo` `planReason` | `:32/:34/:36/:46` | `plan != null`（`:100-109`） | `planReason` 读（`parcel.js:439-440`） | 票面抬头四行；缺席 ⇒ 念「后端没给」 |
+| `totalLegs` `transferCount` | `:38/:40` Integer | 有段时被覆盖（`:118-123`） | 不读 | `multiNumOrNull`；**缺 ≠ 0 段 / 0 次** |
+| `totalDistanceKm` | `:42` BigDecimal | 段里程和 > 0 才覆盖（`:125-129`） | 不读 | 必须带口径：段全 `AMAP` 才说真实道路；含 `ESTIMATED` 就说「含估算段，不是真实道路里程」（依据 `MultiLegPlanner.java:187` 直线估算、`transport-schema.sql:257` Haversine） |
+| `totalDurationMinutes` | `:44` Integer | **各段之和 + 每次换乘 20 分钟**（`:134`，@Schema 只写"总时长(分钟)"没提这条口径） | 不读 | 措辞强制带「含 N 次换乘、每次 20 分钟」；换乘次数没给就写「是否已计入未知」，不替后端宣布 |
+| `candidates` | `:49` List | `multiLegService.preview` 抛异常时保持 null（`:172-174`） | 不读 | 空 ⇒ 念「方案对比没给，不表示这单只有一个方案」 |
+| `Candidate.chosen` | `:69` Boolean | 可缺席 | 不读 | 三态：true/false/null 各一句，null 念「后端没说（chosen 未给）」，不许塌成"不推荐" |
+| `Candidate.durationMinutes` `distanceKm` `transferCount` | `:65/:64/:63` | 可缺席 | 不读 | 全部 `multiNumOrNull`；改前 `minutes` 塌成 0 ⇒ 票面会念「这个方案 0 分钟」 |
+| `Handover.fromPlateNo` `toPlateNo` | `:118/:119` | 未派单为 null（`:330-344`） | 不读 | **真键名**；改前认 `fromPlate`/`toPlate`/`vehiclePlate`（三面 0 生产者）⇒ 真接口下"谁交给谁"整行念空，只有演示包念得出台词 |
+| `Handover.arrivedAt` `handoverStartedAt` `handoverCompletedAt` | `:123/:124/:125` | 可缺席 | 不读 | 完成 > 开始 > 到达；改前认 `handoverTime`/`confirmTime`（三面 0 生产者）⇒ 同上 |
+| `Handover.itemCount` | `:120` Integer | 可缺席 | 不读 | `Int?`；塌成 0 会被念成「0 件」 |
+| `Handover.statusName` `exceptionReason` | `:122/:126` | 可缺席 | 不读 | 异常原因空 ⇒ 念「无异常记录」，不许念成「有异常」 |
+| `Timeline.eventTypeName` `eventTime` `detail` | `:133/:134/:135` | `order != null` 才填（`:176`） | 不读 | 新增读法（改前只认 `label/title/nodeName`、`time/createTime`）⇒ 拓扑时间线整列念空；时刻必须过 `nodeTimeOf` 归一（后端把 `LocalDateTime` 序列化成 Epoch 毫秒，裸切串会切出 `"17590"`） |
+| 非归属人访问 | `AppSendController.java:214-215` | 返回 `new OrderTopologyRespVO()` = **全字段 null 的空结构，不是错误码** | — | 票面四格之一 `Absent`：只说「后端这次没给这张单的票面内容」，绝不念成「包裹不存在」，并保留「回追踪页」出口 |
+
+复跑命令（原样可执行）：`bash tools/check_parcel_ticket_probes.sh`（本轮 rc=0：PT-f 键基数 11 / 白名单外 0、PT-l 用例 15）、
+`bash tools/parcel_ticket_negative_controls.sh`（本轮 ✔=41 ✘=0 △=0）。
+
+⚠ 三面取证的边界：本轮**没有真接口回包**（本机后端未起这张单的登录态），"票面看到 n 段真交接"这一格仍未被演示；
+页面渲染一律 `NOT VERIFIED ON DEVICE`。另记一条判据缺口 **`D-CE-2`**：`R-n3` 那条"删免责话"的负控从写下那天起
+就一直 sed 一句不存在的「不代表车辆能到」（10-12 话术收紧时改写了），静默落空被记成"判据不判"——
+本轮补了 `R-n4`（钉现存那句免责话恰好 4 处）并把注入器换成会报落空的 `swap1`，`reach` 负控由 ✘=1 转 ✘=0。
+

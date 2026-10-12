@@ -56,6 +56,13 @@ rl=$(grep -A14 '/send/reachability' "$DM" | grep -cE '"distanceKm"|"recommendedS
 rm=$(grep -o "pickupServiceModeOrNull" "$SS" | wc -l)
 # R-n 页面 UNKNOWN 分支存在（UNKNOWN 既不能说可运也不能编原因）
 rn=$(grep -c "ReachabilityState.UNKNOWN" "$SS")
+# R-n4 "没判定"那一格的说法**本身**在场（把"未判定"说出来，不暗示"能到"）。
+#   2026-10-13 实测恰好 4：`可达性未判定` 1 处（`SendScreen.kt:275` 的 serviceModeText）
+#   + `可达性暂未知` 3 处（`:1120/:1121/:1122` 那三格）。
+#   ⚠ 旧口径没有这一条，于是负控 R-n3 那条"删免责话"的破口**从写下那天起就没落地过**：
+#   它 sed 的那句「不代表车辆能到」在 10-12 话术收紧时被改写（现全仓 0 命中），而 `sed -i` 不落刀也不报错
+#   ⇒ D-082 记的 `reach ✘=1` 就是这个形状（注入器静默落空 ≠ 判据不判，见 D-084 第 ① 条）。
+rn4=$(grep -c '可达性未判定\|可达性暂未知' "$SS")
 # R-n2 UNKNOWN 分支里说"可运"的写法（§11 的红线：分支存在不等于分支说得对，所以单独数语义）。
 #      分支体是多行的，只看 UNKNOWN 之后 6 行 —— 那里若出现"可就近/可以运输"就是说谎。
 rn2=$(grep -A6 "ReachabilityState.UNKNOWN" "$SS" | grep -cE "可就近|可以运输")
@@ -81,6 +88,7 @@ echo "R-e  ReachabilityState 引用点         : $re   （预期 ≥10：模型 
 echo "R-f  multiBoolOrNull（声明 $rfd + 可达性解析 $rfb）: $rf   （预期 2：Models 声明 1 + parse 使用 1）"
 echo "R-g  公里/步行为可空类型              : $rg   （预期 2：walkMinutes: Int? 与 distanceKm: Double?）"
 echo "R-h  页面裸拼 walkMinutes             : $rh   （预期 0：一律走 walkText）"
+echo "R-n4 「没判定」那一格的说法处数       : $rn4  （预期恰好 4：未判定 1 + 暂未知 3）"
 echo "R-i  直线来源如实标注                 : $ri   （预期 1：模型 providerLabel 里那一句）"
 echo "R-j  ReachabilityContractTest 用例数  : $rj   （预期 ≥17）"
 echo "R-k  Repo 解析出口（parse 次数）      : $rk   （预期 1）"
@@ -116,6 +124,7 @@ ok=1
 [ "$rl" = 5 ] || { echo "× R-l 演示兜底形状偏离真实契约"; ok=0; }
 [ "$rm" = 2 ] || { echo "× R-m 服务方式出现第二个出口"; ok=0; }
 [ "$rn" -ge 2 ] || { echo "× R-n 页面不再处理 UNKNOWN（会把没判定说成可运）"; ok=0; }
+[ "$rn4" = 4 ] || { echo "× R-n4 「没判定」那一格的说法不是恰好 4 处（现 $rn4）：少一处就是某一格又不说自己没判定，用户会把未知读成能到"; ok=0; }
 [ "$rn2" = 0 ] || { echo "× R-n2 UNKNOWN 分支出现了\"可运\"话术（§11 红线）"; ok=0; }
 [ "$rn3" -ge 1 ] || { echo "× R-n3 UNKNOWN 分支的免责句没了（车辆能不能到没判定，页面却可以留一句看起来像结论的话）"; ok=0; }
 [ "$ro" = 1 ] || { echo "× R-o REACHABLE 分支又变成静默（没站点却不提示手选）"; ok=0; }

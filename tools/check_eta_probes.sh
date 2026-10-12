@@ -166,7 +166,7 @@ taa=$(sed -n '/^data class BusVehicle/,/^) {/p' "$MD" | grep -cE 'val etaToNextS
 tab=$(grep -c "Math.max(1, kotlin.math.ceil" "$MD")
 # T-ac 里程/时长读法里不许混进米制或自造别名键（`("distanceKm","distance")`/`("durationMinutes","minutes")`）
 tac=$(grep -rnE 'multiNum(OrNull)?\("(distanceKm|durationMinutes)", *"(distance|meters|minutes)"' $A | grep -vE ':[0-9]+: *(\*|//)' | wc -l)
-# T-ad1 六个 distanceKm 声明全部可空（车辆/线路/段/试算/路线预估/可达性）
+# T-ad1 七个 distanceKm 声明全部可空（车辆/线路/段/试算/路线预估/可达性/候选方案 D-085）
 tad1=$(grep -c "val distanceKm: Double?" "$MD")
 # T-ad2 ⑫ 交给本轮的收口：TransportLeg 类体内 distanceKm/durationMinutes 都是可空类型
 tad2=$(sed -n '/^data class TransportLeg/,/^) {/p' "$MD" | grep -cE 'val (distanceKm|durationMinutes): (Double\?|Int\?)')
@@ -257,7 +257,7 @@ echo "T-z  货运侧『没给』文案（逐条点名）      : $tz/4 条在场 
 echo "T-aa 精确到站分钟可空声明            : $taa  （预期 1：etaToNextStationMinutes: Double?）"
 echo "T-ab 与小程序同口径的向上取整        : $tab  （预期 1：Math.max(1, ceil(...))，0.2 分钟不许显示 0）"
 echo "T-ac 里程/时长读法里的自造别名键     : $tac  （预期 0：distance/meters/minutes 都不在这个契约里）"
-echo "T-ad1 distanceKm 可空声明            : $tad1 （预期 6：车辆/线路/段/试算/路线预估/可达性）"
+echo "T-ad1 distanceKm 可空声明            : $tad1 （预期 7：车辆/线路/段/试算/路线预估/可达性/候选方案）"
 echo "T-ad2 段里程与计划时长可空（⑫ 残留） : $tad2 （预期 2）"
 echo "T-ae 界面裸读 .distanceKm 未判 null  : $tae              （预期 0：闭包判据）"
 echo "T-af DistanceCaliberContractTest 用例: ${tdc:-0}   （预期 ≥4）"
@@ -327,7 +327,7 @@ ok=1
 [ "$taa" = 1 ] || { echo "× T-aa 精确到站分钟又变成非空类型（没给会被说成『约 0 分钟到下一站』）"; ok=0; }
 [ "$tab" = 1 ] || { echo "× T-ab 向上取整口径变了（0.2 分钟会显示成 0，与小程序 detail.js 脱钩）"; ok=0; }
 [ "$tac" = 0 ] || { echo "× T-ac 里程/时长读法又混进自造别名键（米被当公里读）"; ok=0; }
-[ "$tad1" = 6 ] || { echo "× T-ad1 distanceKm 又出现非空声明（缺键塌成 0.0）"; ok=0; }
+[ "$tad1" = 7 ] || { echo "× T-ad1 distanceKm 的可空声明不是恰好 7（现 $tad1）：少了=某一处又出现非空声明（缺键塌成 0.0），多了=新加了一处却没登记（D-085 实测 6→7，增量是 `TransitPlan.distanceKm`，它抄的是 OrderTopologyRespVO.Candidate:64 的 Double）"; ok=0; }
 [ "$tad2" = 2 ] || { echo "× T-ad2 段里程/计划时长又回到非空默认值（⑫ 残留复发）"; ok=0; }
 [ "$tae" = 0 ] || { echo "× T-ae 界面裸读 .distanceKm 没判 null（null 会被打印进文案）"; ok=0; }
 [ "${tdc:-0}" -ge 4 ] || { echo "× T-af ⑬ 里程口径契约测试被删"; ok=0; }

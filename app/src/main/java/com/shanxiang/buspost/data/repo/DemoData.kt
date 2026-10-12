@@ -353,12 +353,19 @@ object DemoData {
         ),
     )
 
-    /** 换乘交接点：待交接清单要展示交出/接收司机与件数 */
+    /**
+     * 换乘交接点：待交接清单要展示交出/接收司机与件数。
+     * ⚠ 键名逐个抄 `OrderTopologyRespVO.Handover`：车牌是 `fromPlateNo`/`toPlateNo`（D-081 那条"演示面与契约同键"
+     *   的收尾——旧写法发的是 `fromPlate`/`toPlate`/`handoverTime`，真接口从不发这三个，于是真机下交接整格念空，
+     *   只有演示包"看起来是对的"）。
+     */
     private fun handoversJson() = a(
         j(
-            "stationName" to "双河口换乘站", "fromPlate" to "渝A·8K231", "toPlate" to "渝B·5M107",
+            "stationName" to "双河口换乘站", "fromPlateNo" to "渝A·8K231", "toPlateNo" to "渝B·5M107",
             "fromDriverName" to "王有德", "toDriverName" to "罗建平",
-            "handoverTime" to "2026-09-28 11:05", "itemCount" to 6,
+            "arrivedAt" to "2026-09-28 10:52", "handoverStartedAt" to "2026-09-28 11:00",
+            "handoverCompletedAt" to "2026-09-28 11:05", "itemCount" to 6,
+            "status" to 2, "statusName" to "已交接",
         ),
     )
 
@@ -536,7 +543,9 @@ object DemoData {
                     "targetStation" to "云山村口站", "etaMinutes" to 41, "dataSource" to "SIMULATED", "statusLabel" to "已分配"),
             )
 
-            path.endsWith("/send/track") || path.endsWith("/send/topology") -> j(
+            path.endsWith("/send/track") || path.endsWith("/send/topology") -> {
+                val topo = path.endsWith("/send/topology")
+                j(
                 "orderNo" to orderNos[0],
                 "status" to 6,
                 "statusName" to "已发车",
@@ -574,7 +583,21 @@ object DemoData {
                 }.toTypedArray()),
                 "stations" to stationsJson(k1),
                 "track" to polylineJson(k1.subList(0, 5)),
-            )
+                ).let {
+                    // 拓扑信封那 10 个键（`OrderTopologyRespVO:25-46`）**只有 /send/topology 会发**。
+                    // 挂在共用报文上，演示包的 `/send/track` 也会"多出一格真接口从不下发的内容"
+                    // —— 那就是 D-081 登记的"演示面比契约更像真话"，所以按路径分开发。
+                    if (!topo) return@let it
+                    it.put("originStationName", "云山村口站").put("destinationStationName", "石桥驿站")
+                        .put("orderStatusName", "已发车").put("planningMode", "MULTI_LEG")
+                        .put("planningModeName", "多段联运").put("planNo", "PLAN-K1-0830")
+                        .put("totalLegs", 2).put("transferCount", 1)
+                        .put("totalDistanceKm", 27.4)
+                        // 86 是各段计划耗时之和，+20 是后端 `TransportTopologyServiceImpl:134` 每次换乘另加的量
+                        .put("totalDurationMinutes", 86 + 20)
+                        .put("planReason", "双河口换乘：全程在班车经停范围内，含 20 分钟换乘等待")
+                }
+            }
 
             path.endsWith("/send/legs") -> legsJson(1)
 

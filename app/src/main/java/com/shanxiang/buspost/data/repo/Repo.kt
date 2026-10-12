@@ -722,9 +722,14 @@ object Repo {
         }
         val nodes = o.multiArr("nodes", "timeline", "records").map {
             TraceNode(
-                label = it.multiStr("label", "title", "statusLabel", "nodeName"),
-                time = it.multiStr("time", "createTime", "nodeTime").substringAfter(' ').take(5),
-                hint = it.multiStr("hint", "description", "stationName", "remark"),
+                // `eventTypeName`/`detail` 是拓扑信封 `Timeline:129-137` 的真键；原来那四个键
+                // （label/title/statusLabel/nodeName 与 hint/description/stationName/remark）在这条链路上一个生产者都没有
+                // ⇒ `/send/topology` 的时间线整列念空（D-085）。放在最前面，另外两条链路的读法不受影响。
+                label = it.multiStr("eventTypeName", "label", "title", "statusLabel", "nodeName"),
+                // 后端把 LocalDateTime 注册成 EpochMillis（`Models.kt:104-107` 那条取证），所以这里必须先过 `ts()`
+                // 归一再取 HH:mm；旧写法直接 `substringAfter(' ').take(5)` 会把 13 位毫秒串切出 "17590"。
+                time = it.nodeTimeOf("eventTime", "time", "createTime", "nodeTime"),
+                hint = it.multiStr("detail", "hint", "description", "stationName", "remark"),
                 // 轨迹节点完成态的真键只有 `done`（小程序 11 处、DemoData 6 处都在写它）；
                 // `finished` 三方 0 命中，`completed` 只在后端 bigscreen 的 admin 汇总里出现过（BigScreenServiceImpl:120），
                 // 都不在这个报文里 ⇒ 撤掉，避免"节点状态"长出第二个名字。
@@ -752,9 +757,12 @@ object Repo {
             polyline = track,
             stations = stations,
             productName = o.multiStr("productName"),
-            statusName = o.multiStr("statusName"),
-            startStation = o.multiStr("startStation", "fromStation", "pickupStation"),
-            endStation = o.multiStr("endStation", "toStation"),
+            // `orderStatusName` 是拓扑信封的真键（`OrderTopologyRespVO:25`）；放在最前，另外两条链路的 `statusName` 不受影响。
+            statusName = o.multiStr("orderStatusName", "statusName"),
+            // 起讫站：拓扑给的是 `originStationName`/`destinationStationName`（`:27`/`:29`），
+            // 查不到站点档案时后端就是 null ⇒ 下面票面那一格念"后端没给"，不兜一个站名。
+            startStation = o.multiStr("originStationName", "startStation", "fromStation", "pickupStation"),
+            endStation = o.multiStr("destinationStationName", "endStation", "toStation"),
             routeName = o.multiStr("routeName", "lineName"),
             shiftCode = o.multiStr("shiftCode"),
             receiverName = o.multiStr("receiverName"),
@@ -773,6 +781,15 @@ object Repo {
             points = points,
             handovers = o.multiArr("handovers", "transfers").map { LegHandover.parse(it) },
             plans = o.multiArr("plans", "candidates", "schemes").map { TransitPlan.parse(it) },
+            // ---- 拓扑信封（OrderTopologyRespVO:32-46）：只有 /send/topology 会发，其余两条链路读到默认值 ----
+            planningMode = o.multiStr("planningMode"),
+            planningModeName = o.multiStr("planningModeName"),
+            planNo = o.multiStr("planNo"),
+            totalLegs = o.multiNumOrNull("totalLegs")?.toInt(),
+            transferCount = o.multiNumOrNull("transferCount")?.toInt(),
+            totalDistanceKm = o.multiNumOrNull("totalDistanceKm"),
+            totalDurationMinutes = o.multiNumOrNull("totalDurationMinutes")?.toInt(),
+            planReason = o.multiStr("planReason"),
         )
     }
 

@@ -24,10 +24,28 @@ cp "$SRC/app/src/main/java/com/shanxiang/buspost/data/repo/DemoData.kt" "$DM"
 cp "$SRC/app/src/main/java/com/shanxiang/buspost/ui/user/SendScreen.kt" "$SS"
 cp "$SRC/app/src/test/java/com/shanxiang/buspost/data/repo/ReachabilityContractTest.kt" "$TS"
 CLEAN=/tmp/reach_neg_clean.$$; cp -r "$SC" "$CLEAN"
+# swap1：替换**恰好一处**；锚点不存在或不唯一就记 MISS，由下面的 ctl 换成"锚点没命中"那句话。
+# 本仓那几处裸 `sed -i` 的洞（D-084 第 ① 条）就在这：R-n3 的 sed 落空了一整轮，
+# 日志却把它记成"判据不判"。落空与不判必须是两种话。
+MISS=0
+swap1() { python - "$1" "$2" "$3" <<'SWAPPY' || MISS=1
+import sys
+p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(p, encoding='utf-8', newline='').read()
+if s.count(old) != 1: sys.exit("ANCHOR-NOT-UNIQUE(%d): %s" % (s.count(old), old[:60]))
+open(p, 'w', encoding='utf-8', newline='').write(s.replace(old, new, 1))
+SWAPPY
+}
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
 
 ctl() { # $1=编号 $2=说明
   local out code
+  if [ "$MISS" = 1 ]; then
+    echo "✘ $1  $2 → 锚点没命中/不唯一，破口根本没注入（这条负控不成立）"
+    MISS=0
+    rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+    return
+  fi
   out=$(BUSPOST_ANDROID="$SC" bash "$PR" 2>&1); code=$?
   if [ "$code" = 1 ] && echo "$out" | grep -q "^× $1"; then
     echo "✔ $1  $2 → exit 1：$(echo "$out" | grep "^× $1" | head -1)"
@@ -94,7 +112,10 @@ PY
 ctl R-m "同一行藏了第二个服务方式出口"
 sed -i 's/ReachabilityState.UNKNOWN/ReachabilityState.NOT_REACHABLE/g' "$SS";               ctl R-n "页面不再处理 UNKNOWN"
 inject "$SS" "ReachabilityState.UNKNOWN ->" '    val p = "车辆可就近上门"';                   ctl R-n2 "UNKNOWN 分支里说可运（§11 红线）"
-sed -i 's/不代表车辆能到/暂时没数据/' "$SS";                                                   ctl R-n3 "免责话被删"
+# ⚠ D-082 那轮记的 `reach ✘=1` 就是这条：它 sed 的那句「不代表车辆能到」在 10-12 话术收紧时已被改写
+#   （现全仓 0 命中），`sed -i` 不落刀也不报错 ⇒ 一整轮把"注入没发生"记成了"判据不判"。
+#   现在换成会报落空的 swap1，并钉住现存那句免责话（判据同轮新增 R-n4）。
+swap1 "$SS" '可达性未判定' '暂时没数据';                                                   ctl R-n3 "免责话被删（「没判定」那一格又不说没判定）"
 sed -i 's/后端判定可上门，但没给出就近站点/（不提）/' "$SS";                                    ctl R-o "REACHABLE 却没站点时静默"
 python - "$SS" <<'PY'
 import sys
