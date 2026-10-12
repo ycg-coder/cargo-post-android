@@ -6169,3 +6169,103 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
 这笔账在只有两个人看这个项目时明显不划算。所以现在的形状是：**执行由机器做（不会手抖打错字符集），触发由人做（不会顺手合并就改库）**。
 待确认：是否 push 后端仓（push master 本身就是云端到端部署：`systemctl restart cargo-post` + 白名单迁移），以及要不要把这条手动作业交队友跑一次
 （跑之前它会先打印云上库现状，那条打印本身就是我们一直缺的"云上到底有没有这三列"的证据）。
+
+### D-084（10-13 01:4x）· D-082 那 20 格逐条消化：13 道"空转"里有 12 道其实是**刀没落下去**
+
+**开工前提**（用户 10-12 深夜选定）："下一轮第一件事 = 修负控整批暴露的 13 道空转闸门 + 7 条失效注入，不要先做功能。"
+本轮照这条做，`app/src/main` **一字未动**（唯一一处 `app/src` 改动见下面第 8 条，是补一条**测试**断言）。
+
+**先把 D-082 自己那句话证伪了一半**（这条比结果重要）
+D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源码回查，13 道的真实成因分三群，只有一群是判据弱：
+- **6 道是 `drop` 根本没落刀 —— 换行符**。`core/navigation/NavigationEngine.kt` 工作树是 **CRLF**
+  （`git ls-files --eol` 实测 `i/lf w/crlf`；`core.autocrlf=true` 检出时转的，其余 `.kt` 因为后来被工具重写过才是 LF
+  ⇒ "全仓 LF"这个前提从今天起带例外），而 `drop` 只找 `"\n}\n"` ⇒ 每次都是 `NO-CLOSING-BRACE` 非零退出、
+  **退出码没人接**。六条 = `N-u`（绑定判据整块 / accepted 凭证）×2、`N-z`（车道话术整块 / 唯一出口）×2、
+  `N-aa`（重算族整块 / 话术出口）×2，恰好全是"整块没了"那一族。
+- **6 道是锚点被这些天的改写顶掉**（判据那一侧同轮重锚了、负控这一侧没人跟）：`N-l`（副标题被 8387929 换掉）、
+  `N-n`（`onNav` 已是 `onOpenNav`）、`N-o`（「本页按名字猜的」→「箭头图形是按名字猜的」）、`N-r`（那格已是单行
+  `if (...) InfoRow(...)`，锚点带花括号）、`L-x`（「接口未返回站点」那半句被当技术术语清了）、`N-ac3`（第二参数换成
+  「语音播报已关闭」）。
+- **1 道（`N-k`）是锚点落在注释上**：它替换的『高德没给』今天只剩两句注释，被 `NC` 滤掉，而 `NK` 数的是「暂未知」
+  那 6 处**生效行**。
+⇒ 机制补了三层（都是"让落空说自己落空"）：注入器读写一律 `newline=''`（不再把 LF 文件整本刷成 CRLF）、
+  `drop` 认 `\n\}\r?\n`、任何注入器落空时 `ctl/ctl_loc/ctl_loc_keep` 打 `✘ … 锚点没命中，破口根本没注入`，
+  并且**本簿 ✘ 条数进退出码**（原来 ✘=13 仍然 exit 0，"批跑完"与"闸门全是摆设"在退出码上分不出来）。
+
+**逐条做了什么**
+1. `navigation_negative_controls.sh`：上面三群全部处理（7 条锚点重锚 + `drop`/换行符 + 落空上报 + 退出码）。
+2. **两处"下限低于实测"的空转闸门**（这条不在 D-082 的 20 格里，是归因 SA-d 时实测出来的同族）：
+   `check_safe_call_probes.sh` 的 SA-d「全 main `attempt {`」与 `check_throwable_probes.sh` 的 TH-f 数的是**同一个扫描面**，
+   两本都写 `-ge 11`，实测已经是 **14** ⇒ 顺手删一到三处都不红。两本同轮改成**恰好 14**，并把 14 处逐点列进 SA-d 注释
+   （`BusPostApp.kt:43 / Locator.kt:214 / AmapNavigationEngine.kt:447 / Repo.kt:140 / Repo.kt:394 / NotifyWorker.kt:34 /
+   BusPostRoot.kt:97 / :111 / :112 / UpdateSection.kt:86 / DriverGuideScreen.kt:136 / DriverNavScreen.kt:718 /
+   DriverSdkNavCard.kt:266 / HandoverScreen.kt:160`）。
+   ⚠ 归因诚实：11→14 的三处里只有**两处**指得到具名提交（`Repo.kt:140` 续期 `dd7d6093`、`UpdateSection.kt:86`
+   装包申请权限 `3687211c`，都在 10-12），第三处落在本仓 git 起点（`d12b419`，10-10）之前 ⇒ **登记为增量未归因**，
+   不写成"谁加的"。另：TH-f 那本自己的 echo 原写"目标 ≥7"、gate 写"-ge 11"——**同一本里两个数**，也是本轮对齐的。
+3. `runcatching_negative_controls.sh`：**反向负控（"必须不红"那一族）不许写死读数**。原来要求输出里出现
+   `sites=32|violations=0|candidates=0`，而 10-10 那片收口把扫描面抬到 **39** ⇒ 字面永远对不上，这一族从此"永远报空跑"。
+   改成把基线那一刻的 SUMMARY 行存成 `BASE_SUMMARY` 当期望值（仍要求 violations=0/candidates=0 且 sites 没被这条注入动过）。
+   另：两条 docs 表行锚点 357→**512**、367→**522**（`RUNCATCHING_AUDIT.md` 的行号列早已随源码重锚，负控没跟），
+   描述里 32/36 那批陈旧数字改到现读。
+4. `exception_negative_controls.sh` + `check_exception_probes.sh`：EX-f 的注册行锚点跟着 `BusRouteBody` 包壳重锚
+   （锚点只指到 `{` 为止，里面套谁不该由这条判据管）；EX-g 第四条破口**判据随动**：新增 `EG4`（`ack.notSent` 分支必须在，
+   目标 1）与 `EG5`（那一句里不许出现"已提交/成功"，目标 0）。为什么不是只对锚点——这一格那句 10-12 被改短成
+   「以下为当前状态」，`EG`（数"未发给后端"）那条腿从此看不见它，把拦下说成已提交时 EG/EG3 一根手指都不动
+   ⇒ **按措辞钉的判据，措辞一改就失去那一格**，所以改成按**分支**钉。
+5. `mission_route_negative_controls.sh` + `check_mission_route_probes.sh`：MR-c 五条整族重锚（那五句全被 8387929 改短）；
+   新增 `MR_C6`＝`这次没问到：$failure`（目标 1）——括号里那半句免责有 `MR_C3` 钉，而**括号前**那半句被换成
+   "后端没有可用路线"时 `MR_C3`/`MR_CT` 都不动；MR-e 两处按新缩进重锚；MR-i 重试入口改成**按窗口定位**——
+   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:813` 有路线支 / `:828` 失败支），
+   按"第一处"删会删错支，而 `MRI_RETRY` 只数失败支那 12 行 ⇒ 那是一条**注入了但打错地方**的破口（`red` 的字节比对挡不住）。
+6. `mission_route_test_negative_controls.sh` MT-2、`navigation_test_negative_controls.sh` 的 M14/M24/M25/M27/M28/M29/M30/M31
+   重锚（全是话术字面被顶掉）。⚠ 这两本都是"第一条落空就 exit 2"，所以**报错那条之后的破口连跑都没跑过**
+   （navigation_test 当时停在 M14 ⇒ M15–M37 全部未验证）⇒ 本轮按整本审，不是只修日志里那条。
+   M30 顺带把"锚点全文件命中两行、靠 `replace(...,1)` 碰巧命中第一行"的写法改成按行前缀定位（成功格与失败格同尾）。
+7. `shell_routing_test_negative_controls.sh` M-1：**语义随动，不是单纯重锚**。旧破口写"未登录不再优先落登录页"，
+   而 Task #16 之后未登录落的是 **USER_SHELL**（游客可看附近公交）⇒ 那句字面早就不在树里。要防的没变
+   （残留 `role=DRIVER` 的陌生人不能进司机壳），所以破口换成"未登录一律给司机壳"，红的正是钉游客模式那条用例。
+8. **`NavigationContractTest.kt` 补了一条断言**（本轮唯一一处 `app/src` 改动）：M25（把多组车道那两个 `byte[]` 念成
+   "第一组就是推荐车道"）整本跑下来是 `✘ 用例仍然全绿` —— **没有任何用例能红**，而这条恰恰是"没核过语义就不许挑组"。
+   按本仓规矩是**补用例，不是撤破口**：在既有的 `没给过与已经不给与多组车道是三种不同说法` 里加一条
+   `Regex("推荐|建议|优先|第一组|走第")` 的 `assertFalse`。**没有新增 `@Test`**（所以 637 这个数字没动）。
+9. `eta_negative_controls.sh` 的沙盒从"逐文件 cp 12 个文件"改成**整目录 copy**：10-12 那批它基线红（沙盒读 5、真身读 7），
+   缺的就是 `ui/user/TraceScreen.kt`（T-z 那七处里有两处）⇒ 这正是本仓那条老规矩的意思："只拷几个文件的沙盒，
+   会在你新增第四个文件时让基线先红"。**基线修绿之后底下又露出一条真空转**（第 21 格，不在 D-082 清单里）：
+   `T-z` 那条破口替换的四个词是 10-12 之前的旧话术（到站分钟未下发/未给到站分钟/里程未给/时长未给），
+   今天树里是 时间暂未知/里程暂未知/时长暂未知/全程时长暂未知 ⇒ sed 一个都没换 = 空跑。重锚后 ✔。
+10. `navigation_test_negative_controls.sh` 的 `fails()` 只把 `$1` 传给 python，而 `$XML` 是**两份**产物路径
+    ⇒ M37 的注入把 `AutoGuideDecisionTest` 打红了（gradle 日志可查 `一个进程只自动跳一次… FAILED`），
+    计数却读成 `failures=0/tests=58`，被记成 △"两者不一致"。改成 `python - "$@"` 后单条复跑 =
+    **✔ M37 红了 1 例（共 62）**。⚠ 同书那 37 条 ✔ 里的"共 58"是**少数了一份产物**的读数，不是判据问题。
+
+**读数（全部实测，日志 `/tmp/queue_round.txt`、`/tmp/queue2.txt`，各簿全文 `/tmp/q*_*.log`）**
+- 判据侧四本改动后基线全绿：`check_mission_route_probes` / `check_exception_probes` / `check_safe_call_probes` /
+  `check_throwable_probes` 各 rc=0；新读数 `MR_C6=1`、`EG4/EG5=1/0`、`SA-d 全 main=14`、`TH-f=14`。
+- 负控（本轮动过的 9 本，逐本 rc / ✔ / ✘ / △）：
+  `navigation` 0/143/0/0 ｜ `safe_call` 0/29/0/0 ｜ `runcatching` 0/20/0/0 ｜ `throwable` 0/18/0/1（那条 △ 是既存的
+  TH-e"被别的判据误抓"，本轮未动）｜ `exception` 0/21/0/0 ｜ `mission_route` 0/52/0/0 ｜ `mission_route_test` 0/3/0/0（◦=4）｜
+  `shell_routing_test` 0/7/0/0 ｜ `eta` 0/61/0/0。**九本合计 ✘=0**；`navigation_test` 整本 0/38/0/1，那唯一一条 △
+  在第 10 条修好后单条复跑转 ✔（复跑同时验了"恢复后逐字节相同 + 用例重新全绿"）。
+- 读产物的两本：**notify_result rc=0 ✔=17**、**oss_credits rc=0 ✔=20**（各跑两遍：全量产物在场都绿）
+  ⇒ D-082 第 3 类"环境红"证实，判据一字未改。
+- 全量：`./gradlew -Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK :app:testDebugUnitTest :app:assembleDebug --rerun-tasks`
+  **rc=0、BUILD SUCCESSFUL in 52s、45 actionable tasks: 45 executed**；从产物聚合 **63 类 / 637 例 / failures 0 / errors 0 /
+  skipped 0**，63 份 XML 的 timestamp 有 63 个唯一值（`2026-10-12T17:14:13.939Z … 17:14:14.033Z`）⇒ 不是上一遍残留。
+- 工作树：15 个文件改动 = 14 本 tools + 1 本 test；`app/src/main` 与五本台账之外没有别的写入面被碰过。
+
+**D-082 那 20 格的对账**
+13 道空转 → 全部处理（6 CRLF + 6 锚点 + 1 注释锚点）；7 条失效注入 → 全部重锚并单本跑绿；
+额外新增 3 格（`TH-f` 同族下限、`T-z` 破口空转、`M25` 没有用例能红、`M37`/`fails()` 读数器坏）——
+⚠ 这几条**不在 D-082 清单里**，是修的过程中被实测顶出来的，登记为 D-084 自己的增量，不回填 D-082 的计数。
+
+**仍欠（四格都不许当已完成）**
+1. **本轮没有重跑负控全批 33 本**，只把动过的 10 本逐本重跑。⇒ 台账不许出现"负控全批绿"。
+   能答的是"这 10 本今天各自重新咬住"；答不了"另外 23 本的注入面有没有被连带打红"——本轮没改任何
+   `app/src/main` 源码文本，唯一被多本共享的输入是那四本判据簿的文本，引用者已 grep 实测
+   （`map3d_visual_negative_controls.sh:55` 直接把 `check_mission_route_probes.sh` 当判据簿跑，而它只读 rc；
+   `exception_test_negative_controls.sh:117` 同理跑 `check_exception_probes.sh` 取 rc）⇒ 两条新判据在基线都是绿的，
+   不会把这两本推成假红，但**它们自己的整本本轮没重跑**。
+2. `check_doc_anchor_probes.sh` 那本在册红（#51 的三条路：逐条人工重锚 / 83 条进在册表 / 闸门改比率）**仍等用户定**。
+3. 本轮全是判据/负控侧，**没有任何真机读数**；`NOT VERIFIED ON DEVICE` 那一格一字未动。
+4. 本地已提交**未 push**（用户口径：所有任务完成后一起推，推之前把 diff 给他看；后端仓要单独点名提醒）。
