@@ -1829,8 +1829,13 @@ data class Arrangement(
     /** 上车站 / 下车站（村民到站通知） */
     val boardingStation: String = "",
     val alightingStation: String = "",
-    /** 在途状态（计划状态文案） */
-    val planStatus: String = "",
+    /**
+     * 调度方案状态**码**（后端 `AppSendArrangementRespVO.planStatus` 是 Integer，不是文案）。
+     * ⚠ 不能用 `multiStr` 读：那条路会把数字 2 直接念成字符串"2"给用户看。
+     * 码→名的表在 `ui/user/ArrangementRows.kt`（对齐后端 `DispatchPlanStatusEnum` 六个值），
+     * null = 后端没给方案（这条安排还没落到调度方案明细），不许塌成 0（"待审核"）。
+     */
+    val planStatusCode: Int? = null,
 ) {
     companion object {
         fun parse(o: JSONObject) = Arrangement(
@@ -1843,7 +1848,7 @@ data class Arrangement(
             statusLabel = o.multiStr("statusName", "statusLabel", "status"),
             boardingStation = o.multiStr("boardingStationName", "boardingStation"),
             alightingStation = o.multiStr("alightingStationName", "alightingStation"),
-            planStatus = o.multiStr("planStatus", "planStatusName"),
+            planStatusCode = o.multiNumOrNull("planStatus")?.toInt(),
         )
     }
 }

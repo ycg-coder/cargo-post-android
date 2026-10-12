@@ -17,6 +17,8 @@ object Routes {
     const val ORDERS = "orders"
     /** 「快递」页在 tab 内，通过 AppState.parcelIntent 直达内层 tab */
     const val PARCEL = "parcel"
+    /** #54：`Repo.myArrangements()`（`GET /send/arrangements`）此前零消费者，这一页把它接上 */
+    const val ARRANGEMENTS = "arrangements"
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val ADDRESS = "address"

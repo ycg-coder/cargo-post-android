@@ -6024,3 +6024,70 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
    本轮只落"司机端读"这一格，没有动发布侧。
 3. 已读水位/未读角标没做：司机端公告目前是"看一眼"，不计已读（后端 `/notice/list` 也没给已读位），
    登记为待议而不是"已闭环"。
+
+### D-081（10-12 19:1x）· #54 用户端「我的乘车安排」：`/send/arrangements` 这条**通路一直是活的，缺的只有读它的那一页**
+
+**起点**（`ANDROID_PARITY_AUDIT_V2.md:155` 记的是 `REAL_COMPLETE`，但全仓零消费者）：
+`Repo.myArrangements()`（`Repo.kt:687`）与 `Arrangement`（`Models.kt:1816`）都在，`grep` 只命中它们自己 ⇒
+通路侧是死代码、界面侧是缺那一格。这一格也不是新功能：`DriverLocationService.kt:53` 那条常驻通知写的就是
+"正在为**乘车安排**与到车提醒上传车辆位置"，而用户端从来没有"乘车安排"可看。
+
+**先核契约再动手（逐字段读生产者，不猜）**
+`AppSendController.arrangements()` 只 set 这十一个键：`orderId`、`orderNo`、`status`、`statusName`、
+上车站两个键、下车站两个键、`planId`、`planStatus`、`vehiclePlateNo`。由此定下三条硬口径：
+1. **这一页不显示任何分钟数** —— 这个端点没有 `etaMinutes` 键（§68），到车提醒走的是 `/send/page` 的
+   `carrierEtaMinutes` 且必须标"直线估算"；在这里写"还有 X 分钟"就是凭空造数。
+2. **`planStatus` 是 Integer 不是文案** —— 旧写法 `multiStr("planStatus")` 会把码 2 直接念成字符串"2"，
+   屏幕上就是"调度方案：2"。改成 `planStatusCode: Int?`（`multiNumOrNull`），码→名的表照抄后端
+   `DispatchPlanStatusEnum` 六个值（0 待审核 / 1 已下发 / 2 执行中 / 3 已完成 / 4 已作废 / 5 异常），
+   未知码原样带出（"未识别的方案状态（9）"），**null 不许塌成 0**。
+   ⚠ 顺带记一笔：VO 的 `@Schema` 注释只写了 0..3，而枚举实际有六个值 —— 生产者自己的文档已经落后于代码。
+3. **没给就说明没给** —— 站点被删时后端 `stationNameMap.get(...)` 给 null，`vehiclePlateNo` 只有派了车才有值；
+   界面统一念"后端没给"，不渲染空白行、也不兜一个站名。
+
+**做法（判定在纯层，页面只渲染）**
+- `ui/user/ArrangementRows.kt`（新）：`planStatusText(code)` + `arrangementRows(a)`（固定六行）+
+  `arrangementsPage(RemoteState, loading)` 出 **四格**：`Failed` / `Loading` / `Empty` / `Shown`。
+  与 D-080 同一条底线：**"这一轮没取到"绝不能念成"还没有乘车安排"**（货已在路上，页面却说没安排）。
+- `ui/user/ArrangementsScreen.kt`（新）：VM 初值 `RemoteState(loading = true)`（不是空列表）；
+  `Routes.ARRANGEMENTS` 注册走 `BusRouteBody`；「我的」里一行入口 `MineRow(… "我的乘车安排" …)`，
+  全工程**恰好一个**导航调用点。
+
+**判据与负控**
+- 新簿 `tools/check_arrangement_probes.sh`：AR-a…AR-i 九项，全绿。
+- 新负控 `tools/arrangement_negative_controls.sh`：**12/12 红且原因对得上**
+  （AR-1 不取数、AR-2/3 注册掉队、AR-4 入口撤掉、AR-5/6 措辞出处、AR-7/8 ETA 与同文件正对照、
+  AR-9 码被当文案念、AR-10 某一格被并进另一格、AR-11 初值写成空、AR-12 摘用例）。
+- AR-e 的"目标 0"这一格值得单独记：反证原先想拿模型里的 `val etaMinutes: Int?` 数，
+  实测那个串在 Models 里有 **6 处**（别的模型也有 ETA 字段），删掉 Arrangement 那一处照样 `-ge 1` 通过 ⇒
+  改成**同文件正对照**（`ArrangementRows.kt` 里"承运车辆"这一行标签必须数得出恰好 1）：
+  它证明的是"过滤器确实在看这个文件"，而不是"某个别处的字段还在"。
+- 结构簿自己的第一版 `nc_all()` 也踩了一次注释形状坑：`grep -rn` 的输出是 `文件:行:内容`，
+  直接套 `^[0-9]+:` 的注释过滤器会**一条都不命中** ⇒ 报出"真调用数=0"这种假红；
+  改成先 `sed 's/^[^:]*:[0-9]*://'` 剥两段再滤（簿里注释写清了这两种形状）。
+
+**判据当场咬住的一处真重复（不是误报）**
+`PL-g` 立刻红了：`不提供网上预约乘车` 出现了 **2 处** —— 我在 `ArrangementRows.kt` 的空态里顺手重抄了这条服务边界。
+这正是这本判据存在的理由（同一条硬规则两份文字各自漂移）。修法是**删掉这一页的重复**、那句只留在
+`core/about/AppPolicies`，并把用例从"要求这一页也写着它"改成**"要求这一页不许再抄一份"**。
+（第一次改完仍红：注释里还留着那句话，`PL-g` 数的是全文命中 —— 注释也不能抄第二份原话。）
+
+**台账随动**：`test_suite_hygiene` SU-b 64→**65**（唯一增量 = `ArrangementRowsContractTest.kt`，产物 tests=13，
+同轮 SU-a 63/**0** ⇒ 不是空壳）。
+
+**读数**
+- `ArrangementRowsContractTest` **13 例**；`BusEtaContractTest` 仍 13 例绿（改 `planStatus` 读法没动它钉的 ETA 口径）。
+- 全量 `:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` = **BUILD SUCCESSFUL、45 tasks executed**，
+  用例 **63 类 / 637 例 / 0 失败 / 0 错误**（63 份 XML timestamp 全为 2026-10-12T11:13，无上一遍残留）。
+- 判据全批 29 本 = **28 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，见 #51）。
+- 后端实测（本机 local）：`GET /app-api/transport/send/arrangements` 未带登录态 →
+  `{"code":401,"msg":"账号未登录"}`（HTTP 200 + 业务 401）⇒ 路由在、要登录，App 的 401 分支会先静默续一次再重试。
+
+**仍欠（三格都不许当成已完成）**
+1. **没有一条真数据的回包**：这一页"看到 n 条安排"仍未被演示过 —— 需要一个带 `orderType=1` 且
+   `status ∈ {2,3,4}` 的登录用户，本机库里没验到；本机唯一实测的是"未登录被拒"这一格。
+2. `NOT VERIFIED ON DEVICE`：六行标签在 440dpi 平板上的换行、84dp 标签列宽、空态/失败态的实际渲染都没复拍。
+3. 演示形态（debug 的 `DemoData` `/send/arrangements` 那两条）写的是**自造键**
+   （`shiftCode/targetStation/dataSource/etaMinutes`），没有后端真给的上车站/下车站/`planStatus` ⇒
+   在演示包里这一页会有几行念"后端没给"。这不算说假话（演示标记也在场），但把演示面改成与契约同键
+   是一格独立的收尾，本轮没做，登记在此。

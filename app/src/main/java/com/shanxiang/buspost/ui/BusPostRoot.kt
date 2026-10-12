@@ -44,6 +44,7 @@ import com.shanxiang.buspost.ui.driver.HandoverScreen
 import com.shanxiang.buspost.ui.login.LoginScreen
 import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
+import com.shanxiang.buspost.ui.user.ArrangementsScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
 import com.shanxiang.buspost.core.about.PolicyKind
@@ -151,6 +152,7 @@ fun BusPostRoot() {
         composable(Routes.ORDERS) { com.shanxiang.buspost.ui.common.BusRouteBody { OrdersScreen() } }
         composable(Routes.PARCEL) { com.shanxiang.buspost.ui.common.BusRouteBody { ParcelScreen(standalone = true) } }
         composable(Routes.NOTIFICATIONS) { com.shanxiang.buspost.ui.common.BusRouteBody { NotificationScreen() } }
+        composable(Routes.ARRANGEMENTS) { com.shanxiang.buspost.ui.common.BusRouteBody { ArrangementsScreen() } }
         composable(Routes.PROFILE) { com.shanxiang.buspost.ui.common.BusRouteBody { ProfileScreen() } }
         composable(Routes.ADDRESS) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen() } }
         composable(Routes.ADDRESS_SELECT) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen(select = true) } }
