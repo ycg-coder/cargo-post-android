@@ -3,6 +3,27 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（凌晨续二，D-086 · **#56 钱包 / 交易记录做完，但先推翻了一条台账前提**）：
+"钱包支付代码就绪"那句（含 `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md:17-19` 与我的记忆）指的是
+**`cargo-post-platform/android-app/` 那份陈旧副本**（其 `WalletScreen.kt:98` 还会在充值成功后自己插一条流水），
+正式仓 `cargo-post-android` 里 wallet 0 命中 ⇒ 本轮按"从零接"做，记忆已就地纠正。
+这一版**只读**（余额四格 + 流水列表 + 两个取数各自成格），三个写口刻意不接且**理由写在屏上**：
+`/recharge` 无幂等键（重复点击重复加余额）、`WalletServiceImpl:53-58` 把模拟到账写成 `pay_method=alipay`+成功
+而 `V028` 没有"来源/是否模拟"列（⇒ 界面没有任何依据能标"模拟模式"，硬标就是本机替后端下结论）、
+`query-pay-order`/`PayService:182-200` 不校验归属人且 status=0 会放款。
+四条如实口径：缺席金额念「后端没给」不显示 ¥0.00、`status` 按 `V028:31` 注释出码表且未知码原样带出、
+渠道那一格只照抄后端原词不补"已扣款"、`total` 就是 `items.size()` ⇒ 只说"本次返回 N 条（未查全量）"。
+读数：`WalletRowsContractTest` 16 例；新判据 `check_wallet_probes.sh`（W-a…W-j）rc=0；新负控
+`wallet_negative_controls.sh` **✔=29（28 条破口 + 基线）✘=0 △=0**；同轮重登 `SU-a` 64→65、`SU-b` 66→67
+（`test_suite_hygiene` 负控复跑 7✔/0✘）；判据全批 **31 本 = 30 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`）；
+全量 `--rerun-tasks` rc=0 / 45 tasks executed / **65 类 668 例 0 失败**；APK 117,209,282 B /
+sha256 `59086c9e…`（对上一包 +32,768 B 登记为增量未归因）。
+⚠ 新簿又抓到两条工具自身的洞（§八 ㊿）：判据 `echo` 里的反引号会被 bash 当命令替换执行；
+"恰好 N"的期望值凭手感写会与判据空转同类。仍欠：没有真接口回包、一律 `NOT VERIFIED ON DEVICE`、
+三个写口与后端那三条等用户/队友决定、负控全批 35 本未重跑、本地已提交**未 push**。
+NEXT：③ `earliestPickupTime` 取件时间窗 → ④ #39 收藏首页入口 → ⑤ #47 分组 hub → ⑥ #43 图标（我出 3 个候选）
+→ 之后是 web 后台管理平台。
+<!-- 上一条 D-085（#55 票面）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:780`，
 `GET /app-api/transport/send/topology`）此前全仓 0 消费者 ⇒ 补的是读它的那一页（判定全在纯层 `ui/user/ParcelTicket.kt`，
 页面 `ParcelTicketScreen.kt` 只渲染，入口是追踪页那一行「看联运票面」、全工程恰好一个导航调用点）。

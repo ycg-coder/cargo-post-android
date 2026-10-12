@@ -1867,6 +1867,17 @@ bash tools/navigation_test_negative_controls.sh   # ⚠ 8 条用例级破口 M1�
 #      第四次坐实。同时把"非归属人后端返回全 null 空结构、不是错误码"（`AppSendController.java:214-215`）
 #      登记成票面第四格 `Absent`，并在三格里都留「回追踪页」出口（用户 10-13 要求"任务出岔子必须有东西兜底"，
 #      判据把出口数钉**恰好 3**：撤任何一处都红）。
+# ㊿ **判据簿自己也会写坏：echo 里的反引号会被 bash 执行、"恰好 N"凭手感写、台账前提没在当前树上复核**（#56 钱包，2026-10-13 04:0x–04:2x；台账 D-086）
+#   ① `check_wallet_probes.sh` 某行 echo 里写了 `` `total` `` 这种反引号 ⇒ bash 把它当**命令替换**执行，
+#      跑出 `total: command not found`，**而那一行照样打印、读数看着完全正常**。
+#      ⇒ 判据/负控簿的话术里引用代码用引号或全角，不许出现反引号；写完的验收不止看 rc，
+#      还要 grep 一遍 `not found|command substitution`。
+#   ② 正对照的期望值第二次凭手感写（写"恰好 8"、现读 6）⇒ 与 ㊾① 同一味病：**任何 N 只能由现读给出**。
+#      写错的期望会在下次真出问题时"恰好"对不上，变成新的空转或新的假红。
+#   ③ **台账前提本身也要在当前树上实测**：任务描述与 `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md:17-19`
+#      都写着"钱包/支付代码就绪"，实测那句指的是 `cargo-post-platform/android-app/` 那份**陈旧副本**
+#      （那一版还会在充值成功后 `listOf(TransactionItem("充值", …)) + transactions` 自己插一条后端没给的流水），
+#      正式仓 `cargo-post-android` 里 wallet 0 命中。⇒ 两棵同名树并存时，取证与"已完成"都必须写清是哪一棵。
 ```
 
 - `mock/fake` 仅允许出现在：测试、`BuildConfig.DEBUG` 分支、debug source set、注释里说明"禁止"、

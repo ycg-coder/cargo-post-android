@@ -6352,3 +6352,62 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 2. `NOT VERIFIED ON DEVICE`：四格实际渲染、92dp 标签列宽、11 行换行在 440dpi 平板上都没复拍。
 3. 本轮**没有重跑负控全批 34 本**（现读 `ls tools/*_negative_controls.sh | wc -l`），只重跑引用到改动字面的 5 本。
 4. `check_doc_anchor_probes.sh` 在册红等用户定；`default_value`/`idempotency` 那两笔 ✘ 仍未归因。
+
+### D-086（10-13 04:2x）· #56 钱包 / 交易记录：正式仓里根本没有钱包代码——"已完成"那句指的是另一份陈旧副本
+
+**取证时撞到的第一条事实比功能本身重要**：任务描述（和 `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md:17-19`、
+既有记忆）都写着"钱包/支付侧代码就绪，配置留空 = 模拟模式"。实测：
+- 正式仓 `cargo-post-android`：`Repo.kt` 里 wallet/balance/recharge/transaction **0 命中**，`Models.kt` 无钱包类，
+  `ui/` 里"支付"只出现在 `NotificationScreen.kt:312` 的图标分派，git log 也 0 命中；
+- 那份代码在 **`cargo-post-platform/android-app/`**（后端仓里的一份 Android 陈旧副本，159 个 .kt）：
+  `Repo.kt:1076/1090/1109` 打 `/wallet/recharge`、`/create-pay-order`、`/wallet/pay`，`ui/user/WalletScreen.kt` 有充值弹窗。
+  ⚠ 那一版里还有一处**客户端造数据**：`WalletScreen.kt:98` 充值后
+  `transactions = listOf(TransactionItem("充值", amount, now, "recharge")) + transactions` ——
+  后端还没给这条流水，界面先自己插一条，正是硬规则禁止的形状。**不去那份副本上改，也不拿它当现状证据。**
+⇒ 本轮按"从零接"做，并把那句过时结论在记忆里就地纠正（memory `project-wallet-payment-status`）。
+
+**这一版只做只读，且理由写在屏上而不是藏起来**。不接三个写口的三条事实依据（逐行读过生产者）：
+1. `AppWalletController.java:65-79` 的 `/recharge` **没有幂等键**（`V028:39` 的唯一索引只盖流水号、盖不住请求），
+   重复点击会**重复加余额**；
+2. `WalletServiceImpl.java:53-58` 那一支把 `pay_method` 写成 `"alipay"`、状态写成成功，
+   而 `V028__wallet_tables.sql:21-41` 的表里**没有"来源 / 是否模拟"列** ⇒ 模拟到账与真实到账在字段上完全不可区分，
+   界面**没有任何依据**能把它标成"模拟模式"——硬要标就是本机替后端下结论；
+3. `query-pay-order`（`AppWalletController.java:59-63` → `PayService.java:182`）只按 `orderNo` 查、**不校验归属人**，
+   且 `status=0` 时会触发放款（`:190-200`）。
+⇒ 页面上放一句真话（"这一版没有充值与余额支付入口…"，唯一出处是纯层常量，判据 `W-c` 钉页面不许重抄），
+   三格失败文案里也带同一句提示。写口等后端补幂等键与来源列之后再接（这三条是要提请后端/用户决定的口子）。
+
+**如实性四条口径**（都有生产者行号）：金额缺席念「后端没给」，不显示 ¥0.00（四个键都是可空 `BigDecimal`）；
+`status` 是数字码（`0/1/2` 的含义只存在于 `V028:31` 注释，后端没有 enum 类）⇒ 纯层照抄注释、未知码原样带出、
+缺席不塌成"处理中"；`payMethod` 那一格标签就叫"渠道（后端原词）"，页面不许补"已扣款 / 这笔是模拟的"；
+`total` 就是 `items.size()`（`AppWalletController:101`）⇒ 只能说"本次返回 N 条（未查全量）"，不许念"共 N 条"。
+两个取数各自成格：余额失败不遮住流水，流水失败不遮住余额；`createTime` 是 Epoch 毫秒，必须过 `ts()` 归一。
+
+**读数（本轮实测）**
+- 新用例 `WalletRowsContractTest` **16 例**；新判据 `check_wallet_probes.sh`（W-a…W-j）rc=0；
+  新负控 `wallet_negative_controls.sh` **rc=0，✔=29（28 条破口按名点名 + 基线）✘=0 △=0**，含"不存在的锚点必须被拒"自检。
+- 同轮重登：`SU-a` `*Test.kt` **64→65**、`SU-b` 源集文件数 **66→67**（唯一增量 = 新用例簿），0 空壳仍 0；
+  `test_suite_hygiene_negative_controls.sh` 复跑 rc=0 ✔=7 ✘=0。
+- 判据全批现读 **31 本 = 30 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，#51 三条路等用户定）。
+- 全量：`--rerun-tasks` **rc=0、BUILD SUCCESSFUL in 51s、45 actionable tasks: 45 executed**；
+  产物聚合 **65 类 / 668 例 / failures 0 / errors 0 / skipped 0**（65 份 XML、timestamp 65 个唯一值）；652→668 = 新用例簿 16 条。
+- 产物指纹：`app-debug.apk` **117,209,282 B** / mtime `2026-10-13 04:08:40` /
+  sha256 `59086c9e314a7843149fbd8bc3e8d7269335613c5fe7568893270ca6d69aea77`；
+  树指纹（与 D-085 同一条命令）files=**199** / sha256 `abb670600b0507fdb24ad988ce92c40e50784799e14d649a3ef1e1bafbda265f`。
+  对 D-085 那个包（117,176,514 B / 03:36）**+32,768 B**；本轮没做类数差集 ⇒ 登记为**增量未归因**，
+  既不写"钱包页值多少字节"，也不写回归。
+
+**写新簿时又抓到判据工具本身两条**（记进 §八 ㊿）：① 判据簿的 `echo` 里写了反引号，bash 会把
+`` `total` `` 当**命令替换**执行（跑出 `total: command not found`，而那一行照样打印，读数看着是对的）
+⇒ 判据自己的话术里不许出现反引号；② "恰好 N"的正对照第一版凭手感写 8、现读是 6
+⇒ 期望值只能由现读给出，写错的期望与判据空转是同一类事故。
+
+**仍欠**
+1. **没有真接口回包**：余额与流水两格都没在本机演示过（未起登录态，也没打 HTTP）⇒ 与 #54/#55 同形，不许写成"可用"。
+2. 一律 `NOT VERIFIED ON DEVICE`。
+3. 三个写口 + 后端那三条（幂等键、来源列、查单归属校验）**等用户/队友决定**，不是本机可以顺手改的共享面。
+4. 本轮负控只跑了新建 1 本与被顶到的 `test_suite_hygiene`；全批 35 本没重跑 ⇒ "负控全批绿"这句仍不成立。
+5. ⚠ 本轮往 `Models.kt`/`Repo.kt` 中间插类与插方法，使既有台账里那些 `文件:行号` 锚点**行号漂移**：
+   在册红那本 `check_doc_anchor_probes.sh` 的 `DA-e ID-MISS` 由 402 → **405**（`DA-d 新增可疑 113`、
+   `消失 9`；本轮新增段落自己的锚点 `check_doc_anchors.py` 实测 out_of_range=0、not_found 仍 12 未涨）。
+   这条不另开一轮修：它正是 #51 那三条路要一起处理的面，等用户定路线后一并重锚。
