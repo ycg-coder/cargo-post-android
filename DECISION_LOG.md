@@ -5765,3 +5765,42 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 
 **另一处自查**：我给本轮台账写的两处行号引用（`Repo.kt:371`/`415`）指的是**改前**的位置，改后是 372/419；
 已就地改成"改前用函数名指认、改后给实测行号"的写法。DA-e 的聚合读数不受这句影响（实测：删掉整段续六，374 一字不变）。
+
+### D-076 续七（10-12 15:5x）· 用户定"先清 8 本账再装 CI 闸"——第一轮：清 2 本 + 修掉 1 个真缺陷
+
+起跑读数（`bash tools/check_*.sh` 逐本，rc 先落变量再拼字符串）：25 本里 **10 本红**；
+用 `git worktree add ../_wt-head --detach HEAD` 量得其中 **8 本在 HEAD 就已红**（另 2 本 envelope/hygiene 是本轮口径没跟上，已随续六补重测复绿）。
+
+**清掉的两本**
+
+1. `check_reachability_probes.sh` R-n3（rc 1→**0**）。红因不是代码：免责话被话术去技术化那轮换成了
+   `SendScreen.kt:1127`「请手动选择取货站点；本单不声称车辆可上门」，判据还点着旧字面量「不代表车辆能到」⇒ 0 命中。
+   判据跟着换点名对象并在簿头写清旧句→新句的对应，**不是放松**：那句再被删或换成万能提示照样红。
+2. `check_throwable_probes.sh` TH-e 豁免面（1→**2**，rc 1→**0**）。实测两处免检 `catch (e: Exception)`：
+   `DriverSdkNavCard.kt:468`（旧登记在册）+ `BusScreen.kt:838`（步行导航唤起高德、失败退网页版）。
+   逐处看过 try 段：**只有一句 `ctx.startActivity(...)`，一个挂起点都没有** ⇒ §三十一"suspend 不许吞取消"在这两处没有适用对象。
+   数量继续钉死恰好 2（再加第三处就得当场改这一行并说为什么）。
+
+**修掉的 1 个真缺陷（这本不抬口径，改代码）**
+
+`check_runcatching_probes.sh` RC-b 实测 **2 处**挂起调用被包在 `runCatching {}` 里：
+`BusScreen.kt:266/271` 的 `loadMyShippingOrders()`。这两处不是装饰——`Repo.productOrders`/`Repo.sendOrders`
+**自己就回 `Feed(error=…)` 并在内部把 `CancellationException` 单独穿透**（`Repo.kt:565`/`:590`），
+外面那层 `runCatching` 收下的恰恰是被穿透上来的取消 ⇒ 换页/销毁时"用户离场"被读成一次普通失败。
+改法：摘掉那两层（它们本来就多余），失败时按 `Feed.error` **保留旧的司机高亮数据**不清空。
+能红证明：把其中一处重新包进 `runCatching` ⇒ 判据立刻红「RC-b 有 1 处挂起代码…」，还原后 `cmp` 一致。
+修后读数：检测器 `sites=41→39 / violations=2→0`；全量 `:app:testDebugUnitTest` = **59 类 / 596 例 / 0 失败**
+（59 份 XML timestamp 全为 2026-10-12T07:48）。
+
+**剩下 6 本红（下一轮的施工图，逐条已定位到格）**
+- `runcatching` RC-a 登记 38/17/56/24 vs 实测 **39/18/58/25**：+1 处生效行 / +1 本生效文件是**提交里带来的**
+  （逐文件比对 `HEAD~1` 与工作树，本轮没改过任何一处计数）。按这本自己的规矩，必须连同
+  `docs/android/RUNCATCHING_AUDIT.md` 第三节**逐点归因**再改数，不许直接抬。
+- `eta` T-m/T-z（『没给』的如实文案计数掉到 3 与 2，目标 ≥4）与 T-ae（1 处界面裸读 `.distanceKm` 未判 null）：
+  前两条与 R-n3 同形（话术被换、判据还点旧句），**T-ae 是形状缺陷**，要先看那处是不是真会把 `null` 打印进文案。
+- `navigation` N-k（「高德没给」措辞被换）/ N-o（车道箭头来源说明没了）：N-o 听起来是真回归——按名字猜的图形会被读成后端下发的车道级引导。
+- `safe_call` SA-e：副标题写死那句 + 反证同红 ⇒ 两行一起看，多半是文案整块被删（真回归）。
+- `mission_route` MR-c ×5 + MR-d 反证失效：这一族全是"字面量点名"，先逐格核对当前文案，再决定改名还是补回。
+- `doc_anchor`：见 #51（ID-MISS 374，其中 +45 是 D-076 源码位移）。
+
+⚠ 这 6 本清完之前**不装 `set -o pipefail`**（#50 已按用户决定挂起）；装闸那一次必须是真绿。

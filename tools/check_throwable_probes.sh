@@ -178,7 +178,7 @@ echo "TH-a 行为用例条数（隔离/取消）      = $TA/$TA2 （目标 ≥7/
 echo "TH-b DemoData 回落点/自带开关闸     = $TB/$TB2 （目标 4/4）"
 echo "TH-c catch(Throwable) 全 main/Api.kt/白名单 = $TC_ALL/$TC_API/$TC_WL （目标 2/0/2）"
 echo "TH-d Repo Exception/取消配对         = $TD1/$TD2 （目标 38/38）"
-echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/1）"
+echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/2：豁免只有那两处 startActivity）"
 echo "TH-f attempt 调用点/helper 穿透      = $TF/$TF2 （目标 ≥7/1）"
 echo "TH-g 挂起形状 runCatching 残留       = $TG （目标 0）"
 echo "TH-h 缺陷话术（登录/上报/日志）      = $TH/$TH2/$TH3 （目标 ≥2/1/≥2）"
@@ -201,7 +201,14 @@ fail=0
 [ "$TD1" -ge 38 ] || { echo "× TH-d Repo 的取消穿透少于 38 处：读接口的取消会被写成一次「加载失败」"; fail=1; }
 [ "$TE_N" = 0 ]  || { echo "× TH-e 有 $TE_N 处挂起代码的 Exception 出口前面没有取消出口：CancellationException 被收成了普通失败"; fail=1; }
 [ "$TE_S" -ge 48 ] || { echo "× TH-e 扫到的挂起形状 Exception 出口少于 48 处：判据的扫描面缩水了（删了 catch 还是改了扫描规则？）"; fail=1; }
-[ "$TE_K" = 1 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 1 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
+# 基数 1 → 2 的增量 = 用户端"步行导航"那一格（`git log` 追到 7d8b819 全面视觉升级那轮，本轮 2026-10-12 复核补登记）。
+#   两处豁免的形状**完全相同**：try 段里只有一个 `ctx.startActivity(Intent(ACTION_VIEW, …))`，
+#   一个挂起点都没有 ⇒ §三十一 那条"suspend 不许吞取消"在这里没有适用对象，
+#   所以它不是"把吞异常合法化"，而是"这一格根本不在扫描语义里"：
+#     · `ui/driver/DriverSdkNavCard.kt:468` 唤起外部地图（ActivityNotFound 先单独接住）
+#     · `ui/user/BusScreen.kt:838` 步行导航唤起高德，失败退网页版
+#   豁免面继续**逐处点名**（数量钉死恰好 2）：再加第三处就得当场改这一行并说清为什么。
+[ "$TE_K" = 2 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 2 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
 [ "$TF" -ge 11 ] || { echo "× TH-f attempt 调用点少于 11：有人把取消可达作用域里的挂起形状改回了 runCatching（F-2 ⑨ 迁移后实测基线=11，7→11 的 4 处逐点归因见本簿上方注释与 D-043）"; fail=1; }
 [ "$TF2" = 1 ]   || { echo "× TH-f attempt 自己不再先穿透取消：它退化成另一个 runCatching"; fail=1; }
 [ "$TG" = 0 ]    || { echo "× TH-g 挂起代码里残留 $TG 处 runCatching：取消会被读成一次普通失败"; fail=1; }

@@ -262,14 +262,16 @@ class BusViewModel : ScreenViewModel() {
     fun loadMyShippingOrders() {
         if (!AppState.hasUserSession) return
         work(reset = false) {
-            // 商城订单：状态为 2（已发货/运输中）
-            runCatching {
-                val productFeed = Repo.productOrders(pageNo = 1, pageSize = 50, status = 2)
+            // 这两个读接口自己就回 `Feed(error = …)`，并且**在内部把取消单独穿透**（`Repo.kt:565`/`:590`）。
+            // 旧写法在外面又套了一层 `runCatching`：那一层收下的正是被穿透上来的 CancellationException
+            // ——换页/销毁时"取消"会被读成一次普通失败（RC-b 实测点名的那两处，§三十一 的口径）。
+            // 这一格只是地图上的高亮装饰：拿不到就维持原样，不清空司机已经看到的东西。
+            val productFeed = Repo.productOrders(pageNo = 1, pageSize = 50, status = 2)
+            if (productFeed.error == null) {
                 shippingProductOrders = productFeed.items.filter { it.vehiclePlate.isNotEmpty() }
             }
-            // 寄货单：状态为 4（已发车/运输中）
-            runCatching {
-                val sendFeed = Repo.sendOrders(pageNo = 1, pageSize = 50, status = 4)
+            val sendFeed = Repo.sendOrders(pageNo = 1, pageSize = 50, status = 4)
+            if (sendFeed.error == null) {
                 shippingSendOrders = sendFeed.items.filter { it.vehiclePlate.isNotEmpty() }
             }
         }
