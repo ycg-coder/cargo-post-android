@@ -5850,3 +5850,69 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 台账变长 ⇒ 这三个数天然被推着走，`≤286` 会在没有任何新漂移的情况下越来越红。
 可选：① 改成**比率**闸门（ID-MISS/records ≤ 23.5%，本轮实测 27.5% ⇒ 仍红，不藏漂移）；② 保持绝对数并逐条消化；
 ③ 抬绝对数并注明增量来源。①与③都是改闸，我不能自己挑，所以先问。
+
+### D-078（10-12 17:2x）· #48 更新通路：GitHub Release → App 内检查 → 下载自装，判定与安装分两层
+
+**起跑实测（全仓零通路，四条都是 grep 出来的，不是印象）**：App 侧 `FileProvider` / `REQUEST_INSTALL_PACKAGES` /
+`ACTION_INSTALL_PACKAGE` / 任何"检查更新"字样 **0 命中**（`AndroidManifest.xml` 里连 `<provider>` 都没有，`res/xml/` 只有
+`shortcuts.xml` 与 `widget_next_bus_info.xml`）；后端 `grep -riE "app_?version|checkUpdate|forceUpdate"` **0 命中**；
+CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 Release**，顶层 `permissions: contents: read`；
+`gh release list` 退出 0 且**输出为空** ⇒ 仓库里一条发布都没有。
+"我的"页只有一行只读的版本号（`MinePages.kt:1023 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
+
+**按用户口径做的取舍**：数据源**只有 GitHub Releases**（用户选定），不新增后端版本表 —— 多一跳只会把"这一句来自哪一路"抹平，
+同 #41/#42 那条理由。代价如实登记在下面"仍欠"。
+
+**分层（这决定了两件事能不能被分别证伪）**
+1. `core/update/AppUpdate.kt` = 纯判定：`UpdateOutcome` 四个分支互斥 —— `Available` / `UpToDate` /
+   **`NoReleaseYet`** / `Failed(reason)`。
+   ⚠ 关键的一格是 `NoReleaseYet`：GitHub 对 `releases/latest` 在"仓库还没有任何发布"时回的是 **HTTP 404**，
+   把它并进"已是最新"就是替没发生的事下结论（新用户第一次点必然撞上这一格）。
+   比较只用 `versionCode`：`releaseCodeOf(tag)` 要求剥掉前导 `v` 后是**纯数字**，非数字一律 `Failed`
+   （不许把"我读不懂这个版本号"演成"你已经最新"）。字符串比 `versionName` 在 9→10 进位会判反，用例里做了反例。
+2. `core/update/AppUpdater.kt` = 执行层：取报文（404 带着码交出去，不压成"请求失败"）→ 判定 →
+   下到**私有缓存 `cache/apk`** → 按 `assets[].size` 核对字节（不符就删半个包再抛）→ `FileProvider` URI + `ACTION_VIEW`。
+   缺"安装未知应用"授权时**跳系统设置页并原样报回来**，不静默失败也不写"已更新"。
+3. `ui/common/UpdateSection.kt` 的 `UpdateCheckRow()` 接在关于页版本行下面：只做显示与接线，
+   **一个字的判定都不写**；挂起调用外面用 `attempt` 不用 `runCatching`（后者会把用户离场的取消收成一次普通失败，RC-b 的形状）。
+4. `app/build.gradle.kts`：`versionCode` 从 `GITHUB_RUN_NUMBER` 派生（本机/PR 仍是 1），
+   新增 `BuildConfig.UPDATE_REPO`（`-P` / 环境变量 / `local.properties` 三选一，默认 `ycg-coder/cargo-post-android`）。
+5. CI：`contents: write` **只给 release job**（顶层仍是 read），加两步 ——
+   `gh release create "v${GITHUB_RUN_NUMBER}" app-release.apk --latest`（同 tag 已存在就**显式红**，不静默覆盖），
+   再**发布后回读** `releases/latest` 证 `tag_name` 就是刚发的那版且带 `app-release.apk`、`size>0`。
+   ⚠ 这一步是我自己加的，因为"发出去了"与"App 查得到"是两件事；只 `upload-artifact` 的旧状态就是证明。
+
+**判据与负控（两本新的）**
+- `tools/check_update_probes.sh` 15 项：清单权限/FileProvider/authorities 各恰好 1、`file_paths` 只开 `cache/apk`
+  且 `external|files|root-path` **0**、代码与清单 authority 同一串、四个结论分支都在场、界面调用点 2（定义 1 + 关于页 1）、
+  `Uri.fromFile` **0**、源码里写死仓库坐标 **0**、CI 三步各 1、tag 与 versionCode 同源。
+- `tools/update_negative_controls.sh` 14 条破口 ⇒ **14/14 红且原因对得上**，收尾 `[恢复] 全部文件与原样一致`。
+  两条被抓出来的判据缺陷（都不是代码问题，是判据自己数不动）：
+  ① U-e"四个分支在场"用裸 `grep -cE` ⇒ 把 `object NoReleaseYet` 整行注释掉仍然数到 4（与天气那本 W-d **同一个坑，第二次犯**）；
+  ② U-j `grep -c 'gh release create'` 把注释掉的行也数进去 ⇒ 同样不响。两处都改成滤注释行后重新咬住。
+
+**台账随动（四本，都按"只升不降 + 逐点归因"重测）**
+- `default_value` DV-v 从红回绿：census 把 `core/update/` 读 GitHub 报文的键（`tag_name`/`assets`/`size`…）
+  数成"后端 0 命中的幻影键"，C 行站点 33→34 顶破上限。修的是**扫描范围**（按目录只排 `core/update`），
+  不是放宽任何模式：别处读一个后端没有的键照样被数出来。
+- `runcatching` RC-a 出现次数 58→60、含注释文件 25→26：全部来自 `UpdateSection.kt` **注释里**点名 runCatching 两行，
+  生效行/生效文件仍是 39/18 —— 这本账因此第一次显式区分"代码里真用"与"注释里解释为什么不用"。
+- `throwable` TH-e 豁免 2→3（新增的是 `parseRelease`：普通函数、try 段无挂起点、catch 后交给 `decideUpdate` 落"没查到"）。
+  ⚠ 这里我先写错了一次：`fetchRaw`/`download` 的挂起调用藏在 lambda **参数**里，检测器认不出匿名参数名 ⇒
+  两处被归成"免检"。修法不是放宽判据，是把参数改名叫 `fetch`/`block`（检测器的挂起标记表里就有这两个词），
+  改完 `挂起形状 50→52`、豁免回到 3、未配对仍是 0 —— 让机器真的看得见，比让我说得过去重要。
+- `test_suite_hygiene` SU-b 61→62、SU-a 59→60：唯一增量是新的 `AppUpdateContractTest.kt`（产物 tests=11）。
+
+**读数**：新用例 `AppUpdateContractTest` **11 例**；全量 `:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` =
+**BUILD SUCCESSFUL、45 tasks executed**，用例 **60 类 / 607 例 / 0 失败**（60 份 XML timestamp 全为 2026-10-12T09:17）；
+判据全批 26 本 = **25 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，见 #51 与续七 补二）。
+清单改动过 ⇒ `assembleDebug` 一并跑（`processDebugResources` 真的解析了新的 `@xml/file_paths`），不是只跑用例。
+
+**仍欠（三格都不许当成已完成）**
+1. `NOT VERIFIED ON DEVICE` 且**还不可能被验**：真实 Release 需要先 push + 在 Actions 里手工触发 release（缺四个
+   `SIGNING_*` secrets 会按既有闸门显式红），本机 `buspost-signing-backup/.../buspost-release.jks` 不存在 ⇒
+   "用户点检查更新真能装上"这一格没有任何实测，只有判定层的用例。
+2. 大陆网络可达性与未认证限流（`api.github.com` 未登录 60 次/时）：这一格的兜底**只有"如实报没查到"**，没有镜像源；
+   要不要加自家后端的发布位做镜像，是要用户决定的产品问题（本轮按"只走 GitHub"的答复做）。
+3. 下载完整性只校验**字节数**（`assets[].size`），不校验签名/散列 —— 单源来自 GitHub 本身。
+   登记为待议，不当成已收口。

@@ -36,6 +36,11 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- #48 更新通路：App 内检查 GitHub Release → 下载 APK → 交系统安装器，需要这一条"安装未知应用"。
+         它**不是**运行时权限（不在 requestPermissions 里要），而是用户在系统设置里给的一次性授权；
+         代码里没授权时会跳 `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 那一页，不会静默失败也不报"已更新"。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Android 11+ 包可见性：内置导航要能唤起外部地图 -->
     <queries>
         <package android:name="com.autonavi.minimap" />
@@ -73,6 +78,18 @@
              「Unable to start service Intent { cmp=…/com.amap.api.location.APSService } … not found」，
              高德内部定位随之失败（AmapErr #1201），导航拿不到起点。 -->
         <service android:name="com.amap.api.location.APSService" />
+
+        <!-- #48：安装包的对外视图。根路径只开放 cache/apk 一个目录（见 res/xml/file_paths.xml），
+             不把 files/ 或整个外部存储挂出去 —— 授权是"这一个 URI、只读、给安装器"。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

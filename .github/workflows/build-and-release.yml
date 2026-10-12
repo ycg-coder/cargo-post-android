@@ -59,6 +59,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
+    # #48 更新通路：App 内"检查更新"只认 GitHub Releases（用户 2026-10-12 定的口径），
+    # 所以这一本 job 需要写权限去创建 Release。**只给这一个 job**，顶层 `permissions:` 仍是 contents: read
+    #（verify 与 pull_request 那条路径不发布任何东西，不给它写权限）。
+    permissions:
+      contents: write
     steps:
       - name: 签名材料齐备性闸门（缺就红，不出包）
         env:
@@ -101,6 +106,9 @@ jobs:
           echo "amap.key=${{ secrets.AMAP_ANDROID_KEY }}" >> local.properties
           echo "amap.webKey=${{ secrets.AMAP_WEB_KEY }}" >> local.properties
           echo "buspost.baseUrl=${BUSPOST_RELEASE_BASE_URL}" >> local.properties
+          # #48：把"发布在哪个仓库"写进包里 —— App 里那一格查的就是这个坐标；
+          # 用 github.repository 而不是在本机配置里写死，是为了 fork / 改名后不必重新发版。
+          echo "buspost.updateRepo=${{ github.repository }}" >> local.properties
       - name: 出 release 包
         run: ./gradlew :app:assembleRelease --console=plain --no-daemon
       - name: 扫包取证（包内地址必须是给定的 https，且不许残留本机/内网地址）
@@ -126,3 +134,34 @@ jobs:
         with:
           name: release-apk
           path: app/build/outputs/apk/release/*.apk
+      # ---- #48：把这一版发成 GitHub Release，App 里那一格才有东西可查 ----
+      # tag 用 `v${GITHUB_RUN_NUMBER}`：它必须与 `app/build.gradle.kts` 里 versionCode 的取数**同一个来源**，
+      # 因为 App 侧比较的就是这个数字（`AppUpdate.releaseCodeOf`）。两处来源不一致时，
+      # 用户看到的会是"已是最新版本"却装着旧包 —— 那种红不会报在任何地方，所以钉死成同一个变量。
+      - name: 创建 GitHub Release（App 内自装的唯一入口）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          TAG="v${GITHUB_RUN_NUMBER}"
+          echo "发布 tag = $TAG （versionCode=$GITHUB_RUN_NUMBER，来自同一次运行编号）"
+          # 资源名固定 app-release.apk：App 侧就是按这个名字挑可安装资源（`AppUpdate.pickApk`）
+          cp "$APK" app-release.apk
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在 —— 补传资源并明确报红，不静默覆盖成另一份包"
+            echo "::error::同一 tag 重复发布（手工触发点重了）：请先删掉 $TAG 或换一次运行，别把两个包混在一个 Release 里"
+            exit 1
+          fi
+          gh release create "$TAG" app-release.apk            --title "乡邮智联 $TAG"            --notes "自动发布：本次运行 $GITHUB_RUN_NUMBER。装了这个包之后，App 里「设置 → 关于 → 检查更新」就能就地更新。"            --latest
+      - name: 发布后回读取证（App 那一格真的能查到这一版）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v${GITHUB_RUN_NUMBER}"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/latest" > /tmp/latest.json
+          grep -q "\"tag_name\":\"${TAG}\"" /tmp/latest.json || { echo "::error::releases/latest 回的不是刚发的那一版"; cat /tmp/latest.json; exit 1; }
+          grep -q "\"name\":\"app-release.apk\"" /tmp/latest.json || { echo "::error::发布里没有名为 app-release.apk 的资源，App 那一格挑不到包"; exit 1; }
+          grep -q "\"size\":0[,}]" /tmp/latest.json && { echo "::error::APK 资源 size 是 0 —— 下载完成后的字节校验会形同虚设"; exit 1; } || true
+          echo "回读通过：latest = ${TAG}，且带 app-release.apk（App 侧 releaseCodeOf 认的就是这个 tag）"

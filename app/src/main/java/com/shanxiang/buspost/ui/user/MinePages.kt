@@ -77,6 +77,7 @@ import com.shanxiang.buspost.ui.common.BackTopBar
 import com.shanxiang.buspost.ui.common.DemoNote
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.ScreenViewModel
+import com.shanxiang.buspost.ui.common.UpdateCheckRow
 
 // ---------- 个人资料 ----------
 
@@ -1021,6 +1022,8 @@ fun SettingsScreen() {
             BusCard(modifier = Modifier.fillMaxWidth()) {
                 Column {
                     InfoRow(label = "版本", value = BuildConfig.VERSION_NAME, icon = BusIcons.info)
+                    // #48：检查更新走 GitHub Releases（用户 2026-10-12 定的通路），判定与文案都在纯函数里
+                    UpdateCheckRow()
                     InfoRow(
                         label = "地图与开源许可",
                         value = "OSM 署名与随包组件",

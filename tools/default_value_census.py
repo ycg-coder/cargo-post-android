@@ -72,9 +72,19 @@ DV_K = re.compile(r"multi(?:Num|Bool)\(")
 DV_K_SKIP = re.compile(r"^\s*(\*|//)")
 
 
+# 第三方契约目录（#48）：`core/update/` 读的是 **GitHub Releases 的报文**（tag_name/assets/size/…），
+# 不是自家后端的 VO。它留在扫描面里会被 DV-v 数成"后端 0 命中的幻影键"，
+# 而那条判据管的是"App 自己编后端键"——两件事混在一起，上限就只能跟着第三方契约长大（口径失效）。
+# 排除**按目录写死**（只排 core/update），不是放宽任何模式：别处读一个后端没有的键照样被数出来。
+THIRD_PARTY_DIRS = {"update"}
+
+
 def walk(root, suffix):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in {".git", "build", "node_modules", "dist"}]
+        if os.path.basename(dirpath) == "core":
+            # 只从 core 下面摘掉 update 这一支（其余同名目录不动）
+            dirnames[:] = [d for d in dirnames if d not in THIRD_PARTY_DIRS]
         for fn in filenames:
             if fn.endswith(suffix):
                 yield os.path.join(dirpath, fn)

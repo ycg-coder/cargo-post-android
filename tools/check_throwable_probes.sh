@@ -178,7 +178,7 @@ echo "TH-a 行为用例条数（隔离/取消）      = $TA/$TA2 （目标 ≥7/
 echo "TH-b DemoData 回落点/自带开关闸     = $TB/$TB2 （目标 4/4）"
 echo "TH-c catch(Throwable) 全 main/Api.kt/白名单 = $TC_ALL/$TC_API/$TC_WL （目标 2/0/2）"
 echo "TH-d Repo Exception/取消配对         = $TD1/$TD2 （目标 38/38）"
-echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/2：豁免只有那两处 startActivity）"
+echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/3：豁免只有那两处 startActivity + 一处纯 JSON 解析）"
 echo "TH-f attempt 调用点/helper 穿透      = $TF/$TF2 （目标 ≥7/1）"
 echo "TH-g 挂起形状 runCatching 残留       = $TG （目标 0）"
 echo "TH-h 缺陷话术（登录/上报/日志）      = $TH/$TH2/$TH3 （目标 ≥2/1/≥2）"
@@ -208,7 +208,11 @@ fail=0
 #     · `ui/driver/DriverSdkNavCard.kt:468` 唤起外部地图（ActivityNotFound 先单独接住）
 #     · `ui/user/BusScreen.kt:838` 步行导航唤起高德，失败退网页版
 #   豁免面继续**逐处点名**（数量钉死恰好 2）：再加第三处就得当场改这一行并说清为什么。
-[ "$TE_K" = 2 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 2 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
+# 基数 2 → 3 的增量 = `core/update/AppUpdate.kt` 的 JSON 解析那一处：
+#   `parseRelease` 是**普通函数**（不是 suspend、块内无任何挂起点），catch 完直接 `return null` 交给
+#   `decideUpdate` 落成"没查到"，所以 §三十一"suspend 不许吞取消"在这里同样没有适用对象。
+#   仍然逐处点名、数量钉死恰好 3：再加第四处就得当场改这一行并说明为什么。
+[ "$TE_K" = 3 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 3 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
 [ "$TF" -ge 11 ] || { echo "× TH-f attempt 调用点少于 11：有人把取消可达作用域里的挂起形状改回了 runCatching（F-2 ⑨ 迁移后实测基线=11，7→11 的 4 处逐点归因见本簿上方注释与 D-043）"; fail=1; }
 [ "$TF2" = 1 ]   || { echo "× TH-f attempt 自己不再先穿透取消：它退化成另一个 runCatching"; fail=1; }
 [ "$TG" = 0 ]    || { echo "× TH-g 挂起代码里残留 $TG 处 runCatching：取消会被读成一次普通失败"; fail=1; }
