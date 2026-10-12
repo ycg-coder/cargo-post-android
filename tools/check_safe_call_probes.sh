@@ -101,7 +101,13 @@ E_SUB=$(grep -cF 'subtitle = vm.polylineSubtitle(),' "$BUS")
 E_OLD_CALL=$(grep -cF 'polyline = Repo.linePolyline(id)' "$BUS")
 E_OLD_SUB=$(grep -cF 'subtitle = if (vm.polyline.size >= 2)' "$BUS")
 E_OLD_REASON=$(grep -cF 'reason = if (vm.polyline.size >= 2) null else "' "$BUS")
-E_NEW_REASON=$(grep -cF 'reason = if (vm.polyline.size >= 2) null else vm.polylineReason(' "$BUS")
+# 基数 1 → 「恰好 2 处 `reason = vm.polylineReason(`」（2026-10-12 续七，逐点归因）：
+#   旧形状里的 `if (vm.polyline.size >= 2) null else …` 那半边判断已经**下移到组件**
+#   （`MapCanvas.kt:66`：`if (polyline.size < 2) { RouteUnavailableState(…, reason, …) }`），
+#   调用点再判一次是同一件事说两遍，所以 F-3 ⑤ 之后页面只交 delegate。这一格仍是**反证**用途：
+#   上面那三个 0（旧调用 / 旧副标题 / 旧硬编码 reason）必须由"新形状在场"来证它们不是整块文案被删。
+#   处数钉死恰好 2：`BusScreen.kt:591`（自绘兜底那支）与 `BusScreen.kt:1097`（线路详情那张地图）。
+E_NEW_REASON=$(grep -cF 'reason = vm.polylineReason(' "$BUS")
 
 # ---------- SA-e2 折线三态是**单一真相**（F-3 ⑤）----------
 # 为什么这一族不并进 SA-e：SA-e 管的是"F-2 ⑧ 那两句文案还在不在原位"，SA-e2 管的是"三格的**优先顺序**有几份"。
@@ -164,7 +170,7 @@ echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D
 echo "SA-d linePolyline 出口 getOrThrow / 签名    = $D_THROW/$D_SIG （目标 1/1）"
 echo "SA-e 页面状态：声明/复位/分类/文案        = $E_DECL/$E_RESET/$E_CLASS/$E_REASON/$E_SUB （目标 1/2/1/2/1）"
 echo "SA-e 旧形状三处（必须归零）                = $E_OLD_CALL/$E_OLD_SUB/$E_OLD_REASON （目标 0/0/0）"
-echo "SA-e 新形状 reason 走 polylineReason        = $E_NEW_REASON （目标 1，反证上面那个 0）"
+echo "SA-e 新状 reason 的 polylineReason 处数   = $E_NEW_REASON （目标恰好 2：自绘兜底 + 线路详情）"
 echo "SA-e2 决策层：枚举/三格/三个纯函数/问的体  = $P_PHASE/$P_CELLS/$P_FUN_SUB/$P_FUN_REASON/$P_FUN_ASK/$P_ASK_BODY （目标 1/3/1/1/1/1）"
 echo "SA-e2 「后端未回传」全树份数 / 在决策文件  = $P_EMPTY_TEXT_ALL/$P_EMPTY_TEXT_PDEC （目标 1/1）"
 echo "SA-e2 页面只接线（两处 delegate / 旧内联） = $P_DELEG_REASON/$P_DELEG_SUB/$P_OLD_LET （目标 1/1/0）/ 反证内联在决策文件 = $P_OLD_LET_PDEC （目标 1）"
@@ -205,7 +211,7 @@ fail=0
 [ "$E_OLD_CALL" = 0 ] || { echo "× SA-e 页面把会抛的读法直接赋给 polyline（旧形状复活）：失败会冒到 work()，共享 error 被写成折线的病因"; fail=1; }
 [ "$E_OLD_SUB" = 0 ] || { echo "× SA-e 副标题又只看折线点数分支：只数得出「有没有」，数不出「问没问过」"; fail=1; }
 [ "$E_OLD_REASON" = 0 ] || { echo "× SA-e 出现了硬编码 reason 字符串（$E_OLD_REASON）：请求失败会被念成「后端没有这条线路的轨迹」——本轮修的就是这句假话"; fail=1; }
-[ "$E_NEW_REASON" = 1 ] || { echo "× SA-e 反证失败：新形状那句不在了，上面那两个 0 是文案整块被删"; fail=1; }
+[ "$E_NEW_REASON" = 2 ] || { echo "× SA-e 反证不对：`reason = vm.polylineReason(` 不是恰好 2 处（现 $E_NEW_REASON）：少了=某一格的失败原因又不说了、上面那几个 0 就变成"文案整块被删"；多了=有人新开了第三格折线说明"; fail=1; }
 [ "$P_PHASE" = 1 ] || { echo "× SA-e2 相位枚举不是那一条（$P_PHASE）：三态长出了第二份定义"; fail=1; }
 [ "$P_CELLS" = 3 ] || { echo "× SA-e2 相位不是三格（$P_CELLS）：少一格就回到「没问」与「后端回空」共用一支的老形状"; fail=1; }
 [ "$P_FUN_SUB" = 1 ] || { echo "× SA-e2 副标题的三态顺序没有唯一出处（$P_FUN_SUB）：顺序一旦被抄进第二处，两处会给出两个答案"; fail=1; }

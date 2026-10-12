@@ -305,14 +305,12 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                                                     append("司机 ${leg.driverName}")
                                                 }
                                                 if (isEmpty()) append("承运待定")
-                                                val dist = leg.distanceKm
-                                                if (dist != null && dist > 0) {
-                                                    append(" · %.1fkm".format(dist))
-                                                }
-                                                val dur = leg.durationMinutes
-                                                if (dur != null && dur > 0) {
-                                                    append(" · 约${dur}分钟")
-                                                }
+                                                // 后端没给就说"暂未知"，不许整段消失（审计 §72 F4 的口径）。
+                                                // 上一版写成 `dist != null && dist > 0` 才 append：那既让"没下发里程"
+                                                // 与"这一段真是 0 公里"在屏幕上长得一样，又让整行被静默裁短 ⇒
+                                                // 判据 T-z/T-ae 点名的就是这一格（缺失又变静默）。
+                                                append(" · " + (leg.distanceKm?.let { "%.1fkm".format(it) } ?: "里程暂未知"))
+                                                append(" · " + (leg.durationMinutes?.let { "约${it}分钟" } ?: "时长暂未知"))
                                             },
                                             color = t.textSecondary,
                                             fontSize = (12 * scale).sp,

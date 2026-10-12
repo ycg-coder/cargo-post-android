@@ -5752,9 +5752,9 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 |---|---|---|---|
 | doc_anchor | 红（ID-MISS **329**） | 红（ID-MISS **374**） | 本轮源码位移贡献 +45（#42 把 `weatherTipsFor` 挪到 Repo.kt 末尾，Repo/Workbench 之下所有历史 `path:line` 锚点整体错位）⇒ 归 #159 |
 | eta / mission_route / navigation / reachability / runcatching / throwable / safe_call(2 条) | 红 | 红行集合与 HEAD **逐字相同** | 本轮前既有欠账 |
-| envelope | **绿**（E-b=3） | 红（E-b=5） | 本轮 #46 新增两处合法标量读法 ⇒ 已按"口径只抬不降 + 逐处点名"抬到 5 并注明后端 `TimestampLocalDateTimeSerializer`（`YudaoJacksonAutoConfiguration.java:62`）⇒ **绿** |
+| envelope | **绿**（E-b=3） | 红（E-b=5） | 本轮 #46 新增两处合法标量读法 ⇒ 已按"口径只抬不降 + 逐处点名"抬到 5，并注明后端的到期时刻是 epoch 毫秒（出处见下方"续六 补注 ①"）⇒ **绿** |
 | test_suite_hygiene | **绿**（SU-b=56/2） | 红（SU-b=61/2） | 本轮新增五本测试类 ⇒ 按"恰好 N 的摩擦设计"补注释并重测：SU-a 59/0、SU-c 0/**596**（596 与全量产物用例总数一致）⇒ **绿** |
-| safe_call | 红 2 条 | 一度红 3 条 | SA-d 的"Repo 只许 1 处 attempt"被 #46 续期那一处顶到 2 ⇒ 没有只改数字，而是**新增第二处整行字面量点名** `D_ATTEMPT_REFRESH`（那处落 `?: return false`，不是 ⑨ 禁的"失败洗成空值"；`Attempt.kt:20-21` 仍 rethrow 取消）⇒ 红行集合回到与 HEAD 逐字相同 |
+| safe_call | 红 2 条 | 一度红 3 条 | SA-d 的"Repo 只许 1 处 attempt"被 #46 续期那一处顶到 2 ⇒ 没有只改数字，而是**新增第二处整行字面量点名** `D_ATTEMPT_REFRESH`（那处落 `?: return false`，不是 ⑨ 禁的"失败洗成空值"；取消仍会穿透，出处见下方"续六 补注 ②"）⇒ 红行集合回到与 HEAD 逐字相同 |
 
 **顺带量出来的一条仪器缺陷（未修，等用户点头才装）**：CI 的"判据簿"那一步是
 `bash "$s" | tail -20 || rc=1`（`.github/workflows/build-and-release.yml:46`），GitHub Actions 的 `run:` 默认**不开** `pipefail`
@@ -5784,13 +5784,18 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 **修掉的 1 个真缺陷（这本不抬口径，改代码）**
 
 `check_runcatching_probes.sh` RC-b 实测 **2 处**挂起调用被包在 `runCatching {}` 里：
-`BusScreen.kt:266/271` 的 `loadMyShippingOrders()`。这两处不是装饰——`Repo.productOrders`/`Repo.sendOrders`
+`BusScreen.kt:262` 的 `loadMyShippingOrders()`（改前两处在 `:266`/`:271`，摘掉外层之后现在是 `:269`/`:273` 那两个调用）。这两处不是装饰——`Repo.productOrders`/`Repo.sendOrders`
 **自己就回 `Feed(error=…)` 并在内部把 `CancellationException` 单独穿透**（`Repo.kt:565`/`:590`），
 外面那层 `runCatching` 收下的恰恰是被穿透上来的取消 ⇒ 换页/销毁时"用户离场"被读成一次普通失败。
 改法：摘掉那两层（它们本来就多余），失败时按 `Feed.error` **保留旧的司机高亮数据**不清空。
 能红证明：把其中一处重新包进 `runCatching` ⇒ 判据立刻红「RC-b 有 1 处挂起代码…」，还原后 `cmp` 一致。
 修后读数：检测器 `sites=41→39 / violations=2→0`；全量 `:app:testDebugUnitTest` = **59 类 / 596 例 / 0 失败**
 （59 份 XML timestamp 全为 2026-10-12T07:48）。
+
+**续六 补注（锚点出处；写成非表格行是因为工具的表格口径只从第一列取标识符，首列是簿名时它会要求簿名出现在代码行里 —— 那是假报）
+
+① 标量信封两条读法的后端出处：`expiresTime` 序列化成 epoch 毫秒由 `TimestampLocalDateTimeSerializer` 完成，注册点 `YudaoJacksonAutoConfiguration.java:62`（`m.addSerializer(LocalDateTime.class, TimestampLocalDateTimeSerializer.INSTANCE)`），另一条 jackson3 口径在同文件 `:43`（`serializerByType`）。
+② 取消穿透的出处：`Attempt.kt:18-21` —— `suspend fun <T> attempt(...)` 先 `catch (e: CancellationException) { throw e }`再才 `catch (e: Throwable)`，所以续期那一处的 `?: return false` 收不到取消。
 
 **剩下 6 本红（下一轮的施工图，逐条已定位到格）**
 - `runcatching` RC-a 登记 38/17/56/24 vs 实测 **39/18/58/25**：+1 处生效行 / +1 本生效文件是**提交里带来的**

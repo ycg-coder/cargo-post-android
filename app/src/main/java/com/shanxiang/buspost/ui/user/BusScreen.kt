@@ -580,6 +580,15 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 // 切线路时重置地图失败标记，让新高德有机会重新尝试
                 LaunchedEffect(line?.id) { mapFailed = false }
 
+                // 折线状态这一句必须留在**主路径**上（F-3 ⑤ / 判据 SA-e、SA-e2 的口径同源）。
+                // 7d8b819 把地图上方的 `SectionTitle(subtitle = vm.polylineSubtitle())` 撤成"地图主视图"时，
+                // 连带删掉了这句唯一出口：此后只有"高德失败转自绘 RouteMap"那一支还带 reason，
+                // 于是"还没去问 / 正在问 / 这次没问到 / 后端回了空"四种情况在主路径上又长成同一个样子。
+                SectionTitle(
+                    line?.name?.ifEmpty { null } ?: "线路地图",
+                    subtitle = vm.polylineSubtitle(),
+                )
+
                 if (mapFailed) {
                     // 高德不可用时回退到自绘地图（与 DriverMissionMap 同模式）
                     RouteMap(

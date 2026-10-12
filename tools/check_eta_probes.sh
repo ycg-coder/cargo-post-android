@@ -66,7 +66,17 @@ tk=$([ -f "$TST" ] && grep -cE "^[[:space:]]*@Test" "$TST" || echo 0)
 # T-l 用户端与桌面卡片不许裸拼 ETA 数字（null 会被打印成 "null 分钟"），一律走三个文案 getter
 tl=$(grep -rnE '\$\{?(v|a|it|vehicle)\.etaMinutes\}?' $A/ui/user $A/widget | wc -l)
 # T-m "没给"的文案各就各位：到站时间未给 / 暂无到站预估 / 距下一站未给 / 来源未识别
-tm=$(grep -cE '"(到站时间未给|暂无到站预估|距下一站未给|来源未识别)' "$MD")
+# 基数 4 → 「逐条各 ≥1」的收紧（2026-10-12，续七）：
+#   ① 旧口径把四个概念并成一条 `|` 正则数总数，"删掉其中一条"只要别处补一条就照旧绿 —— 判别力不够；
+#   ② `距下一站未给` 在 7d8b819（全面视觉升级/话术去技术化）里被改写成 `Models.kt:738` 的
+#      「距下一站暂未知」，语义未变（null 说未知、0.0 是真给了 0），判据跟着换点名对象，**不是放松闸门**。
+TM_HITS=0
+for t in "到站时间未给" "暂无到站预估" "距下一站暂未知" "来源未识别"; do
+    n=$(grep -cF "$t" "$MD")
+    [ "$n" -ge 1 ] || echo "  × T-m 缺一条如实文案：$t（Models.kt 里 0 命中）"
+    TM_HITS=$((TM_HITS + (n > 0 ? 1 : 0)))
+done
+tm=$TM_HITS
 # T-n 桌面卡片与页面同口径
 tn=$(grep -c "etaValueText\|etaUnitText\|etaCaptionText" "$WG")
 # T-o1 到站提醒过滤掉"没给 ETA"的行（旧口径 etaMinutes in 1..10 会把 null 读成 0）
@@ -117,7 +127,29 @@ tx=$([ -f "$TX" ] && grep -cE "^[[:space:]]*@Test" "$TX" || echo 0)
 # T-y 位置过期（REAL_STALE）不参与提醒与列表：新鲜度是承运 ETA 的前置条件
 ty=$(grep -rn 'carrierLocationSource != "REAL_STALE"' $A | wc -l)
 # T-z "没给"的如实文案在货运侧各就各位（后端未给到站分钟 / 到站分钟未下发 / 里程未给 / 时长未给）
-tz=$(grep -rnE "到站分钟未下发|未给到站分钟|时长未给|里程未给" $A | wc -l)
+# 同上收紧 + 同一轮改名对照：
+#   到站分钟未下发/未给到站分钟 → `ParcelScreen.kt:393` 「时间暂未知」；
+#   里程未给 → `BusScreen.kt:1088`、`SendScreen.kt:599` 「里程暂未知」；
+#   时长未给 → `DriverNavScreen.kt:441` 「全程时长暂未知」+ `TraceView.kt`/`TraceScreen.kt` 的「时长暂未知」。
+#   ⚠ 但 `TraceScreen.kt` 那两处不是改名，是**整段消失**（旧写法 `dist > 0 才 append`）：
+#     "没下发" 与 "这段真 0 公里" 长得一样、行还被静默裁短 ⇒ 本轮把两处补回如实标签，这里才够 4 条。
+# 但"文件级在场"不够：本轮实测注入"删掉 TraceScreen 那一处时长暂未知"时，T-z 仍读 4/4
+#   （`时长暂未知` 这个词在别处还有），而那恰恰是这本判据要防的形状 —— **某一格自己变静默**。
+#   所以再加一层**按整串 `?: "X"` 数出现次数**并钉恰好 **7**（2026-10-12 逐处实测：
+#     时间暂未知 1（ParcelScreen.kt:393）／里程暂未知 3（BusScreen.kt:1088、SendScreen.kt:599、TraceScreen.kt:312）
+#     ／时长暂未知 2（SendScreen.kt:600、TraceScreen.kt:313）／全程时长暂未知 1（DriverNavScreen.kt:441））。
+#   ⚠ 这一行第一次落稿时我写成了"恰好 8"，闸门当场红（现 7）——少的那 1 处是把 `?: "时长暂未知"` 与
+#     `?: "全程时长暂未知"` 数重了；照本文件的老规矩（引用任何数字前先 grep 到那一行原文），以 7 为准。
+#   少一处=那一格的缺失又不再说话，多一处=有人在别处新造了一格，两者都要当场重新归因。
+TZ_HITS=0
+TZ_OCC=0
+for t in ': "时间暂未知"' ': "里程暂未知"' ': "时长暂未知"' ': "全程时长暂未知"'; do
+    n=$(grep -roF "?$t" $A --include=*.kt | wc -l | tr -d ' ')
+    [ "$n" -ge 1 ] || echo "  × T-z 货运侧缺一条如实文案：$t"
+    TZ_HITS=$((TZ_HITS + (n > 0 ? 1 : 0)))
+    TZ_OCC=$((TZ_OCC + n))
+done
+tz=$TZ_HITS
 
 # ---- 以下 T-aa…T-ag 是第 ⑬ 轮（精确到站分钟 + 三个 distanceKm 口径）新增的判据 ----
 # 契约口径（2026-09-29 实测，审计 §72）：
@@ -204,7 +236,7 @@ echo "T-j4 演示面显式 JSONObject.NULL      : $tj4  （预期 ≥8：三条 
 echo "T-j5 演示面 etaMinutes 写入点        : $tj5  （预期 1）"
 echo "T-k  BusEtaContractTest 用例数       : ${tk:-0}   （预期 ≥13：⑬ 加了端点语义 + 位置报文用例，E-1 加了别名不采纳用例）"
 echo "T-l  用户端/卡片裸拼 ETA             : $tl   （预期 0：一律走 etaValueText/etaCaptionText）"
-echo "T-m  『没给』文案                    : $tm   （预期 ≥4）"
+echo "T-m  『没给』文案（逐条点名）           : $tm/4 条在场 （预期 4/4）"
 echo "T-n  桌面卡片同口径 getter           : $tn   （预期 3）"
 echo "T-o1 提醒用 mapNotNull 滤掉 null     : $to1  （预期 ≥1）"
 echo "T-o2 页面先判 null 再比较            : $to2  （预期 ≥3：寄货页 + 首页）"
@@ -221,7 +253,7 @@ echo "T-w1 提醒数据源 = /send/page         : $tw1  （预期 1）"
 echo "T-w2 提醒不再读 /send/arrangements   : $tw2  （预期 0）"
 echo "T-x  SendEtaContractTest 用例数      : ${tx:-0}   （预期 ≥12：⑫ 9 条 + E-1 别名不采纳 3 条）"
 echo "T-y  REAL_STALE 不参与提醒/列表       : $ty   （预期 3：提醒 + 首页 + 寄货页）"
-echo "T-z  货运侧『没给』文案              : $tz   （预期 ≥4）"
+echo "T-z  货运侧『没给』文案（逐条点名）      : $tz/4 条在场 / 出现 $TZ_OCC 处 （预期 4/4 与恰好 7）"
 echo "T-aa 精确到站分钟可空声明            : $taa  （预期 1：etaToNextStationMinutes: Double?）"
 echo "T-ab 与小程序同口径的向上取整        : $tab  （预期 1：Math.max(1, ceil(...))，0.2 分钟不许显示 0）"
 echo "T-ac 里程/时长读法里的自造别名键     : $tac  （预期 0：distance/meters/minutes 都不在这个契约里）"
@@ -269,7 +301,7 @@ ok=1
 [ "$tj5" = 1 ] || { echo "× T-j5 演示面 etaMinutes 出现第二个写入点"; ok=0; }
 [ "${tk:-0}" -ge 13 ] || { echo "× T-k 公交 ETA 契约测试被删"; ok=0; }
 [ "$tl" = 0 ] || { echo "× T-l 页面把 null ETA 裸拼进文案"; ok=0; }
-[ "$tm" -ge 4 ] || { echo "× T-m 『没给』的如实文案被删"; ok=0; }
+[ "$tm" = 4 ] || { echo "× T-m 『没给』的如实文案没齐（$tm/4）：每一条都要单独在场，少一条就是那一格又变静默"; ok=0; }
 [ "$tn" = 3 ] || { echo "× T-n 桌面卡片与页面口径脱钩"; ok=0; }
 [ "$to1" -ge 1 ] || { echo "× T-o1 到站提醒又不过滤 null（把没数据说成还没到时间）"; ok=0; }
 [ "$to2" -ge 3 ] || { echo "× T-o2 页面又开始拿 null ETA 参与比较"; ok=0; }
@@ -290,7 +322,8 @@ ok=1
 [ "$tw2" = 0 ] || { echo "× T-w2 到站提醒又读回没有 ETA 键的 /send/arrangements（§68 复发）"; ok=0; }
 [ "${tx:-0}" -ge 12 ] || { echo "× T-x 货运侧 ETA 契约测试被删"; ok=0; }
 [ "$ty" = 3 ] || { echo "× T-y 过期位置又开始参与提醒（新鲜度闸失守）"; ok=0; }
-[ "$tz" -ge 4 ] || { echo "× T-z 『没给』的如实文案被删（缺失又变静默）"; ok=0; }
+[ "$tz" = 4 ] || { echo "× T-z 货运侧『没给』的如实文案没齐（$tz/4）：缺失又变静默"; ok=0; }
+[ "$TZ_OCC" = 7 ] || { echo "× T-z 四处如实文案的出现处数不是恰好 7（现 $TZ_OCC）：少一处=那一格重新变静默，多一处=有人新造了一格，都要重新归因"; ok=0; }
 [ "$taa" = 1 ] || { echo "× T-aa 精确到站分钟又变成非空类型（没给会被说成『约 0 分钟到下一站』）"; ok=0; }
 [ "$tab" = 1 ] || { echo "× T-ab 向上取整口径变了（0.2 分钟会显示成 0，与小程序 detail.js 脱钩）"; ok=0; }
 [ "$tac" = 0 ] || { echo "× T-ac 里程/时长读法又混进自造别名键（米被当公里读）"; ok=0; }
