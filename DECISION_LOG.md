@@ -6091,3 +6091,81 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
    （`shiftCode/targetStation/dataSource/etaMinutes`），没有后端真给的上车站/下车站/`planStatus` ⇒
    在演示包里这一页会有几行念"后端没给"。这不算说假话（演示标记也在场），但把演示面改成与契约同键
    是一格独立的收尾，本轮没做，登记在此。
+
+### D-082（10-12 22:06）· 负控整批 33 本第一次跑完：13 道闸门**注入做了但判据仍绿**，另有 5 本锚点已失效
+
+**为什么要跑这批**：判据本数一路加到 29、负控加到 33，而"整批一起跑"从 10-01 起就是在册欠账。
+单本实测只证明"这本今天还咬"；源码天天在改，**不集体复跑就等于没人知道哪些闸门已经空转**。
+
+**⚠ 我自己先踩了一次读数的坑**（这条比结果更重要）：起跑命令写成
+`bash tools/run_all_negative_controls_batch.sh … | tail -40; echo "BATCH_RC=$?"`
+⇒ 退出码是 `tail` 的 **0**，不是批次的。通知里那句 "exit code 0" 因此完全没有含义，
+真结果只能从 `/tmp/allneg_20261012.txt` 的聚合行读：**33 本里 11 本 rc≠0、15 本自带 ✘**。
+这正是本仓反复登记的那条（管道吞退出码，见"echo $(basename) rc=$?"那次）——**我又用了一次带管道的读法**。
+
+**分类归因（不是"批红了"一句话）**
+1. **实质红（最贵的一类）**：`navigation_negative_controls.sh` ✔=130 ✘=13 ——
+   13 条的措辞全部是"负控制失效（exit 0）"，即**破口注入成功、判据照样绿**：
+   `N-k`（没给的字段被换成断言）、`N-l`（旧断言回到代码里）、`N-n`（工作台入口不再带 DEBUG 闸）、
+   `N-o`（车道箭头来源说明被删）、`N-r`（不可点时不再显示具体缺什么）、`N-u` ×2（绑定判据整块没了 / 凭证与指纹一起没了）、
+   `L-x`（后端没给站点时对话框又变回空白）、`N-z` ×2（车道话术表 22→0 / 唯一出口 1→0）、
+   `N-aa` ×2（重算那一族整块没了 / 话术出口 1→0）、`N-ac`（页面调用开关话术次数不是 3）。
+   ⇒ 这 13 道是**摆设**：它们钉的东西现在没有任何东西在保护。同一本里 130 条仍绿且咬得住，
+   所以不是整本坏，是那 13 个计数器与破口之间的对应关系断了（多数是这几日改源码后，
+   判据数的字面与注入改的位置不再是同一处）。
+   `safe_call` 的 `SA-d` 同形：把 Worker/定位那几处 `attempt` 改掉一处（下限 11→10）**没变红** ⇒ "这条判据永不为红"。
+   `runcatching` 的"不误报"那条：注入后输出里找不到 `sites=32|violations=0|candidates=0` ⇒ **空跑**。
+2. **锚点失效（7 条，横跨 5 本）**：`exception` / `mission_route` / `mission_route_test` / `navigation_test` /
+   `runcatching(drop)` / `safe_call(swap)` / `shell_routing_test` 报的都是"锚点没命中，破口根本没注入"。
+   按纪律这类**不算测过**（"注入根本没发生"最像"批次跑完了"）：这些负控引用的源码字面已经被这些天的改动顶掉，
+   要逐条重锚到今天的文本。
+3. **环境红（2 本，不是判据坏）**：`notify_result` / `oss_credits` 一开机就 rc=2，报的是
+   "真身没有 `TEST-…NotificationWorkerResultTest.xml` / `TEST-…OpenSourceCreditsContractTest.xml`"。
+   成因是我这批之前跑过定向 `--tests` 子集，Gradle 把没跑的那批 XML 剪掉了 ⇒ 这两本读产物、没产物就读不到。
+   本轮收尾重跑全量后**单跑这两本**验证：如果转绿就是环境问题，不改判据（已按这条顺序做）。
+4. **基线不绿就不采信（2 本）**：`doc_anchor`（在册的 #51 那本，红是预期的）与 `eta` ——
+   两本都写的是"基线未通过（exit 1），负控结果一律不采信"，这是它们自己的预检在起作用（好行为：
+   预检不过就一条都不注入）。`eta` 的基线红大概率与第 3 类同源（缺 XML），全量重跑后复测；
+   如果仍红，那就是真回归，单独归因。
+
+**结论与处置（本轮不假装收口）**
+- 这批的价值就在于把"判据会不会咬"变成读得到的数：**13 道空转闸门 + 7 条失效注入 = 20 格欠账**，
+  已逐条点名进账，下一轮按 `navigation` → `safe_call`/`runcatching` → 五本重锚 的顺序消化。
+- **本轮不动这 20 格**：判据空转的修法必须是"逐条看清它原本该数什么"，批量改字面会把真判据也一起改松
+  （与本仓"不许缩小判据变绿"是同一条禁令）。
+- 读数纪律补一条进记忆：**跑批不许接管道**，退出码只能来自脚本本身（这次我就是靠日志聚合行才发现的，
+  如果只看通知里的 exit 0，就会把"13 道闸门空转"记成"负控全批通过"）。
+
+### D-083（10-12 22:1x）· 迁移 SQL 的"自动部署"取舍：能自动，但我把它做成**只能人来按的按钮**
+
+用户提"迁移 SQL 好像可以通过自动部署操作"。逐字核 `cargo-post-platform` 后结论是 **(B) 部分成立**：
+- `.github/workflows/deploy-dev.yml:154` 确实有 `Run database migration`，**无 `if:`**，push master 即在
+  self-hosted runner（`[self-hosted, cargo-post]`，与云机同机）上 `docker compose exec -T mysql` 执行；
+- 但它只跑**硬编码白名单**（`sql/mysql/` 四个 + `V018/V019/V021/V022/V024/V025`，`:200-215`），
+  **V028/V029 都不在里面**；且全仓 `pom.xml` 搜 `flyway|liquibase` **0 命中**、也没有 prod profile
+  ⇒ "重启服务就顺带跑 SQL"不成立（`docs/database.md:12` 自己就写着"未启用自动数据库迁移"）。
+- 更糟的一条：`sql/incremental/V029__execution_writeback.sql` **一直是未跟踪文件**，
+  而"新库靠 `transport-schema.sql` 自带这三列"那半边也还是未提交改动 ⇒ 今天别人部署，两样都拿不到。
+
+**为什么不直接把 V029 塞进白名单**：它是两段裸 `ALTER TABLE ADD COLUMN`。本机库实测第二次执行
+`ERROR 1060 (42S21) Duplicate column name ''actual_arrival_time''`。而那条流水线**每次 push 都无条件重放**
+⇒ 裸 ALTER 进白名单，等于"第二次部署必然红在迁移步，后面的 jar 重启与发布全不执行"。
+
+**已做（全本地、可逆、没碰云）**
+1. 照本仓自己的幂等写法（`V024:11-16` 的 `information_schema` + `PREPARE/EXECUTE`，V024/V025 因此可安全重复）
+   补 `sql/incremental/V030__execution_writeback_guarded.sql`：逐列判存在、**COMMENT 逐字照抄 V029**
+   （列语义只留一套说法）、末尾一条自检要求数出 3/3，数不出就明说"没落到这张表"。
+   本机 `ruoyi-vue-pro`（MySQL 8.0.45）**连跑两遍都 rc=0**：第二遍三条 ALTER 全为 no-op，核对行仍报 3/3，
+   三列 NULLABLE、注释按 utf8mb4 原样入库（无乱码）。V029+V030 已本地提交 `b66b0a9f`（分支
+   `perf/bigscreen-fast-firstload`，**无 upstream、未 push**；该仓工作树另有大量未提交改动，我只单独 add 这两个文件）。
+2. 新增 `.github/workflows/db-migrate-guarded.yml`：**只有 `workflow_dispatch`**（没有 push / schedule / PR 触发），
+   `mode` 默认 `check` 只做只读探测，`apply` 必须另填 `confirm=APPLY` 字面才执行；
+   执行前列出**目标库**（`VERSION()/@@hostname/DATABASE()`，不打密码）再报"三列 / 三表现状"；
+   执行后强制核对 `3/3 + 3/3 + 注释异常=0`，数不满就 `::error` 并 exit 1。只跑 V028（三段 `CREATE TABLE IF NOT EXISTS`）
+   与 V030，**刻意不跑 V029**。`permissions: contents: read`，`concurrency` 排队不取消。
+
+**取舍说明（"怎么安全怎么搞"的具体含义）**：我没有把 SQL 挂到 push 上。装那道闸的收益是"少一次手工"，
+代价是"今后任何一次合并都可能自动改云上共享库，而红在迁移步会连带让发布不执行"——
+这笔账在只有两个人看这个项目时明显不划算。所以现在的形状是：**执行由机器做（不会手抖打错字符集），触发由人做（不会顺手合并就改库）**。
+待确认：是否 push 后端仓（push master 本身就是云端到端部署：`systemctl restart cargo-post` + 白名单迁移），以及要不要把这条手动作业交队友跑一次
+（跑之前它会先打印云上库现状，那条打印本身就是我们一直缺的"云上到底有没有这三列"的证据）。
