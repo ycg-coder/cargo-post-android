@@ -8,6 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -75,6 +78,7 @@ import com.shanxiang.buspost.core.ui.StopState
 import com.shanxiang.buspost.core.ui.TicketCard
 import com.shanxiang.buspost.core.ui.TimelineStop
 import com.shanxiang.buspost.data.model.DriverProfile
+import com.shanxiang.buspost.data.model.Notice
 import com.shanxiang.buspost.data.model.PickupTask
 import com.shanxiang.buspost.data.model.ShiftState
 import com.shanxiang.buspost.data.model.ShiftTask
@@ -87,6 +91,7 @@ import com.shanxiang.buspost.driver.DriverLocationService
 import com.shanxiang.buspost.driver.LocationReportPolicy
 import com.shanxiang.buspost.driver.Running
 import com.shanxiang.buspost.data.repo.DRIVER_UNBOUND
+import com.shanxiang.buspost.data.repo.RemoteState
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.nav.reconcileRole
 import com.shanxiang.buspost.nav.serverSaysDriver
@@ -96,6 +101,7 @@ import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.Map3DVisual
 import com.shanxiang.buspost.ui.common.RouteUnavailableState
 import com.shanxiang.buspost.ui.common.ScreenViewModel
+import com.shanxiang.buspost.ui.common.toState
 import com.shanxiang.buspost.core.code.rememberBusScanner
 import com.shanxiang.buspost.ui.user.formatPrice
 import kotlinx.coroutines.delay
@@ -126,6 +132,14 @@ class WorkbenchViewModel : ScreenViewModel() {
 
     /** 上一次取天气的单调时刻（`Locator.elapsed()` 口径）；0 = 从未取过。15 分钟闸门由 [DriverWeatherTip] 判 */
     internal var weatherAtElapsed = 0L
+        private set
+
+    /**
+     * 司机端平台公告（标记说明里"司机端首页 · 公告"那一格）：走后端现成的 `/notice/list`，
+     * 与用户端首页同一条通路、同一份数据，**不另开第二套公告来源**。
+     * 结论怎么说是 [noticeBanner] 的事，这一层只持有最近一轮的取数状态。
+     */
+    var platformNotices by mutableStateOf(RemoteState<List<Notice>>(loading = true))
         private set
 
     /**
@@ -193,8 +207,9 @@ class WorkbenchViewModel : ScreenViewModel() {
         receipt = text
     }
 
+    /** 进入 / 下拉刷新 / 失败重试都走这里：这是唯一会顺带取平台公告的一轮（见 [syncFromServer] 的 withNotices） */
     fun load() {
-        work(reset = shift == null) { syncFromServer() }
+        work(reset = shift == null) { syncFromServer(withNotices = true) }
     }
 
     /**
@@ -206,7 +221,12 @@ class WorkbenchViewModel : ScreenViewModel() {
      * `driverIdParam()` 那道守卫拦不住它们（`Repo.kt:807-808` 记的就是这件事），
      * 只有在这里停下来才算真的"撤档之后不再替非司机账号拉司机数据"。
      */
-    private suspend fun syncFromServer() {
+    /**
+     * [withNotices] 只在**进入/刷新**那一轮为 true：公告不随司机的发车、到站、装车动作而变，
+     * 挂在每次动作后的回读上就是"点一下作业多发一条 REST"（与天气那格的 15 分钟闸门同一条理由，
+     * 只是这里的触发条件是"人主动刷新"而不是时间）。参数不给默认值：新增调用点必须自己表态。
+     */
+    private suspend fun syncFromServer(withNotices: Boolean) {
         val p = Repo.driverProfile()
         val server = serverSaysDriver(
             driverId = p.value?.driverId ?: 0L,
@@ -283,6 +303,10 @@ class WorkbenchViewModel : ScreenViewModel() {
             driverWeather = Repo.weather(wxGeo, rg.adcode)
             weatherAtElapsed = nowMs
         }
+        // 平台公告：跟着这一轮回读走（撤档早退支到不了这里，那条支路上页面正被送回村民壳）。
+        // **不并进上面那行 `error =`**：公告取不到只该让公告那一栏说"没取到"，
+        // 不该让整块工作台顶出一条"加载失败"——班次与揽件那几路才是真数据。
+        if (withNotices) platformNotices = Repo.notices().toState()
     }
 
     fun depart() {
@@ -551,7 +575,7 @@ class WorkbenchViewModel : ScreenViewModel() {
      */
     private suspend fun runAction(label: String, block: suspend () -> com.shanxiang.buspost.data.repo.Ack) {
         val ack = block()
-        syncFromServer()
+        syncFromServer(withNotices = false)
         receipt = when {
             ack.notSent -> "$label：未发给后端，显示的是当前状态"
             ack.demo -> "$label：演示模式，操作仅在本机显示"
@@ -628,6 +652,11 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
     }
 
     LaunchedEffect(Unit) { if (vm.shift == null) vm.load() }
+
+    // 平台公告那一栏（标记说明里"司机首页 · 公告"）：结论全部来自 `noticeBanner` 那个纯函数，
+    // 这一层只接住"点开看正文"那一下，页面不自己拼第二套说法。
+    val notice = noticeBanner(vm.platformNotices)
+    var noticeSheet by remember { mutableStateOf(false) }
 
     /**
      * 司机进工作台就自动开始位置上报，不再要人去找那个开关（用户口径 v3「登录即上报」）。
@@ -826,6 +855,17 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                 val driverWxLine = DriverWeatherTip.lineOf(driverWx)
                 if (driverWx != null && driverWxLine.isNotEmpty()) {
                     item(key = "weather") { DriverWeatherNotice(driverWx, driverWxLine) }
+                }
+
+                // 平台公告：有公告或**这一轮没取到**才占格（成功且为空 = 后端真没有，不播）。
+                // 失败那一格的出现是判据钉着的：旧写法最容易把"没取到"演成"暂无公告"，
+                // 而改线/停运这类公告恰恰最容易在弱网那一刻取不到。
+                if (notice.show) {
+                    item(key = "notice") {
+                        DriverNoticeStrip(notice) {
+                            if (notice.failed) vm.load() else noticeSheet = true
+                        }
+                    }
                 }
 
                 // 待发车状态：显示大巴车行李舱容量可视化（对齐小程序 workbench.wxml:153-187）
@@ -1114,6 +1154,41 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                 }
             },
             confirmButton = { TextButton(onClick = { scanSheet = false }) { Text("取消") } },
+        )
+    }
+
+    // 公告正文：整份列出来，不只显示第一条就把其余藏掉（正文一律来自后端 `/notice/list`，本机不重写）。
+    // 失败那一栏点它是重试（`vm.load()`），不是弹一个空对话框。
+    if (noticeSheet && notice.notices.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { noticeSheet = false },
+            title = { Text(notice.title) },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    noticeDetailLines(notice.notices).forEach { (head, body) ->
+                        Column {
+                            Text(head, color = t.ink, fontWeight = FontWeight.Bold, fontSize = (13.5f * scale).sp)
+                            Text(
+                                body,
+                                color = t.textSecondary,
+                                fontSize = (12.5f * scale).sp,
+                                modifier = Modifier.padding(top = 3.dp),
+                            )
+                        }
+                    }
+                    if (notice.demo) {
+                        Text(
+                            "这些是演示公告，不是平台发布的内容。",
+                            color = t.textTertiary,
+                            fontSize = (11.5f * scale).sp,
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { noticeSheet = false }) { Text("关闭") } },
         )
     }
 }
@@ -1609,6 +1684,51 @@ private fun DriverWeatherNotice(w: WeatherInfo, line: String) {
             fontSize = (12 * scale).sp,
             modifier = Modifier.padding(top = 6.dp),
         )
+    }
+}
+
+/**
+ * 司机端平台公告那一栏：文字一律来自 `noticeBanner` 的结论（只有"有公告"与"没取到"两种才会走到这里），
+ * 页面不再自己判断"是不是没有公告"。
+ */
+@Composable
+private fun DriverNoticeStrip(banner: NoticeBanner, onClick: () -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    BusCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                BusIcons.volume,
+                contentDescription = null,
+                tint = if (banner.failed) t.danger else t.clay,
+                modifier = Modifier.size((18 * scale).dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    banner.title,
+                    color = t.ink,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (14 * scale).sp,
+                )
+                Text(
+                    banner.body,
+                    color = if (banner.failed) t.danger else t.textSecondary,
+                    fontSize = (12.5 * scale).sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            BusTag(banner.tag, tone = if (banner.failed) BusTone.DANGER else BusTone.CLAY)
+        }
     }
 }
 

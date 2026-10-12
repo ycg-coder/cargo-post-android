@@ -5916,3 +5916,111 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
    要不要加自家后端的发布位做镜像，是要用户决定的产品问题（本轮按"只走 GitHub"的答复做）。
 3. 下载完整性只校验**字节数**（`assets[].size`），不校验签名/散列 —— 单源来自 GitHub 本身。
    登记为待议，不当成已收口。
+
+### D-079（10-12 18:0x）· #49 批次：服务协议 / 隐私政策正文页 —— **"同意"之前必须能看到正文**，而措辞只能有一个出处
+
+**起点**（用户给的功能标记说明里"用户协议 / 隐私政策"那一格，`docs/product/FEATURE_MARKING_SPEC_2026-10-12.md`）：
+此前 App 只有登录页一个勾选框 —— 点它只是把 `agreed` 翻过来，**没有任何正文可看**。
+用户同意的是一个自己看不到的东西，这一格按"功能有没有"数是对的（有勾选、有闸门），按"真实可用"数是空的。
+
+**做法（数据源只有一份，页面只渲染）**
+- `core/about/AppPolicies.kt`：`PolicyKind`(TERMS/PRIVACY) + `PolicySection` + `PolicyDoc` + `AppPolicies.of(k)`，
+  **16 组**分条正文（`PolicySection(` 实读 16 处），更新日期钉成 `UPDATED_ON = "2026-10-12"` 单点。
+- `ui/user/PolicyScreen.kt` 只做渲染（`internal fun PolicyScreen(kind)`：public 会把 internal 的 `PolicyKind` 露出去）。
+- 两条路由 `Routes.PRIVACY/TERMS` 在 `BusPostRoot` 各注册一次且都走 `BusRouteBody`（键盘遮挡/边到端口径跟全工程一致）。
+- 登录页两个可点 `PolicyLink`（**"勾"与"看"分开**：`PL-d` 钉 `PolicyLink(` 恰好 3 = 定义 1 + 调用 2）；
+  关于页两行入口（登录后也找得到）。
+- 这两页**不设角色/登录闸门**（`PL-c` 判 `DRIVER_ONLY` 里不出现 PRIVACY/TERMS）：
+  没同意之前就该读到正文，加闸门等于要求用户先信再读。
+- 正文内容全部按现实写：不提供网上预约乘车、逢站必停拉客、不是网约车平台、支付是模拟模式、
+  没有接入任何广告 SDK、不做人脸识别登录、只有用户主动操作才提交 —— 与 `project-real-usability-bar` 同一条底线。
+
+**第一版被自己的判据打红两条（实测 `8 tests completed, 2 failed`，`AppPoliciesContractTest.kt:60` 与 `:70`）**
+我把"不许承诺本项目明令不做的服务"写成了**禁裸词**：`网约`、`广告`、`预约乘车` 一律不许出现。
+红的是我自己写的诚实否定句 ——「不提供网上预约乘车」「本应用不是出租车/网约车平台」「没有接入任何广告 SDK」。
+判据要禁的是**把没做的说成做了**，不是禁提这个词。改成三组：
+`bannedPromises`（肯定式措辞，如"可在线预约乘车""提供网约车"）+ `notEnabled`（未落地能力的肯定式：
+"已开通在线支付""支持人脸识别登录""含广告""自动检查更新"）+ `mustState`（反过来**要求对应的否定句必须在场**，
+缺一条就是拿沉默糊过去）。这段教训写在测试类头部注释里，不改判据的人才会重复犯。
+
+**判据与负控**
+- 新簿 `tools/check_policy_probes.sh`：PL-a…PL-j 十项，全绿。
+- 新负控 `tools/policy_negative_controls.sh`：P-1…P-9 + 两条"反证自身"（P-4b、P-7b），**11/11 红且原因对得上**。
+- ⚠ **P-7b 第一轮是绿的**（`✘ P-7b 判据仍然绿（破口没咬住）`）：`PL-h` 的反证那侧原先写成"正文句数 ≥20"这种**下限**，
+  而负控的破口是"从数据源删掉一句正文" —— 删一句读 24，`24 ≥ 20` 照样过 ⇒ 那个"页面里正文 0 命中"根本没人能证明它不是空跑。
+  改成钉**恰好 25**（2026-10-12 实测的句数）后，删一句立刻 24≠25 而红。
+  写进两处注释的结论是：**下限型反证只能证"机制数得动"，当不了逐条改动的 tripwire**；
+  代价与 SU-b 同一套摩擦设计 —— 改正文必须同轮改这个数。
+- ⚠ 负控自己的期望值也错过一轮：`[ "$ok" = 10 ]` 在破口加到 11 条之后没人回头核对 ⇒ **期望值必须逐条数出来，不抄上一本的数字**。
+
+**读数**：`AppPoliciesContractTest` **8 例**；当时全量 = **61 类 / 615 例 / 0 失败**（61 份 XML timestamp 全为 2026-10-12T09:58）。
+
+**仍欠**
+1. 正文的法律口径**没人复核过**：`UPDATED_ON`、免责句"不构成法律意见"是我按功能现实写的原话，
+   不是法务结论；这一格要找运营/法务读一遍才算收口（`PL-f` 只钉"只有一个出处"，不钉"说得对"）。
+2. `NOT VERIFIED ON DEVICE`：登录页两个链接真机上能否点开、正文在 440dpi 平板上的换行都没复拍。
+
+### D-080（10-12 18:3x）· 司机端平台公告栏：把后端现成的 `/notice/list` 接进司机工作台，**并把"没取到"与"没有公告"钉成两格**
+
+**起点**（`docs/product/FEATURE_MARKING_SPEC_2026-10-12.md` 一（二）"绩效/公告/联系调度/车队"那一行）：
+公告通路后端早就有、用户端首页一直在用（`Repo.notices()` → `NoticeCarouselStrip`），司机端却一条都不显示。
+同一件事的两面：通路侧是**死代码**（司机域没人调），界面侧是**缺那一格**。用户口径是"没有的按实际情况完善、
+不要和已有功能冲突" ⇒ 不新造第二套公告来源，直接把现成那条接上（`DN-a` 钉死"全工程只有三个消费者"）。
+
+**做法（判定与渲染分两层，与 #42 天气同一套分工）**
+- `ui/driver/DriverNotices.kt`（新）：`NoticeBanner` + `noticeBanner(RemoteState<List<Notice>>)` + `noticeDetailLines(...)`。
+  三种说法必须是三个返回值：`error` 非空 → "平台公告没取到" + 后端原话 + "下拉刷新或点「刷新」再取一次"；
+  取成功且空 → **整栏不出现**（真没有不值得播报）；还没取过结论（`success=false`）→ 整栏不出现且不替后端下任何结论。
+- `WorkbenchViewModel` 加 `platformNotices`，初值是 `RemoteState(loading = true)` 而**不是空列表**（`DN-g`）：
+  开局就把初值写成"成功且空"等于替后端说了"没有公告"。
+- 取数挂在 `syncFromServer(withNotices: Boolean)`：只有 `load()`（进入 / 下拉刷新 / 失败重试）取，
+  作业动作后的回读**不取**（参数不给默认值，新增调用点必须自己表态）。
+  公告失败**不并进整页 `error =`**（`DN-f`）：一条附属信息取不到不该让整块工作台报"加载失败"。
+- 渲染 `item(key = "notice")` + 点开 `AlertDialog` 列**全部**公告（`noticeDetailLines`，`DN-b` 钉这一环）；
+  失败那一栏点击是重试，不弹空框。缺标题/缺正文说"这条公告没有标题/没有正文"，不编内容也不留白。
+
+**后端实测（本机 local 库，只读 GET）**
+`curl http://127.0.0.1:48080/app-api/transport/notice/list` → `{"code":0,"msg":"","data":[]}`。
+⇒ 通路是真的；库里当前 0 条 ⇒ 这一格现在**正确地不出现**。"司机真看到一条公告"这一格仍未被演示过（不许当成已验）。
+
+**本轮最重要的实测打回：先写判据（全绿）再跑全量 = 12 例红**
+第一版把公告取数挂在**每一轮** `syncFromServer()` 上，`:app:testDebugUnitTest --rerun-tasks` 报
+**62 类 / 624 例 / 12 失败**，红的全是既有的三个司机工作台行为类：
+- `DriverActionHonestyContractTest` 5 条全红（`加载本身恰好 5 条读 expected:<5> but was:<6>` 等）；
+- `MissionRouteStateContractTest` 4 条 `kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for 5000 ms`；
+- `WorkbenchRoleReconcileContractTest` 3 条同样的 5 秒超时。
+两条根因，第二条才是这次的真教训：
+1. 公告不随司机的发车/到站/装车动作而变，挂在动作后的回读上 = **点一次作业多一条 REST**（与 #42 天气 15 分钟闸门同一条理由）；
+2. `MockWebServer` 是**按序回填的队列**，多出来的第 6 跳没有响应 ⇒ 表现不是"计数差一"而是**整条用例挂在超时上**。
+   只看红因会误诊成"协程/调度问题"，读 XML 里的 `TimeoutCancellationException` 才认出是队列少一格。
+修法没有放宽任何判据的强度：改成 `withNotices` 只在进入/刷新那一轮取，
+三个类的计数同轮逐条重登（5→6、11→12、6→7，`awaitLoaded` 仍是一条都不许多；早退支仍是 **1** 条；
+只有演示回落那一类把 `repeat(5)` 补成 `repeat(6)`），并给 `enqueueRest/enqueueFirstFour` 写明
+"第 6 条公告不在这里给，要用的用例自己显式补一行"。
+**登记这条口径**：改一个会被 `server.requestCount` 钉住的取数点，**必须先跑那三个类**再看判据簿 ——
+结构判据只看文本，它证明"接线在"，永远证明不了"没多跳"。
+
+**台账随动（两本，都按"逐条数出来 + 同轮改打印行"）**
+- `test_suite_hygiene` SU-b 63→**64**：唯一增量是新的 `DriverNoticesContractTest.kt`（产物 tests=9），
+  SU-a 同轮 62/**0** ⇒ 不是空壳；夹具数仍是 2。
+- `idempotency` H-h 锚点 `11, server.requestCount`→`12, ...`（仍是 **3** 条）：这本用逐字锚点数"真发出去那一侧"的对照，
+  测试里的数字一改，这里不同轮改就会假红。
+- 上一本（#49 政策正文页）的收尾也记在这里：`policy_negative_controls.sh` 由 **10/11 → 11/11**，
+  P-7b 从"删一句正文但判据仍绿"改成 `PLH_PROOF` 钉**恰好 25**（见 D-079）；
+  同时把该簿最后的期望值 `[ "$ok" = 10 ]` 按条数改成 **11** —— 上一本的数字就是因为没跟着数才红的。
+
+**读数**
+- 新用例 `DriverNoticesContractTest` **9 例**（定向跑 `10:33` 那一遍）；
+- 全量 `:app:testDebugUnitTest --rerun-tasks` = **62 类 / 624 例 / 0 失败 / 0 错误**，
+  62 份 XML timestamp 全部为 `2026-10-12T10:34`（同一分钟，无上一遍残留）；
+- 新判据簿 `tools/check_driver_notice_probes.sh`（DN-a…DN-i，九项）绿；
+  新负控 `tools/driver_notice_negative_controls.sh` **13/13 红且原因对得上**（含 DN-8/DN-9 两条"反证自身"、
+  DN-12/DN-13 两条取数时机）；判据全批 28 本 = **27 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，见 #51）。
+
+**仍欠**
+1. `NOT VERIFIED ON DEVICE`：公告栏在 440dpi 平板上的换行、点开对话框、失败态点重试都没复拍；
+   且本机库 0 条公告 ⇒ "看到公告"这一格连演示都没有，只有判定层的用例。
+2. 公告的**内容管理**在后台侧（这份表三（十三）"公告发布/审核/推送/阅读/分类/模板"），
+   本轮只落"司机端读"这一格，没有动发布侧。
+3. 已读水位/未读角标没做：司机端公告目前是"看一眼"，不计已读（后端 `/notice/list` 也没给已读位），
+   登记为待议而不是"已闭环"。

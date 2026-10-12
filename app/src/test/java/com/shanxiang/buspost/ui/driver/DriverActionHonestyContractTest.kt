@@ -56,7 +56,10 @@ class DriverActionHonestyContractTest : ServerTest() {
     private fun midWayShift() = """[{"shiftId":7101,"status":1,"currentStationId":501,"stops":[{"stationId":501,"stationName":"起点站","sequenceNo":1},{"stationId":502,"stationName":"中途站","sequenceNo":2},{"stationId":503,"stationName":"末站","sequenceNo":3}]}]"""
 
     /**
-     * 一次工作台回读的 5 条响应，顺序与 syncFromServer 一致：profile → shifts → pickups → tasks → route。
+     * 一次**进入/刷新**的回读是 6 条，顺序与 syncFromServer 一致：profile → shifts → pickups → tasks → route → notice；
+     * 作业动作后的那次回读只有 5 条（公告不随司机动作而变，见 `WorkbenchScreen.kt` 的 `withNotices`）。
+     * ⚠ 2026-10-12 加公告那一格时本类全部计数同轮 +1（只加在进入/刷新那侧），不是把闸调松：
+     *   少一条会红、多一条也会红。
      * 车牌的真实键是 `plateNo`（`AppDriverProfileRespVO:19`），`Models.kt:1374` 现在也只认它——
      * 上一版夹具写的 `plate` 是已被删掉的自造别名，留着它只会让夹具离真机越来越远。
      */
@@ -66,6 +69,8 @@ class DriverActionHonestyContractTest : ServerTest() {
         respondData(pickupsJson)
         respondData("[]")
         respondData("null")
+        // 公告：夹具给"后端确实没有公告"这一格（show=false，不影响本类任何画面断言，只多一跳计数）
+        respondData("[]")
     }
 
     /**
@@ -86,7 +91,7 @@ class DriverActionHonestyContractTest : ServerTest() {
         awaitUntil { !vm.loading }
         assertNull("加载必须干净完成，坏夹具会把早退读成通过", vm.error)
         assertEquals(expectStations, vm.shift?.stations?.size)
-        assertEquals("加载本身恰好 5 条读", 5, server.requestCount)
+        assertEquals("加载本身恰好 6 条读（5 条司机域 + 1 条公告）", 6, server.requestCount)
     }
 
     @Test
@@ -102,7 +107,7 @@ class DriverActionHonestyContractTest : ServerTest() {
 
         vm.arrive(0L)
 
-        assertEquals("站点编号缺项时一条都不许出网，连动作后的回读都不发", 5, server.requestCount)
+        assertEquals("站点编号缺项时一条都不许出网，连动作后的回读都不发", 6, server.requestCount)
         assertEquals("后端没给本站编号，到站提交不了——请回到工作台重新拉取班次", vm.receipt)
         assertFalse(vm.docked)
     }
@@ -123,7 +128,7 @@ class DriverActionHonestyContractTest : ServerTest() {
         vm.arrive(0L)
         awaitUntil { !vm.busy }
 
-        assertEquals("5 读 + 1 写 + 5 读", 11, server.requestCount)
+        assertEquals("6 读 + 1 写 + 5 读", 12, server.requestCount)
         val body = bodyOf(requestsFor("/app-api/transport/driver/arrive").single())
         assertTrue("报文仍是后端 ReqVO 那两个字段，早退闸门不改 wire", body.contains("\"shiftId\":7101"))
         assertTrue(body.contains("\"stationId\":502"))
@@ -147,14 +152,14 @@ class DriverActionHonestyContractTest : ServerTest() {
 
         // 闸门外先有一次真的在路上（另一个入口/上一次点击还没跑完），键与工作台这次完全相同
         Repo.arrive(7101L, 502L)
-        assertEquals("闸门外的这一次是真发出去了", 6, server.requestCount)
+        assertEquals("闸门外的这一次是真发出去了", 7, server.requestCount)
         assertFalse(vm.docked)
 
         vm.arrive(502L)
         awaitUntil { !vm.busy }
         assertNull("notSent 那一支的回读也必须干净完成", vm.error)
 
-        assertEquals("拦下后只该多 5 条回读，多一条就是幂等闸没拦住", 11, server.requestCount)
+        assertEquals("拦下后只该多 5 条回读，多一条就是幂等闸没拦住", 12, server.requestCount)
         assertFalse("一个字节都没上网络，画面不许先行进入「停靠作业」", vm.docked)
         assertTrue(vm.receipt!!.contains("未发给后端"))
     }
@@ -179,16 +184,16 @@ class DriverActionHonestyContractTest : ServerTest() {
 
         // 手动输入那一支的输入框只收数字，但核验按钮在没有码时同样可点：这两条必须都不出网
         vm.verify(task, "")
-        assertEquals("空码一条都不发", 5, server.requestCount)
+        assertEquals("空码一条都不发", 6, server.requestCount)
         assertEquals("取件码还没填，核销提交不了——请扫码或让寄件人报出取件码", vm.receipt)
 
         vm.verify(task, "   ")
-        assertEquals("纯空格同样不发：Api 出网前会把空串整个键丢掉，后端收到的是没有 pickupCode 的请求", 5, server.requestCount)
+        assertEquals("纯空格同样不发：Api 出网前会把空串整个键丢掉，后端收到的是没有 pickupCode 的请求", 6, server.requestCount)
 
         vm.verify(task, "1234")
-        awaitUntil { server.requestCount >= 11 }
+        awaitUntil { server.requestCount >= 12 }
 
-        assertEquals("填了码才走真提交", 11, server.requestCount)
+        assertEquals("填了码才走真提交", 12, server.requestCount)
         val body = bodyOf(requestsFor("/app-api/transport/driver/pickup-verify").single())
         assertTrue(body.contains("\"orderId\":8801"))
         assertTrue("发送的还是用户输入的那一串，判空不改报文", body.contains("\"pickupCode\":\"1234\""))
@@ -218,7 +223,7 @@ class DriverActionHonestyContractTest : ServerTest() {
         vm.continueToNextStation()
         assertEquals(503L, vm.targetStationId())
         assertEquals("推进不得回写后端给的当前站", 501L, vm.shift?.currentStationId)
-        assertEquals("纯本机视图：一条请求都不许多发", 5, server.requestCount)
+        assertEquals("纯本机视图：一条请求都不许多发", 6, server.requestCount)
 
         // 再点两次跨过末站：第二次 navOffset=2（仍 ≤ 上限），第三次触发上限归位并给回执
         vm.continueToNextStation()
@@ -226,6 +231,6 @@ class DriverActionHonestyContractTest : ServerTest() {
         assertEquals("到末站后不再往后指（不存在第 4 站）", 503L, vm.targetStationId())
         assertTrue(vm.receipt!!.contains("已经是最后一站"))
         assertEquals(501L, vm.shift?.currentStationId)
-        assertEquals(5, server.requestCount)
+        assertEquals(6, server.requestCount)
     }
 }
