@@ -6869,6 +6869,7 @@ Java 侧一字未改，全部在 `yudao-ui-admin-vue3` + 一条菜单 SQL。
 **顺带登记、本轮不动**：路线表单只发 `{stationId}` ⇒ `plannedMinutes` 恒 null ⇒ 后端按"累计直线里程 ÷ 20km/h"重算覆盖
 （页面有二次确认，属已知设计，但"后台无法保留手工计划分钟"要登记）；
 `Vehicle/Station/Notice` 三个表单把 GET 到的整条记录原样 PUT 回去 ⇒ 并发下 lost update（已排进收口后的功能队列第 1 项）。
+  ⚠ 这一句在 D-096 核过契约后**收窄**：三本里只有 `Vehicle` 成立（不显示的字段是 `realtimeStatus`），`Station`/`Notice` 的 BaseVO 字段与表单显示项完全一致 ⇒ 不是同族缺陷。上一轮那句是三本一起写的，属于没核 VO 就登记。
 
 ### D-095（10-13 14:0x–15:5x）· 台账锚点重量一次：65 条真漂移改回真实行号 ⇒ DA-f 转绿、DA-d 对齐；DA-e 仍红，且**本轮实测证明它不能靠机械证据关掉**
 
@@ -6926,3 +6927,67 @@ D-087 与本轮两批负控里 `doc_anchor_negative_controls.sh` 都以 rc=2 收
   四道自查闸逐条负测过（安全圆越界 358.9px / evenOdd 洞没挖开 / pathData 退化到一点 / 没有 `<group>`，各自 `rc=1` 并点名原因；基线与还原后 `rc=0`）。
   诚实边界：**像素级不保证与 Android 系统渲染器一致**（本机没有那个渲染器），同源的是几何不是位。
 
+### D-096（10-13 16:3x–17:0x）· 用户把范围放开到"预留的也可以做"之后：先按《标记说明》逐节数清家底，再落两片后台切片
+
+**先更正两份账**（都是"读文档 + 数文件"就能证的，之前却凭印象写）
+1. docx 里标"是（预留）"的项中，**这几项本仓早已做了**：深色模式 / 老年人模式（fontScale）/ 4 套主题色
+   （`ui/user/SettingsScreen.kt` + `ui/common/BusTheme.kt` + `core/Prefs.kt`）、扫码装车·妥投·取件核销
+   （`core/code/Scanner.kt`、`QrCode.kt`、`ui/common/QrView.kt`）、离线真实道路缓存（`core/map/RouteSource.kt` 的 `CACHE_REAL_ROAD`）、
+   天气提醒（含按角色分文案）、多租户与 OAuth2 客户端（框架自带）、在线支付（代码就绪、卡商户资质）。
+   ⇒ "预留"这一列不能当"我们没做"读，也不能当"不用做"读。
+2. 差点把"签名"4 个命中读成电子签名已做 —— 逐条读下来全是**方法签名**，电子签名确实没做。
+   同族：关键词命中 ≠ 语义命中（§八 ㉞③ 那条的又一次同形）。
+
+**后台家底（实测清点，不是印象）**：`views/transport/**` 33 个 .vue、`src/api/transport/` 19 个真模块
+（另有 `settlement/`、`resource/` 两个**空目录**，git 不跟踪，不是死接口）、21 个 admin 控制器、33 个 DO、
+框架自带 `views/system/*` 与 `views/infra/*`。按 docx 的后台 21 节数：**7 有 / 7 部分 / 7 无**。
+无的七节里最值钱的两块：**对账与结算**（只有 `DispatchSettlement` 那种"一趟的结算"，没有账单表）与
+**出车/途中/收车安全检查表**（`DepartureCheckDO` 只有一个 `result` 单值，装不下 docx 点名的 14 项 + 拍照 + 重大标记）。
+
+**这一轮落下的两片**
+- `7b88b17e` 订单详情挂**事件时间线**：后端 `OrderEventController` 早就只有 `list-by-order`（权限复用 `transport:order:query`），
+  后台没有任何页面消费它 ⇒ docx「快件跟踪」那 11 个状态里靠事件说话的那几格（异常/退回/拒收/超时）在界面上看不见。
+  新增 `api/transport/orderEvent` + 详情弹窗一段 `el-timeline`，**三格分开念**：读到 N 条 / 后端确实说没有 / 这一格没读到（显示原因）。
+  事件类型名一律用后端 `typeName()` 翻好的 `eventTypeName`，前端不再自己映射一套（两处口径迟早分叉）。
+- `b4d4dff4` 车辆表单**不再回写 `realtimeStatus`**：逐个核 VO 后，上一轮"三本表单都 lost update"那句要收窄——
+  只有 Vehicle 成立（BaseVO 8 个可写字段、表单显示 7 个，漏网的是系统同步的 `realtimeStatus`），
+  并发形状是"A 开着编辑窗读到 0，司机这期间点发车推成 1，A 保存 ⇒ 写回 0"。
+  改法是 `MANAGED_FIELDS`(7) + `pickManaged` 在回读与提交两处过滤；顺带把 `insuranceExpireDate` 显式写进初值与 resetForm（原先两处都漏，靠 v-model 隐式创建）。
+  两片凭证都是同一套：`ts:check` 现读 RC=0，再注入一行必然报错的代码要求它**点名文件与行号**且 RC=2，还原后复跑回 0 并 grep 残留为 0。
+  ⚠ 未验证的格子照实写：本机没有跑起来的前端 + 后端 + 已建表的库 ⇒ 接口真回包与并发回写这条都**没有运行时证据**，只有契约与代码形状。
+
+**过程中被自己的判据抓到的两件事**
+1. `pickManaged` 一开始返回 `Record<string, any>`，`ts:check` 当场红在"丢了必填 `plateNo`" ⇒ 静态检查这一遍不是走过场。
+2. 我在 D-095 收尾段落里"引用锚点"，这件事本身又生成了新锚点（records 1444→1448、DA-d 又冒新增）
+   ⇒ 在册表必须在**所有台账文本落完之后**再对齐一次，否则"我刚写完的那段"自己把闸门弄红。已补一次 `--pin-write`（283 行，新增 0 / 消失 0）。
+
+**当前判据状态**：负控 39 本里 **38 本绿**；只剩 `doc_anchor` 因 DA-e（ID-MISS 现读 323 > 闸门 286）自拒，
+那 35 格只能逐条读句子（#159），**下限没动**。
+
+### D-097（10-13 17:2x–17:5x）· 计价规则接上后台（`c01ea86e`），以及"红证脚本自己把破版固化成备份"这一条
+
+**做了什么**：`transport_pricing_rule` 表 + `PricingRuleService` 早就在被 `CargoPricingService` / `DispatchEstimationService` 读，
+但后台没有任何页面能改 ⇒ 改运价 = 直连数据库。这一片补成"读当前生效值 + 保存(upsert)"一页
+（形状是**单行配置**，`selectFirst` 按 id 升序取首条，所以不是多行 CRUD）。
+关键那一格：`getRule()` 在库里没有配置行时**返回全默认值** ⇒ 接口带 `configured` 旗标，页面分三种念法
+（没配 / 已配 / 读失败留空并显示原因）。不这么做，`1.00 元/人公里` 就会被念成"运营配过的值"——
+同族本仓抓过两次（D-090 抹数据、#57 "后端没给"）。
+
+**凭证**：`PricingRuleServiceSaveTest` 3 例，两处破口各让 1 例红（`Wanted but not invoked` / `AssertionFailedError`），
+还原 `rc=0`、产物 `tests=3 failures=0`；模块全量 `MVN_EXIT=0`、本轮重写 40 份报告、`tests=362 failures=0 errors=0`
+（359 + 新增 3 对得上）；前端 `ts:check RC=0` 并注入两处坏代码自证扫到新文件
+（点名 `pricingRule/index.ts(22,40)` 与 `index.vue(72,7)`、RC=2），还原后 RC=0、残留 grep 0。
+`V032__pricing_rule_menu.sql` 用 `WHERE NOT EXISTS` + `INSERT IGNORE`；⚠ 不在 CI 白名单 ⇒ 生效前需人工执行，
+不执行的表现是"菜单里没有这一项"（表在基线已建，不像 V028/V031 那样连带依赖未建的表）。
+
+**两条要记的形状错误（都在自己身上，都在本轮被抓）**
+1. **红证脚本自己制造了一个假基线**：第一版 `red_pricing.py` 的顺序是 `copyfile(源码→备份)` **在前、断言在后**；
+   它在 Windows 上调 `mvn`（无扩展名的 shell 脚本）抛 `WinError 193` 崩在断言之前，
+   于是**破版源码已经被写进工作树**，而第二次运行又把那个破版当作"原始版"备份走 ⇒ 我"还原"了一次破版。
+   ⇒ 固定顺序改成：**先断言起点干净 → 再备份 → 破 → 跑 → `finally` 还原 → 再断言终点干净**；
+   并且 `mvn` 在 Windows 上必须走 `mvn.cmd`（`subprocess` 不会执行无扩展名的 sh 包装）。
+   发现方式很偶然：第二次运行"断言失败"看起来像源码被谁改坏了，实际是我自己的备份顺序错了。
+2. **`mvn -pl <模块>` 必须在仓库根跑**：我在模块目录里跑了两次，报的是
+   `Could not find the selected project in the reactor` —— 这种 mvn 失败**不产生任何 surefire 产物**，
+   如果只盯着"上一次那份 tests=3 failures=0 的 XML"就会把"根本没跑"读成"跑过了且绿"。
+   ⇒ 每次跑用例前先删掉对应 XML，跑完要求它重新出现（本轮脚本就是这么做的）。
