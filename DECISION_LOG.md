@@ -6991,3 +6991,31 @@ D-087 与本轮两批负控里 `doc_anchor_negative_controls.sh` 都以 rc=2 收
    `Could not find the selected project in the reactor` —— 这种 mvn 失败**不产生任何 surefire 产物**，
    如果只盯着"上一次那份 tests=3 failures=0 的 XML"就会把"根本没跑"读成"跑过了且绿"。
    ⇒ 每次跑用例前先删掉对应 XML，跑完要求它重新出现（本轮脚本就是这么做的）。
+
+### D-098（10-13 18:0x–18:3x）· 揽收点四项属性（`c45b83c6`）：先核三条契约再动手，结果三条都改了我的预设
+
+**为什么先核**：上一版排序里我把这项写成"Station 加列 + 表单"，看着像常识活。真去读契约时三条都需要改口径：
+1. `transport-schema.sql:169-170` 已经有 `contact_name/contact_mobile` —— 逐表读下来那对属于
+   **`transport_passenger_order`（客运预约单联系人）**，不是站点表 ⇒ 不冲突，但也说明"grep 到列名"不等于"这列在我要动的表上"。
+2. `station_type` 枚举只有 `BUS_STOP/CARGO_STATION/MIXED`（`StationTypeEnum`），**表达不了"电商站点"**
+   ⇒ 用独立 `ecommerce_flag`，不去扩既有枚举（它已被 App/小程序按值消费，扩枚举是跨端契约变更，不是加列）。
+3. 全仓 **没有** `PickupPoint` 实体 ⇒ 揽收点就是 `transport_station` 表达的 ⇒ 补列而不是建新表（否则会造出第二份"站点"真相）。
+
+**落了什么**：V033 幂等加四列（沿用 V024/V025/V030 的 `information_schema` + PREPARE/EXECUTE 形状）+
+`StationDO`/`StationBaseVO`/`api/transport/station`/`StationForm.vue` 四处同步；
+`business_hours` 是自由文本且**空串=未公布**，界面提示里明写"不冒充 24 小时"（同族：D-090 抹数据、#57 后端没给）。
+
+**基线 `transport-schema.sql` 本轮故意没动**：它在工作树里带着别人未提交的改动，
+我这一笔若顺手改它，就会把别人的改动一起 `add` 进去（这仓的规矩是"有垃圾禁 add -A"，同族）。
+⇒ 新库同样靠执行 V033 补列，两条路都通，这一点写在 SQL 文件头。
+
+**两处被自己的构建抓到**
+- `@Size` 忘了 `import jakarta.validation.constraints.Size` ⇒ mvn 编译红、**0 份 surefire 产物**。
+  这一红很值钱，因为我是**先删光旧报告再跑**的：0 份 = 根本没跑成，不会被上一次那份"362 例全绿"糊过去。
+- 模板写成 `v-model="form.contactName"`，而这个组件的绑定前缀是 `formData` ⇒ 先 grep 现读确认前缀再改，
+  改完 `vue-tsc` 的覆盖自证（注入一个 `contactNameTypo` 错绑）在 `StationForm.vue(66,37)` 点名报错、RC=2，
+  `git checkout` 还原后 RC=0、grep 残留 0 ⇒ 这条自证用的是"提交之后注入、还原靠 git"的顺序，比备份文件干净。
+
+**当前凭证与未验证格**：后端 `MVN_EXIT=0`、40 份全新报告、`tests=362 failures=0 errors=0`；
+前端 `ts:check RC=0`。⚠ 未执行 V033 之前，后台提交这四项会因缺列报错 ⇒ "云上这一格可用"这一格仍不成立；
+本机没有跑起来的前端+后端+库，接口真回包与表单交互都没在运行时验过。
