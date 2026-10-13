@@ -6796,3 +6796,50 @@ rc=0 **✔=22 ✘=0 △=0**。配负控的同一轮必须先把松闸收紧，�
 4. `check_doc_anchor_probes.sh` 在册红（#51 三条路等用户定）；
 5. `#47 分组 hub` 仍等口径、`assets/logo.png` 是否随图标一起换仍等回话；
 6. 两仓本地已提交未 push：本条提交前一刻现读 App 25 = **25**、后端 = **10**（本条落地后 App 变 26）。
+
+### D-093（10-13 12:5x–13:3x）· web 后台第二批：用户钱包只读页上线到代码层，"能改钱"那个口刻意不接
+
+App 这批只剩两件等拍板的事（#43 已选定并落地、#47 等口径），按用户"别忘了 web 端"转做后台管理平台第二批。
+Java 侧一字未改，全部在 `yudao-ui-admin-vue3` + 一条菜单 SQL。
+
+**契约（逐行读 `WalletController.java`）**
+| 端点 | 读到的事实 | 后果 |
+|---|---|---|
+| `GET /account/get?userId=` | 走 `walletService.getOrCreateAccount(userId)` | **这个"查询"有写副作用**：账户不存在就建一条 ⇒ 不能当只读探测用，注释里写明 |
+| `GET /transaction/page` | 直接返回 `PageResult<WalletTransactionDO>`（没有 RespVO） | `total` 是**真分页总数**（与 App 侧那个 `items.size()` 不是一回事，见 D-086 第 4 条口径） |
+| `POST /adjust-balance` | 参数是 `@RequestParam`（query，不是 body），只有 userId/amount/reason | ① 前端按惯例发 JSON body 会参数缺失；② **没有幂等键** ⇒ 重复点击重复改钱；③ `amount == 0` 时 `> 0` 与 `< 0` 两支都不走，**什么都不做却返回"调整成功"** |
+| `status` | 数字码，含义只存在于 `V028__wallet_tables.sql:31` 注释（后端无枚举类） | 界面照抄注释，未知码原样带出，null 不塌成"处理中" |
+| `payMethod` | 运营调整写 `"balance"`；App 模拟充值那支写 `"alipay"`（D-086） | 渠道那一格只照抄原词，不补"已扣款/是模拟的" |
+
+**做了什么**
+1. `src/api/transport/wallet/index.ts`：两个读口；**刻意不导出 `adjustBalance()`**，理由写在文件末尾注释里。
+2. `src/views/transport/wallet/index.vue`：按用户 ID 查询的只读页（账户卡 + 流水分页），
+   页面顶部一条 `el-alert` 明写"这一页只提供查询，不提供改账"和那两条理由——**把不做的事写在屏上，而不是藏起来**；
+   四格口径与 #56 同一条（缺席≠¥0.00、失败≠没有、空态分三种、Epoch 毫秒格式化）。
+3. `sql/incremental/V031__wallet_menu.sql`：菜单 + 角色授权，写成 `WHERE NOT EXISTS` + `INSERT IGNORE` 的**可重复执行**形状。
+   为什么不能直接往基线加一行：`transport-menu.sql:130-146` 是裸 `INSERT INTO system_menu ... VALUES`（固定主键），
+   而 `deploy-dev.yml:200` 每次 push master **无条件重放**那份文件 ⇒ 追加一行会让第二次部署红在迁移步
+   （与 V029→V030 那次同一个理由）。同一份 SQL 里也**不给** `transport:wallet:adjust` 配按钮。
+
+**验证（含一次自证）**
+- `npm run ts:check`（vue-tsc --noEmit）全项目 **TS_RC=0、0 个 error**。
+  ⚠ 但"0 error"在文件根本没进编译程序时也一样成立 ⇒ 照本仓规矩做一次注入自证：
+  往这个新页面塞一行 `const __negctl_broken: number = (__negctl_broken_unused as string)`，
+  ts:check **当场报 `src/views/transport/wallet/index.vue(84,7)` 三条错、RC=2**；还原后回到 RC=0
+  ⇒ 这一页真的被类型检查扫过。`grep -rn __negctl src/` = **0** 证明残留已清干净。
+- SQL 幂等：本机**没有 mysql 客户端**（`which mysql` 空）⇒ 只核了语句形状，**没跑过第二遍**，
+  所以"可重复执行"的依据是写法不是实测，不写成已验证。
+- 后端 Java 未改 ⇒ 不重跑 mvn（上一份凭证仍是 D-090 的 `compile rc=0` + `TransportOrderServiceImplTest` 19 例全绿）。
+
+**部署前置（不写清就会被当成"已可用"）**
+`V031` 与它依赖的 `V028__wallet_tables.sql` **都不在** CI 迁移白名单里（现读 V018/V019/V021/V022/V024/V025，
+`deploy-dev.yml:213-215`）⇒ 在有人执行这两份 SQL 之前，"云上打开这一页能看到数据"这句**不成立**，
+页面会直接报错而不是显示空表。这与 D-086 那格"V028 未执行"是同一条账。
+
+**仍欠**
+1. **这一页没有被浏览器打开过**（本机没有跑起来的前端 dev server + 后端 + 已建表的库）⇒ 布局、查询链路、分页都只是代码读证 + 类型检查；
+2. 改账口要不要做（幂等键 + 零值拒绝 + 归属审计）是**用户/队友的决定**；
+3. `V028`/`V031` 进白名单或人工执行，仍等队友在库上做（V029 那一格也在等同一个人）；
+4. web 侧**没有任何自动化判据/负控**（App 那套机制在 web 端还不存在）⇒ 本轮的凭证只有 ts:check 一份；
+5. 39 本 App 负控整批未重跑；`#47` 口径与 `assets/logo.png` 换不换仍等用户；
+6. 两仓本地已提交未 push（本轮后现读：App 27 个、后端 11 个）。

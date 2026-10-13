@@ -3,6 +3,26 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（下午续，D-093 · **web 后台第二批：用户钱包只读页，"能改钱"那个口刻意不接**）：
+Java 一字未改，全部在 `yudao-ui-admin-vue3` + 一条菜单 SQL。契约逐行读 `WalletController`：
+`GET /account/get` 走 `getOrCreateAccount` ⇒ **这个"查询"有写副作用**（账户不存在就建一条，不能当只读探测）；
+`GET /transaction/page` 直接返回 `PageResult<WalletTransactionDO>`，`total` 是真分页总数（与 App 侧那个 `items.size()` 不是一回事）；
+`POST /adjust-balance` 参数是 `@RequestParam`（发 body 会参数缺失）、**没有幂等键**、`amount == 0` 时两支都不走却返回"调整成功"。
+⇒ `api/transport/wallet` **刻意不导出 `adjustBalance()`**，页面顶部一条 `el-alert` 把"这一页只提供查询、不提供改账"和那两条理由写在屏上，
+`V031` 菜单也**不给** `transport:wallet:adjust` 配按钮；四格口径与 #56 同一条（缺席≠¥0.00、失败≠没有、空态分三种、Epoch 毫秒格式化）。
+**V031 为什么不能直接往基线加一行**：`transport-menu.sql:130-146` 是裸 `INSERT ... VALUES`（固定主键），
+而 `deploy-dev.yml:200` 每次 push master **无条件重放**它 ⇒ 追加一行会让第二次部署红在迁移步（与 V029→V030 同一个理由），
+所以写成 `WHERE NOT EXISTS` + `INSERT IGNORE`。⚠ 但"可重复执行"只核了**语句形状**——本机没有 mysql 客户端（`which mysql` 空），**没跑过第二遍**，不写成已验证。
+**ts:check 做过一次自证**：全项目 `npm run ts:check`（vue-tsc --noEmit）**TS_RC=0 / 0 error**，
+可"0 error"在文件根本没进编译程序时也一样成立 ⇒ 往新页面塞一行类型错，ts:check **当场报 `views/transport/wallet/index.vue(84,7)` 三条错、RC=2**，
+还原后回到 RC=0，`grep -rn __negctl src/` = **0** 证明残留清干净 ⇒ 这一页确实被类型检查扫过。
+部署前置：`V031` 与它依赖的 `V028` **都不在** CI 白名单（现读 V018/V019/V021/V022/V024/V025）
+⇒ 在有人执行这两份 SQL 之前"云上打开这一页能看到数据"这句不成立，页面会报错而不是显示空表（与 D-086 那格同一条账）。
+仍欠：**这一页没有被浏览器打开过**（本机没有跑起来的前端 + 后端 + 已建表的库）；改账口要不要做是用户/队友的决定；
+web 侧**没有任何自动化判据/负控**（App 那套机制在这儿还不存在）⇒ 本轮凭证只有 ts:check 一份；
+39 本 App 负控整批未重跑；`#47` 口径与 `assets/logo.png` 换不换仍等用户；两仓本地已提交未 push（现读 App 27、后端 11）。
+NEXT：① 39 本负控整批重跑 → ② web 侧继续（要么给后台补一套结构判据，要么按同一口径再补 1-2 个"看着有其实是空的"页面）→ ③ 等 #47 口径。
+<!-- 上一条 D-092（四笔 ✘ 归因 + D-CE-4 关掉）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（下午，D-092 · **四笔挂了整天的 ✘ 全部归因完毕，D-CE-4 关掉**）：
 `default_value ✘=3` + `idempotency ✘=1` 从 D-082 起每轮都写"仍未归因"，逐条查完的结论是**四条里没有一条是判据真的不判**：
 `DV-y6t` 锚点被文案改写顶掉（批日志第 55 行就有 `OLD-MISS`，现话术是「暂无任务段」）；
