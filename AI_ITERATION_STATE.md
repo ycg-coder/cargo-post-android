@@ -3,6 +3,33 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（中午，D-090 · **转做 web 后台第一批，抓到一条真在抹数据的缺陷**）：
+App 这批只剩两件等拍板（#43 选型、#47 口径），按"别忘了 web 端"转做 `yudao-ui-admin-vue3` 的 transport 模块。
+**清点结果（只认 `cargo-post-platform` 这一棵树）**：19 个 api 模块**全部有消费者**、views 里 `request.*` **0 命中**（HTTP 全走 api 层）、
+TODO/mock/假数据/生产 `console.log` **0 命中**、21 条菜单 SQL 组件路径逐个存在、8 个全 CRUD 控制器**都有页面** ⇒ 这一片是干净的。
+**真缺陷**：后台"编辑订单"静默抹子表数据。根因与 App 侧 #57 同一族——`TransportOrderRespVO` 只回读部分子表字段，
+而 `OrderForm.vue` 是 `resetForm()` 打回默认 → `{...formData, ...响应}` → 整个 PUT 回去，于是"没回读"被当成"用户清空了"：
+① `updatePostalOrder:553` 守卫看 `mailNo == null`，表单发的是**空串** ⇒ 放行 ⇒ **承运商被写成空串、件数被 `!= null ? : 1` 兜成 1**（库里 5 件变 1 件）；
+② `updateCargoOrder:529` 把缺键的 `freshFlag` 判成 **false** ⇒ 生鲜单静默降级（生鲜正是承运审核走人工的开关）；
+③ 客运三键整块不回读 ⇒ `updatePassengerOrder:513` 因 `passengerCount==null` 直接 return（**后台改客运单的人数/联系人根本改不动**），
+而一旦填了人数，联系人就被空串抹掉。
+改法：RespVO 补 6 键 + `toVO` 按 orderType 三分支（新增客运分支、注入 `PassengerOrderMapper`）+ 更新侧一律"没带就不改"（默认值只留在创建路径）。
+**读数**：`TransportOrderServiceImplTest` 17→**19 例**，两条新用例**先红后绿**——改回旧写法重跑，红的正是被抹掉的两个值
+（`expected: <null> but was: <1>` / `expected: <null> but was: <false>`）；恢复后 19 例全绿 / `BUILD SUCCESS`；`mvn -o -pl yudao-module-transport compile` rc=0。
+⚠ 后端工作树有 **47 个别人的未提交改动**（algorithm/**、application-*.yaml、VehicleForm.vue、一个被删的 mp3）⇒ 只 `git add` 我改的 4 个路径，**没有 `add -A`**；
+提交 `9f1fa41f` 本地未 push（推 master 触发云端部署）。
+**实测否掉一条子代理结论**（记下来，因为差点照着改）："派单方案表『里程口径』那列因 RespVO 没有 `routeProvider` 而永远 warning" —— 不成立：
+那列读 `/plan/page`，而 `DispatchController:81` 该端点**直接返回 `PageResult<DispatchPlanDO>`**，DO 有 `routeProvider:36` 且 `:3792` 真写入 ⇒ 列是真值。
+真实漂移只剩形状：详情用的 `DispatchPlanRespVO` 缺 `score`/`routeProvider`，TS 反过来缺 5 个键，而 `/plan/get` 在 views 里 **0 调用者** ⇒ 当下不可见，登记不当 bug 修。
+**web 侧仍在册缺口**：① `WalletController`（含 `/adjust-balance`，**能改钱**）没有后台页面 —— 全 CRUD 控制器只有它没页；
+② 3 个空壳目录（`api/transport/resource`、`api/transport/settlement`、`views/transport/settlement`）+ 12 个落在非空目录里的 `.gitkeep` 残留；
+③ `expiry`、`dispatch-center` 两页没有自己的 api 模块（复用别的，不是缺陷，但按"一页一模块"写判据会假红）。
+仍欠：本轮**没跑 App 侧判据与用例**（`app/src` 一字未动，上一份读数仍是 D-088 的 67 类 / 694 例 / 0 失败 + 判据 33 本 = 32 绿 / 1 红）；
+后台侧**没有自动化判据**（App 那套 check_*/负控机制在 web 端还不存在）⇒ 本轮的"绿"只有 mvn 一份凭证；
+`default_value ✘=3`/`idempotency ✘=1` 仍未归因；两仓本地已提交未 push（App 21 个、后端 10 个）。
+NEXT：① web 后台——先给"改钱"的钱包口补带权限的页面（或明确它不该存在）；② 清 15 处 `.gitkeep`/空壳目录残留；
+③ 等 #43 图标选型与 #47 口径；两件等到之前不再在 App 侧猜需求。
+<!-- 上一条 D-089（#43 图标候选 + #47 查无定义）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（上午续，D-089 · **#43 前半交付：三个图标方向等挑；#47「分组 hub」查无定义 ⇒ 不猜**）：
 NEXT 首项 `#47 分组 hub` 在 `DECISION_LOG` / 审计 / `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md` 里
 `grep "分组 hub|hub 分组|分组页"` = **0 命中**（`#47` 只在状态板自己的 NEXT 行出现过）⇒ 按"宁可空着也不猜需求"本轮**不实现**，

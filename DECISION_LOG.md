@@ -6629,3 +6629,60 @@ Android 13 themed icon 会糊成一坨）/ 把第二套标志 `assets/logo.png`�
    `check_doc_anchor_probes.sh` 在册红——三笔都还在册；
 4. 全部改动仍**只本地 commit、未 push**（现读：App 仓 `git rev-list --count origin/main..HEAD` = **20** 个未推提交，
    后端仓 `origin/master..HEAD` = **9** 个；推后端仓会触发云端部署，要单独提醒）。
+
+### D-090（10-13 10:5x–11:1x）· web 后台第一批：查单编辑**真的在抹数据**（邮快件承运商被清空、件数被改成 1）；顺手记下一条被实测否掉的子代理结论
+
+App 这批只剩两件等拍板的事（#43 图标选型、#47 口径），按用户"不要忘记 web 端"的口径转做后台管理平台。
+先做了一遍 `yudao-ui-admin-vue3` 的 transport 模块清点（只看 `cargo-post-platform`，工作区里那五份陈旧副本一律不作证据）：
+
+**干净的部分（实测，不是印象）**
+- `src/api/transport/` 19 个模块**全部有消费者**（0 死接口）；`views/transport/**` 里
+  `request.get|post|put|delete` **0 命中** ⇒ 所有 HTTP 都走 api 层，没有绕过；
+- TODO / FIXME / 待实现 / mock / 假数据 / 生产路径 `console.log` = **0 命中**；
+- 路由与菜单没有悬空：`sql/mysql/transport-menu.sql` + `transport-multi-leg-menu.sql` 里
+  21 条 `transport/...` 组件路径逐个存在，`router/modules/remaining.ts` 唯一那条大屏路由也解析得到；
+- 8 个全 CRUD 的 admin 控制器（Driver/Notice/Order/Product/Route/Shift/Station/Vehicle）**都有对应页面**。
+
+**真缺陷（已修，先红后绿）**：后台"编辑订单"会静默抹掉子表数据
+根因是**同一族病**：`TransportOrderRespVO` 只回读一部分子表字段，
+而 `OrderForm.vue` 的编辑流程是 `resetForm()` 先把 6 项打回默认值、再 `{...formData, ...data}` 合并响应
+⇒ 这 6 项停在"空"上，`submitForm()` 又把整个 formData PUT 回去。三条落库路径逐行核过：
+1. `updatePostalOrder:553` 的守卫是 `if (getMailNo() == null) return;` —— 表单发的是**空串不是 null**，守卫放行，
+   于是 `carrierCode` 落成空串（**承运商被抹掉**）、`itemCount` 被 `postalItemCount != null ? : 1` 兜成 **1**（库里 5 件变 1 件）；
+2. `updateCargoOrder:529` 同形：`freshFlag` 缺键被 `!= null && get()` 判成 **false**
+   —— 生鲜单静默降级，而生鲜正是"承运审核走人工"的开关；`cargoItemCount` 缺键同样兜成 1；
+3. 客运子表**整块不回读**（RespVO 没有 passengerCount/contactName/contactMobile），
+   而 `updatePassengerOrder:513` 的守卫是 `passengerCount == null` 就 return
+   ⇒ 后台改客运单的人数/联系人**根本改不动**（看起来能填、填了没生效），
+   而一旦管理员填了人数，同一支里的 `contactName/contactMobile` 就被表单那个空串抹掉。
+
+改法（与 App 侧 #57 同一条口径：**回读补齐 + 更新侧"没带就不改"，默认值只留在创建路径**）：
+`TransportOrderRespVO` 补这 6 个键；`toVO` 从 `if (3) … else …` 改成按 orderType 三分支，
+新增客运分支（注入 `PassengerOrderMapper`）；两条 update 路径去掉 `: 1` 与 `&& get()` 的兜底写法。
+
+**读数**：`TransportOrderServiceImplTest` 17 → **19 例**；两条新用例是**先红后绿**——
+把服务改回旧写法重跑，红的正是被抹掉的那两个值：
+`update_postal_order_without_item_count_keeps_stored_count` → `expected: <null> but was: <1>`、
+`update_cargo_order_without_fresh_flag_does_not_downgrade_it` → `expected: <null> but was: <false>`；
+恢复修复后 **Tests run: 19, Failures: 0, Errors: 0** / `BUILD SUCCESS`，
+`mvn -o -pl yudao-module-transport compile` rc=0。
+⚠ 后端仓工作树里有 47 个**别人的未提交改动**（algorithm/**、application-*.yaml、VehicleForm.vue、一个被删的 mp3 等），
+所以只 `git add` 我改的 4 个路径，**没有 `add -A`**；提交 `9f1fa41f`，本地未 push（推 master 会触发云端部署）。
+
+**一条被实测否掉的结论（记下来，因为它是子代理报的、我差点照着改）**：
+"派单方案表的『里程口径』那一列因为 `DispatchPlanRespVO` 没有 `routeProvider` 而永远显示 warning" —— **不成立**。
+实测：那一列读的是 `planList`（`:610`），来自 `/transport/dispatch/plan/page`，
+而 `DispatchController:81-82` 该端点**直接返回 `PageResult<DispatchPlanDO>`**，DO 里有 `routeProvider:36` 且由
+`DispatchServiceImpl:3792` 真实写入（:868 注释还写着"degree 仅直线估算参考，禁止展示为真实道路"）⇒ 那一列是真值。
+真实的漂移只剩形状问题：`getPlan`（详情）用的 `DispatchPlanRespVO` 缺 `score`/`routeProvider` 两键，
+TS 反过来缺 `planNo`/`planningMode`/`totalLegCount`/`transferCount`/`planReason` 五键，
+而 `/plan/get` 这个详情端点在 `views/transport/**` 里**0 个调用者** ⇒ 当下不可见，登记为在册形状差，不当 bug 修。
+
+**仍在册的 web 侧缺口（本轮没动）**
+1. `WalletController`（`/account/get`、`/transaction/page`、`/adjust-balance`）**没有后台页面** ——
+   全 CRUD 控制器都有页，只有它没有；而"调整余额"是**能改钱**的口，没页面意味着现在只能直连 HTTP 做，
+   这比"有个带权限的页面"更危险，值得排；
+2. `api/transport/resource/`、`api/transport/settlement/`、`views/transport/settlement/` 三个**空壳目录**（只有 `.gitkeep`），
+   另有 12 个 `.gitkeep` 落在**非空**目录里（dispatch/order/operation/route/shift/station/vehicle/driver 等）⇒ 是历史残留；
+3. `expiry/index.vue` 与 `dispatch-center/index.vue` 没有自己的 api 模块（复用 driver+vehicle / dispatch+topology+monitoring）
+   —— 不是缺陷，但计数类判据若按"一个页面一个 api 模块"写就会假红。
