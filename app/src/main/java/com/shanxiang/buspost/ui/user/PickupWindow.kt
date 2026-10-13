@@ -104,9 +104,10 @@ internal fun pickupMillisFromJson(o: JSONObject, key: String = "earliestPickupTi
 
 /** 回读文本：有值才念时刻，缺席念 [PICKUP_ABSENT_TEXT]（这一格不许塌成"随时可取"） */
 internal fun pickupReadbackText(millis: Long?): String = millis?.let {
-    LocalDate.ofInstant(java.time.Instant.ofEpochMilli(it), PICKUP_ZONE).format(PICKUP_DATE_FMT) + " " +
-        java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), PICKUP_ZONE)
-            .format(PICKUP_HOUR_FMT) + " 之后"
+    // ⚠ 只能从 LocalDateTime 换算再取日期：LocalDate 上的 ofInstant 重载是 API 34，
+    //   minSdk 26 上会被 lint 判 NewApi（本轮就是被 :app:lintDebug 抓出来的——只跑 assembleDebug + 用例挡不住它）
+    val at = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), PICKUP_ZONE)
+    at.toLocalDate().format(PICKUP_DATE_FMT) + " " + at.format(PICKUP_HOUR_FMT) + " 之后"
 } ?: PICKUP_ABSENT_TEXT
 
 /**

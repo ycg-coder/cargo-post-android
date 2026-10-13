@@ -88,6 +88,10 @@ PL_PROOF=$(nc_count "$PS" 'if (s.fresh) CargoChip')
 PM_UNDO=$(nc_count "$SD" 'PickupWindowChip("不限制", on = vm.pickupDay < 0) {')
 PM_UNDO_BODY=$(grep -c 'vm.pickupDay = -1' "$SD")
 
+# PW-o 不许用只有 API 34 才有的换算：minSdk 26，这条是本轮被 :app:lintDebug 抓出来的
+PO_API34=$(grep -rn "LocalDate\.ofInstant" "$M" --include=*.kt | wc -l)
+PO_PROOF=$(grep -rn "LocalDateTime\.ofInstant" "$M" --include=*.kt | wc -l)
+
 # PW-n 出网值必须整点对齐（档位由 plusDays 给，不含分/秒）：
 # 一旦这个键每次都不同，`Repo.userCreateKey`（SHA-256 覆盖报文每个键值）就会每次换一把幂等键
 # ⇒ 「同一份寄货单还在创建中」那道本地闸拦不住连点两次。用例见 PickupWindowContractTest 那条对齐断言。
@@ -122,5 +126,7 @@ fail=0
 
 [ "$PN_ALIGN" = 1 ] || { echo "× PW-n 出网值不再整点对齐（现 $PN_ALIGN）：这一键每次点击都不同的话，本地幂等键会被顶开，连点两次拦不住"; fail=1; }
 { [ "$PN_TIMEUNIT" = 0 ] && [ "$PN_DAYSHIFT" = 3 ]; } || { echo "× PW-n 纯层里混进了分/秒级位移（分秒级=$PN_TIMEUNIT / 正对照 plusDays=$PN_DAYSHIFT）：同上，幂等键会随每次点击漂移"; fail=1; }
+[ "$PO_API34" = 0 ] || { echo "× PW-o 又出现 API 34 才有的换算（现 $PO_API34）：minSdk 26 上 lint 会判 NewApi，只跑 assembleDebug 挡不住"; fail=1; }
+[ "$PO_PROOF" = 2 ] || { echo "× PW-o 正对照掉了（LocalDateTime 换算现 $PO_PROOF，目标恰好 2）：上面那个 0 可能是没扫到东西"; fail=1; }
 if [ "$fail" = 0 ]; then echo "取件时间窗判据通过"; else echo "取件时间窗判据失败"; fi
 exit "$fail"
