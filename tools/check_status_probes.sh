@@ -62,16 +62,16 @@ echo "S-c  页面 when(数字) 排码表 : $sc   （预期 0）"
 echo "S-c2 车辆运行态 when(v.status): $sc2 （预期 2：HomeScreen + BusScreen，是 Android 自有枚举不是后端码）"
 echo "S-c3 审核码走 ReviewStatus.of: $sc3  （预期 6：ReviewMapper 2 + ReviewCard 2 + SendScreen 2）"
 echo "S-d  ServerStatus 枚举数     : $sd   （预期 6：货运/段/商城/审核/任务点/交接）"
-echo "S-e  未知码占位文案引用点    : $se   （预期 ≥6）"
+echo "S-e  未知码占位文案引用点    : $se   （预期 ≥10：2026-10-13 收到现读）"
 echo "S-f  错注释文字指纹 待派单   : $sf   （预期 0）"
 echo "S-g  DemoData 重复货运表     : $sg   （预期 0）"
 echo "S-h  缺键 -1 哨兵点          : $sh   （预期 3：TransportLeg / MissionStop / Repo.traceOf）"
-echo "S-i  页面/核心引用枚举点数   : $si   （预期 ≥20，随改道上升）"
-echo "S-j  STATUS_MAPPING.md 段码表: $sj   （预期 ≥1）"
-echo "S-k  StatusMappingContractTest 用例数: $sk   （预期 ≥15）"
+echo "S-i  页面/核心引用枚举点数   : $si   （预期 ≥65：现读 65，随改道上升；原 ≥20 离实测太远）"
+echo "S-j  STATUS_MAPPING.md 段码表: $sj   （预期 ≥4：现读 4）"
+echo "S-k  StatusMappingContractTest 用例数: $sk   （预期 ≥17：现读 17）"
 echo "S-la 自造下一状态（nextStatus/legStep/LEG_ACTIONS）: $la   （预期 0，§26/§27/§28）"
 echo "S-lb 本机 copy(status=...) 改写: $lb   （预期 0，§26/§27）"
-echo "S-lc 段动作字面量出现的文件数: $lc   （预期 ≤3：实测 2 = 映射器 + DemoData 的演示报文；Repo.legAction 只收形参）"
+echo "S-lc 段动作字面量出现的文件数: $lc   （预期 ≤2：现读 2 = 映射器 + DemoData 的演示报文；原 ≤3 多留一格，加第三处也不红）"
 echo "S-ld 司机页引用 DriverLegStateMapper 的文件数: $ld   （预期 ≥3：RoutesScreen + HandoverScreen + DriverExceptionScreen）"
 echo "S-le 页面直调 Repo.legAction 点数: $le   （预期 3，且每处后面都必须回读）"
 echo "S-le2 不回读的写操作页        : ${ler:-无} （预期 无）"
@@ -84,18 +84,18 @@ ok=1
 [ "$sc2" = 2 ] || { echo "× S-c2 车辆运行态 when 数量变了（核对是否有人把后端码混进来）"; ok=0; }
 [ "$sc3" = 6 ] || { echo "× S-c3 审核码入口减少"; ok=0; }
 [ "$sd" = 6 ] || { echo "× S-d 单一映射表被增删（枚举数不为 6）"; ok=0; }
-[ "$se" -ge 6 ] || { echo "× S-e 未知码占位文案没人引用了"; ok=0; }
+[ "$se" -ge 10 ] || { echo "× S-e 未知码占位文案引用点掉到 10 以下（2026-10-13 现读 10，原地板 ≥6 离实测太远，删四处也不红）"; ok=0; }
 [ "$sf" = 0 ] || { echo "× S-f 错的段码注释又回来了"; ok=0; }
 [ "$sg" = 0 ] || { echo "× S-g DemoData 第二张货运表复现"; ok=0; }
 [ "$sh" = 3 ] || { echo "× S-h 缺键哨兵数量变化（§14 三态退化风险）"; ok=0; }
-[ "$si" -ge 20 ] || { echo "× S-i 枚举引用点掉到 20 以下，说明有页面退回本地判断"; ok=0; }
-[ "${sj:-0}" -ge 1 ] || { echo "× S-j 文档缺失或段码表被删"; ok=0; }
-[ "${sk:-0}" -ge 15 ] || { echo "× S-k 契约测试用例被删"; ok=0; }
+[ "$si" -ge 65 ] || { echo "× S-i 枚举引用点掉到 65 以下（现读 65，原地板 ≥20 形同不判）：有页面退回本地判断"; ok=0; }
+[ "${sj:-0}" -ge 4 ] || { echo "× S-j 文档缺失或段码表被删（现读 4 处 TransportLegStatusEnum）"; ok=0; }
+[ "${sk:-0}" -ge 17 ] || { echo "× S-k 契约测试用例被删（现读 17 条，原地板 ≥15 允许偷偷少两条）"; ok=0; }
 [ "$sa" = 0 ] || { echo "× S-a 又出现了按数字比段状态"; ok=0; }
 [ "$la" = 0 ] || { echo "× S-la 客户端又在算下一状态（§26/§27/§28 回潮）"; ok=0; }
 [ "$lb" = 0 ] || { echo "× S-lb 本机改写段状态（§26/§27 回潮）"; ok=0; }
-[ "$lc" -le 3 ] || { echo "× S-lc 段动作字面量散到了映射器之外"; ok=0; }
-[ "$ld" -ge 2 ] || { echo "× S-ld 司机页面退回本地状态判断"; ok=0; }
+[ "$lc" -le 2 ] || { echo "× S-lc 段动作字面量散到了映射器之外（现读 2 个文件，原天花板 ≤3 多留一格）"; ok=0; }
+[ "$ld" -ge 3 ] || { echo "× S-ld 司机页面退回本地状态判断（现读 3 个页面；原判定 ≥2 与话术 ≥3 不一致，本轮对齐成 3）"; ok=0; }
 [ "$le" = 3 ] || { echo "× S-le 段动作入口数量变了（核对是否漏了回读）"; ok=0; }
 [ -z "$ler" ] || { echo "× S-le2 这些页面写完不回读：$ler（本机自封状态 = 假闭环）"; ok=0; }
 

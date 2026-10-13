@@ -338,7 +338,7 @@ printf 'DV-g2 EarningItem 未给文案 getter   : %s  （预期 2）\n' "$dvg2"
 printf 'DV-h  页面裸读可空数值              : %s  （预期 0：一律走 *Text getter）\n' "$dvh"
 printf 'DV-i  无生产者键全 main 命中        : %s  （预期 0）\n' "$dvi"
 printf 'DV-j  ts() 的 EpochMillis 分支      : %s  （预期 1）\n' "$dvj"
-printf 'DV-k  全项目数值非可空读法基线      : %s  （预期 ≤111：F-2 收到 132，F-3 ② 收到 116，#262 收到 115，#261 收到 111，只降不升）\n' "$dvk"
+printf 'DV-k  全项目数值非可空读法基线      : %s  （预期 ≤107：F-2 收到 132，F-3 ② 收到 116，#262 收到 115，#261 收到 111，2026-10-13 收到现读 107——原 ≤111 高出实测 4，删四处也不红）\n' "$dvk"
 printf 'DV-l  EarningsContractTest 用例数   : %s  （预期 ≥8）\n' "$dvl"
 printf 'DV-m  档案真实键读法(plateNo/两件数) : %s  （预期 =3：换成自造名就数不到）\n' "$dvm"
 printf 'DV-m2 档案解析体自造别名            : %s  （预期 0：plate/vehiclePlate/carNo/capacityKg/usedKg/verified）\n' "$dvm2"
@@ -375,7 +375,7 @@ printf 'DV-z5 话术出口/未取到字面量           : %s/%s  （预期 2/1�
 printf 'DV-z6 ParcelCountContractTest 用例    : %s  （预期 ≥4：失败≠0 只剩 grep 就没人钉）\n' "$dvz6"
 printf 'DV-u  C 类形态拆分(独立实现/census)  : arr %s/%s numbool %s/%s 非可空 %s/%s str %s/%s  （预期四对全等，非可空 ≤19）\n' \
     "$hand_arr" "$cens_arr" "$hand_nb" "$cens_nb" "$hand_nn" "$cens_nn" "$hand_str" "$cens_str"
-printf 'DV-v  三面 0 生产者键/站点           : keys %s sites %s 其中 C 行 %s 非可空数值布尔 %s  （预期 ≤132/≤165/≤33/≤42，只降不升）\n' \
+printf 'DV-v  三面 0 生产者键/站点           : keys %s sites %s 其中 C 行 %s 非可空数值布尔 %s  （预期 ≤127/≤152/≤32/≤38，只降不升：2026-10-13 把天花板收到现读——原来 132/165/33/42 高出实测 5/13/1/4，负控注入一个孤立键也不红）\n' \
     "$tfz_keys" "$tfz_sites" "$tfz_c" "$tfz_nb"
 printf 'DV-w  DV-k 口径桥                    : grep %s = census 行 %s + delta %s（逐名列 %s）｜DV-k 实测 %s  （预期 bridge_grep==DV-k 且 delta ≤2）\n' \
     "$bridge_grep" "$bridge_rows" "$bridge_delta" "$bridge_only" "$dvk"
@@ -419,7 +419,7 @@ ok=1
 [ "$dvh" = 0 ] || { echo "× DV-h 页面裸读可空数值（能编译就说明上游已塌 0）"; ok=0; }
 [ "$dvi" = 0 ] || { echo "× DV-i 无生产者键在全项目复现"; ok=0; }
 [ "$dvj" = 1 ] || { echo "× DV-j EpochMillis 时间口径分支丢失（13 位毫秒数会原样进 UI）"; ok=0; }
-[ "$dvk" -le 111 ] || { echo "× DV-k 数值非可空读法基数回涨（#262 收口到 115，#261/G-1 收口到 111）"; ok=0; }
+[ "$dvk" -le 107 ] || { echo "× DV-k 全项目数值非可空读法回涨（2026-10-13 现读 107）"; ok=0; }
 [ "$dvl" -ge 8 ] || { echo "× DV-l 契约测试用例被删"; ok=0; }
 [ "$dvm" = 3 ] || { echo "× DV-m 档案真实键读法缺位（plateNo/cargoCapacityKg/cargoCapacity 少一个就是契约断裂）"; ok=0; }
 [ "$dvm2" = 0 ] || { echo "× DV-m2 档案解析体又采纳了自造别名"; ok=0; }
@@ -480,10 +480,10 @@ ok=1
 [ "$cens_nn" -le 19 ] || { echo "× DV-u C 类非可空数值/布尔读法回涨（F-3 ② 实测 19，只许降）"; ok=0; }
 [ "$cens_arr" -ge 0 ] || { echo "× DV-u census 的 c_shape 缺项（拆分列没写出来）"; ok=0; }
 # DV-v：三面 0 生产者（这一轮才第一次有演示面那一列）
-[ "$tfz_keys" -le 132 ] || { echo "× DV-v 三面 0 生产者的键数回涨（本轮实测 132）"; ok=0; }
-[ "$tfz_sites" -le 165 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（本轮实测 165）"; ok=0; }
-[ "$tfz_c" -le 33 ] || { echo "× DV-v C 行里的三面 0 生产者站点回涨（本轮实测 33）"; ok=0; }
-[ "$tfz_nb" -le 42 ] || { echo "× DV-v 三面 0 生产者里的非可空数值布尔回涨（本轮实测 42）"; ok=0; }
+[ "$tfz_keys" -le 127 ] || { echo "× DV-v 三面 0 生产者的键数回涨（2026-10-13 现读 127）"; ok=0; }
+[ "$tfz_sites" -le 152 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（2026-10-13 现读 152）"; ok=0; }
+[ "$tfz_c" -le 32 ] || { echo "× DV-v C 行里的三面 0 生产者站点回涨（2026-10-13 现读 32）"; ok=0; }
+[ "$tfz_nb" -le 38 ] || { echo "× DV-v 三面 0 生产者里的非可空数值布尔回涨（2026-10-13 现读 38）"; ok=0; }
 # DV-w：两个口径必须接得上
 [ "$dvw_eq" = 1 ] || { echo "× DV-w census 的 grep 口径读数与 DV-k 不等 ⇒ 有一边被单独改过，DV-k 这个基线不再是同一个东西"; ok=0; }
 [ "$dvw_delta_ok" = 1 ] || { echo "× DV-w 口径桥不平（grep − census 行 ≠ 逐点列出的 delta）"; ok=0; }
