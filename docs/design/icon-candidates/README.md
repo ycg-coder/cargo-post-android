@@ -1,4 +1,20 @@
-# 启动图标候选（#43，2026-10-13）——三个方向，等选一个再落地
+# 启动图标候选（#43，2026-10-13）——**已选方向 2 并落地**（D-091）
+
+2026-10-13 用户回话"图标选2"。落地结果与仍然缺的东西都在下面，三张概念稿保留作选型依据。
+
+- 已换：`res/drawable/ic_launcher_foreground.xml`（车头 + 两个镂空车灯 + 弧线 + 站点圆点，满幅 108dp、整组按 0.86 缩进安全圆）
+  / `res/drawable/ic_launcher_background.xml`（`#0E5A52 → #17A07A` 线性渐变）/ `mipmap-anydpi-v26/ic_launcher.xml` 三层接线；
+  退役的 `bus_launcher_bg` 已从 `colors.xml` 删除。
+- 结构判据：`tools/check_launcher_icon_probes.sh`（IC-a…IC-g）+ 负控 `tools/launcher_icon_negative_controls.sh`（16 条破口）。
+- **仍然缺的两件**：① 商店 1024×1024 位图（本机没有矢量光栅化工具，**不该拿再生成的概念稿冒充导出图**）；
+  ② 桌面真机效果未验（`NOT VERIFIED ON DEVICE`）。
+- **刻意没做**：各密度位图与 `ic_launcher_round`（`minSdk = 26`，API 26+ 只认 adaptive icon）；
+  `assets/logo.png`（启动页 + 登录页用的**用户原图**）也**不重绘** —— 它现在与新图标不同源，
+  要不要一起换是用户的决定。
+
+---
+
+## 以下为选型时的原文（保留）
 
 三张图都是**概念稿**，不是可直接出厂的资源。共同问题：右下角带"Qoder AI 生成"水印、
 画面被烤成了圆角方块（自适应图标要的是**满幅 108dp 画布**，圆角与遮罩由系统裁）。
