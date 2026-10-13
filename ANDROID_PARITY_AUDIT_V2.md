@@ -352,7 +352,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`CONTRACT_MISMATCH`（P0，把"待客户操作"显示成"已完成"）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/data/model/Models.kt`、`app/src/main/java/com/shanxiang/buspost/ui/user/TraceScreen.kt`
-- **类 / 函数**：`freightStatusLabel`(`Models.kt:387-391`)、`freightTone`(`:393-398`)、`TraceViewModel`/`TraceScreen`(`:110-111`、`:181`)
+- **类 / 函数**：`freightStatusLabel`(`Models.kt:482-486`)、`freightTone`(`:393-398`)、`TraceViewModel`/`TraceScreen`(`:110-111`、`:181`)
 - **当前行为**：`freightStatusLabel` 按 **0..8 顺序**给文案：`0 已创建 / 1 待审核 / 2 待客户操作 / 3 待入池 / 4 已入池 / 5 已分配 / 6 已发车 / 7 已完成 / 8,9 已取消`，且注释断言"与小程序 parcel.js STATUS_TEXT 同源"。`ParcelTrace` 本身有 `statusLabel`（`:675`，优先后端 `statusName`），但 `TraceScreen` 两处都没用它，直接 `freightStatusLabel(tr.status)`。
 - **后端真实行为**：`TransportOrderStatusEnum.java:19-45` 是 **0..13 的枚举码**，其中 `1 已入池 / 2 已分配 / 3 已发车 / 4 已完成 / 5 已取消 / 6 待审核 / 7 待客户操作 / 8 待入池 / 9 部分完成 / 10 运输中 / 11 换乘中 / 12 派送中 / 13 异常`。审核前置态（6/7/8）是**插在前面**的，不是顺序号。
 - **小程序行为**：`pages/parcel/parcel.js:15-25` 的 `STATUS_FLOW` 是**按枚举码 keyed** 的：`{0 已创建}{6 待审核}{7 待客户操作}{8 待入池}{1 已入池}{2 已分配}{3 已发车}{4 已完成}{5 已取消}`；`:617`/`:477`/`:260` 一律 `o.statusName || statusText(o.status)` —— **后端文案优先**；`:724` 时间轴用 `STATUS_FLOW.findIndex` 按顺序判定，注释明确"而非数值比较，兼容审核前置状态 6/7/8"。
@@ -378,7 +378,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：`saveSession` 只取 `accessToken`/`token`，写入 `Api.token` + `Prefs.token`，其余 `refreshToken`/`expiresTime` 直接丢。`Account.parse` 也不保留 refreshToken。
 - **后端真实行为**：`AppAuthLoginRespVO` 同时返回 `accessToken`、`refreshToken`、`expiresTime`；`AppAuthController.java:66-71` 提供 `POST /member/auth/refresh-token?refreshToken=…`（`@PermitAll`，`@RequestParam`），返回新的 `AppAuthLoginRespVO`。access token 有 TTL，过期后所有业务接口 401。
 - **小程序行为**：`utils/api.js:14 handle401` 在 401 时用 refreshToken 重登并把挂起的请求排队重放。
-- **问题**：会话到点必掉，用户在使用中被踢回登录页；司机在途（`DriverLocationService` 正在上报）被踢后，`clearSessionLocal()` 会连 `driverId`/`driverShiftId` 一起清掉（`Prefs.kt:159-181`），位置上报直接停摆（`DriverLocationService.kt:93` 的 `Prefs.driverId <= 0L` 分支），而前台通知只显示"当前没有在途班次"——司机不会知道是登录过期了。
+- **问题**：会话到点必掉，用户在使用中被踢回登录页；司机在途（`DriverLocationService` 正在上报）被踢后，`clearSessionLocal()` 会连 `driverId`/`driverShiftId` 一起清掉（`Prefs.kt:151-173`），位置上报直接停摆（`DriverLocationService.kt:93` 的 `Prefs.driverId <= 0L` 分支），而前台通知只显示"当前没有在途班次"——司机不会知道是登录过期了。
 - **修改方案**：① `saveSession` 增 `Prefs.refreshToken = p.str("refreshToken")`、`Prefs.tokenExpiresAt = 解析 expiresTime`；② 见 §20 的刷新与重放；③ 被踢时若 `Running.shiftId > 0`，通知文案明确"登录已过期，位置上报已暂停，请重新登录"；④ 不改后端、不加兼容字段。
 - **测试方案**：单测 `SessionPersistenceTest`：mock 登录响应含 refreshToken，断言 `Prefs.refreshToken` 非空；`logout()` 后为空（已有 clearSession 用例覆盖，补 refreshToken 断言）。
 
@@ -423,7 +423,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：OkHttp 拿到 `{"code":0,"data":12}` 时，`root.opt("data")` 是一个 **JSON number/boolean/String**（不是对象也不是数组），`toPayload` 把它塞进 `{"v":12}`。而 `Payload.str/multiStr/multiNum` 只认业务键名，不认 `v` → 一律返回默认值。
 - **后端真实行为**：`AppNotificationController.java:44-48` 是 `CommonResult<Long> unreadCount()`（裸数字）；`AppFileController.java:34-38` 是 `CommonResult<String> uploadFile(...)`（**裸 URL 字符串**）；`AppDriverController.java:239-243` 是 `CommonResult<Long> messagesUnreadCount`。这些都是 yudao `CommonResult<T>` 的正常形态。
 - **小程序行为**：`api.js:417`/`api.js:486-492` 直接把 `res` 当数字 / 当 URL 字符串用（小程序封装里 `resolve(res.data)` 不做对象假设），所以它一直是对的。
-- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:86`、`NotificationScreen.kt:102`、`AlertEngine.kt:25` 三处写入）里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
+- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:86`、`NotificationScreen.kt:102`、`AlertEngine.kt:39` 三处写入）里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
 - **修改方案**：在 `Payload` 上补一个**标量出口**，而不是去改后端信封（硬规则：不重设计后端）：
   1. `Payload` 增 `val scalar: Any?` 与 `fun scalarStr(vararg fallback: String): String` / `fun scalarNum(): Double`，`toPayload` 的非对象/非数组分支同时填 `scalar` 与保留 `{"v"}`（旧调用点不破，符合"不删字段保兼容"）；
   2. `Repo.unreadCount` 改 `p.scalarNum().ifEmpty{ multiNum("count","unreadCount") }` 口径：先标量、后对象键；`Repo.uploadPhoto` 改先 `scalarStr()`（即后端裸 String），再退回 `url/fileUrl`；`Repo.kt:1003` 同步；
@@ -479,8 +479,8 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   - 标量出口随 §22 一起落地：`Repo.driverUnreadCount(): Long?` 走 `Payload.longOf("count","unreadCount")`，与用户侧同一通道（`Repo.kt:1054`）。
   - **未绑定不请求**：`driverIdParam()` 在 `driverId <= 0` 时抛 `DriverUnboundException`，`runCatching` 吞掉后返回 null，请求根本不上网络。测试实测 `server.requestCount == 0`（`ScalarEnvelopeContractTest.司机未绑定角标时一个请求都不发`）；判定条件是"请求数"这种外部行为，不是"返回 null"这种自说自话。
   - 绑定后带后端授予的 driverId：`/driver/messages/unread-count?driverId=61` 断言在 URL 上，值 61 来自 `/driver/profile` 而不是本机猜测。
-  - "显示未绑定而不是 0"这一条：角标侧不虚构（null → 保持上一个值，未绑定态初值 0 ⇒ tab 无红点，等于"没有可信提醒"而不是"后端说没有提醒"）；数据侧 `WorkbenchScreen.kt:178` 的 `error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()` 里 `driverTasks()`/`routeGuide()` 未绑定时返回 `DRIVER_UNBOUND`，首页仍显示"未绑定司机档案：后端没有该账号的 driverId，请联系站点核对工号"。**没做**：`/driver/profile` 与 `/driver/shifts` 按后端契约是登录态识别、不受守卫，所以未绑定时首页确实能拿到 profile 的 0 件数据 —— 这是后端口径，不是客户端缺陷。
-  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:36/47` 与 `DriverMessagesScreen.kt:85/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
+  - "显示未绑定而不是 0"这一条：角标侧不虚构（null → 保持上一个值，未绑定态初值 0 ⇒ tab 无红点，等于"没有可信提醒"而不是"后端说没有提醒"）；数据侧 `WorkbenchScreen.kt:292` 的 `error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()` 里 `driverTasks()`/`routeGuide()` 未绑定时返回 `DRIVER_UNBOUND`，首页仍显示"未绑定司机档案：后端没有该账号的 driverId，请联系站点核对工号"。**没做**：`/driver/profile` 与 `/driver/shifts` 按后端契约是登录态识别、不受守卫，所以未绑定时首页确实能拿到 profile 的 0 件数据 —— 这是后端口径，不是客户端缺陷。
+  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:36/47` 与 `DriverMessagesScreen.kt:59/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
 
 ---
 
@@ -512,7 +512,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **后端真实行为**：`AppDriverHandoverRespVO.java:11-62` 只有 `id, orderId, orderNo, goodsName, stationId, stationName, fromDriverId, fromDriverName, toDriverId, toDriverName, itemCount, weightKg, photoUrl, status(Integer), statusName(String), handoverTime, remark`。**没有** from/to 站点、没有车牌、没有 needPhoto、没有 action、没有 createTime。
 - **小程序行为**：`pages/driver/handover/handover.js:55-70` 直接 `{...h}` 透传后端字段，并只用 `handoverTime`（`formatBackendTime(h.handoverTime)`）——它按后端真字段渲染。
 - **问题**：`status = multiStr("status","statusLabel")` 命中后端的**数字** `status`，卡片上出现"1""2"这种裸码而不是 `statusName`；`fromStation/toStation/fromPlate/toPlate` 恒空，交接卡中间段"谁交给谁、在哪交"只有司机姓名可用（`fromDriverName/toDriverName` 解析正确，`transferStation` 用 `stationName` 兜对了）；`needPhoto` 恒 false → `HandoverScreen` 里"凭证缺失"分支（`:131-136`）永不触发，是死代码；`time` 读 `createTime` → 恒空（该用 `handoverTime`，而 `handoverTime` 其实已被单独解析，页面显示的却是 `time` 位置）。
-- **修改方案**：① `status` 改 `status = o.multiStr("statusName").ifEmpty { handoverStatusText(o.multiNum("status").toInt()) }`，并新增与后端 `TransportHandoverStatusEnum` 对齐的小表（不许自己编 0..N）；② 站点用 `stationName` 填 `transferStation`，`fromStation/toStation` 改成 `fromStationName/toStationName`（若后端将来补字段可直接命中，保持"不删字段"）；③ 删掉 `needPhoto` 的假来源，改由 UI 侧规则决定（后端 `HandoverServiceImpl.java:222-223` 允许照片可选，故 Android 文案改为"建议上传凭证"，不再显示"凭证缺失"）；④ `time` 用 `handoverTime` 优先。
+- **修改方案**：① `status` 改 `status = o.multiStr("statusName").ifEmpty { handoverStatusText(o.multiNum("status").toInt()) }`，并新增与后端 `TransportHandoverStatusEnum` 对齐的小表（不许自己编 0..N）；② 站点用 `stationName` 填 `transferStation`，`fromStation/toStation` 改成 `fromStationName/toStationName`（若后端将来补字段可直接命中，保持"不删字段"）；③ 删掉 `needPhoto` 的假来源，改由 UI 侧规则决定（后端 `HandoverServiceImpl.java:328-329` 允许照片可选，故 Android 文案改为"建议上传凭证"，不再显示"凭证缺失"）；④ `time` 用 `handoverTime` 优先。
 - **测试方案**：`HandoverTaskParseTest`：用**后端真实样例报文**（从 `/driver/handovers` 抓一条或按 VO 手写字段名）断言 `status=="待交接"`、`transferStation=="…"`、`time` 非空；再加一条防御断言：只给 `status:1` 不给 `statusName` 时，渲染的是中文文案而不是 "1"。
 
 ---
@@ -592,7 +592,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：点一下就把本机角色改成 DRIVER 并 `nav.navigate(Routes.DRIVER_SHELL)`，**不调 `Repo.bindDriver()`**，也不看 `Prefs.driverId` 是否 > 0。
 - **后端真实行为**：司机身份来自 `GET /driver/profile` 返回的 `driverId`；`Repo.bindDriver`(`:165-177`) 已经写得很正确——`profile.driverId > 0` 才落盘，否则返回错误"该账号未绑定司机档案，请联系站点核对工号"。登录路径 `LoginViewModel:117-123` **有**这个校验（选 DRIVER 角色登录时若未绑定就拦住），所以工程里存在两套纪律：登录有、切换没有。
 - **小程序行为**：小程序没有"切换角色"按钮，角色由后端 profile 决定（`api.js` 无角色入参）——Android 这个入口本身就是本地概念。
-- **问题**：① 非司机账号点进来后，`Prefs.driverId` 仍是 0，于是 `/driver/legs?driverId=0`、`/driver/tasks?driverId=0` 全带 0 去问后端，返回空列表 → 页面显示"暂无任务"，**掩盖了"你没有司机档案"这个真因**（违反"真实空数据才是空"的另一面：不是空数据的情况不能渲染成空）；② `driverId` 是 `Prefs` 里的残留值时更糟：`Prefs.clearSession`(`:150-164`) 只在退出登录时清，同设备换账号若走的是"直接登录另一个账号"路径，旧 `driverId` 可能还在，A 的司机端会读到 B 的班次数据（后端有归属校验时才侥幸安全，但这是越权探测面）；③ `DriverLocationService.kt:93` 依赖 `Prefs.driverId > 0`，未绑定时位置上报"看起来在跑但一句不发"。
+- **问题**：① 非司机账号点进来后，`Prefs.driverId` 仍是 0，于是 `/driver/legs?driverId=0`、`/driver/tasks?driverId=0` 全带 0 去问后端，返回空列表 → 页面显示"暂无任务"，**掩盖了"你没有司机档案"这个真因**（违反"真实空数据才是空"的另一面：不是空数据的情况不能渲染成空）；② `driverId` 是 `Prefs` 里的残留值时更糟：`Prefs.clearSession`(`:150-164`) 只在退出登录时清，同设备换账号若走的是"直接登录另一个账号"路径，旧 `driverId` 可能还在，A 的司机端会读到 B 的班次数据（后端有归属校验时才侥幸安全，但这是越权探测面）；③ `DriverLocationService.kt:130` 依赖 `Prefs.driverId > 0`，未绑定时位置上报"看起来在跑但一句不发"。
 - **修改方案**：① `MineRow` 的点击改成 `work { val b = Repo.bindDriver(); if ((b.value?.driverId ?: 0L) > 0) { AppState.setRole(DRIVER); nav.navigate(DRIVER_SHELL) } else { error = b.error } }`，与 `LoginViewModel` 同一条纪律；② 司机壳顶部加一条 `driverId <= 0` 的硬状态条"未绑定司机档案"，所有 `/driver/*` 调用在 `driverId <= 0` 时**直接短路不发请求**（在 `Repo` 层加守卫，避免 0 号查询打到后端）；③ 角色切换时若 `Prefs.userId` 变了就无条件 `clearSession` 后再绑定。
 - **测试方案**：Robolectric：mock `/driver/profile` 回 `{driverId:0}` → 断言仍停留在用户端且出现"未绑定"文案、`nav` 未跳转；mock 回 `{driverId:7}` → 断言 `Prefs.driverId==7` 且进入司机壳；断言 `driverId==0` 时 `MockWebServer` 收到 0 条 `/driver/` 请求。
 
@@ -636,7 +636,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 `Bits.kt:46` 的 `DemoNote` 体内首行仍是裸 `return`（横幅实现整段注释），调用点实测 **24 处**：司机侧 6 处
 （`DriverMessagesScreen.kt:127`、`DriverNavScreen.kt:221`、`EarningsScreen.kt:84`、`HandoverScreen.kt:187`、`RoutesScreen.kt`、`WorkbenchScreen.kt`）
 + 用户侧 18 处。所以"司机端把用户域演示态带进来"这一疑虑的正解是：**两个域的演示态都不可见**，同一条根因。
-不依赖 `DemoNote` 的写操作回执仍正常（`HandoverScreen.kt:132-133`、`RoutesScreen.kt:103` 的"演示模式：未提交后端"），
+不依赖 `DemoNote` 的写操作回执仍正常（`HandoverScreen.kt:66-67`、`RoutesScreen.kt:103` 的"演示模式：未提交后端"），
 这说明修法只要恢复 `DemoNote` 渲染就能一次覆盖 24 处，不必逐页改。**本轮未动**：属演示诚实性而非分域（硬规则 1），
 按 §58 顺序排在分域之后；本条的 grep 判据（体内首行不得为裸 `return`）现在仍为红，是**待修的回归基线**，不是新增违规。
 
@@ -786,7 +786,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/data/model/Models.kt`
 - **类 / 函数**：`TransportLeg.parse`(`:761-788`)
-- **当前行为（㊶ / D-062 现读 `TransportLeg.parse` 后更正本行；原文写的是 #261 之前的形状）**：`seq` 读 `seq|legSeq|legSequence|sort`；起点读 `fromStation|fromStationName|startStation|pickupStation`；终点读 `toStation|toStationName|endStation|deliveryStation`；车牌读 `plateNo|vehiclePlate|plate`；折线读 `navigationPolyline|polyline|track`；段坐标只读后端那四个真键（`AppSendLegRespVO.java:24-33` 的 `fromLongitude`），走 `multiNumOrNull` ⇒ 缺键=null，见 `Models.kt:1138-1141` 的 `fromLatitude`；`etaMinutes` 只认一个名字，见 `Models.kt:1153`。
+- **当前行为（㊶ / D-062 现读 `TransportLeg.parse` 后更正本行；原文写的是 #261 之前的形状）**：`seq` 读 `seq|legSeq|legSequence|sort`；起点读 `fromStation|fromStationName|startStation|pickupStation`；终点读 `toStation|toStationName|endStation|deliveryStation`；车牌读 `plateNo|vehiclePlate|plate`；折线读 `navigationPolyline|polyline|track`；段坐标只读后端那四个真键（`AppSendLegRespVO.java:24-33` 的 `fromLongitude`），走 `multiNumOrNull` ⇒ 缺键=null，见 `Models.kt:1168-1171` 的 `fromLatitude`；`etaMinutes` 只认一个名字，见 `Models.kt:1183`。
    旧行里的 `startLatitude`/`endLongitude` 那批自造别名现在在 `Models.kt` 里 **0 命中**（已撤读，G-1）。
 - **后端真实行为**：`AppDriverLegRespVO.java:11-74` 下发 `id / orderId / orderNo / legSequence / fromStationId / fromStationName / toStationId / toStationName / status(Integer) / statusName / estimatedDeparture / estimatedArrival / actualArrival / vehicleId / plateNo / distanceKm / durationMinutes / navigationSource / handoverRequired / handoverId / handoverStatusName`。**该 VO 没有任何坐标或折线字段**，段级几何只能来自 `/driver/route`（`AppDriverRouteRespVO.polyline/currentSegmentPolyline`）。`estimated = navigationSource=="ESTIMATED"` 这类值在 Android 侧的解析路径本身没错，但后端该字段现在只会给白名单来源（§54）。
 - **小程序行为**：`parcel.js:446` 直接拼 `activeLeg.legSequence / fromStationName / toStationName / statusName`；`routes.js`/`handover.js` 透传字段名，从不自造。
@@ -847,7 +847,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   永远判不到，线路来源在 `NearbyLine.dataSource`（`REAL_TRANSIT`/`PROJECT_TRANSIT`）不在车辆上。
   ③ 消费方全部先判 null：`AlertEngine:90` 改 `mapNotNull`、`HomeScreen:163` `!= null && in 1..45`、
   `ParcelScreen:83` `filter { it.etaMinutes != null }`、`NextBusWidgetProvider:102-106` 与 `BusScreen:368-370`/`HomeScreen:758-759`
-  改读 getter；排序改 `byUserDistance()`（`Models.kt:715-725`，与后端 `:436-437` `nullsLast` 同口径 ——
+  改读 getter；排序改 `byUserDistance()`（`Models.kt:834-844`，与后端 `:436-437` `nullsLast` 同口径 ——
   旧实现 `sortedBy { etaMinutes }` 把"不知道"排成"最快到站"）。
   ④ **未采纳**"用 `etaToNextStationMinutes` 取整顶上去"：`AppBusRespVO:49-50` 那个键在 nearby 端点根本没有（`NearbyBus` 20 个字段里没有它），
   而语义是"车→它的下一站"，不是"车→用户在等的那站"；拿它填 `etaMinutes` 等于换个方向再编一次。
@@ -1105,7 +1105,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - `app/src/release/AndroidManifest.xml:10` `usesCleartextTraffic="false"`，debug 才允许明文（`:9`）——落实"release 关闭 cleartext HTTP"。
 - 签名文件在源码树之外：`find . -name "*.jks" -o -name "*.keystore"` 零命中；`:44-50` 默认读同级目录 `../buspost-signing-backup/keystore.properties`，`.gitignore:11/:16` 已排除 `local.properties`、`keystore.properties`。
 - 高德 key 不进源码：`AndroidManifest.xml:55-58` 用 `@string/amap_key`，由 `build.gradle.kts:76 resValue("string","amap_key", amapKey)` 在构建期注入，`grep -rn "amap_key" app/src/` 只命中 manifest ✔。
-- 源码内无真实凭证：`grep -rniE "password\s*=\s*\"|secret|token\s*=\s*\"[0-9a-f]{20,}" app/src/main` 仅命中 `MinePages.kt:171 password = ""`（空串，表单初值）；`DemoData` 的 token 是 `demo-android-token` 假值（受 §46 第 ④ 点约束保留前缀纪律）。
+- 源码内无真实凭证：`grep -rniE "password\s*=\s*\"|secret|token\s*=\s*\"[0-9a-f]{20,}" app/src/main` 仅命中 `MinePages.kt:92 password = ""`（空串，表单初值）；`DemoData` 的 token 是 `demo-android-token` 假值（受 §46 第 ④ 点约束保留前缀纪律）。
 - 会话清理：`Prefs.clearSession`(`:150-164`) 无条件清 `token/refreshToken/userId/mobile/nickname/avatar/gender/role/driverId/driverName/vehiclePlate/driverShiftId`；`Repo.logout`(`:182-186`) 先尽力通知后端再无条件清本地（正确）。
 
 **待办 2 项**：
@@ -1325,7 +1325,7 @@ bash tools/check_domain_probes.sh
 #        写裸词不写 `driverIdParam()`（实测会少算 KDoc 里那次引用），数字对不上时无法区分"少了一个调用点"还是"注释被删了"；
 #   P-c：角色切换入口 2（`MineScreen` 先 `bindDriver` / `DriverShell` 退出用户版回写 `Role.USER`）；
 #   P-d：深链分域闸 2（`Routes.DRIVER_ONLY` 声明 + `BusPostRoot.deepLinkAllowed` 判据）；
-#   P-e：司机通知落司机页 1（`AlertEngine.kt:53` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
+#   P-e：司机通知落司机页 1（`AlertEngine.kt:78` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
 #        人眼复核 `trace/*` 只能出现在司机分支 `return`(`:57`) 之后的用户分支里；
 #   P-f：`DRIVER_UNBOUND` 引用 5 = Repo 的映射 + 异常类 + 常量，MineScreen 的 import + 使用。
 # 与 §55 C 同一课：**这些判据全部按内容/函数名，不按行号**；行号白名单会随一次插入整段失效。
@@ -1789,7 +1789,7 @@ bash tools/check_eta_probes.sh
 - **修改方案**（全部已落地）：
   1. `DriverShell.kt:38` 退出前 `AppState.setRole(Role.USER)`，注释写明"本机角色决定后台提醒读哪个域的接口"；
      `Prefs.role` 是 `AlertEngine` 唯一的分支依据，所以这一行就把后台轮询带回用户域。
-  2. `AlertEngine.kt:48-53` 司机分支：`route = Routes.DRIVER_MESSAGES`，`orderNo` 进正文（`"${content}（运单 $no）"`），
+  2. `AlertEngine.kt:78-83` 司机分支：`route = Routes.DRIVER_MESSAGES`，`orderNo` 进正文（`"${content}（运单 $no）"`），
      不再拼 `trace/*`；用户分支(`:60-89`)继续按 `orderNo → trace/*` 走（那是村民端合法入口）。
      判据用内容而不是行号：`grep -c 'route = Routes.DRIVER_MESSAGES'` = 1，且司机分支内 `trace/` 命中 0。
   3. `Routes.kt:34-37` `DRIVER_ONLY = setOf(DRIVER_NAV, DRIVER_MESSAGES, HANDOVER)`；
@@ -1861,7 +1861,7 @@ bash tools/check_eta_probes.sh
 
 判定：`CONTRACT_MISMATCH`（P0，**已修**）→ 附带两条方法论问题（`UI_ONLY` 判据太弱 / 台账建议与源码冲突）
 
-- **文件**：`data/model/Models.kt`（`Reachability`）、`data/repo/Repo.kt:506`、`data/repo/DemoData.kt:425`、`ui/user/SendScreen.kt`
+- **文件**：`data/model/Models.kt`（`Reachability`）、`data/repo/Repo.kt:506`、`data/repo/DemoData.kt:490`、`ui/user/SendScreen.kt`
 - **修前行为**：读 `reachable|ok`、`nearestStation|stationName`、`distance|distanceMeters`、`walkMinutes|minutes`；
   界面拿布尔 `reachable` 分支、把 `distanceMeters/1000.0` 当公里显示（后端本来就是**公里**，于是差 1000 倍），
   `originalAddress` 提交 `reach?.nearestStation.orEmpty()`（恒空），`pickupServiceMode` 写死 `"STATION"`。
@@ -1959,7 +1959,7 @@ bash tools/check_eta_probes.sh
   `busId/plateNo/shiftCode/routeName`）；`routeId` 只在 `AppBusLineRespVO.java:13`（`Long`）上出现，
   而 `AppBusNearbyRespVO` 的 `NearbyLine` 内部类只有 `routeName/startStation/endStation/dataSource` 四个键 ——
   **连首页"线路"列表也没有 id**。
-- **口径冲突的额外一步**：行 VO 的 `routeId` 是 `Long`，`BusLine.parse`（`Models.kt:739`）用
+- **口径冲突的额外一步**：行 VO 的 `routeId` 是 `Long`，`BusLine.parse`（`Models.kt:801`）用
   `multiStr("routeId","lineId","id")` 读成字符串，`/bus/line-polyline` 又按 `routeId` 字符串查询（`Repo.kt:696-697`），
   数值→字符串这条转换只有一处，留在 `BusLine` 里是对的，不要在页面再转一次。
 - **本轮处置**：
@@ -2359,7 +2359,7 @@ T-ah 0（位置报文不许渲染成"在途"）。**T-c 8 → 9**（BusVehicle �
    **没有一个是能被 JVM 用例调用的函数**。而工程只有 JVM 用例（MockWebServer + 真实 `org.json`），**无 Robolectric**
    ⇒ `NavHost` 渲染不出来，"司机壳里到底有没有用户首页"这一问在本机**不可测**。
    为一条验收引入 Robolectric 是**框架级投入**（§60 那笔账），不在验收轮顺手做。
-2. **跨域导航点全工程只有 2 处，且两处都是故意的**：`ui/user/MineScreen.kt:164`（`nav.navigate(Routes.DRIVER_SHELL)`，
+2. **跨域导航点全工程只有 2 处，且两处都是故意的**：`ui/user/MineScreen.kt:201`（`nav.navigate(Routes.DRIVER_SHELL)`，
    外面那层 `enterDriverMode` 先 `Repo.bindDriver()` 才给进）
    与 `ui/driver/DriverShell.kt:39`（`nav.navigate(Routes.USER_SHELL)`，:38 紧跟 `AppState.setRole(Role.USER)`，就是"用户版"出口）。
    ⇒ 任何"用户目录不许出现 `DRIVER_SHELL` 字样"式的判据都会把真业务判成违规；判据必须**给这条出口留名额**。
@@ -2447,7 +2447,7 @@ internal fun deepLinkTarget(route: String, role: Role): String?
 
 1. **`AppDriverLegActionReqVO` 只有四个键**：`driverId / legId / photoUrl / remark`（`AppDriverLegActionReqVO.java:9-22`）。
    **没有任何异常类型、等级、code 键** —— 想发 `type: ROAD_BLOCKED` 就是自造契约，指令 §54 与硬规则都禁止。
-2. **`exception` 这个动作在服务层早就存在**：`DriverAppServiceImpl.java:1498` `case "exception" -> reportLegException(leg, reqVO.getRemark())`，
+2. **`exception` 这个动作在服务层早就存在**：`DriverAppServiceImpl.java:1529` `case "exception" -> reportLegException(leg, reqVO.getRemark())`，
    同一段 `default -> throw exception(BAD_REQUEST)` ⇒ 动作名是服务层的白名单，客户端只能沿用它、不能发明新的。
 3. **缺的只是 HTTP 入口**：`reportLegException`（`:1503-1519`）做齐了"段置异常 → 订单置异常 → 记事件 → 告警后台 → 通知下单人"，
    而 `AppDriverController` 此前**没有**把这条路接出来。本轮补 `@PostMapping("/leg/exception")`（`AppDriverController.java:226-231`），
@@ -3303,7 +3303,7 @@ UI/服务侧按"取消从哪来"分三种收法（`attempt {}` 替换挂起形�
   `planId`（缺键 = -1）+ `taskWindowStart` / `taskWindowEnd`（走 `reportTimeOf`，**不许回落 `createTime`** 去给任务段编一个没发生过的窗口）
   + `MissionStop.parseTaskItem`；`taskType/type/bizType`、`goodsName/cargoName`、`itemCount/count`、`actionLabel/taskName`、`planTime`
   这几族幻影键在**任务族**已 0 读取点（⚠ 别的模型里同名键还没逐族核对，见 ③）。货名后端根本没有 ⇒ 界面不再显示货名。
-- 面板：`WorkbenchScreen.kt:795-853` 的"今日运营任务"，同站多动作由 `DriverTaskSegment.group` 聚一条（口径抄小程序 workbench
+- 面板：`WorkbenchScreen.kt:710-768` 的"今日运营任务"，同站多动作由 `DriverTaskSegment.group` 聚一条（口径抄小程序 workbench
   行首取该站 `visitSequence` 最小的那条）；段的先后只跟后端整表的升序，**本机不重排**（调度决定去哪里）。
   接口没给那一支写的是 **"任务段接口未给"**（`WorkbenchScreen.kt:853`），不是"今天没任务"。
 - 同轮：用例 `DriverTaskRespContractTest`、判据 `DV-y`、负控制（#265/#266）。
