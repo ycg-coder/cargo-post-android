@@ -7231,3 +7231,37 @@ T3 把名单第二本换成必红 stub ⇒ 兜住回到 `rc=0` ✔。**3/3**。
 覆盖面确实窄了一格：**抄一句不带句末标点的话现在数不到**；换来的是"CI 与本机同一个数"，
 而原来那个数在 CI 上是假的（0/0 还能念成"正文被删空"）。
 
+### D-103（10-14 07:0x–07:4x）· 合进 master 之后前端生产构建红了：`ts:check` 绿不等于"前端验过了"
+
+**症状**：PR #187 合入 master（`7b0757e4`）后，`Deploy to dev server` 作业在 **`Build frontend`** 这一步红，
+`Project validation` 却是绿的 ⇒ 看名字会以为"校验过了，是部署环境的问题"。
+本地复现同一条命令（`node --max_old_space_size=3072 ./node_modules/vite/bin/vite.js build --mode prod`）也红：
+
+```
+[plugin vite:vue] …/src/views/transport/pricingRule/index.vue:4:45
+RolldownError: Attribute name cannot contain U+0022 ("), U+0027 ('), and U+003C (<).
+```
+
+**根因是我自己写的文案**：`el-alert` 的 `description="…不是"运价为 0"…"`、`"…不代表"没有定价"。"` ——
+把 ASCII 双引号写进了**双引号包裹的 HTML 属性值**里，SFC 模板分词器把第二对引号当成新属性的开始。
+同一句用中文引号「」就没事，而我当时恰恰是用 ASCII 引号在强调那句假话长什么样。
+
+**为什么我上一轮说"前端 `ts:check` RC=0"却没挡住**：`vue-tsc` 走类型面，模板这一层的语法错它不报。
+⇒ 口径改掉：**前端凭证只能是 `vite build`（或 SFC parse）的退出码**，`ts:check` 只证明类型面。
+
+**做法（不是一颗一颗试）**：`vite` 一次只报第一个错，逐轮重跑要十几分钟。
+直接用仓库里那份 `@vue/compiler-sfc` 的 `parse()` 扫全部 234 个 `.vue`，一轮就列出**所有**解析错：
+只有这一个文件、2 处。改完复扫 = 0 处，`vite build --mode prod` = `built in 6.60s`、退出码 0。
+（`.pnpm` 顶层没有 `@vue/compiler-sfc`，require 要指到 `node_modules/.pnpm/@vue+compiler-sfc@…/node_modules/…`；
+顺带又踩一次本仓老坑：**我在提交信息里也写了裸双引号**，把 python 字符串SyntaxError了一遍。）
+
+**master 有分支保护**（"Changes must be made through a pull request"），所以修只能走 PR：
+`tmp/fe-quote-fix` → PR **#188** → 已合，master = `75e60b69`，`Deploy to dev server` 重新排队。
+本笔（D-103）经 **PR #2** 进 App 的 `main`。
+
+**顺带查清的一条环境事实**（写在这里免得下轮又猜）：`db-migrate-guarded.yml` 是 **`workflow_dispatch`**，
+部署流水线**不会自动重放任何迁移**。所以上一轮我说"V028 不在 CI 白名单"说法不准 ——
+真实的等待人工执行清单是 V028/V030/V031/V032/V033/V034（V029 刻意不跑，V030 是它的可重复形态），
+已按文件写法逐个核对过可重复性（V031/V032 是 `INSERT … WHERE NOT EXISTS`，V033/V034 是 `information_schema` 逐列守卫）
+并写进 PR #187 的合并后评论。
+
