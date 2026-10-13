@@ -3,6 +3,35 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（中午续，D-091 · **#43 后半：图标换成方向 2（车头 + 弧线），过程里被自己的判据与 lint 各抓一次**）：
+`ic_launcher_foreground.xml` 整幅重画（白色车头 + 两个 evenOdd 镂空车灯 + 弧线路线 + 站点圆点）、
+新增 `ic_launcher_background.xml`（满幅线性渐变 `#0E5A52 → #17A07A`，就是选那两色）、`ic_launcher.xml` 背景改指它、
+退役的 `bus_launcher_bg` 从 colors.xml 删掉（App 主色板另有 `bus_primary`，不受影响）。
+**纠正两条我自己写错的判断**：① README 说"monochrome 复用前景会糊成一坨"是没核的推测——旧前景糊是因为里面有**第二层不透明深蓝**，
+新前景只有一种白色、镂空是透明洞 ⇒ 复用前景正确，改为用判据 IC-e 钉住"复用成立的前提"（不许出现第二种 fillColor）；
+② "各密度位图/round 要补"不成立（minSdk 26），IC-g 反过来把**故意没做的两件事**（各密度位图、商店 1024 图）钉成可见状态。
+**形状没被眼睛看过**：本机无可视化面（in-app browser `visibilityState=hidden`、无 SVG 光栅化工具）⇒ 只有数值验证：
+按 `scale 0.86 / pivot(54,54)` 变换后逐点算，最远点（站点圆点边缘）距心 **32.51 ≤ 33** 安全圆 ⇒ 圆/圆角遮罩都切不到内容；
+包围盒 x 27.3..78.6 / y 30.8..82.9 全在画布内，光学中心偏下 2.8dp（弧线把重心往下带，刻意没调）；真机桌面仍 `NOT VERIFIED ON DEVICE`。
+**lint 抓出一条上两轮漏的**：`PickupWindow.kt:107 LocalDate.ofInstant` 是 **API 34**（min 26）⇒ NewApi error。
+根因是收尾命令组合：D-087/088/090 我跑的是 `assembleDebug + testDebugUnitTest`，**没带 lintDebug** ⇒ 694 例全绿挡不住一个 API 违规。
+改成 `LocalDateTime.ofInstant(...).toLocalDate()`，并加判据 **PW-o**（全仓该 API 名 0 命中 + 正对照恰好 2）。
+⚠ 同族小坑两条：注释里原样写那个 API 名会被 grep 数进去（"0 命中"变 1）；`local.properties:13` 的 `PropertyEscape` 是**本机文件、不在 VCS**，
+改它有写坏 SDK 路径的风险 ⇒ 不动它，登记"本机 lint 常态 1 条环境红"，**以后比 lint 要比 error 的 id 列表，不比 rc**。
+**判据自己被抓两次**：IC-g 期望值凭手感写 1、现读 2（新书第一次跑就红在自己写的数字上，§八 ㊿ 第三次兑现）；
+IC-c1 注入"大圆角底板"而判据只认 `rx=` ⇒ 红了隔壁 IC-e ⇒ 不是撤破口，是把判据改成"不许出现半径 ≥16 的圆角弧"（本作品最大圆角 9）；
+另 `mkpng` 把目录建到 `res/` 上一层 ⇒ 判据扫不到 = **"注入位置错"这一族 D-084 的新变体**（同样靠"仍然绿"暴露）。
+**读数**：`assembleDebug + testDebugUnitTest + lintDebug --rerun-tasks` **55 tasks executed**、用例 **67 类 / 694 例 / 0 失败**，
+但整条命令 **RC=1**（lint 剩 1 error = PropertyEscape 环境红；我那条 NewApi 已消失，error 2→1）；
+新判据 `check_launcher_icon_probes.sh`（IC-a…IC-g）rc=0；新负控 `launcher_icon_negative_controls.sh` **rc=0 ✔=17（16 条破口 + 基线 + 锚点自检）✘=0 △=0**；
+判据全批 **34 本 = 33 绿 / 1 红**（红的仍是 doc_anchor）；APK **117,227,100 B** / `d62b8288…`，对 D-088 **+1,434 B ⇒ 增量未归因**；
+树指纹 files=**204** / `63782b9c…`（+1 = 背景层 drawable）。
+仍欠：桌面真机效果未验；`assets/logo.png`（启动页/登录页用的**用户原图**，KDoc 明写"不重绘/不复刻/不抠底"）与新图标不同源——
+**换不换它是用户的决定，我不重绘用户提供的原图**；商店 1024 图仍缺（本机无矢量光栅化工具，不该拿再生成的概念稿冒充导出图）；
+`default_value ✘=3`/`idempotency ✘=1` 未归因；本地已提交未 push（现读 App 22 个、后端 10 个）。
+NEXT：① 等 #47 口径（唯一还堵着的功能项）；② web 后台：钱包 `/adjust-balance` 那个"能改钱"的口没有页面；
+③ 收尾命令从此固定带 `lintDebug`，并把"比 id 列表不比 rc"写进规矩。
+<!-- 上一条 D-090（web 后台第一批：编辑订单抹数据）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（中午，D-090 · **转做 web 后台第一批，抓到一条真在抹数据的缺陷**）：
 App 这批只剩两件等拍板（#43 选型、#47 口径），按"别忘了 web 端"转做 `yudao-ui-admin-vue3` 的 transport 模块。
 **清点结果（只认 `cargo-post-platform` 这一棵树）**：19 个 api 模块**全部有消费者**、views 里 `request.*` **0 命中**（HTTP 全走 api 层）、

@@ -6686,3 +6686,66 @@ TS 反过来缺 `planNo`/`planningMode`/`totalLegCount`/`transferCount`/`planRea
    另有 12 个 `.gitkeep` 落在**非空**目录里（dispatch/order/operation/route/shift/station/vehicle/driver 等）⇒ 是历史残留；
 3. `expiry/index.vue` 与 `dispatch-center/index.vue` 没有自己的 api 模块（复用 driver+vehicle / dispatch+topology+monitoring）
    —— 不是缺陷，但计数类判据若按"一个页面一个 api 模块"写就会假红。
+
+### D-091（10-13 11:2x–11:5x）· #43 后半：图标换成方向 2（车头 + 弧线），过程里被自己的判据与 lint 各抓一次
+
+**换了什么**：`res/drawable/ic_launcher_foreground.xml` 整幅重画（白色车头正面 + 两个车灯镂空 + 一条弧线路线 + 站点圆点）、
+新增 `res/drawable/ic_launcher_background.xml`（满幅线性渐变 `#0E5A52 → #17A07A`，就是候选 2 那两色）、
+`mipmap-anydpi-v26/ic_launcher.xml` 背景层从 `@color/bus_launcher_bg` 改指这个 drawable，
+并把退役后无人引用的 `bus_launcher_bg` 从 `colors.xml` 删掉（App 主色板另有 `bus_primary`，不受影响）。
+
+**两条我此前写错、这轮纠正的判断**
+1. README 里那句"monochrome 复用前景会让 themed icon 糊成一坨"**是没核过的推测**。实测口径：旧前景之所以会糊，
+   是因为它里面有**第二层不透明的深蓝色**（站牌立柱）；新前景只有一种白色、镂空靠 `fillType="evenOdd"` 的透明洞，
+   ⇒ 复用前景做 monochrome 是正确且省事的。所以 `<monochrome>` 仍指向前景，并被判据 IC-e 钉住
+   （"前景里不许出现第二种 fillColor"——这条钉的是**复用成立的前提**，不是审美）。
+2. "各密度位图 + `ic_launcher_round` 要补"也不成立（`minSdk = 26`，API 26+ 只认 adaptive icon），
+   这条已在 D-089 记过，本轮把它写进判据 IC-g：**故意没做的两件事**（各密度位图、商店 1024 图）
+   要一直保持"没做"的可见状态，谁偷偷做了或把它写成已完成，都会红。
+
+**没被眼睛看过这件事**：本机没有可用的可视化面（in-app browser 报 `visibilityState=hidden`，也没有 SVG 光栅化工具），
+所以图标**只有数值验证**：把前景几何按 `scale 0.86 / pivot (54,54)` 变换后逐点算，
+最远点是站点圆点边缘，距画布中心 **32.51 ≤ 33**（自适应图标安全圆）⇒ 圆形与圆角方形遮罩都不会切掉内容；
+内容包围盒 x 27.3..78.6 / y 30.8..82.9 全在 108 画布内，光学中心偏下约 2.8dp（弧线与圆点把重心往下带，刻意没调）。
+⚠ 真机上桌面长什么样仍未验（`NOT VERIFIED ON DEVICE`）。
+
+**lint 抓出一条我上两轮漏掉的**：`:app:lintDebug` 报
+`PickupWindow.kt:107 Call requires API level 34 … java.time.LocalDate#ofInstant [NewApi]`（min 26）。
+根因是**收尾命令的组合**：D-087/D-088/D-090 我跑的是 `assembleDebug + testDebugUnitTest`，**没带 lintDebug**
+⇒ 694 例全绿也挡不住一个 API 级别违规。改法：换成 `LocalDateTime.ofInstant(...).toLocalDate()`（API 26 可用），
+并加判据 `PW-o`（全仓 `LocalDate.ofInstant` 生效引用 0，正对照 `LocalDateTime.ofInstant` 恰好 2）。
+⚠ 顺带一条同族小坑：第一版注释里原样写了那个 API 名 ⇒ 被 grep 数进去，"0 命中"变 1 命中；
+注释里引用 API 名要拆开写（与 §八 ㊿① 反引号那条同族：**判据要数的东西不许出现在判据自己的话术里**）。
+
+**判据自己也被自己抓两次**
+- `IC-g` 第一版把"README 里'落地清单'出现次数"写成 1，现读 **2** ⇒ 新书第一次跑就红在自己写的期望值上
+  （§八 ㊿ 的第三次兑现：任何 N 只能由现读给出）。
+- `IC-c1` 注入的是"大圆角底板"，而判据只认 `rx=` ⇒ 红了但红的是隔壁 IC-e（第二层不透明色）。
+  这不是撤破口，是**判据没看见那个形状**：改成"不许出现半径 ≥16 的圆角弧"（本作品最大圆角只有 9），
+  于是破口与判据对上。同时 `mkpng` 把目录建到了 `res/` 的上一层 ⇒ 判据扫不到，注入器"成功"了但破口不在场
+  （这是 D-084 那族"注入落空"的新变体：**位置错**而不是锚点错，同样靠"仍然绿"暴露）。
+
+**读数（本轮实测）**
+- 全量 `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug --rerun-tasks`：**55 actionable tasks: 55 executed**，
+  用例 **67 类 / 694 例 / 0 失败 / 0 错误**（本轮没动 `app/src/**.kt` 的功能面，只改了 PickupWindow 那一处换算）；
+  **但整条命令 RC=1**：lint 剩 **1 error**，是 `PropertyEscape` 指向 `local.properties:13` 的 `sdk.dir`
+  —— 那是**本机文件、不在版本控制里、Android Studio 自己写的**，改它有把 SDK 路径写坏的风险，
+  所以本轮**不动它**，只登记："本机 lint 有 1 条环境红" ⇒ 以后比 lint 要**比 error 的 id 列表**，不是比 rc。
+  我引入的那条（NewApi）已消失：error 从 2 → 1，剩下这条 id 是 PropertyEscape。
+- 新判据 `tools/check_launcher_icon_probes.sh`（IC-a…IC-g）rc=0；
+  新负控 `tools/launcher_icon_negative_controls.sh` **rc=0 ✔=17（16 条破口 + 基线 + 不存在的锚点被拒自检）✘=0 △=0**。
+- 判据全批现读 **34 本 = 33 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，#51 三条路等用户定）。
+- 产物指纹：`app-debug.apk` **117,227,100 B** / mtime `2026-10-13 11:34:04` / sha256
+  `d62b8288f31a8957aed492ce428257d2804b81248213dddf930e1b129c41e478`；对 D-088 那包 **+1,434 B ⇒ 增量未归因**
+  （没做 dex 类数差集；图标是资源不是类，这个数只登记不解释）。
+- 树指纹 files=**204** / sha256 `63782b9c770fac2932afa39392ce679b24829fc5c293b02e4dc0a2414b4624b8`
+  （D-088 是 203 / `4c5ee97a…`，+1 = 新增的背景层 drawable）。
+
+**仍欠**
+1. **桌面真机效果未验**；`assets/logo.png`（启动页 + 登录页用的**用户原图**，KDoc 明写"不重绘 / 不复刻 / 不抠底"）
+   与新图标**不同源**这件事现在更明显了——换不换它是**用户的决定**，我不会去重绘用户提供的原图；
+2. 商店 1024×1024 位图仍没有（本机没有矢量光栅化工具；要一张真导出，不是再生成一张概念稿）；
+3. 本机 lint 的 `PropertyEscape` 环境红在册（见上，比 id 列表不比 rc）；
+4. `default_value ✘=3`、`idempotency ✘=1` 两笔历史 ✘ 仍未归因；`check_doc_anchor_probes.sh` 在册红；
+   `check_status_probes.sh` 无配对负控（`D-CE-4`）；
+5. 两仓本地已提交未 push（App 22 个、后端 10 个）。
