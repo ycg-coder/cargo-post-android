@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -574,9 +575,11 @@ private fun OrderCard(o: ProductOrder, onClick: () -> Unit) {
                         contentAlignment = Alignment.Center,
                     ) {
                         if (g.image.isNotEmpty()) {
-                            coil.compose.AsyncImage(
-                                model = g.image,
+                            NetworkImage(
+                                url = g.image,
                                 contentDescription = g.name,
+                                width = 400.dp,
+                                height = 46.dp,
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                                 modifier = Modifier.fillMaxWidth().height(46.dp),
                             )

@@ -57,6 +57,10 @@ val signingProps = Properties().apply {
 val releaseBaseUrl = cfg("baseUrl")
 val isCiRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
 
+// versionCode 走 CI 的 GITHUB_RUN_NUMBER（每次 workflow 运行自增），本地开发用 1。
+// 这样每个 CI 构建都有唯一版本号，app 内更新才能正确比较新旧。
+val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+
 fun qu(v: String) = "\"${v.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {

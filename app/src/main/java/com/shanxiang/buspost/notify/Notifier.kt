@@ -24,6 +24,7 @@ object Channels {
     const val SHIFT = "shift"
     const val ARRIVAL = "arrival"
     const val SERVICE = "service"
+    const val WEATHER = "weather"
 
     fun ensure(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -39,6 +40,13 @@ object Channels {
                 vibrationPattern = longArrayOf(0, 260, 160, 260)
             },
             channel(SERVICE, "服务状态", "司机位置上报等后台服务提示", NotificationManager.IMPORTANCE_LOW),
+            channel(
+                WEATHER, "天气预警", "暴雨、大雪、高温等恶劣天气提醒，影响出行与装车",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+            },
         ).forEach { mgr.createNotificationChannel(it) }
     }
 

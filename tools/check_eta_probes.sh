@@ -46,7 +46,11 @@ tg=$(grep -rnE '"(在途|空闲|已到站|停用|待发车)" *->' $A | wc -l)
 th1=$(grep -o "BusVehicle.parse(" "$RP" | wc -l)
 # T-h2 Repo 里不许再直接构造 BusVehicle
 th2=$(grep -n "BusVehicle(" "$RP" | grep -vc "BusVehicle.parse" || true)
-# T-i 按离用户远近排序的口径引用点：模型声明 1 + 三处 import + 三处调用
+# T-i 按离用户远近排序的口径引用点：模型声明 1 + 四处 import + 五处调用。
+#   四处 import = BusScreen / HomeScreen / NextBusWidgetProvider / AddressSearchScreen（2026-10-13 合并 origin/main 时
+#   对方新增的"手动地址查公交"页，它没有自造排序，用的是同一个 byUserDistance ⇒ 口径面 +1 是**并进来**不是散掉）。
+#   调用五处 = 上面四处各 1，加 HomeScreen 的第二处（两个卡片同口径）。
+#   数量变了就要重新逐点点名：少一处 = 有人把 nullsLast 那条口径换成裸 sort，多一处 = 又开了一处不走口径的排序。
 ti=$(grep -rn "byUserDistance" $A | wc -l)
 # T-j1 progress 只在 lines 端点出现一次（nearby 的 NearbyBus 没有这个键）
 tj1=$(printf '%s' "$VJ" | grep -c '\.put("progress"')
@@ -228,7 +232,7 @@ echo "T-f2 整数码 2 读成停用               : $tf2  （预期 1）"
 echo "T-g  中文状态串硬映射                : $tg   （预期 0：两个端点都不发中文码）"
 echo "T-h1 Repo 车辆解析出口               : $th1  （预期 2：nearby 列表 + 单车详情）"
 echo "T-h2 Repo 直接构造 BusVehicle        : $th2  （预期 0）"
-echo "T-i  byUserDistance 引用点            : $ti   （预期 7：声明 1 + import 3 + 调用 3）"
+echo "T-i  byUserDistance 引用点            : $ti   （预期 10：声明 1 + import 4 + 调用 5，逐点见上方 T-i 注释）"
 echo "T-j1 演示面 progress 写入点          : $tj1  （预期 1：只在 lines 分支）"
 echo "T-j2 演示面车辆 routeId              : $tj2  （预期 0：真实车辆 VO 没有这个键）"
 echo "T-j3 演示面 routeProvider=SCHEDULE   : $tj3  （预期 1）"
@@ -293,7 +297,7 @@ ok=1
 [ "$tg" = 0 ] || { echo "× T-g 中文状态串又被当成码表输入"; ok=0; }
 [ "$th1" = 2 ] || { echo "× T-h1 车辆解析出现第三个/少了出口"; ok=0; }
 [ "$th2" = 0 ] || { echo "× T-h2 Repo 又开始自己拼 BusVehicle"; ok=0; }
-[ "$ti" = 7 ] || { echo "× T-i 排序口径引用点数量变了（nullsLast 失守风险）"; ok=0; }
+[ "$ti" = 10 ] || { echo "× T-i 排序口径引用点数量不是 10（现 $ti）：多一处或少一处都要逐点点名，口径散掉就是 nullsLast 失守"; ok=0; }
 [ "$tj1" = 1 ] || { echo "× T-j1 演示面给 nearby 也编了 progress"; ok=0; }
 [ "$tj2" = 0 ] || { echo "× T-j2 演示面又发自造的车辆 routeId"; ok=0; }
 [ "$tj3" = 1 ] || { echo "× T-j3 演示面 routeProvider 又写自造码"; ok=0; }

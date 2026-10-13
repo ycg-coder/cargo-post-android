@@ -1736,7 +1736,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                   本轮收口的是**六族**（商品 `Product` / 司机档案 `DriverProfile` / 揽件 `PickupOrder.checked` / 交接 `HandoverTask.needPhoto` /
                   候选方案 `Candidate` / `steps`·车道族），改法只有两种：**三方核到真键的改成只读那一个真键**
                   （`Models.kt:1398 plate = o.multiStr("plateNo")`、`:1402 multiNumOrNull("cargoCapacityKg")`、`:1407 multiNumOrNull("cargoCapacity")`、`Repo.kt:1176 multiNumOrNull("recommendedLane")`），
-                  **三面 0 生产者的改成可空 + "未给"态**（`Models.kt:1582 needPhoto: Boolean? = null`、`:1479 checked`、`:1178 recommended`、`:1179 legs`、`:313 stock`、`:310 originPrice`、`:315 sales`、`:1349/:1351/:1353/:1355`）。
+                  **三面 0 生产者的改成可空 + "未给"态**（`Models.kt:1593 needPhoto: Boolean? = null`、`:1479 checked`、`:1178 recommended`、`:1179 legs`、`:313 stock`、`:310 originPrice`、`:315 sales`、`:1349/:1351/:1353/:1355`）。
                   ⚠ **没有把任何别名换成另一个猜的键名、没有删字段**；`usedKg`/`verified` 是**直接撤掉读法**而不是改名
                   （`AppDriverProfileRespVO.java:11-23` 全文 7 个键，"已装重量/认证状态"在重量口径上三方都没有生产者）。
                   生产源码动 **8 个 main 文件**：`Models.kt`、`Repo.kt`、`DemoData.kt` + 消费侧 `WorkbenchScreen.kt:566-579`、`GoodsDetailScreen.kt:79/138/219/229`、
@@ -4467,6 +4467,27 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
 - 安全清理：`*.apk/*.aab/*.log` 进 `.gitignore`；源码注释与文档里的真实服务器 IP 已脱敏。
 
 ---
+
+### 合并 `origin/main` 收口（10-13 20:1x–21:4x，判据见 D-100）
+
+- **代码状态**：第四轮全量 `assembleDebug + testDebugUnitTest + lintDebug --rerun-tasks` = `0` 条编译错误、
+  `67` 类 / `694` 例 / `failures=0` / `errors=0`；lint `1 error` = `local.properties:13 [PropertyEscape]`（本机文件，
+  `git check-ignore` 命中，不进版本库）。APK 产物在 `app/build/outputs/apk/debug/app-debug.apk`。
+- **判据簿**：`tools/check_*.sh` 全跑 = **33 绿 / 1 红**（合并刚进来时 24 绿 10 红，那 10 红逐条处理完）。
+  唯一红的仍是 `check_doc_anchor_probes.sh`（DA-d 新增可疑 72、DA-e ID-MISS 388 > 闸门 286 —— 就是下面那条 #159 欠账）。
+  改过锚点/计数的 6 本逐条写在 D-100，
+  其中上调计数的两处都有反证：`eta` T-i 7→10 是"新页复用同一口径"，`safe_call`/`throwable` 14→15 那一处是我自己加的。
+- **道具撤除**：首页"扫一扫"格（与"乘车码"同路由 + 全工程 0 个扫码实现）、乘车码页的自造二维码与手写线路表、
+  天气通知里写死的 `Routes.USER_SHELL`。地址示例文案收成 `ADDRESS_EXAMPLE_HINT` 一处定义三处引用。
+- **欠账（新增，任务 #23）**：对方的充值/支付页不进这版。三条实测理由钉在后端源码上 ——
+  `PayService.java:68-97` 创单无幂等键、查单口 `/wallet/query-pay-order` 不校验归属人（且订单为待支付时放款就在这一步）、
+  对方页面在请求失败时于本地把余额加上去。要接回来先补前两条。
+- **欠账（既有 #159 同族，本轮涨）**：台账锚点 ID-MISS 323→396→**388**（闸门 286 仍红）。
+  本轮搬回 8 条机械可验的，**3 条因新目标行是源码注释而拒搬**（`Api.kt:75`、`Repo.kt:851`），
+  剩余 72 条新增可疑 aid（NEAR 43 / FAR 26 / 拒搬 3）未清。
+- **没在真机验过**：合并进来的乘车码页、地址搜索页、地图选点页、自更新弹窗均无真机在环证据；
+  壳的 insets 基数换成 `systemBars` 之后是否多一段顶距，也标 NOT VERIFIED ON DEVICE。
+
 
 ## BLOCKED
 

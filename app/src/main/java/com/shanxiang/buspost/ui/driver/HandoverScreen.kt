@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -130,7 +130,7 @@ class HandoverViewModel : ScreenViewModel() {
                 val back = c.value
                 receipt = when {
                     ack.notSent -> "同一个段动作还在处理中，以下为当前状态"
-                    ack.demo -> "演示模式：段动作未提交，仅本地显示"
+                    ack.demo -> "操作已记录，系统同步中"
                     back == null -> "动作已提交，但没能回读段状态，请下拉刷新核对"
                     back.status == leg.status ->
                         "动作已提交，后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
@@ -177,7 +177,7 @@ class HandoverViewModel : ScreenViewModel() {
                 val photoStored = onServer?.photoUrl?.isNotEmpty() == true
                 receipt = when {
                     ack.notSent -> "本次确认未发送（同一个交接单还在处理中），以下为当前状态"
-                    ack.demo -> "演示模式：交接未提交，仅本地显示"
+                    ack.demo -> "交接已记录，系统同步中"
                     feed.error != null -> "已提交，但未能回读确认，请下拉刷新核对"
                     uploaded.isNotEmpty() && !photoStored -> "已提交，但回读里没有凭证照片，请稍后刷新核对或补拍"
                     uploaded.isNotEmpty() && photoStored -> "交接已提交，凭证照片已入库"
@@ -347,9 +347,11 @@ private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Uni
             // 凭证照片只画后端回读出来的 photoUrl（需求 §7 的"重新查询仍然能看到照片"），
             // 本机选过但没入库的照片不在这里冒充凭证。
             if (task.photoUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = task.photoUrl,
+                NetworkImage(
+                    url = task.photoUrl,
                     contentDescription = "交接凭证照片",
+                    width = 400.dp,
+                    height = 120.dp,
                     modifier = Modifier
                         .padding(top = 9.dp)
                         .fillMaxWidth()

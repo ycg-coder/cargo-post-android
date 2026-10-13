@@ -80,7 +80,7 @@ WH_INIT_BAD=$(nc_count "$WS" 'success = true))')
 # W-j 契约用例在场（下限 = 现读，等于 16；D-085 ㊾①：写 ≥ 而实测更高 = 删用例不红）
 WJ=$(grep -cE '^[[:space:]]*@Test' "$CT")
 
-echo "W-a 常量 / 注册 / BusRouteBody / 入口（本页·全工程） = $WA_CONST/$WA_REG/$WA_BODY/$WA_ENTRY/$WA_ENTRY_ALL （目标 1/1/1/1/1）"
+echo "W-a 常量 / 注册 / BusRouteBody / 入口（本页·全工程） = $WA_CONST/$WA_REG/$WA_BODY/$WA_ENTRY/$WA_ENTRY_ALL （目标 1/1/1/1/2）"
 echo "W-b 三个写口 / 两个读口                = $WB_RECHARGE+$WB_PAY+$WB_ORDER / $WB_BAL+$WB_TXS （目标 0+0+0 / 1+1）"
 echo "W-c 那句话：纯层声明 / 页面引用 / 页面重抄 = $WC_NOTE/$WC_PAGE/$WC_PAGE_LITERAL （目标 1/1/0）"
 echo "W-d 未识别状态 / 未识别类型 / multiStr 读码 = $WD_UNK_STATUS/$WD_UNK_TYPE/$WD_BAD_STATUS （目标 1/1/0）"
@@ -96,7 +96,7 @@ fail=0
 [ "$WA_REG" = 1 ] || { echo "× W-a 注册点不是恰好一处（现 $WA_REG）：这一页打不开或与全工程口径不一致"; fail=1; }
 [ "$WA_BODY" = 1 ] || { echo "× W-a 有注册但没走 BusRouteBody（$WA_BODY/1）：这一页的键盘遮挡与边到端口径会和全工程不一致"; fail=1; }
 [ "$WA_ENTRY" = 1 ] || { echo "× W-a 「我的」里那个入口不是恰好一条（现 $WA_ENTRY）"; fail=1; }
-[ "$WA_ENTRY_ALL" = 1 ] || { echo "× W-a 全工程入口数=$WA_ENTRY_ALL（目标 1）：多了就是第二处导航各走各的"; fail=1; }
+[ "$WA_ENTRY_ALL" = 2 ] || { echo "× W-a 全工程入口数=$WA_ENTRY_ALL（目标 2：「我的」列表 1 + 首页宫格 1，2026-10-13 合并 origin/main 时对方补了首页那一格）：这个 app 的既有口径就是同一页多面入口（NOTIFICATIONS 3 处 / PROFILE 2 / SETTINGS 3），多了第三处或首页那格没了都要重新点名"; fail=1; }
 { [ "$WB_RECHARGE" = 0 ] && [ "$WB_PAY" = 0 ] && [ "$WB_ORDER" = 0 ]; } || { echo "× W-b 写口被接进了生效代码（recharge=$WB_RECHARGE pay=$WB_PAY create-pay-order=$WB_ORDER）：那三个口今天不能接（无幂等键 / 模拟与真到账不可区分 / 查单不校验归属人），接了就是一次真扣款或重复加余额的风险"; fail=1; }
 { [ "$WB_BAL" = 1 ] && [ "$WB_TXS" = 1 ]; } || { echo "× W-b 两个读口不齐（$WB_BAL/$WB_TXS，目标 1/1）：这一页又变回死代码"; fail=1; }
 [ "$WC_NOTE" = 1 ] || { echo "× W-c 那句话在纯层不再是唯一声明（现 $WC_NOTE）"; fail=1; }

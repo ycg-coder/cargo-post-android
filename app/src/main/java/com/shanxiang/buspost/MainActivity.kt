@@ -8,10 +8,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
+import com.shanxiang.buspost.core.update.AppUpdater
+import com.shanxiang.buspost.core.update.Release
+import com.shanxiang.buspost.core.update.UpdateDialog
+import com.shanxiang.buspost.core.update.UpdateOutcome
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.notify.NotifyWorker
@@ -40,6 +48,18 @@ class MainActivity : ComponentActivity() {
             val driving by AppState.driving.collectAsStateWithLifecycle()
             // 夜间暗色由 AppState 统一裁决（`dark || 驾驶模式夜间`），这里不自己拼 —— 拼两遍就是两个真相
             val nightUi by AppState.nightUi.collectAsStateWithLifecycle()
+
+            // app 内自更新：冷启动查一次 GitHub Release，**只有真读到"有可用新版本"才弹窗**。
+            // 查询失败 / 仓库还没发布过 都不弹任何东西 —— 但这里也不说"已是最新"：
+            // 要说这句话得去「设置 → 关于 → 检查更新」，那一格才把原话摆出来（#48 的诚实分格）。
+            var updateRelease by remember { mutableStateOf<Release?>(null) }
+            LaunchedEffect(Unit) {
+                updateRelease = (AppUpdater.check() as? UpdateOutcome.Available)?.release
+            }
+            updateRelease?.let { release ->
+                UpdateDialog(release = release, onDismiss = { updateRelease = null })
+            }
+
             BusAppTheme(theme = theme, dark = nightUi, elderly = elderly, driving = driving) {
                 BusPostRoot()
             }

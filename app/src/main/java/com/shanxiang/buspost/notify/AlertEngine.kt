@@ -6,6 +6,7 @@ import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
+import kotlinx.coroutines.CancellationException
 
 /**
  * 提醒判定内核：前台（App 打开时 20 秒一轮）和后台（WorkManager 15 分钟一轮）共用同一套逻辑，
@@ -128,8 +129,99 @@ object AlertEngine {
                     )
                 }
         }
-        val announced = fresh.size + arrival
+
+        // ---------- 天气预警 ----------
+        // 与到车提醒同模式：同一类天气 4 小时内不重复推送；天气状况变了（晴→雨）立即推，
+        // 持续同一种恶劣天气（雨→雨）不重复打扰。没有位置就不推（无法确定"当地"天气）。
+        var weatherAlerted = 0
+        if (Prefs.weatherAlertEnabled) {
+            val geo = com.shanxiang.buspost.core.loc.Locator.once(context)
+            if (geo != null) {
+                try {
+                    val rg = Repo.reverseGeo(geo)
+                    val w = Repo.weather(geo, rg.adcode)
+                    if (!w.mock) {
+                        val severity = weatherSeverity(w.text, w.temperature)
+                        if (severity != null) {
+                            val now = System.currentTimeMillis()
+                            val elapsed = now - Prefs.lastWeatherAlertTimestamp
+                            val conditionChanged = Prefs.lastWeatherAlertCondition != w.text
+                            // 4 小时内同一天气不重推；天气变了立即推
+                            if (conditionChanged || elapsed >= 4 * 3600 * 1000L) {
+                                Prefs.lastWeatherAlertTimestamp = now
+                                Prefs.lastWeatherAlertCondition = w.text
+                                weatherAlerted++
+                                val (title, body) = weatherAlertText(severity, w.text, w.temperature, w.wind)
+                                Notifier.push(
+                                    context,
+                                    Channels.WEATHER,
+                                    title,
+                                    body,
+                                    "weather_alert".hashCode() and 0x7fffffff,
+                                    // 有意**不带 route**：天气预警不属于用户域也不属于司机域，点开就交给
+                                    // 角色裁决那一步（`startDestinationFor`）。在这里写死 `Routes.USER_SHELL`
+                                    // 就是通知替角色决定进哪个壳 —— 判据 SR-g 钉的正是这一格（D-100）。
+                                )
+                            }
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    // 取消必须穿透：这一格在挂起作用域里，把它收成一次普通失败就是 F-2 ⑨ 迁掉的那类病
+                    throw e
+                } catch (_: Exception) {
+                    // 天气取数失败不影响其他提醒，静默跳过
+                }
+            }
+        }
+
+        val announced = fresh.size + arrival + weatherAlerted
         return AlertScan(outcomeOf(causes, announced), announced = announced)
+    }
+
+    /**
+     * 天气严重程度判定：返回 null 表示不需要预警，非 null 表示需要预警并给出等级。
+     * 与 Repo.farmTips 同口径但更严格 —— farmTips 给建议，这里决定是否推送通知。
+     * 等级：LIGHT（提示）/ HEAVY（警告），影响文案措辞。
+     */
+    private enum class WeatherSeverity { LIGHT, HEAVY }
+
+    private fun weatherSeverity(condition: String, temperature: Int): WeatherSeverity? {
+        val c = condition.lowercase()
+        // 暴雨、大雪、冰雹等 → 重度预警
+        if (c.contains("暴雨") || c.contains("大") && (c.contains("雨") || c.contains("雪")) ||
+            c.contains("冰雹") || c.contains("雷暴") || c.contains("台风")
+        ) return WeatherSeverity.HEAVY
+        // 普通雨雪、大雾、极端高温/低温 → 轻度预警
+        if (c.contains("雨") || c.contains("雪") || c.contains("雾") || c.contains("沙尘") ||
+            c.contains("霾") || temperature >= 38 || temperature <= -10
+        ) return WeatherSeverity.LIGHT
+        return null
+    }
+
+    private fun weatherAlertText(
+        severity: WeatherSeverity,
+        condition: String,
+        temperature: Int,
+        wind: String,
+    ): Pair<String, String> {
+        val prefix = when (severity) {
+            WeatherSeverity.HEAVY -> "⚠️ 恶劣天气预警"
+            WeatherSeverity.LIGHT -> "🌧 天气提醒"
+        }
+        val body = buildString {
+            append("当前天气：$condition，气温 ${temperature}°C")
+            if (wind.isNotEmpty()) append("，$wind")
+            append("。")
+            when {
+                condition.contains("雨") -> append(" 出行请带雨具，山货装车前请加盖苫布防淋。")
+                condition.contains("雪") -> append(" 路面可能湿滑，发车请减速慢行。")
+                condition.contains("雾") || condition.contains("霾") -> append(" 能见度低，山路发车请注意安全。")
+                temperature >= 38 -> append(" 气温偏高，生鲜件建议走早班车。")
+                temperature <= -10 -> append(" 气温极低，注意防寒保暖。")
+                else -> append(" 请关注天气变化，合理安排出行。")
+            }
+        }
+        return prefix to body
     }
 
     /**

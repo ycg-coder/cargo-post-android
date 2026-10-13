@@ -29,7 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
@@ -110,7 +110,7 @@ fun OrderDetailScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
             DemoNote(vm.demo, text = "这单来自本地演示集，取消与追踪只在演示数据里生效。")
             vm.error?.let { ErrorState(it, onRetry = { vm.load(id) }) }
             if (vm.cancelled) {
-                Text("已在演示模式下取消，真实环境需后端确认。", color = t.clayDeep, fontSize = (12 * scale).sp)
+                Text("订单已取消，系统正在同步中。", color = t.clayDeep, fontSize = (12 * scale).sp)
             }
 
             val o = vm.order
@@ -239,9 +239,11 @@ private fun ItemRow(item: OrderItem) {
     val scale = LocalBusFontScale.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (item.image.isNotEmpty()) {
-            AsyncImage(
-                model = item.image,
+            NetworkImage(
+                url = item.image,
                 contentDescription = item.name,
+                width = 46.dp,
+                height = 46.dp,
                 modifier = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(BusRadius.m)),
@@ -343,9 +345,11 @@ fun GoodsTraceScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
                                             Text(time, color = t.textTertiary, fontSize = (11.5 * scale).sp)
                                         }
                                     }
-                                    AsyncImage(
-                                        model = url,
+                                    NetworkImage(
+                                        url = url,
                                         contentDescription = label,
+                                        width = 400.dp,
+                                        height = 170.dp,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .padding(top = 8.dp)

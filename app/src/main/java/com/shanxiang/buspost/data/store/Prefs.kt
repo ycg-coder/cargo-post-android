@@ -119,6 +119,20 @@ object Prefs {
         get() = sp.getBoolean("arrivalAlert", true)
         set(v) = sp.edit().putBoolean("arrivalAlert", v).apply()
 
+    var weatherAlertEnabled: Boolean
+        get() = sp.getBoolean("weatherAlert", true)
+        set(v) = sp.edit().putBoolean("weatherAlert", v).apply()
+
+    /** 上次天气预警推送时间戳（ms）：同一类天气 4 小时内不重复推送 */
+    var lastWeatherAlertTimestamp: Long
+        get() = sp.getLong("lastWeatherAlertTs", 0L)
+        set(v) = sp.edit().putLong("lastWeatherAlertTs", v).apply()
+
+    /** 上次天气预警的天气状况文本：天气变了才重新推送（晴→雨推，雨→雨不推） */
+    var lastWeatherAlertCondition: String
+        get() = sp.getString("lastWeatherAlertCond", "") ?: ""
+        set(v) = sp.edit().putString("lastWeatherAlertCond", v).apply()
+
     /** 语音播报转向指引，司机行驶中免看屏 */
     var voiceGuidance: Boolean
         get() = sp.getBoolean("voiceGuidance", false)

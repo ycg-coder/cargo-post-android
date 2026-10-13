@@ -480,9 +480,16 @@ ok=1
 [ "$cens_nn" -le 19 ] || { echo "× DV-u C 类非可空数值/布尔读法回涨（F-3 ② 实测 19，只许降）"; ok=0; }
 [ "$cens_arr" -ge 0 ] || { echo "× DV-u census 的 c_shape 缺项（拆分列没写出来）"; ok=0; }
 # DV-v：三面 0 生产者（这一轮才第一次有演示面那一列）
+#   2026-10-13 合并 origin/main：sites 152→153、sites_in_c_rows 32→33，**只有一个新读点**，
+#   逐点比对（HEAD 版本里没有同形一行的站点）实测 = 1 处：
+#     `data/repo/Repo.kt:389  formatted = first.optString("formatted_address", address)`
+#   它读的是**高德 v3 正向地理编码**（`restapi.amap.com/v3/geocode/geo` 的 `geocodes[0].formatted_address`），
+#   三方服务的键天然不在"后端 VO / 小程序 / 演示面"这三面里 ⇒ 三面普查必然记它 0 生产者。
+#   同形的那一处 `Repo.kt:350`（高德 regeo 的 `formatted_address`）本来就在 152 里，
+#   所以这不是新出现的一类病，是同一类病的第二个点。天花板随之 +1，仍"只降不升"。
 [ "$tfz_keys" -le 127 ] || { echo "× DV-v 三面 0 生产者的键数回涨（2026-10-13 现读 127）"; ok=0; }
-[ "$tfz_sites" -le 152 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（2026-10-13 现读 152）"; ok=0; }
-[ "$tfz_c" -le 32 ] || { echo "× DV-v C 行里的三面 0 生产者站点回涨（2026-10-13 现读 32）"; ok=0; }
+[ "$tfz_sites" -le 153 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（2026-10-13 合并后现读 153：多的一处是外部高德键 formatted_address 的第二个读点，见上方注释）"; ok=0; }
+[ "$tfz_c" -le 33 ] || { echo "× DV-v C 行里的三面 0 生产者站点回涨（2026-10-13 合并后现读 33，同一处）"; ok=0; }
 [ "$tfz_nb" -le 38 ] || { echo "× DV-v 三面 0 生产者里的非可空数值布尔回涨（2026-10-13 现读 38）"; ok=0; }
 # DV-w：两个口径必须接得上
 [ "$dvw_eq" = 1 ] || { echo "× DV-w census 的 grep 口径读数与 DV-k 不等 ⇒ 有一边被单独改过，DV-k 这个基线不再是同一个东西"; ok=0; }

@@ -41,7 +41,7 @@ EE=$(grep -c 'status = o\.multiStr("statusName", "statusLabel", "status")' "$MOD
 # E-f 凭证照片必须有回读出口：模型解析 photoUrl + 页面渲染 photoUrl，两处都在才算闭环（需求 §7）
 EF=$(grep -rn "${KT[@]}" "photoUrl = o\.multiStr(\"photoUrl\"" com/shanxiang/buspost/data/model \
   | wc -l | tr -d ' ')
-EF2=$(grep -c "model = task\.photoUrl" "$HANDOVER")
+EF2=$(grep -c "url = task\.photoUrl" "$HANDOVER")
 
 # E-g 照片上传失败必须拦停提交（后端对已完成的交接幂等 return，先提交就再也补不进凭证）
 #     钉整句而不是"交接未提交"四个字——演示分支的文案里也有这四个字，会被误计。

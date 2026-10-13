@@ -545,7 +545,7 @@ class WorkbenchViewModel : ScreenViewModel() {
                     ?: throw IllegalStateException("读取照片失败")
                 val ack = Repo.uploadPhoto(bytes, "cargo-${System.currentTimeMillis()}.jpg")
                 if (ack.url.isEmpty()) {
-                    error = if (ack.demo) "演示模式：照片未真实上传，作业未提交" else "照片未上传成功，作业未提交，请重试"
+                    error = "照片上传失败，作业未提交，请重试"
                     return@work
                 }
                 if (loadTask != null) runAction(if (loadTask.isProduct) "商城单装车" else "货运单装车") {

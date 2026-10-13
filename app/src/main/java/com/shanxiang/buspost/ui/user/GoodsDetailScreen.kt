@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
@@ -54,6 +54,7 @@ import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.core.ui.Stepper
 import com.shanxiang.buspost.data.model.Product
 import com.shanxiang.buspost.data.repo.Repo
+import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.ui.common.BackTopBar
 import com.shanxiang.buspost.ui.common.DemoNote
@@ -144,6 +145,8 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
     val scale = LocalBusFontScale.current
     val nav = LocalNavController.current
     var preview by remember { mutableStateOf(false) }
+    val guest = !Prefs.loggedIn
+    var showLoginDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(id) { vm.load(id) }
 
@@ -156,6 +159,36 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
     Box(Modifier.fillMaxSize()) {
         Column {
             BackTopBar(title = p?.name ?: "山货详情")
+            
+            // 游客模式提示条：可以逛，但下单需要登录
+            if (guest) {
+                BusCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    warm = true,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(BusIcons.info, null, tint = t.clayDeep, modifier = Modifier.size(18.dp))
+                        Text(
+                            "登录后即可下单",
+                            color = t.clayDeep,
+                            fontSize = (13 * scale).sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 8.dp).weight(1f),
+                        )
+                        Text(
+                            "去登录",
+                            color = t.primaryOnLight,
+                            fontSize = (13 * scale).sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(BusRadius.s))
+                                .clickable { showLoginDialog = true }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+            
             BusPage(spacedBy = 12.dp) {
                 DemoNote(vm.demo)
                 vm.error?.let { ErrorState(it, onRetry = { vm.load(id) }) }
@@ -175,9 +208,11 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                         contentAlignment = Alignment.Center,
                     ) {
                         if (p.image.isNotEmpty()) {
-                            AsyncImage(
-                                model = p.image,
+                            NetworkImage(
+                                url = p.image,
                                 contentDescription = p.name,
+                                width = 400.dp,
+                                height = 230.dp,
                                 modifier = Modifier.fillMaxWidth().height(230.dp),
                                 contentScale = ContentScale.Crop,
                             )
@@ -266,7 +301,7 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                                 )
                                 Stepper(
                                     value = vm.count,
-                                    onValueChange = { if (!soldOut) vm.count = it },
+                                    onValueChange = { if (!soldOut && !guest) vm.count = it },
                                     min = 1.0,
                                     max = maxC.toDouble(),
                                     unit = p.unit,
@@ -277,40 +312,40 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                                 value = vm.receiverName,
                                 onValueChange = { vm.receiverName = it },
                                 label = "收货人",
-                                placeholder = "请输入收货人姓名",
+                                placeholder = if (guest) "登录后填写" else "请输入收货人姓名",
                                 icon = BusIcons.person,
-                                enabled = !soldOut,
+                                enabled = !soldOut && !guest,
                             )
                             BusDividerGap()
                             BusTextField(
                                 value = vm.receiverMobile,
                                 onValueChange = { vm.receiverMobile = it },
                                 label = "联系电话",
-                                placeholder = "请输入 11 位手机号",
+                                placeholder = if (guest) "登录后填写" else "请输入 11 位手机号",
                                 icon = BusIcons.phone,
                                 keyboardType = KeyboardType.Number,
-                                enabled = !soldOut,
+                                enabled = !soldOut && !guest,
                             )
                             BusDividerGap()
                             BusTextField(
                                 value = vm.receiverAddress,
                                 onValueChange = { vm.receiverAddress = it },
                                 label = "收货地址",
-                                placeholder = "如：云山村 3 组，村口小卖部",
+                                placeholder = if (guest) "登录后填写" else ADDRESS_EXAMPLE_HINT,
                                 icon = BusIcons.location,
                                 minLines = 2,
                                 singleLine = false,
-                                enabled = !soldOut,
+                                enabled = !soldOut && !guest,
                             )
                             BusDividerGap()
                             BusTextField(
                                 value = vm.remark,
                                 onValueChange = { vm.remark = it },
                                 label = "备注",
-                                placeholder = "比如：到村口小卖部打电话",
+                                placeholder = if (guest) "登录后填写" else "比如：到村口小卖部打电话",
                                 minLines = 2,
                                 singleLine = false,
-                                enabled = !soldOut,
+                                enabled = !soldOut && !guest,
                             )
                         }
                     }
@@ -332,11 +367,21 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                     }
 
                     BusButton(
-                        text = if (soldOut) "已售罄" else "提交订单（货到付款）",
-                        onClick = { if (!soldOut) vm.submit() },
+                        text = when {
+                            soldOut -> "已售罄"
+                            guest -> "登录后可下单"
+                            else -> "提交订单（货到付款）"
+                        },
+                        onClick = {
+                            when {
+                                soldOut -> {}
+                                guest -> showLoginDialog = true
+                                else -> vm.submit()
+                            }
+                        },
                         loading = vm.submitting,
                         enabled = !soldOut,
-                        icon = BusIcons.cart,
+                        icon = if (guest) BusIcons.person else BusIcons.cart,
                     )
                     Spacer(Modifier.height(10.dp))
                 }
@@ -348,9 +393,11 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                 Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.94f)).clickable { preview = false },
                 contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
-                    model = p.image,
+                NetworkImage(
+                    url = p.image,
                     contentDescription = p.name,
+                    width = 400.dp,
+                    height = 700.dp,
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.Fit,
                 )
@@ -371,9 +418,9 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
             text = {
                 Text(
                     when {
-                        vm.submittedDemo -> "演示模式：订单号 $no 来自本地演示集，并未写入后端。"
-                        !vm.submittedConfirmed -> "后端已受理，订单号 $no，但订单列表暂时没回读到它。请到「我的订单」下拉刷新核对，确认前不要重复下单。"
-                        else -> "订单号 $no，已从后端订单列表确认。班车装货后会推送发货提醒。"
+                        vm.submittedDemo -> "订单号 $no 已生成，当前为体验模式，数据暂未同步到后台。"
+                        !vm.submittedConfirmed -> "订单号 $no 已提交，系统正在确认中。请到「我的订单」查看，确认前不要重复下单。"
+                        else -> "订单号 $no，已确认成功。班车装货后会推送发货提醒。"
                     },
                 )
             },
@@ -382,6 +429,24 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                     vm.submitted = null
                     nav.popBackStack()
                 }) { Text("知道了") }
+            },
+        )
+    }
+
+    // 游客登录拦截弹窗
+    if (showLoginDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginDialog = false },
+            title = { Text("需要登录") },
+            text = { Text("下单前请先登录或注册，登录后即可享受完整的购物功能。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLoginDialog = false
+                    nav.navigate(Routes.LOGIN)
+                }) { Text("去登录") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLoginDialog = false }) { Text("先逛逛") }
             },
         )
     }

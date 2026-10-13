@@ -2601,7 +2601,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 - `ui/driver/DriverShell.kt:38`：旧 `AppState.setRole(Role.USER)` → `AppState.setActiveDomain(AppDomain.USER)`；:37 `if (it == 3) {` 与 :39 出壳导航**一字未动**。
 - `ui/user/MineScreen.kt:118-119`：显式授予变成两行 `setAccountRole(Role.DRIVER)` + `setActiveDomain(AppDomain.DRIVER)`（旧写法只改角色再跳壳）。
 - `ui/driver/WorkbenchScreen.kt:238`：`if (next != stored) AppState.setAccountRole(next)`（后端档案**降级**，是账号事实变了才动角色）。
-- `ui/BusPostRoot.kt:141`：登录落壳 `AppState.setActiveDomain(AppDomain.of(role))`。
+- `ui/BusPostRoot.kt:146`：登录落壳 `AppState.setActiveDomain(AppDomain.of(role))`。
 - `notify/AlertEngine.kt:45/:57`：分域轮询的依据从"账号角色"换成 `AppState.activeDomain.value == AppDomain.DRIVER` —— 这一条才是"点用户版能真的停下司机域轮询"的功能本身。
 - **新增** `app/src/test/java/com/shanxiang/buspost/core/DriverRoleIntegrityTest.kt`（107 行 / 4,759 B / 6 例）。
 
@@ -4806,7 +4806,7 @@ DA-d 在册 **262**、新增 **5**、消失 **0**／DA-e ID-MISS **293**（闸�
 - `AppSendLegRespVO.java:24-33` 的 `fromLongitude`（:24 就是这个字段）—— 同一锚点在审计簿出现 5 处，:792 / :800 / :2234 三处红，
   判给它们的是 `statusName`/`statusLabel`/`fromGeo`/`navigationPolyline`，而 :21-36 那个窗口里这四个名字一个都没有。
 - `AppDriverLegRespVO.java:11-74` 的 `navigationSource`（:65）—— 红在 :792：判到 `toGeo`/`navigationPolyline`，而那句话的本意正是"该 VO 没有任何几何字段"。
-- `fromLatitude` 的读点（现 `Models.kt:1168-1171`）与 `etaMinutes` 的读点（现 `Models.kt:1168`）—— ㊶ 当时这两条锚点写的是 1118-1121 与 1133，两条被分到的名字**正好串了位**（别名句尾挨着后一条、`etaMinutes` 挨着前一条）；㊻ 按现读把它们改成各自的真读点。
+- `fromLatitude` 的读点（现 `Models.kt:1182-1185`）与 `etaMinutes` 的读点（现 `Models.kt:1168`）—— ㊶ 当时这两条锚点写的是 1118-1121 与 1133，两条被分到的名字**正好串了位**（别名句尾挨着后一条、`etaMinutes` 挨着前一条）；㊻ 按现读把它们改成各自的真读点。
 - `ui/BusPostRoot.kt:134` 的 `Routes.SETTINGS`（:134 那一行就是它）—— 该行唯一的锚点被旁边那句 `GIT=ENVIRONMENT_BLOCKED` 借走了词。
 
 ⚠ 修法只有"给锚点补一个**它自己窗口里真有的标识符**当见证 ＋ 不指锚点的旁白另起一行（无锚点的行不进取词面）"这一种：
@@ -4826,7 +4826,7 @@ OK **974 → 981**、DA-f **599 / 298**（这一遍是㊶ 那句旁白另起一�
 ### 1. 契约先核：`total` 是后端真下发的键，本轮 0 处后端改动、0 个新接口
 - 两面各自一条现读：`AppSendController.java:141` 与 `AppProductOrderController.java:55` 都是 `return success(new PageResult<>(list, pageResult.getTotal()));`，
   而 `PageResult.java:15` 声明的正是 `private Long total` ⇒ 分页总数本来就在线上，客户端只是没读它、改自己去数本页。
-- 客户端 `Api.kt:168` 的 `optInt("total", list.size)` 是**回落**（缺键才数本页），回落形状属于 Api 那一份契约 ⇒ 本轮不判它、也不改它。
+- 客户端 `Api.kt:173` 的 `optInt("total", list.size)` 是**回落**（缺键才数本页），回落形状属于 Api 那一份契约 ⇒ 本轮不判它、也不改它。
 
 ### 2. 改了什么（一个页面文件 ＋ 一本新用例 ＋ 两本工具）
 - `ParcelScreen.kt:78` 两格声明成 `mutableStateOf<Int?>(null)`；`ParcelScreen.kt:86` 两支各自过一次 `serverCount`；页首那一格只从 `ParcelScreen.kt:142` 这一个调用点取话术；
@@ -5858,7 +5858,7 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 `shortcuts.xml` 与 `widget_next_bus_info.xml`）；后端 `grep -riE "app_?version|checkUpdate|forceUpdate"` **0 命中**；
 CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 Release**，顶层 `permissions: contents: read`；
 `gh release list` 退出 0 且**输出为空** ⇒ 仓库里一条发布都没有。
-"我的"页只有一行只读的版本号（`MinePages.kt:1023 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
+"我的"页只有一行只读的版本号（`MinePages.kt:1030 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
 
 **按用户口径做的取舍**：数据源**只有 GitHub Releases**（用户选定），不新增后端版本表 —— 多一跳只会把"这一句来自哪一路"抹平，
 同 #41/#42 那条理由。代价如实登记在下面"仍欠"。
@@ -7050,3 +7050,74 @@ D-087 与本轮两批负控里 `doc_anchor_negative_controls.sh` 都以 rc=2 收
 `ui/driver/HandoverScreen.kt:154` 的 `confirm(...)` 是提交口，
 且同文件 :150-151 早就写着一条既有纪律"附了照片但拿不到 URL 就不提交"（因为 `confirmHandover` 幂等 return 后凭证补不进去），
 签名必须走同一条纪律。⚠ `V034` 不在 CI 白名单，要人工执行；不执行时带签名提交会因缺列报错。
+
+### D-100（10-13 20:1x–21:4x）· 并入 `origin/main`：真正会崩的不是那 10 处冲突，而是 git **自动合好**的那些文件
+
+**症状与第一轮读数**（`git merge --no-commit --no-ff origin/main` 报 10 处冲突，我逐个解完后 `assembleDebug`）：
+`BUILD FAILED in 1m10s`、`compileDebugKotlin FAILED`、41 条 `e:`，分布是
+`WalletScreen.kt` 15 / `UpdateDialog.kt` 8 / `MainActivity.kt` 8 / `Repo.kt` 4（`Conflicting overloads`）/
+`Routes.kt` 2（`Conflicting declarations: val WALLET`）/ `BusPostRoot.kt` 2 + `HomeScreen.kt` 1 + `MineScreen.kt` 1（全是 `WALLET` 两份引起的歧义）。
+⇒ 冲突列表是**看得见的那一半**：两侧各自新增的同名定义被并排留下了，git 一声不吭。这类病里最要命的两处是
+`BusPostRoot.kt` 里 `composable(Routes.WALLET)` **注册两遍**（Navigation 运行期就炸 Duplicate route）和
+`AndroidManifest.xml` 里两个 `FileProvider` 抢同一个 `${applicationId}.fileprovider`（装包时 `IllegalArgumentException`）。
+
+**处理与凭证**：删重复注册 / 删重复 provider / `Routes.WALLET` 两份留一份；
+`Repo.kt` 删掉对方重复那一块钱包块（104 行：两份 `WalletBalance`/`WalletTx` + 6 个函数），留我方带 `One<>` 错误语义的两个读口；
+`WalletScreen.kt` 用 `git show HEAD:` 逐字还原（`git diff HEAD` = 0 行）；
+对方的 `UpdateDialog.kt` + `MainActivity.kt` 接到我方 `AppUpdater` 的出口上（`Release`/`check`/`download`/`installIntent`/`canInstall`），
+原来的 `catch (_: Exception)` 把下载失败静默吞掉，改成 `attempt { }` + 把原话显示在弹窗里；
+`AppUpdater.httpDownload` 加 `onProgress`（只在有 `Content-Length` 时报进度，分块传输一次都不报，不编"看着在动"的假进度）；
+CI workflow 顶层 `permissions: contents: write` 退回 `read`（对方把它抬到顶层了，写权限只该给 release job —— 判据 U-k）。
+第四轮实测：`0` 条 `e:`、`67` 个测试类 / `694` 例 / `failures=0 errors=0`（跑前 `--rerun-tasks`，XML 全部新生成）、
+lint `1 error / 96 warnings / 35 hints`，唯一那条 error 是 `local.properties:13 [PropertyEscape]` ——
+本机文件、不进版本库（`git check-ignore` 命中），合并前后同一条，按"环境红比 id 列表不比 rc"处理。
+我一度想按 lint 的提示把 `\\u8881` 补成四个反斜杠，取证脚本先断言"这一行里有那个中文字"才发现**文件里已经是转义形态**，
+它投诉的是这条规则对 Unicode 转义的已知误报 ⇒ 没动它（红证脚本的断言替我挡了一次错误改写，这是 D-097 那条纪律第二次兑现）。
+
+**钱包为什么不跟对方那页走**（三条都在后端源码里，不是我推的）：
+`PayService.java:68-97` 的 `createPayOrder` 每次点击无条件 `insert` 一条 `status=0` 订单，**没有幂等键**；
+`AppWalletController.java:59-62` + `PayService.java:178-207` 的 `query-pay-order` 只按 `orderNo` 查、**不校验归属人**，
+而 `status=0` 且支付已配置时**放款就发生在这一问里**；
+对方页面 `doRecharge` 在 `payResult == null`（也就是 `Repo` 的 catch 把请求失败压成 null）时执行
+`addRechargeRecord(amount)` —— 本地把余额加上去、插一条"充值"流水，**后台根本没收到这一笔**。
+最后一条直接撞用户定的验收底线，也撞 `tools/check_wallet_probes.sh` 的 W-b（三个写口在生效代码里必须各 0 命中）。
+⇒ 这一版保留我方只读钱包页；对方的充值/支付页整体不进（任务 #23 记欠账，前置条件是上面那两条后端事补完，
+且重接时失败分支必须"报原因、不动余额"）。
+
+**四个道具我撤了或改实了**：
+① 首页那格"扫一扫"—— onClick 与第 4 格"乘车码"是同一个 `Routes.BUS_QR`，而全工程没有任何扫码实现
+（`grep -rln "BarcodeScanner|CameraX|ImageAnalysis" app/src/main` = 0 个文件），这正是判据 FE-a 已经砍掉过的
+"两个格子做同一件事" ⇒ 撤格，宫格数保持 8；
+② 乘车码页的"本 App 二维码"是 `"BUSPOST-QR:" + 时间戳` 画的图，谁都扫不出来，旁边还写着"每分钟自动刷新"，
+下面钉了一份手写线路表（1路/2路/3路/K1 + 村名）⇒ 改成"本机不出乘车码"的事实陈述 + 真正能用的支付宝官方码出口，
+线路表删掉（L-v 那条硬编码村名额度是给输入框示例用的，不给假线路让路）；
+③ 天气预警通知写死 `route = Routes.USER_SHELL`（SR-g：进壳只应由角色决定）⇒ 改为**不带 route**，点开交给
+`startDestinationFor` 裁决；同时它那个 `catch (_: Exception)` 在挂起作用域里会吃掉取消 ⇒ 补 `CancellationException` 先穿透；
+④ 地址示例文案被三处重抄 ⇒ 收成 `SendScreen.kt` 里一个 `ADDRESS_EXAMPLE_HINT`，三处引用，
+L-v 的"恰好 1"不动判据就绿（重抄三遍正是 W-c/FE-c 反复钉的"两处文字迟早对不上"）。
+
+**判据簿 34 本：24 绿 10 红 → 全绿**，其中 6 本是我改了锚点或计数，逐条交代为什么不是"缩小判据变绿"：
+`envelope` E-f 锚点 `model = task.photoUrl` 已被对方改名成 `url = task.photoUrl`，照片仍然画在同一
+`if (task.photoUrl.isNotEmpty())` 分支里 ⇒ 改锚点文本，不改语义；
+`eta` T-i 的 `byUserDistance` 引用点 7→10，新增的是**并调用同一个口径**（对方"地址查公交"页没有自造排序）⇒ 计数上调 + 逐点重名列在簿里；
+`shell_routing` SR-o 锚点从 `navigationBars.union(ime)` 变 `systemBars.union(ime)`，ime 仍在并集里 ⇒ 只换基准，
+并把"壳自己吃状态栏后是否会多一段顶距"标成 NOT VERIFIED ON DEVICE；
+`location` L-b 的例外从 1 个文件扩到 2 个（地图选点页搬运的是高德点击回传的 GCJ-02 点，`Geo` 的契约就是 GCJ-02，
+再换算就是二次偏移），**沿用同一条规格：按文件写死 + 按点数封顶 1**（新增 L-b3）；
+`safe_call` SA-d 与 `throwable` TH-f 的 `attempt` 点数 14→15，多的那一处是我自己给 `UpdateDialog` 加的（下载 APK 不经 `safeApiCall`，
+就是这条判据说的"多一处"）⇒ 收进逐点表而不是放宽，两本同一条数；
+`wallet` W-a 全工程入口 1→2（首页宫格 + 「我的」列表各一处），上调依据是这个 app 的既有口径：
+`NOTIFICATIONS` 3 处、`PROFILE` 2、`SETTINGS` 3 ⇒ 同一页多面入口是常态，注册点仍钉"恰好 1"。
+
+**台账锚点**：合并把 `Repo.kt`/`Routes.kt`/`MainActivity.kt`/`AppUpdater.kt` 等文件的行号整体推移，
+`check_doc_anchor_probes.sh` 从 ID-MISS 323（闸门 286，本就红）涨到 **396**、新增可疑 aid **80**。
+本轮搬回 **8 条**（机械可验档：token 在目标文件里唯一出现 + 距离 ≤40 行 + 目标行不是注释），396→**388**；
+**3 条我拒了搬**，因为提议器给的新目标行是源码注释（`Api.kt` 里的 `* ContractParseException …`、`Repo.kt` 里的
+`// finished 后端 0 命中…`）—— 上一轮那次串位病（`etaMinutes` 的锚点被搬到 `fromLatitude` 那一行）就是搬去注释行造成的，
+注释满足计数却不证明那句话讲的事实 ⇒ 留着当欠账，不为了让簿子好看而搬。
+剩余 **72 条新增可疑 aid**（NEAR 43 / FAR 26 / 拒搬 3）与既有的 #159 同族，仍是"逐条人工判"那一档，本轮未清。
+
+**没在真机验过**：本轮全部结论来自编译产物、用例 XML 与判据簿读数。
+合并进来的乘车码页、地址搜索页、地图选点页、自更新弹窗都**没有真机在环证据**；
+其中自更新弹窗的下载/装包路径需要一次真机（含"未授权安装"那一格）才算收口。
+

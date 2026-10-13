@@ -144,7 +144,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | --- | --- | --- | --- | --- | --- | --- |
 | 列表本体 `data.list` | `Api.kt:160-165` `Payload.list`（`arr ?: obj.optJSONArray("list")`）→ `Repo.kt:852-859` `Feed(p.list.map{NotifyMsg.parse(it)}, p.demo, total = p.total)` | `AppNotificationController.java:33-42` 返回 `CommonResult<PageResult<…>>`；`PageResult.java:18 private List<T> list`（`total` 在 `:15`） | `{"list":[{"id":9,"readStatus":0,"content":"车已装车","eventType":"LOAD"}],"total":1}`（`NotificationWorkerResultTest.kt:82` 原样） | `{"code":0,"msg":"","data":null}` | `Api.kt:342-343` ⇒ 空 `Payload` ⇒ `list` 空集合、**不抛**、不回落演示数据；`Feed.error=null` 与 `Feed.cause=null`，结局是"没有新消息"而不是"失败" | `ApiTest.kt:22-41`（`assertNull(empty.arr)`）、`RepoTest.kt:53-61`（502 才是 error）、`NotificationWorkerResultTest.kt:78-102` |
 | `data` 直接是数组（司机侧消息 / 交接 / 段列表） | 同上 `arr` 分支（`Api.kt:447-451` `toPayload`） | `AppDriverController.java:135-140`（handovers）、`:149-154`（legs）返回 `CommonResult<List<…>>`；`:236`（messages）返回 `PageResult` | `[{"id":91,"status":4,"statusName":"交接完成","photoUrl":"…"}]`（`ScalarEnvelopeContractTest.kt:198`） | `data: []` | 空集合，同上一条 | `ScalarEnvelopeContractTest.kt:198-202`、`DriverExceptionContractTest.kt:37` |
-| `total` | `Api.kt:168` `obj?.optInt("total", list.size)` | `PageResult.java:15` | `:1` | 键不在 | **回落本页条数**（不是"后端总条数"），分页页脚因此可能偏小 | ⚠ 缺键面**无用例**（`ApiTest.kt:29` 只钉在场面）→ 见七.10 |
+| `total` | `Api.kt:173` `obj?.optInt("total", list.size)` | `PageResult.java:15` | `:1` | 键不在 | **回落本页条数**（不是"后端总条数"），分页页脚因此可能偏小 | ⚠ 缺键面**无用例**（`ApiTest.kt:29` 只钉在场面）→ 见七.10 |
 | `unread-count` 裸标量 | `Repo.kt:950-952` `longOf("count","unreadCount")` | `AppNotificationController.java:44-48` `CommonResult<Long>`（`data` 就是数字本体，没有键） | `{"code":0,"data":3}` | `data: null` | `Api.kt:132-146` ⇒ `null`（`Long?`），**与 0 分家**，UI 不显示"0 条未读" | `ScalarEnvelopeContractTest.kt:36-59` |
 | `readStatus`（Integer 0/1，不是布尔） | `Models.kt:1270` `multiBool("readStatus","isRead","read") \|\| multiNum("readStatus") == 1.0` | `AppNotificationRespVO.java:31`（DO `:34`） | `"readStatus":0` | 键不在 | `false`（未读），是安全方向 | `NotificationWorkerResultTest.kt:82` 用的就是 `"readStatus":0` |
 | `eventType` / `eventTypeName` / `level` / `actionRequired` | `Models.kt:1406`（多别名先取成 `evt`，再同时喂 `type:1269` 与 `eventType:1274`）、`:1275`（eventTypeName）、`:1276`（level）、`:1277`（actionRequired） | VO `:16` / `:19`（**由 controller `:40-41` 现算**，不来自 DB）/ `:34` / `:37` | `"eventType":"LOAD"` | 键不在 | 名 `""`；`level` ⇒ `MsgLevel.UNKNOWN`（`Models.kt:1254-1261`），不冒充普通级别 | `DomainSplitTest.kt:65/83/145` 覆盖空信封 |
@@ -217,7 +217,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 
 ### 七.8 信封与序列化的两条全局口径（会影响"缺失样例"怎么造）
 
-1. `CommonResult.java:27/33/37`（`code/msg/data`）＋ `PageResult.java:15/18`（`total/list`）⇒ 端上 `Api.kt:160-168` 的 `list`/`total`
+1. `CommonResult.java:27/33/37`（`code/msg/data`）＋ `PageResult.java:15/18`（`total/list`）⇒ 端上 `Api.kt:173-181` 的 `list`/`total`
    读法**只对分页三处成立**（`notification/page`、`driver/messages`、`send/page`）；`driver/handovers`、`driver/legs` 的 `data` 是裸数组。
 2. 后端**没有**配 `default-property-inclusion`（`application.yaml` 内 `jackson` 段实测无该项）⇒ 声明了但没赋值的字段会以
    **显式 `null` 出现在 JSON 里**（键在场）。端上 `multiNumOrNull/multiBoolOrNull`（`Models.kt:75-93`）把"键不在"和"值为 null"

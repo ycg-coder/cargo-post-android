@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -210,10 +211,15 @@ fun BusRouteBody(content: @Composable () -> Unit) {
     // 只吃 navigationBars 的话键盘一弹就把主操作整块盖住 —— 2026-10-10 真机（小米平板 6，2136x3200@440dpi）
     // 实测：登录页"登录"按钮与《服务协议》勾选行完全不可见，且表单不滚动（截图 08-ime-scroll / 09-home）。
     // 用 union 而不是再叠一层 imePadding：键盘弹起时 ime 那一格已含导航条，叠两次会多出一段空白。
+    // 2026-10-10 补上 statusBars：部分页面（寄货/商品详情等）没有 BackTopBar 做顶部避让，
+    // 内容会顶进状态栏。统一在这里收口并消费掉，页面内的 BackTopBar/Signpost 不再重复避让。
+    // systemBars 包含状态栏 + 导航栏；再 union ime 覆盖键盘弹起场景。
+    val allInsets = WindowInsets.systemBars.union(WindowInsets.ime)
     Box(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+            .windowInsetsPadding(allInsets)
+            .consumeWindowInsets(allInsets),
         contentAlignment = Alignment.TopCenter,
     ) {
         FluidBackground(Modifier.matchParentSize())

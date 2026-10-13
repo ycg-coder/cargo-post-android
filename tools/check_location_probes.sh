@@ -21,12 +21,20 @@ LA=$(grep -rn "${KT[@]}" "CoordinateTransform\.\(convert\|convertAll\)(" . \
 # 那种点必须只有一个出口（Locator）。例外按文件写死、并按点数封顶（L-b2），换文件搬运就红。
 LB=$(grep -rn "${KT[@]}" "Geo([a-zA-Z]*\.latitude" . \
   | grep -v "core/loc/Locator\.kt" | grep -v "core/navigation/AmapNavigationEngine\.kt" \
+  | grep -v "ui/user/MapPointPickerScreen\.kt" \
   | grep -vE ":[0-9]+: *\*" | wc -l | tr -d ' ')
 
 # L-b2 SDK 折点搬运处数：豁免**按数量封顶 1 处**而不是按文件放行整个文件。
 # 教训：只写文件级 grep -v 时，在这个文件里再加第二处 Geo(p.latitude, p.longitude) 判据照样绿
 # （本轮负控 BREAK2 实测 rc=0 暴露了这个洞）—— 按文件豁免等于把出口唯一性换成"信这个文件"。
 LB2=$(grep -c "Geo([a-zA-Z]*\.latitude" com/shanxiang/buspost/core/navigation/AmapNavigationEngine.kt)
+
+# LB3 第二个具名例外（2026-10-13 合并 origin/main 时对方新增的"地图选点"页）：
+#   `ui/user/MapPointPickerScreen.kt` 里 `Geo(latLng.latitude, latLng.longitude)` 搬运的是
+#   **高德地图点击回传的 LatLng**，高德给出来就已经是 GCJ-02（`Geo` 的契约就是 GCJ-02，见 Locator.kt:192
+#   "消费方拿到的 geo 一定是 GCJ-02"），这里再走一次换算就是二次偏移。与 LB2 同一类，所以同一条规格：
+#   **按文件写死 + 按点数封顶 1**，在这个文件里再加第二处手写 Geo 就红。
+LB3=$(grep -c "Geo([a-zA-Z]*\.latitude" com/shanxiang/buspost/ui/user/MapPointPickerScreen.kt)
 
 # L-c 上报报文里是否混进了客户端时间键（后端 VO 没有这个字段，带上就是伪造轨迹时间）
 LC=$(grep -n -A 12 '"\$T/driver/location"' com/shanxiang/buspost/data/repo/Repo.kt \
@@ -99,6 +107,7 @@ LX=$(grep -rn "${KT[@]}" "暂无可选村庄" . | wc -l | tr -d ' ')
 echo "L-a 换算真实调用点   = $LA （目标 2：Locator 出口 + RealRoadRoute.gcj02Points）"
 echo "L-b Geo(latitude) 越界 = $LB （目标 0）"
 echo "L-b2 SDK 折点搬运处数（唯一豁免文件内） = $LB2 （目标 1）"
+echo "L-b3 地图选点页 SDK 点搬运处数（第二个具名例外） = $LB3 （目标 1）"
 echo "L-c 报文客户端时间键  = $LC （目标 0）"
 echo "L-d 无班次拦停旧文案  = $LD （目标 0）"
 echo "L-e 手写偏移公式越界  = $LE （目标 0）"
@@ -114,6 +123,7 @@ fail=0
 [ "$LA" = 2 ] || { echo "× L-a 应为 2（多了=重复偏移，少了=有人绕过出口拿原始坐标）"; fail=1; }
 [ "$LB" = 0 ] || { echo "× L-b 出现手写 WGS-84 Geo，坐标系出口不再唯一"; fail=1; }
 [ "$LB2" = 1 ] || { echo "× L-b2 SDK 折点搬运不是恰好 1 处（现 $LB2）：豁免要么被扩大，要么已不必要，都要重新核坐标系归属"; fail=1; }
+[ "$LB3" = 1 ] || { echo "× L-b3 地图选点页的 SDK 点搬运不是恰好 1 处（现 $LB3）：0=那一格被改成走换算（会二次偏移），2+=有人又手抄了一个点当坐标"; fail=1; }
 [ "$LC" = 0 ] || { echo "× L-c 上报报文带了后端 VO 没有的时间字段，等于伪造轨迹时间"; fail=1; }
 [ "$LD" = 0 ] || { echo "× L-d 无班次不报文的旧拦停回来了（运输段司机会永远不上报）"; fail=1; }
 [ "$LE" = 0 ] || { echo "× L-e 业务代码手写了偏移公式（§五：只允许一个入口）"; fail=1; }

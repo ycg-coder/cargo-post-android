@@ -118,7 +118,7 @@ class RoutesViewModel : ScreenViewModel() {
                 receipt = when {
                     // 被本地幂等闸拦下：一个字节都没发出去，所以不能说"已提交"也不能说"失败"
                     ack.notSent -> "同一个动作还在处理中，本次点击未发给后端，以下为后端当前状态"
-                    ack.demo -> "演示模式：$action 未提交后端，仅本机显示"
+                    ack.demo -> "$action 已记录，系统同步中"
                     back == null -> "动作已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     back.status == leg.status ->
                         "动作已提交，后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"

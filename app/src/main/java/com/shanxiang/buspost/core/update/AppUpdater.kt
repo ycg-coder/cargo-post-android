@@ -91,13 +91,18 @@ object AppUpdater {
         return dest
     }
 
-    /** 真实下载出口：流式写盘，返回字节数（不整包进内存） */
-    suspend fun httpDownload(url: String, dest: File): Long =
+    /**
+     * 真实下载出口：流式写盘，返回字节数（不整包进内存）。
+     * 进度按 HTTP 响应头的 `Content-Length` 算 —— 头里没给长度（分块传输）就一次都不回调，
+     * 界面那一格停在 0% 而不是编一个"看着在动"的假进度。
+     */
+    suspend fun httpDownload(url: String, dest: File, onProgress: (Float) -> Unit = {}): Long =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val conn = java.net.URL(url).openConnection()
                 conn.connectTimeout = 20_000
                 conn.readTimeout = 60_000
+                val declared = conn.contentLengthLong
                 conn.getInputStream().use { input ->
                     dest.outputStream().use { output ->
                         var total = 0L
@@ -107,6 +112,7 @@ object AppUpdater {
                             if (n < 0) break
                             output.write(buf, 0, n)
                             total += n
+                            if (declared > 0L) onProgress((total.toFloat() / declared.toFloat()).coerceIn(0f, 1f))
                         }
                         total
                     }
