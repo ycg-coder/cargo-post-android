@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -108,6 +109,13 @@ class SendViewModel : ScreenViewModel() {
     var stations by mutableStateOf<List<Station>>(emptyList())
     var pickup by mutableStateOf<Station?>(null)
     var delivery by mutableStateOf<Station?>(null)
+    /**
+     * 最早取货时间（`AppSendOrderCreateReqVO.java:76`）：`-1` = 没选，**整个键不出网**（后端把不填当"不设下限"，
+     * `AlgorithmOrderDTO.java:74` 原话"没填即 null、算法不凭空判"）。这里存"第几天 + 整点"而不是绝对毫秒，
+     * 是为了让隔夜草稿恢复后跟着当天的候选一起过期——旧时刻会被判成 null，不会被提交成一个过去的时间。
+     */
+    var pickupDay by mutableStateOf(-1)
+    var pickupHour by mutableStateOf(-1)
     var quote by mutableStateOf<QuoteResult?>(null)
     var routePreview by mutableStateOf<RoutePreview?>(null)
     var reach by mutableStateOf<Reachability?>(null)
@@ -129,6 +137,8 @@ class SendViewModel : ScreenViewModel() {
     var stationsDemo by mutableStateOf(false)
     var formError by mutableStateOf("")
     var created by mutableStateOf<com.shanxiang.buspost.data.repo.Ack?>(null)
+    /** 取件时间的提交回执（成功页那一行）：只在提交后那一轮有值，不进草稿 */
+    var pickupReceipt by mutableStateOf("")
     var submitting by mutableStateOf(false)
     /** 分步流程：1 填货物 → 2 拍照确认 → 3 提交成功（对齐小程序 send.wxml 三步） */
     var step by mutableStateOf(1)
@@ -193,6 +203,10 @@ class SendViewModel : ScreenViewModel() {
         o.put("receiverAddress", receiverAddress)
         o.put("pickupId", pickup?.id ?: 0L)
         o.put("deliveryId", delivery?.id ?: 0L)
+        // 只存"第几天 + 整点"这一对档位：绝对毫秒存进草稿会隔夜变成一个过去的时间，
+        // 而档位由 `pickupMillisOf(now, …)` 现算，过期自然变 null（整个键不发）。
+        o.put("pickupDay", pickupDay)
+        o.put("pickupHour", pickupHour)
         Prefs.sendDraft = o.toString()
     }
 
@@ -216,6 +230,9 @@ class SendViewModel : ScreenViewModel() {
         val did = o.optLong("deliveryId")
         stations.firstOrNull { it.id == pid }?.let { pickup = it }
         stations.firstOrNull { it.id == did }?.let { delivery = it }
+        // 档位原样恢复；是否还有效由 pickupMillisOf(当前时钟, …) 现判，旧时刻不会被提交
+        o.optInt("pickupDay", -1).takeIf { it >= 0 }?.let { pickupDay = it }
+        o.optInt("pickupHour", -1).takeIf { it in 0..23 }?.let { pickupHour = it }
     }
 
     fun clearDraft() {
@@ -348,6 +365,8 @@ class SendViewModel : ScreenViewModel() {
         receiverName = ""
         receiverMobile = ""
         receiverAddress = ""
+        pickupDay = -1
+        pickupHour = -1
         photoUri = null
         photoUrl = ""
         photoUploadFailed = false
@@ -378,7 +397,19 @@ class SendViewModel : ScreenViewModel() {
         "originalAddress" to originalAddress.trim(),
         "originalLatitude" to myGeo?.lat,
         "originalLongitude" to myGeo?.lng,
+        // 最早取货时间：只可能是正数 Epoch 毫秒或 null。null 会被 `Api.kt:308` 整个键丢掉，
+        // 后端因此按"不设下限"处理；发字符串则会被 `TimestampLocalDateTimeDeserializer` 静默解成 0（1970 年），
+        // 所以这一格的形状由 `pickupSubmitMillis` 唯一决定，界面不许直接写这个键。
+        "earliestPickupTime" to pickupSubmitMillis(),
     )
+
+    /**
+     * 出网值单独抽出、时钟可注入：界面用当前时刻，契约用例给固定时钟（隔夜草稿恢复出的旧时刻在这里判成
+     * null，于是整个键不发，而不是发一个过去的时间）。
+     */
+    internal fun pickupSubmitMillis(
+        now: java.time.ZonedDateTime = java.time.ZonedDateTime.now(PICKUP_ZONE),
+    ): Long? = pickupSubmitValue(pickupMillisOf(now, pickupDay, pickupHour), now.toInstant().toEpochMilli())
 
     fun submit() {
         formError = validateStep2()
@@ -412,6 +443,11 @@ class SendViewModel : ScreenViewModel() {
                     pickupCode = ack.pickupCode.ifEmpty { server?.pickupCode.orEmpty() },
                     confirmed = page.error == null,
                 )
+                // 取件时间那一格单独回执：把"本次发没发"与"后端回读没回读"分开说，不含糊过去
+                pickupReceipt = pickupSubmitConclusion(
+                    form["earliestPickupTime"] as? Long,
+                    server?.earliestPickupMillis,
+                )
                 step = 3
             } finally {
                 submitting = false
@@ -435,7 +471,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
     }
 
     LaunchedEffect(Unit) { if (vm.stations.isEmpty()) vm.load(context) }
-    LaunchedEffect(vm.goodsName, vm.weight, vm.itemCount, vm.length, vm.width, vm.height, vm.note, vm.category, vm.fresh, vm.receiverName, vm.receiverMobile, vm.receiverAddress, vm.pickup, vm.delivery) {
+    LaunchedEffect(vm.goodsName, vm.weight, vm.itemCount, vm.length, vm.width, vm.height, vm.note, vm.category, vm.fresh, vm.receiverName, vm.receiverMobile, vm.receiverAddress, vm.pickup, vm.delivery, vm.pickupDay, vm.pickupHour) {
         delay(500)
         vm.saveDraft()
     }
@@ -545,6 +581,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                             showNext = true,
                             onClick = { pickStation = 1 },
                         )
+                        PickupWindowPicker(vm)
                     }
                 }
 
@@ -833,6 +870,13 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                         }
                     }
 
+                    // 取件时间这一格的回执（判定在 PickupWindow 纯层）：没填、已填已回读、已填但后端没回读，三种说法不同
+                    if (vm.pickupReceipt.isNotEmpty()) {
+                        BusCard(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                            Text(vm.pickupReceipt, color = t.textSecondary, fontSize = (12.5 * scale).sp)
+                        }
+                    }
+
                     // 温馨提示（对齐 match-reminder）
                     BusCard(modifier = Modifier.fillMaxWidth()) {
                         Column {
@@ -1028,6 +1072,78 @@ private fun CategoryChips(selected: String, onPick: (String) -> Unit) {
             }
         }
     }
+}
+
+/**
+ * 最早取货时间选择器：判定与出网值全在 `PickupWindow.kt`，这里只把候选画出来。
+ * 三件事决定了形状：
+ * - 过去的整点**不进候选**（不是置灰还能点），所以这一格提交不出过去的时间；
+ * - 「不限制」是一等选项，不填时整个键被 `Api` 丢掉，后端按不设下限处理（不是发 0、也不是发"现在"）；
+ * - 后果那句话放在选择器下面，而不是只在成功页才说。
+ */
+@Composable
+private fun PickupWindowPicker(vm: SendViewModel) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val now = java.time.ZonedDateTime.now(PICKUP_ZONE)
+    val groups = pickupOptions(now)
+    val millis = vm.pickupSubmitMillis(now)
+    val hours = groups.firstOrNull { it.second.firstOrNull()?.dayOffset == vm.pickupDay }?.second.orEmpty()
+    Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("最早取货时间", color = t.textSecondary, fontSize = (12.5 * scale).sp, modifier = Modifier.weight(1f))
+            Text(
+                pickupSelectionText(millis),
+                color = if (millis == null) t.textTertiary else t.ink,
+                fontSize = (12.5 * scale).sp,
+                fontWeight = if (millis == null) FontWeight.Normal else FontWeight.Bold,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            PickupWindowChip("不限制", on = vm.pickupDay < 0) {
+                vm.pickupDay = -1
+                vm.pickupHour = -1
+            }
+            groups.forEach { (_, opts) ->
+                val day = opts.first().dayOffset
+                PickupWindowChip(pickupDayLabel(now.toLocalDate(), day), on = vm.pickupDay == day) {
+                    vm.pickupDay = day
+                }
+            }
+        }
+        if (vm.pickupDay >= 0) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                hours.forEach { opt ->
+                    PickupWindowChip(
+                        String.format(java.util.Locale.CHINA, "%02d:00", opt.hour),
+                        on = vm.pickupHour == opt.hour,
+                    ) { vm.pickupHour = opt.hour }
+                }
+            }
+        }
+        Text(PICKUP_DISPATCH_NOTE, color = t.textTertiary, fontSize = (11.5 * scale).sp)
+    }
+}
+
+@Composable
+private fun PickupWindowChip(text: String, on: Boolean, onClick: () -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    Text(
+        text,
+        color = if (on) t.primaryOnLight else t.textSecondary,
+        fontSize = (12 * scale).sp,
+        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(BusRadius.pill))
+            .background(if (on) t.primaryLight else t.track)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+    )
 }
 
 /**

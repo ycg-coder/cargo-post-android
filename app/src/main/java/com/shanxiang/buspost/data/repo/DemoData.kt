@@ -260,6 +260,9 @@ object DemoData {
             "dataSource" to if (i == 0) "REAL" else "SIMULATED",
             "estimatedArrivalTime" to if (hasCarrier) "11:40" else "",
             "createTime" to "2026-09-2${8 - i} 09:1${i}4",
+            // 演示形态把两格都演出来：第 2 单带后端那个回读键（数字毫秒），其余不带 ⇒ 列表里同时看得见
+            // "有值怎么念"和"没给怎么念"，不是一屏假完整。真实接口这一键来自 AppSendOrderRespVO（本轮补）。
+            "earliestPickupTime" to if (i == 1) System.currentTimeMillis() + 3 * 3600_000L else null,
             "remark" to if (i == 0) "易碎，请轻放" else "",
         )
     }

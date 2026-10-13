@@ -1015,6 +1015,14 @@ data class SendOrder(
     val driverMobile: String = "",
     val orderType: Int = 0,
     val bizType: String = "",
+    /**
+     * 最早取货时间（后端 `AppSendOrderRespVO` 的 `earliestPickupTime`，本轮补的回读键）。
+     * **只认数字毫秒**：`YudaoJacksonAutoConfiguration` 把 `LocalDateTime` 注册成 Epoch 毫秒数字，
+     * 而后端反序列化那一侧对非数字串是**静默变 0**（`TimestampLocalDateTimeDeserializer.java:24-27`）——
+     * 本机不重复这个形状：看见字符串、看见 0 一律当"没给"（null），界面因此不许把它渲染成 1970 年。
+     * ⚠ null 有两层含义且分不开：这一版没部署回读键、或用户下单时就没填 ⇒ 措辞必须说"后端没给这一项"。
+     */
+    val earliestPickupMillis: Long? = null,
 ) {
     val statusLabel: String get() = statusName.ifEmpty { freightStatusLabel(status) }
     /** 语义色跟着 [FreightOrderStatus] 的码走（§18：旧页面按 status 区间上色，把 4 已完成读成主色） */
@@ -1075,6 +1083,8 @@ data class SendOrder(
             driverMobile = o.multiStr("driverMobile", "driverPhone"),
             orderType = o.multiNum("orderType").toInt(),
             bizType = o.multiStr("bizType"),
+            // 只认 Number：multiNum 会把字符串 coerce 成数字（含 "2026-10-13 15:00:00" → 0.0），那正是后端那个静默 0 的形状
+            earliestPickupMillis = (o.opt("earliestPickupTime") as? Number)?.toLong()?.takeIf { it > 0L },
         )
     }
 }
