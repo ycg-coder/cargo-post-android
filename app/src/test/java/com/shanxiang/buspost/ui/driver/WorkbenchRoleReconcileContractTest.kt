@@ -39,12 +39,17 @@ class WorkbenchRoleReconcileContractTest : ServerTest() {
         Prefs.driverShiftId = 88L
     }
 
-    /** 档案之外的四条司机域回包：都用"成功且空"，把判据干净地留给请求条数 */
+    /**
+     * 档案之外的四条司机域回包 + 一条公告回包（`load()` 那一轮的第 6 跳）：都用"成功且空"，
+     * 把判据干净地留给请求条数。2026-10-12 加公告那一格时本类的 5 全部同轮改成 6，
+     * 而"撤档后只发档案这一条"仍是 **1** —— 早退支在公告之前就 return 了，这一格没被顺手放宽。
+     */
     private fun enqueueRest() {
         respondData("[]")
         respondData("[]")
         respondData("[]")
         respondData("null")
+        respondData("[]")
     }
 
     @Test
@@ -83,7 +88,7 @@ class WorkbenchRoleReconcileContractTest : ServerTest() {
         vm.load()
         awaitUntil { !vm.loading }
 
-        assertEquals("失败轮次不得少发任何一条", 5, server.requestCount)
+        assertEquals("失败轮次不得少发任何一条", 6, server.requestCount)
         assertEquals("未知不等于否定：角色原样保留", Role.DRIVER, Prefs.role)
         assertEquals(61L, Prefs.driverId)
         assertFalse(vm.demoted)
@@ -107,7 +112,7 @@ class WorkbenchRoleReconcileContractTest : ServerTest() {
         assertEquals(Role.USER, Prefs.role)
         assertFalse(vm.demoted)
         assertEquals("身份仍然要收下（后续显式进司机模式要用它拼参数）", 61L, Prefs.driverId)
-        assertEquals(5, server.requestCount)
+        assertEquals(6, server.requestCount)
         assertNull(vm.error)
     }
 
@@ -119,7 +124,8 @@ class WorkbenchRoleReconcileContractTest : ServerTest() {
     fun `演示回落不算后端否定`() {
         TestHost.demoBackend()
         residueDriver()
-        repeat(5) { respond("服务不可用", code = 500) }
+        // 6 条 = 4 条司机域 + 档案 + 公告，全部回 500，靠演示回落顶上
+        repeat(6) { respond("服务不可用", code = 500) }
 
         val vm = WorkbenchViewModel()
         vm.load()

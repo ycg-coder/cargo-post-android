@@ -78,24 +78,38 @@ class MinutesContractTest {
         )
     }
 
-    /** ③ 换乘方案时长：只认 Candidate 的 durationMinutes，`totalMinutes` / `minutes` 不再接 */
+    /**
+     * ③ 换乘方案时长：只认 Candidate 的 durationMinutes，`totalMinutes` / `minutes` 不再接。
+     *
+     * ⚠ D-085 把 `TransitPlan.minutes` 收成 `Int?`：`Candidate:65` 是 `Integer`、可以缺席，
+     *   旧写法 `multiNum(...).toInt()` 把"没给"塌成 **0**，而票面那一行会把它念成"这个方案 0 分钟"——
+     *   下面三条断言原先钉的正是那个 0（钉住了缺陷本身），现在钉"缺席就是 null"。
+     */
     @Test
     fun `换乘方案时长只认 durationMinutes，totalMinutes 与 minutes 不再被采纳`() {
         val real = TransitPlan.parse(obj("name" to "方案 A", "legCount" to 2, "durationMinutes" to 86))
         assertEquals(86, real.minutes)
 
         val legacy = TransitPlan.parse(obj("name" to "方案 A", "legCount" to 2, "totalMinutes" to 99))
-        assertEquals("totalMinutes 没有生产者，不许再当契约键", 0, legacy.minutes)
+        assertEquals("totalMinutes 没有生产者，不许再当契约键", null, legacy.minutes)
 
         assertEquals(
-            0,
+            "minutes 这个键后端从不发；缺 durationMinutes 就是没给，不许塌成 0 分钟",
+            null,
             TransitPlan.parse(obj("name" to "方案 A", "minutes" to 77)).minutes,
         )
         // 信封级的 totalDurationMinutes（整单总时长，另一个对象另一个口径）也不许流进这里
         assertEquals(
-            0,
+            null,
             TransitPlan.parse(obj("name" to "方案 A", "totalDurationMinutes" to 210)).minutes,
         )
+        // Candidate 另两格同样可缺席：transferCount:63 / distanceKm:64
+        val bare = TransitPlan.parse(obj("modeName" to "方案 A"))
+        assertEquals(null, bare.transfers)
+        assertEquals(null, bare.distanceKm)
+        val full = TransitPlan.parse(obj("modeName" to "方案 A", "transferCount" to 1, "distanceKm" to 27.4))
+        assertEquals(1, full.transfers)
+        assertEquals(27.4, full.distanceKm)
     }
 
     /** ④ 班次总时长：只认 plannedDurationMinutes，段时长 durationMinutes 不许冒充 */
@@ -138,7 +152,7 @@ class MinutesContractTest {
         // 每一套方案都要有非零时长：读成 0 就意味着两侧键名又对不上了
         assertTrue(
             "演示方案时长读成 0，parser 与 DemoData 漂移：${read.map { it.minutes }}",
-            read.all { it.minutes > 0 },
+            read.all { (it.minutes ?: 0) > 0 },
         )
         assertEquals(listOf(86, 142), read.map { it.minutes })
     }

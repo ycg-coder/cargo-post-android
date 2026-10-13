@@ -6,6 +6,7 @@ import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
+import kotlinx.coroutines.CancellationException
 
 /**
  * 提醒判定内核：前台（App 打开时 20 秒一轮）和后台（WorkManager 15 分钟一轮）共用同一套逻辑，
@@ -157,11 +158,16 @@ object AlertEngine {
                                     title,
                                     body,
                                     "weather_alert".hashCode() and 0x7fffffff,
-                                    route = Routes.USER_SHELL,
+                                    // 有意**不带 route**：天气预警不属于用户域也不属于司机域，点开就交给
+                                    // 角色裁决那一步（`startDestinationFor`）。在这里写死 `Routes.USER_SHELL`
+                                    // 就是通知替角色决定进哪个壳 —— 判据 SR-g 钉的正是这一格（D-100）。
                                 )
                             }
                         }
                     }
+                } catch (e: CancellationException) {
+                    // 取消必须穿透：这一格在挂起作用域里，把它收成一次普通失败就是 F-2 ⑨ 迁掉的那类病
+                    throw e
                 } catch (_: Exception) {
                     // 天气取数失败不影响其他提醒，静默跳过
                 }

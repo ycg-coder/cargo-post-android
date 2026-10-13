@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <cache-path name="updates" path="updates/" />
+<!--
+  #48 更新通路：FileProvider 只开放**安装包那一个目录**（`cache/apk`）。
+  不把 files/、外部存储根或整个 cache/ 挂出去 —— 授权范围应该是"这一个 URI、只读、给系统安装器"，
+  而不是"任何拿到 authority 的应用都能翻我缓存"。
+  路径与 `AppUpdater.download()` 里的 `File(context.cacheDir, "apk")` 必须一致，改一处就要改另一处。
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="apk"
+        path="apk/" />
 </paths>

@@ -331,7 +331,7 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                                 value = vm.receiverAddress,
                                 onValueChange = { vm.receiverAddress = it },
                                 label = "收货地址",
-                                placeholder = if (guest) "登录后填写" else "如：云山村 3 组，村口小卖部",
+                                placeholder = if (guest) "登录后填写" else ADDRESS_EXAMPLE_HINT,
                                 icon = BusIcons.location,
                                 minLines = 2,
                                 singleLine = false,

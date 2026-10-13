@@ -224,6 +224,11 @@ class HomeViewModel : ScreenViewModel() {
         // 旧写法让它落到 empty 那一支，念出「附近暂无公交线路」，
         // 而同一时刻实时公交页写着 80 条线路、1192 个站点（设备实拍 home_1 与 bus_1 前后脚）—— 两屏互相打脸。
         if (geo == null) return "noloc"
+        // 有失败原因就必须报 error：旧写法先 `nearby ?: return "loading"`，而 `Repo.kt:837` 失败时回的是
+        // One(null, error=…) ⇒ `error != null` 必然 `nearby == null` ⇒ 下面那行 error 判定与
+        // 「网络不太好 / 重新加载」那张卡（:496-502）一起变成**死代码**，失败只表现为永远转圈的骨架屏
+        // —— 真机反馈"首页没有附近公交卡片"读到的就是这一格。
+        if (nearby == null && error != null) return "error"
         val r = nearby ?: return "loading"
         if (error != null && r.vehicles.isEmpty()) return "error"
         // 同上：inService 缺失不许当成"运营中"的反面（F-2 §四）；
@@ -411,8 +416,16 @@ fun HomeScreen(
             FeatureTile(BusIcons.wallet, "钱包", FeatureBg.DEEP, {
                 if (guest) onLoginClick?.invoke() else nav.navigate(Routes.WALLET)
             }, Modifier.weight(1f), 6)
-            FeatureTile(BusIcons.camera, "扫一扫", FeatureBg.CLAY, {
-                if (guest) onLoginClick?.invoke() else nav.navigate(Routes.BUS_QR)
+            // 收藏线路：这一格读的是本机 DataStore（后端没有收藏接口），所以**不设登录闸门**——
+            // 旁边三格要 gate 是因为它们去的是账号数据。旧的"更多功能"格与"个人中心"格是同一个
+            // onSelectTab(3)，属重复入口，这一格把它换掉。
+            // ⚠ 合并 origin/main 时对方在同一 Row 又加了一格"扫一扫"，onClick 与本页第 4 格"乘车码"
+            //    是同一个 `nav.navigate(Routes.BUS_QR)`，而全工程没有任何扫码实现
+            //    （`grep -rln "BarcodeScanner|CameraX|ImageAnalysis" app/src/main` = 0 个文件）。
+            //    两格同一去向 + 一个做不到的动作名，正是上面"更多功能"那一条已经砍掉过的病，
+            //    所以这一格并进"乘车码"、宫格数保持 8（判据 FE-a 的目标值就是这个数）。
+            FeatureTile(BusIcons.star, FAVORITE_ENTRY_LABEL, FeatureBg.CLAY, {
+                nav.navigate(Routes.BUS)
             }, Modifier.weight(1f), 7)
         }
         }

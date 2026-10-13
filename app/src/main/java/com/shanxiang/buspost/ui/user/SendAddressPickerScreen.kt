@@ -179,7 +179,7 @@ fun SendAddressPickerScreen(
                         value = vm.addressInput,
                         onValueChange = { vm.addressInput = it },
                         label = "地址",
-                        placeholder = "如：云山村 3 组，村口小卖部",
+                        placeholder = ADDRESS_EXAMPLE_HINT,
                         icon = BusIcons.location,
                         minLines = 2,
                         singleLine = false,
@@ -239,9 +239,9 @@ fun SendAddressPickerScreen(
                                     modifier = Modifier.padding(start = 6.dp),
                                 )
                             }
-                            if (reach.distanceKm != null) {
+                            reach.distanceKm?.let { km ->
                                 Text(
-                                    "距离：${String.format("%.1f", reach.distanceKm)} 公里",
+                                    "距离：${String.format("%.1f", km)} 公里",
                                     color = t.textSecondary,
                                     fontSize = (11 * scale).sp,
                                 )

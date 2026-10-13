@@ -394,12 +394,34 @@ if (now - last401At > 2000) {
 - 自适应图标: mipmap-anydpi-v26/ic_launcher.xml
 - 各密度: mdpi(48x48), hdpi(72x72), xhdpi(96x96), xxhdpi(144x144), xxxhdpi(192x192)
 
-**当前状态**: ✅ 已配置 (`@mipmap/ic_launcher`)
+**当前状态（2026-10-13 复测，替换 10-12 那一版）**：⚠ **自适应图标已配、商店 1024 位图已补、各密度位图仍无（判定为不需要）**
+- `res/mipmap-anydpi-v26/ic_launcher.xml` = 唯一的启动图标资源，内容 `<background=@drawable/ic_launcher_background>`
+  + `<foreground=@drawable/ic_launcher_foreground>` + `<monochrome=@drawable/ic_launcher_foreground>`
+  （10-12 那一版这里写的是 `@color/bus_launcher_bg` —— D-091 换向方向 2 时背景已改成渐变 drawable，
+  那个颜色条目已删；monochrome 复用前景是刻意的：前景只有白色与透明镂空，themed icon 取 alpha 通道即正确的单色剪影）；
+- `mipmap-mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi` **目录不存在**（`ls res | grep mipmap` 只有 anydpi-v26 一行）。
+  `minSdk = 26`（`app/build.gradle.kts:74`）⇒ 这在本项目里**不是崩溃点**：API 26+ 只认 adaptive icon。
+  但"各密度 PNG"那一栏的要求并未满足，且商店截图/对外素材需要一张真位图；
+- **10-13 补上商店那张位图**：`tools/render_launcher_store_png.py` 读**同一份 VectorDrawable 的 pathData**
+  （viewport 108、`<group>` 的 scale/pivot 从 XML 读不写死、evenOdd 挖洞、strokeWidth + round cap）
+  渲 `docs/design/ic_launcher_store_1024.png`。本轮实测读数：`尺寸=(1024, 1024) 模式=RGB（无 alpha）
+  前景采样=23614 最远半径=308.4px < 安全圆 312.9px 风挡取色=(18,119,99)（洞是透的）字节=9058`。
+  脚本自带四道硬闸并逐条负测过（安全圆越界 / evenOdd 洞没挖开 / pathData 退化 / 没有 `<group>`，各自 `rc=1` 并点名原因；基线与还原后 `rc=0`）。
+  ⚠ **诚实边界**：本机没有 Android 渲染器，这张位图是**同一几何的另一种实现**，像素级不保证与系统渲染完全一致（抗锯齿/渐变插值不同）；
+  各密度位图仍**不做**——`minSdk = 26` 下 API 26+ 只认 adaptive icon，补一套 PNG 只是多一份会漂移的拷贝。
+- `AndroidManifest.xml:55/57` 的 `android:icon` 与 `android:roundIcon` 都指向同一个 `@mipmap/ic_launcher`
+  （没有单独的 `ic_launcher_round` 资源； adaptive icon 由系统按机型形状裁切，这是正常做法，不算缺件）。
+
+**未收口（队列 #43，等用户给设计稿）**：图标美术本身、`monochrome` 需要单独一层才能出正确的主题图标灰度版、
+以及启动页/登录页仍在用第二套标志 `app/src/main/assets/logo.png`
+（消费点 `core/ui/SplashOverlay.kt:291` 的 `LOGO_ASSET` 与 `ui/login/LoginScreen.kt:80` 的硬写串），
+换图标时这两处要与 mipmap 收敛成一套，否则桌面是新标、开屏是旧标。
 
 ### 6.2 启动屏
 
-**文件**: `res/drawable/splash_background.xml`  
-**设计**: 品牌Logo居中 + 渐变色背景 (#1e5a96 → #2d7bc4)
+**文件**: ~~`res/drawable/splash_background.xml`~~ — 该文件不存在（`ls res/drawable | grep splash` 零命中）。
+**实际实现**: Compose 的 `core/ui/SplashOverlay.kt`，品牌位图为 `assets/logo.png`，
+即 §6.1 说的第二套标志；渐变色背景那句描述对应的是代码里的 brush，不是一个 drawable 资源。
 
 ### 6.3 应用截图
 

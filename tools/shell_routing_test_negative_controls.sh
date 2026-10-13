@@ -73,9 +73,13 @@ echo "  gradle exit=$BASE（必须 0，基线不绿的负控一律不采信）"
 #   下面 7 条照跑照打，看起来像一轮完整的负控。不绿的基线一律在第一条破口之前退出。
 [ "$BASE" = 0 ] || { echo "✘ 基线未通过，本轮负控不采信（先看 /tmp/shell_neg_baseline.log 红的是哪条用例）"; exit 2; }
 
-# M-1 未登录不再优先落登录页：残留 role=DRIVER 的陌生人被直接放进司机工作台
-red "$SD" 'assert "!loggedIn -> Routes.LOGIN" in s; s = s.replace("    !loggedIn -> Routes.LOGIN\n", "", 1)'
-case_run M-1 "删掉未登录分支"
+# M-1 未登录被直接放进司机壳：残留 role=DRIVER 的陌生人进了司机工作台（游客模式那一格不再管角色）
+# ⚠ D-082 之后重锚 + 语义随动：旧破口写的是 `!loggedIn -> Routes.LOGIN`，而 Task #16 之后
+#   未登录落的是 **USER_SHELL（游客可看附近公交）**，那句字面早就不在树里 ⇒ assert 直接 exit 2，
+#   这本 M-2 之后一条都没跑到。判据要防的那件事没变（陌生人不能进司机壳），所以破口换成
+#   "未登录一律给司机壳" —— 它红的正是 ShellRoutingContractTest 里钉游客模式那一条。
+red "$SD" 'a = "    !loggedIn -> Routes.USER_SHELL"; assert a in s; s = s.replace(a, "    !loggedIn -> Routes.DRIVER_SHELL", 1)'
+case_run M-1 "未登录落到司机壳"
 
 # M-2 角色与壳的对应关系接反：司机进了用户壳（分域看起来还在，实际串了）
 red "$SD" 'a = "    role == Role.DRIVER -> Routes.DRIVER_SHELL"; assert a in s; s = s.replace(a, "    role == Role.DRIVER -> Routes.USER_SHELL", 1)'

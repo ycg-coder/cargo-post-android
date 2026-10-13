@@ -27,6 +27,8 @@ class BusPostApp : Application() {
         Channels.ensure(this)
         Api.initCache(this)
         Repo.restoreSession()
+        // 业务请求 401 时先试静默续期（后端 /member/auth/refresh-token 一直存在，此前 App 从不调用）
+        Api.refresher = { Repo.refreshTokenOnce() }
         Api.onUnauthorized = {
             Prefs.clearSession()
             AppState.kickToLogin()

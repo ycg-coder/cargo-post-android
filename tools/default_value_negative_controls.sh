@@ -193,7 +193,7 @@ subst "$CS" 'multi(?:Num|Bool)(?:OrNull)?\(|opt(?:Int|Double|Boolean|Long)\(' \
                                                                                                               ctl DV-u "census 的 numbool 规则把字符串读法也算进去（与独立实现分叉=拆分列不可信）"
 # 三面 0 生产者 = 后端 0 ∧ 小程序 0 ∧ 演示面 0：新读点走 OrNull，DV-k 的 116 不动，只能由 DV-v 响
 inject "$MD" 'fun JSONObject.timeOf(vararg keys: String)' 'private val dvvOrphan = JSONObject().multiNumOrNull("dvvOrphanKey")'
-                                                                                                              ctl DV-v "新增一个三面 0 生产者的数值读法（键 132→133、站点 165→166）"
+                                                                                                              ctl DV-v "新增一个三面 0 生产者的数值读法（键 127→128、站点 152→153：天花板 2026-10-13 已收到现读）"
 # DV-w 是"两个基数是不是同一个东西"的桥：只改 census 侧的 DV_K 常数，DV-k 的 grep 不动，桥必须断
 subst "$CS" 'DV_K = re.compile(r"multi(?:Num|Bool)\(")' 'DV_K = re.compile(r"multi(?:Num|Bool|Str)\(")'
                                                                                                               ctl DV-w "census 的 DV_K 口径含 multiStr（116 与桥读数不再是同一件事）"
@@ -223,7 +223,7 @@ PY
                                                                                                               ctl DV-y5 "DriverTaskRespContractTest 被注释掉一条（缺键塌 0 复发无人报警）"
 subst "$WB" 'DriverTaskSegment.group(vm.tasks)' 'DriverTaskSegment.groupV21(vm.tasks)'
                                                                                                               ctl DV-y6g "页面不再从唯一出口取任务段（第二套分段口径的入口形状）"
-subst "$WB" 'SectionTitle("今日运营任务", subtitle = "任务段接口未给")' 'SectionTitle("今日任务", subtitle = "任务段接口未给")'
+subst "$WB" 'SectionTitle("今日运营任务", subtitle = "暂无任务段")' 'SectionTitle("今日任务", subtitle = "暂无任务段")'
                                                                                                               ctl DV-y6t "无段那一支的标题被改名：后端没下发时那一格在界面上消失"
 subst "$MD" 'items.groupBy { it.planId }' 'items.groupBy { it.stop.visitSequence }'
                                                                                                               ctl DV-y6p "按 visitSequence 分段：多方案混排会被并成一段（顺序口径不再是后端的）"

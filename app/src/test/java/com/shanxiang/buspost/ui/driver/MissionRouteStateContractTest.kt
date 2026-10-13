@@ -118,7 +118,11 @@ class MissionRouteStateContractTest : ServerTest() {
         Prefs.driverId = 61L
     }
 
-    /** profile / shifts / pickups / tasks 四条按序回成功且空，把判据干净留给第 5 条 route */
+    /**
+     * profile / shifts / pickups / tasks 四条按序回成功且空，把判据干净留给第 5 条 route。
+     * ⚠ 第 6 条（公告）不在这里给：公告只在 `vm.load()` 那一轮发（作业动作后的回读不发），
+     * 要用的用例自己显式补一行，免得把"这一轮到底发了几条"读糊。
+     */
     private fun enqueueFirstFour() {
         respondData("""{"driverId":61,"name":"王有德","plateNo":"渝A·8K231"}""")
         respondData("[]")
@@ -137,12 +141,13 @@ class MissionRouteStateContractTest : ServerTest() {
         driverResidue()
         enqueueFirstFour()
         respond("服务不可用", code = 500)
+        respondData("[]")
 
         val vm = WorkbenchViewModel()
         vm.load()
         awaitUntil { !vm.loading }
 
-        assertEquals(5, server.requestCount)
+        assertEquals("5 条司机域 + 1 条公告（route 失败不影响公告那一跳照发）", 6, server.requestCount)
         assertEquals(PolylinePhase.Asked, vm.routePhase)
         assertNotNull("失败原因必须留得住，否则页面只剩『后端没有』这一句可说", vm.routeFailure)
         assertNotNull(vm.guide)
@@ -188,6 +193,7 @@ class MissionRouteStateContractTest : ServerTest() {
         driverResidue()
         enqueueFirstFour()
         respond("服务不可用", code = 500)
+        respondData("[]")
 
         val vm = WorkbenchViewModel()
         vm.load()
@@ -199,7 +205,7 @@ class MissionRouteStateContractTest : ServerTest() {
         vm.load()
         awaitUntil { vm.demoted }
 
-        assertEquals("早退后仍然只多发这一条档案请求", 6, server.requestCount)
+        assertEquals("早退后仍然只多发这一条档案请求（第一轮 5 司机域 + 1 公告，第二轮只有档案）", 7, server.requestCount)
         assertEquals(PolylinePhase.NotAsked, vm.routePhase)
         assertNull(vm.routeFailure)
     }
@@ -219,6 +225,7 @@ class MissionRouteStateContractTest : ServerTest() {
         respondData(
             """{"shiftCode":"K1-0830","lineName":"K1 县城 ⇄ 云山村","routeProvider":"OSM_GRAPHHOPPER","routeDistanceMeters":24600,"routeDurationSeconds":3720,"deviated":false,"stops":[{"stationId":31,"stationName":"高家镇客运站","longitude":106.91,"latitude":30.94,"visitSequence":1,"actionType":4,"actionName":"揽收","quantity":6,"status":2,"statusName":"已到站"}]}"""
         )
+        respondData("[]")
 
         val vm = WorkbenchViewModel()
         vm.load()
@@ -239,7 +246,8 @@ class MissionRouteStateContractTest : ServerTest() {
     fun `演示回落不算这次没问到`() {
         TestHost.demoBackend()
         driverResidue()
-        repeat(5) { respond("服务不可用", code = 500) }
+        // 6 条 = 5 条司机域 + 1 条公告（只有 load() 那一轮取公告）；全部回 500，靠演示回落顶上
+        repeat(6) { respond("服务不可用", code = 500) }
 
         val vm = WorkbenchViewModel()
         vm.load()

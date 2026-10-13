@@ -1,547 +1,168 @@
 package com.shanxiang.buspost.ui.user
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
-import com.shanxiang.buspost.core.ui.BusIcons
-import com.shanxiang.buspost.core.ui.BusRadius
-import com.shanxiang.buspost.core.ui.BusTextField
-import com.shanxiang.buspost.core.ui.BusTone
+import com.shanxiang.buspost.core.ui.BusPage
+import com.shanxiang.buspost.core.ui.EmptyState
+import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
-import com.shanxiang.buspost.ui.common.BackTopBar
+import com.shanxiang.buspost.core.ui.SkeletonList
+import com.shanxiang.buspost.data.model.WalletBalance
+import com.shanxiang.buspost.data.model.WalletTxPage
+import com.shanxiang.buspost.data.repo.RemoteState
 import com.shanxiang.buspost.data.repo.Repo
+import com.shanxiang.buspost.ui.common.BackTopBar
+import com.shanxiang.buspost.ui.common.DemoNote
 import com.shanxiang.buspost.ui.common.ScreenViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.shanxiang.buspost.ui.common.toState
 
+/**
+ * 用户端「我的钱包 / 交易记录」（#56）。**只读**：余额四格 + 流水列表 + 一个重试。
+ *
+ * 判定不在这层（全在 [WalletRows.kt]）。写口的三个理由（无幂等键、模拟与真到账字段不可区分、
+ * `query-pay-order` 不校验归属人）记在 `Repo.walletTransactions()` 的注释与台账 D-086，
+ * 并且这句话也写在屏上——用户找不到入口时，页面上要有一句真话，而不是让人以为 App 坏了。
+ */
 class WalletViewModel : ScreenViewModel() {
-    var balance by mutableStateOf(0.0)
-    var transactions by mutableStateOf<List<TransactionItem>>(emptyList())
+    /** 两个取数各自一份状态，初值都是"还没结论"（不是空数据）：开局就 success=true 等于替后端说"没流水/0 元" */
+    var balance by mutableStateOf(RemoteState<WalletBalance>(loading = true))
+        private set
+    var txs by mutableStateOf(RemoteState<WalletTxPage>(loading = true))
+        private set
 
-    fun load() = work {
-        val bal = Repo.walletBalance()
-        balance = bal.balance
-        val txs = Repo.walletTransactions(20)
-        transactions = txs.map { tx ->
-            val displayTime = tx.createTime
-                .replace("T", " ")
-                .substringBeforeLast(":")
-                .let { raw ->
-                    if (raw.length > 16) raw.substring(0, 16) else raw
-                }
-            TransactionItem(
-                title = tx.title.ifEmpty { when (tx.type) {
-                    "recharge" -> "充值"
-                    "consume" -> "消费"
-                    "refund" -> "退款"
-                    else -> tx.type
-                } },
-                amount = tx.amount,
-                time = displayTime,
-                type = when (tx.type) {
-                    "recharge" -> "recharge"
-                    "consume" -> when {
-                        tx.title.contains("公交") || tx.title.contains("乘车") -> "bus"
-                        tx.title.contains("寄货") -> "send"
-                        else -> "shopping"
-                    }
-                    "refund" -> "recharge"
-                    else -> "shopping"
-                },
+    var fetched by mutableStateOf(false)
+        private set
+
+    fun load() {
+        fetched = true
+        work(reset = balance.data == null && txs.data == null) {
+            val b = Repo.walletBalance().toState()
+            val t = Repo.walletTransactions().toState()
+            balance = b
+            txs = t
+            demo = b.demo || t.demo
+            error = b.error ?: t.error
+        }
+    }
+}
+
+@Composable
+fun WalletScreen(vm: WalletViewModel = viewModel()) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val page = walletPage(vm.balance, vm.txs)
+
+    LaunchedEffect(Unit) { if (!vm.fetched) vm.load() }
+
+    Column {
+        BackTopBar(title = "我的钱包", subtitle = "余额与交易记录（只读）")
+        BusPage(spacedBy = 12.dp) {
+            DemoNote(page.balance.cell == WalletCell.Shown && vm.balance.demo, text = "当前为演示数据，不是平台真给出的余额。")
+            WalletSectionBlock(page.balance, vm, scale, t) {
+                vm.load()
+            }
+            WalletSectionBlock(page.txs, vm, scale, t) {
+                vm.load()
+            }
+            Text(
+                NO_WRITE_ENTRY_NOTE,
+                color = t.textTertiary,
+                fontSize = (12 * scale).sp,
             )
+            Spacer(Modifier.height(6.dp))
         }
-    }
-
-    fun addRechargeRecord(amount: Double) {
-        val now = java.text.SimpleDateFormat("今天 HH:mm", java.util.Locale.CHINA).format(java.util.Date())
-        transactions = listOf(TransactionItem("充值", amount, now, "recharge")) + transactions
-        balance += amount
-    }
-
-    fun doRecharge(amount: Double, channel: String = "alipay") = work(reset = false) {
-        val payResult = Repo.createPayOrder(amount, channel)
-        if (payResult == null) {
-            addRechargeRecord(amount)
-            return@work
-        }
-        if (payResult.optBoolean("simulated", false)) {
-            addRechargeRecord(amount)
-            return@work
-        }
-        pendingPayOrderNo = payResult.optString("orderNo", "")
-        pendingPayOrderString = payResult.optString("orderString", "")
-    }
-
-    var pendingPayOrderString by mutableStateOf("")
-    var pendingPayOrderNo by mutableStateOf("")
-
-    fun checkPayResult() = work(reset = false) {
-        val orderNo = pendingPayOrderNo
-        if (orderNo.isEmpty()) return@work
-        val result = Repo.queryPayOrder(orderNo)
-        if (result != null && result.optString("status") == "paid") {
-            pendingPayOrderNo = ""
-            pendingPayOrderString = ""
-            load()
-        }
-    }
-
-    fun clearPendingPay() {
-        pendingPayOrderString = ""
-        pendingPayOrderNo = ""
     }
 }
 
-data class TransactionItem(
-    val title: String,
-    val amount: Double,
-    val time: String,
-    val type: String,
-)
-
-private const val ALIPAY_PAY = "alipays://platformapi/startapp?appId=10000007"
-private const val WECHAT_PAY = "weixin://"
-
+/** 一格一个结论：余额与流水各自有"没取到 / 还没取到 / 后端没给内容 / 有"，互不遮盖 */
 @Composable
-fun WalletScreen(
-    vm: WalletViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+private fun WalletSectionBlock(
+    section: WalletSection<*>,
+    vm: WalletViewModel,
+    scale: Float,
+    t: com.shanxiang.buspost.core.ui.BusTokens,
+    onRetry: () -> Unit,
 ) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    val context = LocalContext.current
-    var showRecharge by remember { mutableStateOf(false) }
-    var showPay by remember { mutableStateOf<PayRequest?>(null) }
-
-    LaunchedEffect(Unit) {
-        if (vm.balance == 0.0 && vm.transactions.isEmpty()) vm.load()
-    }
-
-    // 监听待支付订单：有 orderString 时调起支付宝
-    LaunchedEffect(vm.pendingPayOrderString) {
-        val orderString = vm.pendingPayOrderString
-        if (orderString.isNotEmpty()) {
-            try {
-                // 支付宝 H5 支付：通过 URL scheme 打开
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("alipays://platformapi/startapp?sa_id=10000007&clientVersion=3.7.0.0718&qrcode=$orderString"))
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                try {
-                    // 降级：打开支付宝扫码页
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("alipays://platformapi/startapp?appId=10000007")))
-                } catch (_: Exception) {
-                    Toast.makeText(context, "未检测到支付宝，请先安装支付宝", Toast.LENGTH_SHORT).show()
-                }
+    when (section.cell) {
+        WalletCell.Loading -> SkeletonList(2)
+        WalletCell.Failed -> ErrorState(section.body, onRetry = onRetry)
+        WalletCell.Empty -> EmptyState(title = section.title, subtitle = section.body, actionText = "重新取", onAction = onRetry)
+        WalletCell.Shown -> {
+            val rows: List<Pair<String, String>> = when (val d = section.data) {
+                is WalletBalance -> walletBalanceRows(d)
+                else -> emptyList()
             }
-            vm.clearPendingPay()
-        }
-    }
-
-    fun openAlipay() {
-        try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ALIPAY_PAY)))
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "未检测到支付宝，请先安装支付宝", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun openWechat() {
-        try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WECHAT_PAY)))
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "未检测到微信，请先安装微信", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        BackTopBar(title = "钱包", subtitle = "余额与交易记录")
-
-        LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // 余额卡
-            item {
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(BusRadius.l))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(t.primaryDark, t.primary, t.accent)
-                            )
+            BusCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    ) {
+                        Text(section.title, color = t.textSecondary, fontSize = (13 * scale).sp, fontWeight = FontWeight.Bold)
+                        BusButton(
+                            text = if (vm.loading) "重新取…" else "重新取",
+                            small = true,
+                            variant = BusButtonVariant.OUTLINE,
+                            enabled = !vm.loading,
+                            onClick = onRetry,
+                            fullWidth = false,
                         )
-                        .padding(20.dp),
-                ) {
-                    Column {
-                        Text(
-                            "账户余额（元）",
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = (13 * scale).sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            String.format("%.2f", vm.balance),
-                            color = Color.White,
-                            fontSize = (36 * scale).sp,
-                            fontWeight = FontWeight.Black,
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            WalletActionChip("充值") { showRecharge = true }
-                            WalletActionChip("收款码") { openAlipay() }
-                            WalletActionChip("提现") { openAlipay() }
+                    }
+                    if (section.body.isNotEmpty()) {
+                        Text(section.body, color = t.textTertiary, fontSize = (11.5 * scale).sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                    when (val d = section.data) {
+                        is WalletBalance -> LabeledRows(rows, scale, t)
+                        is WalletTxPage -> d.items.forEachIndexed { i, tx ->
+                            if (i > 0) BusDivider(Modifier.padding(vertical = 8.dp))
+                            LabeledRows(walletTxRows(tx), scale, t)
                         }
                     }
                 }
             }
-
-            // 支付方式
-            item {
-                BusCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "支付方式",
-                        color = t.ink,
-                        fontSize = (14 * scale).sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 10.dp),
-                    )
-                    PaymentMethodRow(
-                        icon = BusIcons.wallet,
-                        title = "余额支付",
-                        subtitle = "余额 ¥${String.format("%.2f", vm.balance)}",
-                        onClick = null,
-                    )
-                    BusDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    PaymentMethodRow(
-                        icon = BusIcons.qr,
-                        title = "支付宝",
-                        subtitle = "支付宝快捷支付",
-                        onClick = { openAlipay() },
-                    )
-                    BusDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    PaymentMethodRow(
-                        icon = BusIcons.send,
-                        title = "微信支付",
-                        subtitle = "微信快捷支付",
-                        onClick = { openWechat() },
-                    )
-                }
-            }
-
-            // 交易记录标题
-            item {
-                Row(
-                    Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "交易记录",
-                        color = t.ink,
-                        fontSize = (15 * scale).sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        "查看全部",
-                        color = t.primaryOnLight,
-                        fontSize = (12 * scale).sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
-
-            if (vm.transactions.isEmpty() && !vm.loading) {
-                item {
-                    Text(
-                        "暂无交易记录",
-                        color = t.textSecondary,
-                        fontSize = (13 * scale).sp,
-                        modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(),
-                    )
-                }
-            }
-
-            items(vm.transactions, key = { "${it.title}_${it.time}" }) { tx ->
-                TransactionRow(tx, scale)
-            }
-
-            item { Spacer(Modifier.height(8.dp)) }
-        }
-    }
-
-    // 充值弹窗
-    if (showRecharge) {
-        RechargeDialog(
-            onDismiss = { showRecharge = false },
-            onConfirm = { amount, method ->
-                showRecharge = false
-                vm.doRecharge(amount, method)
-            },
-        )
-    }
-}
-
-@Composable
-private fun WalletActionChip(label: String, onClick: () -> Unit) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(BusRadius.pill))
-            .background(Color.White.copy(alpha = 0.22f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Text(
-            label,
-            color = Color.White,
-            fontSize = (13 * scale).sp,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-@Composable
-private fun PaymentMethodRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: (() -> Unit)?,
-) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = if (onClick != null) {
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(BusRadius.m))
-                .clickable { onClick() }
-                .padding(vertical = 2.dp)
-        } else Modifier,
-    ) {
-        Box(
-            Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(t.primaryLight),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = t.primary, modifier = Modifier.size(18.dp))
-        }
-        Column(Modifier.padding(start = 10.dp).weight(1f)) {
-            Text(title, color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = t.textTertiary, fontSize = (11 * scale).sp)
-        }
-        if (onClick != null) {
-            Icon(BusIcons.next, null, tint = t.textTertiary, modifier = Modifier.size(16.dp))
         }
     }
 }
 
+/** 一行一个"标签 → 后端真给的原文 / 没给就说明没给"，页面自己不补第三个值 */
 @Composable
-private fun TransactionRow(tx: TransactionItem, scale: Float) {
-    val t = LocalBusTokens.current
-    val (icon, bgTint) = when (tx.type) {
-        "bus" -> BusIcons.bus to t.primaryLight
-        "recharge" -> BusIcons.wallet to t.goldLight
-        "send" -> BusIcons.send to t.clay.copy(alpha = 0.12f)
-        "shopping" -> BusIcons.leaf to t.primaryLight
-        else -> BusIcons.calendar to t.track
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(BusRadius.m))
-            .background(t.card)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(bgTint),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = t.primary, modifier = Modifier.size(18.dp))
-        }
-        Column(Modifier.padding(start = 10.dp).weight(1f)) {
-            Text(tx.title, color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
-            Text(tx.time, color = t.textTertiary, fontSize = (11 * scale).sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        Text(
-            buildString {
-                if (tx.amount > 0) append("+")
-                append(String.format("%.2f", tx.amount))
-            },
-            color = if (tx.amount > 0) t.primary else t.danger,
-            fontSize = (14 * scale).sp,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-private data class PayRequest(val amount: Double, val method: String)
-
-@Composable
-private fun RechargeDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (amount: Double, method: String) -> Unit,
-) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    var amountText by remember { mutableStateOf("") }
-    var selectedMethod by remember { mutableStateOf("alipay") }
-
-    val quickAmounts = listOf("10", "30", "50", "100")
-    val amount = amountText.toDoubleOrNull() ?: 0.0
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("充值") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("选择充值金额", color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
-
-                // 快捷金额
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    quickAmounts.forEach { qa ->
-                        val selected = amountText == qa
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(BusRadius.m))
-                                .background(if (selected) t.primary else t.track)
-                                .clickable { amountText = qa }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
-                            Text(
-                                "¥$qa",
-                                color = if (selected) Color.White else t.ink,
-                                fontSize = (14 * scale).sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-                }
-
-                // 自定义金额
-                BusTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = "自定义金额",
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.fillMaxWidth(),
+private fun LabeledRows(rows: List<Pair<String, String>>, scale: Float, t: com.shanxiang.buspost.core.ui.BusTokens) {
+    Column {
+        rows.forEachIndexed { i, (label, value) ->
+            if (i > 0) BusDivider(Modifier.padding(vertical = 7.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(label, color = t.textTertiary, fontSize = (12.5 * scale).sp, modifier = Modifier.width(104.dp))
+                Text(
+                    value,
+                    color = if (value == NOT_GIVEN) t.textTertiary else t.ink,
+                    fontSize = (13.5 * scale).sp,
+                    fontWeight = if (i == 0) FontWeight.Medium else FontWeight.Normal,
+                    modifier = Modifier.weight(1f),
                 )
-
-                Spacer(Modifier.height(4.dp))
-                Text("支付方式", color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
-
-                // 支付宝
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(BusRadius.m))
-                        .background(if (selectedMethod == "alipay") t.primaryLight else t.track.copy(alpha = 0.5f))
-                        .clickable { selectedMethod = "alipay" }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF1677FF)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("支", color = Color.White, fontSize = (12 * scale).sp, fontWeight = FontWeight.Black)
-                    }
-                    Text("支付宝", color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 10.dp).weight(1f))
-                    if (selectedMethod == "alipay") {
-                        Icon(BusIcons.check, null, tint = t.primary, modifier = Modifier.size(18.dp))
-                    }
-                }
-
-                // 微信
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(BusRadius.m))
-                        .background(if (selectedMethod == "wechat") t.primaryLight else t.track.copy(alpha = 0.5f))
-                        .clickable { selectedMethod = "wechat" }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF07C160)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("微", color = Color.White, fontSize = (12 * scale).sp, fontWeight = FontWeight.Black)
-                    }
-                    Text("微信支付", color = t.ink, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 10.dp).weight(1f))
-                    if (selectedMethod == "wechat") {
-                        Icon(BusIcons.check, null, tint = t.primary, modifier = Modifier.size(18.dp))
-                    }
-                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { if (amount > 0) onConfirm(amount, selectedMethod) },
-                enabled = amount > 0,
-            ) {
-                Text("确认充值 ¥${if (amount > 0) String.format("%.0f", amount) else "0"}")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-    )
+        }
+    }
 }

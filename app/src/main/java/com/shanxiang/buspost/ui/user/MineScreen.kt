@@ -186,6 +186,15 @@ fun MineScreen(vm: MineViewModel = viewModel()) {
                     nav.navigate(Routes.PARCEL)
                 })
                 BusDivider()
+                MineRow(BusIcons.route, "我的乘车安排", "哪班公交带货 · 哪个站交接", {
+                    nav.navigate(Routes.ARRANGEMENTS)
+                })
+                BusDivider()
+                // #56：钱包这一行是全工程**唯一一个**入口（判据 W-b 钉恰好一处，多一处就是两处各跳各的）
+                MineRow(BusIcons.wallet, "我的钱包", "余额与交易记录（只读）", {
+                    nav.navigate(Routes.WALLET)
+                })
+                BusDivider()
                 MineRow(BusIcons.bus, "切换为司机模式", "发车 · 装车 · 妥投", {
                     // 角色切换由后端档案决定：绑定成功才进司机壳（审计 §29）
                     vm.enterDriverMode {

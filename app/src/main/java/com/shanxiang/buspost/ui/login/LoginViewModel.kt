@@ -35,9 +35,12 @@ class LoginViewModel : ViewModel() {
     /** 演示入口只在显式开启演示模式的构建里出现；release 恒为 false，页面上也不该有这个按钮 */
     val demoEntryAvailable: Boolean get() = Api.demoAllowed
 
+    // 码长跟着后端契约走：`AppAuthSmsLoginReqVO.code` 是 `@Length(min = 4, max = 6)` + 全数字。
+    // 旧写法 `4..8` 的上半段是空话：输入框本来就 `take(6)`（LoginScreen.kt:148），
+    // 而 7-8 位后端永远发不出来也永远不收 ⇒ 能提交的那一格不存在，等于在校验里撒了个没人的范围。
     val canSubmit: Boolean
         get() = mobile.length == 11 && agreed && !busy &&
-            (if (mode == 0) password.length >= 6 else code.length in 4..8)
+            (if (mode == 0) password.length >= 6 else code.length in 4..6)
 
     fun sendSms() {
         if (mobile.length != 11) {
@@ -110,8 +113,10 @@ class LoginViewModel : ViewModel() {
             error = "密码至少 6 位"
             return
         }
-        if (mode == 1 && code.length < 4) {
-            error = "请输入短信验证码"
+        if (mode == 1 && code.length !in 4..6) {
+            // 说清是"几位到几位"，而不是"请输入短信验证码" —— 用户对着一个 6 位框被打回时，
+            // 需要知道是自己少输了、还是这框压根不收（后端 @Length(min=4,max=6)）
+            error = "请输入 4-6 位短信验证码"
             return
         }
         if (!agreed) {

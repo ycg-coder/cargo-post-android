@@ -44,10 +44,15 @@ import com.shanxiang.buspost.ui.driver.HandoverScreen
 import com.shanxiang.buspost.ui.login.LoginScreen
 import com.shanxiang.buspost.ui.user.AddressEditScreen
 import com.shanxiang.buspost.ui.user.AddressScreen
+import com.shanxiang.buspost.ui.user.ArrangementsScreen
+import com.shanxiang.buspost.ui.user.ParcelTicketScreen
+import com.shanxiang.buspost.ui.user.WalletScreen
 import com.shanxiang.buspost.ui.user.AddressSearchScreen
 import com.shanxiang.buspost.ui.user.BusDetailScreen
 import com.shanxiang.buspost.ui.user.BusScreen
+import com.shanxiang.buspost.core.about.PolicyKind
 import com.shanxiang.buspost.ui.user.OssLicensesScreen
+import com.shanxiang.buspost.ui.user.PolicyScreen
 import com.shanxiang.buspost.ui.user.FeedbackScreen
 import com.shanxiang.buspost.ui.user.GoodsDetailScreen
 import com.shanxiang.buspost.ui.user.GoodsTraceScreen
@@ -154,6 +159,9 @@ fun BusPostRoot() {
         composable(Routes.ORDERS) { com.shanxiang.buspost.ui.common.BusRouteBody { OrdersScreen() } }
         composable(Routes.PARCEL) { com.shanxiang.buspost.ui.common.BusRouteBody { ParcelScreen(standalone = true) } }
         composable(Routes.NOTIFICATIONS) { com.shanxiang.buspost.ui.common.BusRouteBody { NotificationScreen() } }
+        composable(Routes.ARRANGEMENTS) { com.shanxiang.buspost.ui.common.BusRouteBody { ArrangementsScreen() } }
+        // #56 钱包：只读余额与流水。写口（充值/余额支付）这一版不开，理由写在页面上而不是藏起来
+        composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }
         composable(Routes.PROFILE) { com.shanxiang.buspost.ui.common.BusRouteBody { ProfileScreen() } }
         composable(Routes.ADDRESS) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen() } }
         composable(Routes.ADDRESS_SELECT) { com.shanxiang.buspost.ui.common.BusRouteBody { AddressScreen(select = true) } }
@@ -162,6 +170,9 @@ fun BusPostRoot() {
         composable(Routes.SETTINGS) { com.shanxiang.buspost.ui.common.BusRouteBody { SettingsScreen() } }
         // 指令 v2.1 ⑭：OSM/ODbL 署名的最小入口，用户域，不加角色闸门
         composable(Routes.OSS_LICENSES) { com.shanxiang.buspost.ui.common.BusRouteBody { OssLicensesScreen() } }
+        // 登录页的《服务协议》勾选行要能点开正文 ⇒ 这两条路由不设角色/登录闸门（内容全在 AppPolicies，页面只渲染）
+        composable(Routes.PRIVACY) { com.shanxiang.buspost.ui.common.BusRouteBody { PolicyScreen(PolicyKind.PRIVACY) } }
+        composable(Routes.TERMS) { com.shanxiang.buspost.ui.common.BusRouteBody { PolicyScreen(PolicyKind.TERMS) } }
         composable(Routes.HANDOVER) { com.shanxiang.buspost.ui.common.BusRouteBody { HandoverScreen() } }
         composable(Routes.DRIVER_MESSAGES) { com.shanxiang.buspost.ui.common.BusRouteBody { DriverMessagesScreen() } }
         // 旧 DriverNavScreen 转 DEBUG ONLY（DECISION_LOG D-003 / 任务 #51）：正式包连路由都没有，
@@ -202,6 +213,13 @@ fun BusPostRoot() {
             arguments = listOf(navArgument("no") { type = NavType.StringType }),
         ) { com.shanxiang.buspost.ui.common.BusRouteBody { TraceScreen(it.arguments?.getString("no").orEmpty()) } }
 
+        // #55 查件票面：`/send/topology` 那条零消费者通路的唯一读方。用户域，不加角色闸门；
+        // 页内自带"回追踪页"的出口（票面取不到时不能把人关在门外）。
+        composable(
+            Routes.PARCEL_TICKET,
+            arguments = listOf(navArgument("no") { type = NavType.StringType }),
+        ) { com.shanxiang.buspost.ui.common.BusRouteBody { ParcelTicketScreen(it.arguments?.getString("no").orEmpty()) } }
+
         composable(
             Routes.BUS_DETAIL,
             arguments = listOf(navArgument("routeId") { type = NavType.StringType }),
@@ -213,8 +231,6 @@ fun BusPostRoot() {
         composable(Routes.SEND_ADDRESS_PICKER) { com.shanxiang.buspost.ui.common.BusRouteBody { SendAddressPickerScreen() } }
         // 乘车码：当地公交乘车二维码
         composable(Routes.BUS_QR) { com.shanxiang.buspost.ui.common.BusRouteBody { BusQrScreen() } }
-        // 钱包：余额、充值、交易记录
-        composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }
     }
 
     // 闪屏压在导航图之上（含底部导航栏），与小程序"页面内 fixed 遮罩 + 隐藏 tabBar"等效

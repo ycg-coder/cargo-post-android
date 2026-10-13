@@ -126,7 +126,13 @@ TE_K=$(printf '%s\n' "$TE" | awk '/^TOTAL/ {print $6}')
 #   ⇒ 12 − 5 = 7。attempt 自己的定义与那 7 处一个没少；迁移前的 12 留在 D-034，不就地改历史读数。
 # ⚠ 下限 7→11 是 F-2 ⑨ 的实测结果：把 4 个"取消可达作用域"里的 runCatching 迁到 attempt
 #   （Repo.kt openMeteoWeather 的预报解析 / AmapNavigationEngine.calculateRoute 的算路受理 /
-#    BusPostRoot 深链 navigate / DriverNavScreen TTS 设语种），逐点理由见 docs/android/RUNCATCHING_AUDIT.md。
+#    BusPostRoot 深链 navigate / DriverNavScreen TTS 设语种），逐点理由见 docs/android/RUNCATCHING_AUDIT.md 第二节。
+# ⚠ 11→14（2026-10-12 实测，与 check_safe_call_probes.sh 的 SA-d 数的是同一个扫描面）：
+#   **下限落后实测 = 空转闸门**。SA-d 原来写 `-ge 11`，D-082 的负控第 10 条把一处 attempt 换成 runCatching
+#   之后照样绿 —— 差的这 3 处里只有两处指得到具名提交（Repo.kt:140 续期 dd7d6093、UpdateSection.kt:86
+#   装包申请权限 3687211c，都在 10-12），第三处落在本仓 git 起点（d12b419，2026-10-10）之前，
+#   **登记为增量未归因**，不写成"是谁加的"。两本一起改成**恰好 14**：加/删一处都要同轮改数，
+#   并把那一点列进 SA-d 上方那张 14 处逐点表（两本各说一套就是 §八 ㉗ 那个老毛病）。
 TF=$(grep -rn 'attempt {' "$S" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
 TF2=$(grep -c 'catch (e: CancellationException)' "$ATT")
 
@@ -178,8 +184,8 @@ echo "TH-a 行为用例条数（隔离/取消）      = $TA/$TA2 （目标 ≥7/
 echo "TH-b DemoData 回落点/自带开关闸     = $TB/$TB2 （目标 4/4）"
 echo "TH-c catch(Throwable) 全 main/Api.kt/白名单 = $TC_ALL/$TC_API/$TC_WL （目标 2/0/2）"
 echo "TH-d Repo Exception/取消配对         = $TD1/$TD2 （目标 38/38）"
-echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/1）"
-echo "TH-f attempt 调用点/helper 穿透      = $TF/$TF2 （目标 ≥7/1）"
+echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/3：豁免只有那两处 startActivity + 一处纯 JSON 解析）"
+echo "TH-f attempt 调用点/helper 穿透      = $TF/$TF2 （目标 恰好 15/1）"
 echo "TH-g 挂起形状 runCatching 残留       = $TG （目标 0）"
 echo "TH-h 缺陷话术（登录/上报/日志）      = $TH/$TH2/$TH3 （目标 ≥2/1/≥2）"
 echo "TH-i work() 的取消出口（缩进整行）   = $TI （目标 1）"
@@ -201,8 +207,19 @@ fail=0
 [ "$TD1" -ge 38 ] || { echo "× TH-d Repo 的取消穿透少于 38 处：读接口的取消会被写成一次「加载失败」"; fail=1; }
 [ "$TE_N" = 0 ]  || { echo "× TH-e 有 $TE_N 处挂起代码的 Exception 出口前面没有取消出口：CancellationException 被收成了普通失败"; fail=1; }
 [ "$TE_S" -ge 48 ] || { echo "× TH-e 扫到的挂起形状 Exception 出口少于 48 处：判据的扫描面缩水了（删了 catch 还是改了扫描规则？）"; fail=1; }
-[ "$TE_K" = 1 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 1 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
-[ "$TF" -ge 11 ] || { echo "× TH-f attempt 调用点少于 11：有人把取消可达作用域里的挂起形状改回了 runCatching（F-2 ⑨ 迁移后实测基线=11，7→11 的 4 处逐点归因见本簿上方注释与 D-043）"; fail=1; }
+# 基数 1 → 2 的增量 = 用户端"步行导航"那一格（`git log` 追到 7d8b819 全面视觉升级那轮，本轮 2026-10-12 复核补登记）。
+#   两处豁免的形状**完全相同**：try 段里只有一个 `ctx.startActivity(Intent(ACTION_VIEW, …))`，
+#   一个挂起点都没有 ⇒ §三十一 那条"suspend 不许吞取消"在这里没有适用对象，
+#   所以它不是"把吞异常合法化"，而是"这一格根本不在扫描语义里"：
+#     · `ui/driver/DriverSdkNavCard.kt:468` 唤起外部地图（ActivityNotFound 先单独接住）
+#     · `ui/user/BusScreen.kt:838` 步行导航唤起高德，失败退网页版
+#   豁免面继续**逐处点名**（数量钉死恰好 2）：再加第三处就得当场改这一行并说清为什么。
+# 基数 2 → 3 的增量 = `core/update/AppUpdate.kt` 的 JSON 解析那一处：
+#   `parseRelease` 是**普通函数**（不是 suspend、块内无任何挂起点），catch 完直接 `return null` 交给
+#   `decideUpdate` 落成"没查到"，所以 §三十一"suspend 不许吞取消"在这里同样没有适用对象。
+#   仍然逐处点名、数量钉死恰好 3：再加第四处就得当场改这一行并说明为什么。
+[ "$TE_K" = 3 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 3 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
+[ "$TF" = 15 ] || { echo "× TH-f attempt 调用点不是恰好 15（现 $TF）：少了=有人把取消可达作用域里的挂起形状改回了 runCatching（F-2 ⑨ 迁的那 4 处与 ⑧ 剩的那 7 处都在这个数里，逐点表见 check_safe_call_probes.sh 的 SA-d 注释，2026-10-13 合并后是 15 处），多了=新开了一处不走 safeApiCall 的网络读；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删一到三处都不红（D-082）"; fail=1; }
 [ "$TF2" = 1 ]   || { echo "× TH-f attempt 自己不再先穿透取消：它退化成另一个 runCatching"; fail=1; }
 [ "$TG" = 0 ]    || { echo "× TH-g 挂起代码里残留 $TG 处 runCatching：取消会被读成一次普通失败"; fail=1; }
 [ "$TH" -ge 2 ]  || { echo "× TH-h 登录页不再区分「网络失败/客户端缺陷」：缺陷被洗成一句普通提示"; fail=1; }

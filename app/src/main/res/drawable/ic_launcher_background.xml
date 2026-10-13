@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标背景层（#43 选定方向 2：车头 + 弧线路线）。
+  满幅 108dp 线性渐变（青绿 → 翠绿），不再用 @color/bus_launcher_bg 那片深蓝——
+  桌面图标与 App 内深蓝主色板**刻意不同源**这件事已登记为待用户决定的面（换图标不等于换品牌色）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:startColor="#FF0E5A52"
+                android:endColor="#FF17A07A" />
+        </aapt:attr>
+    </path>
+</vector>

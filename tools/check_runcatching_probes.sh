@@ -73,7 +73,7 @@ DOC_MIG=$(grep -c '^| .* | 已迁 attempt |' "$DOC")
 ROWS=$((KEEP + DOC_MIG))
 MIG_PROOF=$(grep -c '已迁 attempt\| RC-ROWS-BEGIN' "$DOC")
 
-echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标 38/17/56/24）"
+echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标恰好 39/18/60/26）"
 echo "RC-a2 反证：同一 NC 管道的 attempt 行数   = $RA_PROOF （必须 >0，否则 RC-a 的数不可信）"
 echo "RC-b 块内含挂起调用（unsafe/violation）  = $D_VIOL （目标 0）"
 echo "RC-b2 检测器 sites/候选待复核/挂起名面     = $D_SITES/$D_CAND/$D_NAMES"
@@ -82,10 +82,25 @@ echo "RC-d 免疫前提 runBlocking/suspendCancellableCoroutine = $D_RB/$D_SCC �
 echo "RC-e 分类表行/其中已迁                    = $ROWS/$DOC_MIG （目标 42/4）"
 
 fail=0
-[ "$RA_ACTIVE" = 38 ] || { echo "× RC-a 生效 runCatching 行不是 38（实测 $RA_ACTIVE）：F-2 ⑨ 迁走 4 处后是 30，F-3 ⑭ 读回 SDK 当前路径 +1 ⇒ 31，N-2 把语音开关交给高德 +1 ⇒ 32，2026-10-10 收未入账那一片 +6 ⇒ 38（AmapNavigationEngine.kt 的 prepare() released 出口摘监听 +1、loadOnce() 预加载 .so +1；新一屏 ui/driver/DriverGuideScreen.kt 的 AndroidView factory/update/onDispose 两步 +4）；再变就要连同 docs/android/RUNCATCHING_AUDIT.md 第三节与 D-043/D-053 一起逐点归因"; fail=1; }
-[ "$RA_FILES" = 17 ]   || { echo "× RC-a 生效文件数不是 17（实测 $RA_FILES）：16→17 的唯一增量是新增那本 ui/driver/DriverGuideScreen.kt；BusPostRoot.kt 的那一处仍是迁走的（少的那一个文件是谁？）"; fail=1; }
-[ "$RA_RAW" = 56 ]     || { echo "× RC-a 出现次数不是 56（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56）"; fail=1; }
-[ "$RA_ALLFILES" = 24 ] || { echo "× RC-a 含注释文件数不是 24（实测 $RA_ALLFILES）：23→24 的唯一增量是 ui/driver/DriverGuideScreen.kt；生效文件仍须是 17"; fail=1; }
+# 基数 38 → 39 的逐点归因（2026-10-12 续七，按本簿自己的规矩"连同 RUNCATCHING_AUDIT 第三节一起数"）：
+#   +3 = `7d8b819`（全面视觉升级 + 步行导航 + 收藏线路）在 **`ui/user/BusScreen.kt` 一个文件里**新加三处
+#          （`git show 7d8b819` 里 `+` 行含 runCatching 的恰好 3 条，逐条读 diff 确认都落在 BusScreen）；
+#   -2 = 本轮摘掉其中包着 suspend 调用的那两处（`Repo.productOrders/sendOrders` 自己回 Feed(error) 且
+#          内部已穿透取消，外层 runCatching 收下的就是取消 ⇒ RC-b 实测点名的 violations=2）。
+#   ⇒ 38 + 3 - 2 = 39；剩下的那一处是 `BusScreen.kt` 里 `val millis = runCatching {` 的**非挂起**解析，
+#     它同时就是"生效文件 17 → 18"的唯一增量（BusScreen.kt 以前没有生效行）。
+[ "$RA_ACTIVE" = 39 ] || { echo "× RC-a 生效 runCatching 行不是恰好 39（实测 $RA_ACTIVE）：F-2 ⑨ 迁走 4 处后是 30，F-3 ⑭ 读回 SDK 当前路径 +1 ⇒ 31，N-2 把语音开关交给高德 +1 ⇒ 32，2026-10-10 收未入账那一片 +6 ⇒ 38（AmapNavigationEngine.kt 的 prepare() released 出口摘监听 +1、loadOnce() 预加载 .so +1；新一屏 ui/driver/DriverGuideScreen.kt 的 AndroidView factory/update/onDispose 两步 +4）；再变就要连同 docs/android/RUNCATCHING_AUDIT.md 第三节与 D-043/D-053 一起逐点归因"; fail=1; }
+# 基数 17 → 18：唯一增量同上，`ui/user/BusScreen.kt`（7d8b819 那轮带进来的那一处非挂起解析）。
+[ "$RA_FILES" = 18 ]   || { echo "× RC-a 生效文件数不是恰好 18（实测 $RA_FILES）：16→17 的唯一增量是新增那本 ui/driver/DriverGuideScreen.kt；BusPostRoot.kt 的那一处仍是迁走的（少的那一个文件是谁？）"; fail=1; }
+# 基数 56 → 58：+3（7d8b819 的三处）−2（本轮摘掉的整行）+1（本轮注释里点名 runCatching 说明为什么摘）。
+#   出现次数与生效行**不可互引**（口径含注释与同行两次出现），所以两行分开打数。
+# 基数 56 → 58 → 60：D-076 续七把 TraceScreen/BusScreen 那两处摘掉后是 58；本轮 #48 又在
+#   `ui/common/UpdateSection.kt` 的**注释**里点名 runCatching 两次（"为什么这里必须用 attempt 而不是 runCatching"），
+#   生效行与生效文件都没变（39/18）⇒ 这本账要区分"代码里真用"与"注释里解释为什么不用"。
+#   含注释文件数 24 → 25 → 26 的第二次增量就是这一本 UpdateSection.kt。
+[ "$RA_RAW" = 60 ]     || { echo "× RC-a 出现次数不是恰好 60（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56）"; fail=1; }
+# 基数 24 → 25：唯一增量仍是 `ui/user/BusScreen.kt`（现在既有那处非挂起解析，也有注释点名它）。
+[ "$RA_ALLFILES" = 26 ] || { echo "× RC-a 含注释文件数不是恰好 26（实测 $RA_ALLFILES）：23→24 的唯一增量是 ui/driver/DriverGuideScreen.kt；生效文件仍须是 17"; fail=1; }
 [ "$RA_PROOF" -gt 0 ]  || { echo "× RC-a2 反证失败：同一套管道连 attempt 都数不出来，那 RC-a 的 38 不可信"; fail=1; }
 [ "$D_VIOL" = 0 ]      || { echo "× RC-b 有 $D_VIOL 处 runCatching 块内含挂起调用：取消会被收进 Result 读成一次普通失败（明细看上面 VIOLATION 行）"; fail=1; }
 [ "$D_SITES" = "$RA_ACTIVE" ] || { echo "× RC-b2 检测器 sites($D_SITES) 与 grep 生效行($RA_ACTIVE) 不一致：两套机制有一边失真，两边的数都不能用"; fail=1; }

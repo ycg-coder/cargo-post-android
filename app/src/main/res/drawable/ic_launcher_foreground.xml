@@ -1,20 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 站牌剪影：站牌板 + 立柱，白色落在深蓝底上 -->
+<!--
+  启动图标前景层（#43 选定方向 2）：车头正面 + 一条弧线路线 + 一个站点圆点。
+  三条硬约束（都是自适应图标的规则，不是审美选择）：
+  1. **满幅 108dp 画布、主体不烤圆角**——圆角与遮罩由系统按机型裁；
+  2. 所有可见内容必须落在以 (54,54) 为心、半径 33dp 的**安全圆**内 ⇒ 整组按 0.86 缩放，
+     否则圆点与弧线末端会被圆形遮罩切掉；
+  3. 只用一种白色，镂空靠 evenOdd（风挡与两个车灯是**透明洞**，不是画成背景色）
+     ⇒ 这样同一个文件才能直接当 monochrome 层用（themed icon 取的是 alpha 通道）。
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M34,26h40a4,4 0 0 1 4,4v26a4,4 0 0 1 -4,4h-40a4,4 0 0 1 -4,-4v-26a4,4 0 0 1 4,-4z" />
-    <path
-        android:fillColor="#FF123F6E"
-        android:pathData="M38,34h32v4h-32z M38,44h20v4h-20z M38,52h26v4h-26z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M51,60h6v22h-6z" />
-    <path
-        android:fillColor="#FFD9A441"
-        android:pathData="M42,80h24v6h-24z" />
+
+    <group
+        android:name="mark"
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+
+        <!-- 车身：外轮廓 + 风挡 + 两个车灯（evenOdd 挖洞） -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M42,27h24a9,9 0 0 1 9,9v22a6,6 0 0 1 -6,6h-30a6,6 0 0 1 -6,-6v-22a9,9 0 0 1 9,-9z M42,34h24a5,5 0 0 1 5,5v9a2,2 0 0 1 -2,2h-30a2,2 0 0 1 -2,-2v-9a5,5 0 0 1 5,-5z M44,57m-3.2,0a3.2,3.2 0 1,0 6.4,0a3.2,3.2 0 1,0 -6.4,0z M64,57m-3.2,0a3.2,3.2 0 1,0 6.4,0a3.2,3.2 0 1,0 -6.4,0z" />
+
+        <!-- 两个轮（车身下沿的两个小舌） -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M41,64h7v4a3.5,3.5 0 0 1 -7,0z M60,64h7v4a3.5,3.5 0 0 1 -7,0z" />
+
+        <!-- 弧线路线：一条从站点驶向车底的路线 -->
+        <path
+            android:pathData="M28,74C40,90 68,88 80,68"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="5" />
+
+        <!-- 站点圆点 -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M28,74m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0z" />
+    </group>
 </vector>

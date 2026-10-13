@@ -126,7 +126,12 @@ SN2=$((SA + SN))
 #          不是拦修复（与 NAC2 的"恰好 N 摩擦设计"同一规格）。
 # ⚠ 三条都**剔注释行**：负控的 `drop` 是把整行改成 `// NEG-CONTROL 摘掉：…`，
 #   字面量还在文本里 —— 不剔注释的话破口会读成"还在"，负控当场变灰（F-1 ③ 那条坑的同形）。
-SO_IME=$(grep -n 'navigationBars\.union(WindowInsets\.ime)' "$TB" | grep -vE "$NC" | wc -l | tr -d ' ')
+#   ⚠ 2026-10-13 合并 origin/main：这一格的基准从 `navigationBars.union(ime)` 变成 `systemBars.union(ime)`
+#     （对方把壳的 insets 基数换成 systemBars = 状态栏 + 导航栏）。本判据只钉"ime 有没有并进来"这一件事，
+#     基数换了不影响它的破坏力：去掉 `.union(WindowInsets.ime)` 就红。
+#     **没在真机复验过**的是另一件事：壳现在自己吃状态栏，若壳内的某段布局也补了状态栏高度就会多出一段顶距
+#     —— 那要等真机在环那一轮量（NOT VERIFIED ON DEVICE，D-100 记了）。
+SO_IME=$(grep -n 'systemBars\.union(WindowInsets\.ime)' "$TB" | grep -vE "$NC" | wc -l | tr -d ' ')
 # ⚠ 窗口必须封口：第一版写成"LOGIN 之后任意一条非注释 `BusRouteBody {`"，于是把登录那行注释掉之后，
 #   awk 继续往下扫到 `composable(Routes.SEND) { … BusRouteBody { … } }` 又数到 1 ⇒ 负控 SR-o2 实测**不红**
 #   （本轮亲眼看它灰掉一次）。现在遇到下一条 `composable(` 就停，破口才只落在登录那一格里。

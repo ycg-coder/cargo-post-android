@@ -24,6 +24,15 @@ object Prefs {
         get() = str("refreshToken")
         set(v) = put("refreshToken", v)
 
+    /**
+     * accessToken 的到期时刻（epoch 毫秒；0 = 后端没给或没登录过）。
+     * 存它是因为后端 access token 只有 1800 秒，而 App 以前完全不判到期 ——
+     * 30 分钟后第一条请求 401 就直接清盘跳登录，用户体感是"每次进来都要重新登录"。
+     */
+    var expiresAt: Long
+        get() = sp.getLong("expiresAt", 0L)
+        set(v) = sp.edit().putLong("expiresAt", v).apply()
+
     var userId: Long
         get() = sp.getLong("userId", 0L)
         set(v) = sp.edit().putLong("userId", v).apply()
@@ -195,6 +204,7 @@ object Prefs {
         sp.edit()
             .remove("token")
             .remove("refreshToken")
+            .remove("expiresAt")
             .remove("userId")
             .remove("mobile")
             .remove("nickname")

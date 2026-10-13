@@ -4,14 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +28,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shanxiang.buspost.core.ui.BusButton
@@ -45,7 +36,6 @@ import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
-import com.shanxiang.buspost.core.ui.QrView
 import com.shanxiang.buspost.ui.common.BackTopBar
 
 private const val ALIPAY_TRANSIT_QR = "alipays://platformapi/startapp?appId=20001104"
@@ -56,19 +46,6 @@ fun BusQrScreen() {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     val context = LocalContext.current
-
-    val qrContent = "BUSPOST-QR:${System.currentTimeMillis() / 60000}"
-
-    val infiniteTransition = rememberInfiniteTransition(label = "qr-pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulse",
-    )
 
     fun openAlipayTransit() {
         try {
@@ -87,7 +64,7 @@ fun BusQrScreen() {
     }
 
     Column(Modifier.fillMaxSize()) {
-        BackTopBar(title = "乘车码", subtitle = "扫码乘车 · 到站自动扣费")
+        BackTopBar(title = "乘车码", subtitle = "本机没有卡务接口 · 扫码乘车走支付宝官方码")
 
         Column(
             Modifier
@@ -119,33 +96,22 @@ fun BusQrScreen() {
                 }
             }
 
-            // 本 App 二维码
-            Box(
-                Modifier
-                    .size(220.dp)
-                    .clip(RoundedCornerShape(BusRadius.l))
-                    .background(Color.White)
-                    .border(
-                        width = 3.dp,
-                        color = t.primary.copy(alpha = pulseAlpha),
-                        shape = RoundedCornerShape(BusRadius.l),
+            // 本机不出二维码：后端没有任何卡务/闸机/乘车码接口（`grep -rn "qr|card|ticket-code"
+            // App*Controller` 0 个出口），而下面那行 `"BUSPOST-QR:" + 时间戳` 画出来的图**谁都扫不出来**——
+            // 把它摆在"每分钟自动刷新"的话术下面，就是让用户举着一张假票上车。
+            // 真实能用的只有支付宝乘车码那一个出口，所以这一格改成品实的话 + 那一个出口。
+            BusCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("本机不出乘车码", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "后台还没有卡务/闸机接口，这一页没有可刷新的二维码。" +
+                            "要扫码乘车请走下面那张「支付宝官方乘车码」，扣费与线路以支付宝页面显示为准。",
+                        color = t.textSecondary,
+                        fontSize = (12 * scale).sp,
+                        lineHeight = (17 * scale).sp,
                     )
-                    .padding(18.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                QrView(
-                    text = qrContent,
-                    caption = "",
-                    modifier = Modifier.fillMaxSize(),
-                )
+                }
             }
-
-            Text(
-                "乡邮智联乘车码 · 每分钟自动刷新",
-                color = t.textTertiary,
-                fontSize = (11 * scale).sp,
-                textAlign = TextAlign.Center,
-            )
 
             // 双入口按钮
             Row(
@@ -165,40 +131,16 @@ fun BusQrScreen() {
                 )
             }
 
-            // 支持的线路
-            BusCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("适用线路", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
-                    listOf(
-                        "1路 · 县城⇄云山村",
-                        "2路 · 县城⇄石桥村",
-                        "3路 · 县城⇄河坝镇",
-                        "K1 · 县城快线",
-                    ).forEach { line ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(t.primary),
-                            )
-                            Text(
-                                line,
-                                color = t.textSecondary,
-                                fontSize = (12 * scale).sp,
-                                modifier = Modifier.padding(start = 8.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 使用须知
+            // 使用须知：只说这一页真能做的事。
+            // 原来这里钉了一份手写线路表（1路 县城⇄…、K1 县城快线…），后台没有给过这些车次，
+            // 而判据 L-v 的全工程唯一硬编码村名额度是给输入框示例用的，不是给假线路让路的（D-066）。
             BusCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("使用须知", color = t.ink, fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "· 推荐使用支付宝乘车码，全市公交通用\n· 上车扫码，下车无需再扫\n· 票价按站点距离自动计算\n· 余额不足时请提前充值",
+                        "· 本页不代扣车费，票价与优惠按承运方规则结算\n" +
+                            "· 能坐哪几路、怎么刷卡，以支付宝乘车码页面显示为准\n" +
+                            "· 线路与班次在「实时公交」那一页读的是后台下发，不在这页手写",
                         color = t.textSecondary,
                         fontSize = (12 * scale).sp,
                         lineHeight = (18 * scale).sp,

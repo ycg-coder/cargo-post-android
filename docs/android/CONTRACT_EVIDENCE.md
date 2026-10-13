@@ -128,7 +128,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 **本节的行号是量出来的，不是抄的**（11:5x 复核）：把 §七 里每条 `文件名:行号` 抽出来，在两个仓里解析后与磁盘当前内容逐条比对，
 共 **218 条可解析锚点全部落在有效行内**（越界 0 条），其中 **9 处与实文不符、已就地改正**：
 `AppDriverHandoverRespVO.java:63→:62`（remark）、`Models.kt:1272→:1273`（orderNo）、
-`Models.kt:1275→` 该格的 `levelOf` 标签错指（`levelOf` 实为 `:1254-1261`，四个字段应为 `:1269`/`:1274`/`:1275`/`:1276`/`:1277`）、
+`Models.kt:1410→` 该格的 `levelOf` 标签错指（`levelOf` 实为 `:1254-1261`，四个字段应为 `:1269`/`:1274`/`:1275`/`:1276`/`:1277`）、
 `Models.kt:818→:816` 与 `:489→:488`（两处 distance 读点）、`Models.kt:1774-1779→:1774-1782`（quote 五键实际在 `:1775/1776/1777/1780/1781`）、
 `Repo.kt:1166→:1165`（`NavStep.etaSeconds`，块是 `:1157-1166`）、`Repo.kt:86→:87`（`Ack.amount` 默认值，`:86` 是 `pickupCode`）、
 以及 §七.3 那格里的 `:1273` 同批改正。
@@ -144,10 +144,10 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | --- | --- | --- | --- | --- | --- | --- |
 | 列表本体 `data.list` | `Api.kt:160-165` `Payload.list`（`arr ?: obj.optJSONArray("list")`）→ `Repo.kt:852-859` `Feed(p.list.map{NotifyMsg.parse(it)}, p.demo, total = p.total)` | `AppNotificationController.java:33-42` 返回 `CommonResult<PageResult<…>>`；`PageResult.java:18 private List<T> list`（`total` 在 `:15`） | `{"list":[{"id":9,"readStatus":0,"content":"车已装车","eventType":"LOAD"}],"total":1}`（`NotificationWorkerResultTest.kt:82` 原样） | `{"code":0,"msg":"","data":null}` | `Api.kt:342-343` ⇒ 空 `Payload` ⇒ `list` 空集合、**不抛**、不回落演示数据；`Feed.error=null` 与 `Feed.cause=null`，结局是"没有新消息"而不是"失败" | `ApiTest.kt:22-41`（`assertNull(empty.arr)`）、`RepoTest.kt:53-61`（502 才是 error）、`NotificationWorkerResultTest.kt:78-102` |
 | `data` 直接是数组（司机侧消息 / 交接 / 段列表） | 同上 `arr` 分支（`Api.kt:447-451` `toPayload`） | `AppDriverController.java:135-140`（handovers）、`:149-154`（legs）返回 `CommonResult<List<…>>`；`:236`（messages）返回 `PageResult` | `[{"id":91,"status":4,"statusName":"交接完成","photoUrl":"…"}]`（`ScalarEnvelopeContractTest.kt:198`） | `data: []` | 空集合，同上一条 | `ScalarEnvelopeContractTest.kt:198-202`、`DriverExceptionContractTest.kt:37` |
-| `total` | `Api.kt:168` `obj?.optInt("total", list.size)` | `PageResult.java:15` | `:1` | 键不在 | **回落本页条数**（不是"后端总条数"），分页页脚因此可能偏小 | ⚠ 缺键面**无用例**（`ApiTest.kt:29` 只钉在场面）→ 见七.10 |
-| `unread-count` 裸标量 | `Repo.kt:869-871` `longOf("count","unreadCount")` | `AppNotificationController.java:44-48` `CommonResult<Long>`（`data` 就是数字本体，没有键） | `{"code":0,"data":3}` | `data: null` | `Api.kt:132-146` ⇒ `null`（`Long?`），**与 0 分家**，UI 不显示"0 条未读" | `ScalarEnvelopeContractTest.kt:36-59` |
+| `total` | `Api.kt:173` `obj?.optInt("total", list.size)` | `PageResult.java:15` | `:1` | 键不在 | **回落本页条数**（不是"后端总条数"），分页页脚因此可能偏小 | ⚠ 缺键面**无用例**（`ApiTest.kt:29` 只钉在场面）→ 见七.10 |
+| `unread-count` 裸标量 | `Repo.kt:950-952` `longOf("count","unreadCount")` | `AppNotificationController.java:44-48` `CommonResult<Long>`（`data` 就是数字本体，没有键） | `{"code":0,"data":3}` | `data: null` | `Api.kt:132-146` ⇒ `null`（`Long?`），**与 0 分家**，UI 不显示"0 条未读" | `ScalarEnvelopeContractTest.kt:36-59` |
 | `readStatus`（Integer 0/1，不是布尔） | `Models.kt:1270` `multiBool("readStatus","isRead","read") \|\| multiNum("readStatus") == 1.0` | `AppNotificationRespVO.java:31`（DO `:34`） | `"readStatus":0` | 键不在 | `false`（未读），是安全方向 | `NotificationWorkerResultTest.kt:82` 用的就是 `"readStatus":0` |
-| `eventType` / `eventTypeName` / `level` / `actionRequired` | `Models.kt:1264`（多别名先取成 `evt`，再同时喂 `type:1269` 与 `eventType:1274`）、`:1275`（eventTypeName）、`:1276`（level）、`:1277`（actionRequired） | VO `:16` / `:19`（**由 controller `:40-41` 现算**，不来自 DB）/ `:34` / `:37` | `"eventType":"LOAD"` | 键不在 | 名 `""`；`level` ⇒ `MsgLevel.UNKNOWN`（`Models.kt:1254-1261`），不冒充普通级别 | `DomainSplitTest.kt:65/83/145` 覆盖空信封 |
+| `eventType` / `eventTypeName` / `level` / `actionRequired` | `Models.kt:1406`（多别名先取成 `evt`，再同时喂 `type:1269` 与 `eventType:1274`）、`:1275`（eventTypeName）、`:1276`（level）、`:1277`（actionRequired） | VO `:16` / `:19`（**由 controller `:40-41` 现算**，不来自 DB）/ `:34` / `:37` | `"eventType":"LOAD"` | 键不在 | 名 `""`；`level` ⇒ `MsgLevel.UNKNOWN`（`Models.kt:1254-1261`），不冒充普通级别 | `DomainSplitTest.kt:65/83/145` 覆盖空信封 |
 | **`orderNo`** | `Models.kt:1273` `multiStr("orderNo","bizOrderNo","no")` | **PRODUCER_NOT_FOUND**：VO 字段清单 `AppNotificationRespVO.java:13-46` 内无此项；DO `TransportUserNotificationDO.java:15-39` 只有 `orderId/planId/legId/eventId`；`sql/mysql/transport-schema.sql:651-672` 无 `order_no` 列；admin `NotificationRespVO.java:10-38` 亦无。（对照：`/legs`、`/handovers` 是**显式多join 才产出** `orderNo` 的，`DriverAppServiceImpl.java:1615`/`:1647`） | — | 恒缺失 | ⇒ `""`；**渲染侧四处消费点全带 `isNotEmpty()` 闸门**（`NotificationScreen.kt:206`、`DriverMessagesScreen.kt:170` 与 `:222`、`AlertEngine.kt:74`/`:96`）⇒ 表现是"没有单号标签、不能点开轨迹"，**不是假单号** | 无用例（键本身不存在，无法造正常样例）→ 见七.10 |
 
 ### 七.2 handover photo
@@ -176,25 +176,25 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | 字段 | Android parser | 后端 producer | 正常样例 | 缺失样例 | 缺失处理 | 测试类 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `etaMinutes`（公交） | `Models.kt:742` `multiNumOrNull(...)?.toInt()` ⇒ `Int?` | `AppBusRespVO.java:44` ← `AppBusServiceImpl.java:132`/`:134`；`AppBusNearbyRespVO.java:123` ← `:719/720/728/745/768` | `"etaMinutes":6` | 键不在 / `null` | `null` ⇒ `etaValueText="—"`、`etaCaptionText="到站时间未给"` | `BusEtaContractTest.kt:66-79`、`:220-232` |
-| `waitDepartureMinutes` | `Models.kt:753` 同上 | `AppBusRespVO.java:47` ← `:136`；`AppBusNearbyRespVO.java:126` ← `:720` | `3` | 键不在 | `null`（不许塌 0） | `MinutesContractTest.kt:59-70`（含显式 `null` 与别名 `waitMinutes` 不再被认） |
-| `etaToNextStationMinutes` | `Models.kt:757` **无别名**、保 `Double?` 不截断 | `AppBusRespVO.java:50` ← `AppBusServiceImpl.java:140`（`/realtime`）；**`/nearby` 的 `NearbyBus` 没有这个字段** ⇒ 该端点 PRODUCER_NOT_FOUND | `3.7` | nearby 报文里没有 | `null` ⇒ UI 退到 `etaMinutes` 或"到站时间未给"（`Models.kt:625-634`） | `BusEtaContractTest.kt:190-200` 正面钉住"nearby 没这键 ⇒ null" |
+| `waitDepartureMinutes` | `Models.kt:725` 同上 | `AppBusRespVO.java:47` ← `:136`；`AppBusNearbyRespVO.java:126` ← `:720` | `3` | 键不在 | `null`（不许塌 0） | `MinutesContractTest.kt:59-70`（含显式 `null` 与别名 `waitMinutes` 不再被认） |
+| `etaToNextStationMinutes` | `Models.kt:811` **无别名**、保 `Double?` 不截断 | `AppBusRespVO.java:50` ← `AppBusServiceImpl.java:140`（`/realtime`）；**`/nearby` 的 `NearbyBus` 没有这个字段** ⇒ 该端点 PRODUCER_NOT_FOUND | `3.7` | nearby 报文里没有 | `null` ⇒ UI 退到 `etaMinutes` 或"到站时间未给"（`Models.kt:625-634`） | `BusEtaContractTest.kt:190-200` 正面钉住"nearby 没这键 ⇒ null" |
 | `nearestStationEtaMinutes` | `Models.kt:762` | `AppBusNearbyRespVO.java:144` ← `:681`（`fillNearestStationEta:641`）；真名**不是** `nearestStationMinutes`（后者全仓 0 命中，含 `.py/.sql/.md/.ts/.js`） | `8` | 键不在 | `null` | `MinutesContractTest.kt:108-117` 同族口径 |
-| `stopsToNearestStation` | `Models.kt:763` | `AppBusNearbyRespVO.java:147` ← `:667` `Math.max(0, index-nextIndex)` | `2` | 键不在 | `null` | 同上 |
+| `stopsToNearestStation` | `Models.kt:736` | `AppBusNearbyRespVO.java:147` ← `:667` `Math.max(0, index-nextIndex)` | `2` | 键不在 | `null` | 同上 |
 | `plannedMinutes` | `Models.kt:500` `multiNum(...).toInt()` ⇒ **缺键 0**（非空字段） | `AppBusLineRespVO.java:54` ← `AppBusServiceImpl.java:188`；`AppDriverStationRespVO.java:17` ← `DriverAppServiceImpl.java:1911-1914`；`RouteStationRespVO.java:32`（admin） | `12` | 键不在 / 别名 `minutes`、`offsetMinutes` | **0**，且别名一律不认 | `MinutesContractTest.kt:42-55`（期望值就是 0） |
-| `plannedDurationMinutes` | `Models.kt:1381` `multiNum ⇒ 0` | `AppDriverShiftRespVO.java:24` ← `DriverAppServiceImpl.java:229` | `55` | 别名 `durationMinutes` | `0` | `MinutesContractTest.kt:94-104` |
+| `plannedDurationMinutes` | `Models.kt:1506` `multiNum ⇒ 0` | `AppDriverShiftRespVO.java:24` ← `DriverAppServiceImpl.java:229` | `55` | 别名 `durationMinutes` | `0` | `MinutesContractTest.kt:94-104` |
 | `durationMinutes`（方案级） | `Models.kt:1159` `TransitPlan.minutes` 读 `durationMinutes`，⇒ `0` | `RoutePreviewRespVO.java:19` ← `AppSendRouteInfoService.java:87`/`:130` | `210` | 别名 `totalMinutes`（无生产者） | `0`；别名不认 | `MinutesContractTest.kt:74-90`（"totalMinutes 没有生产者"） |
 | `walkMinutes` | `Models.kt:1920` `multiNumOrNull ⇒ null` | `AppSendReachabilityRespVO.java:32` | `12` | 键不在 / 别名 `minutes` | `null` ⇒ `walkText` 不带数字 | `MinutesContractTest.kt:108-117`、`ReachabilityContractTest.kt:138-155` |
-| `roadEtaSeconds` / `NavStep.etaSeconds` | `Repo.kt:1111`、`Repo.kt:1165` 都是 `multiNum ⇒ 0`（`NavStep` 的映射块是 `:1157-1166`） | `AppDriverRouteRespVO.java:48 routeDurationSeconds`、`:78 nextStopEtaSeconds`、`:83 nextStopRoadEtaSeconds` | `routeDurationSeconds:600` | 键不在 | **0**（0 秒在路上与"未知"没分家）→ 七.10 缺陷 D-⑯-4 | 无用例 |
+| `roadEtaSeconds` / `NavStep.etaSeconds` | `Repo.kt:1195`、`Repo.kt:1165` 都是 `multiNum ⇒ 0`（`NavStep` 的映射块是 `:1157-1166`） | `AppDriverRouteRespVO.java:48 routeDurationSeconds`、`:78 nextStopEtaSeconds`、`:83 nextStopRoadEtaSeconds` | `routeDurationSeconds:600` | 键不在 | **0**（0 秒在路上与"未知"没分家）→ 七.10 缺陷 D-⑯-4 | 无用例 |
 
 ### 七.5 distance / duration（段里程与段时长）
 
 | 字段 | Android parser | 后端 producer | 正常样例 | 缺失样例 | 缺失处理 | 测试类 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `distanceKm`（司机段） | `Models.kt:1160` `multiNumOrNull`，**不给 `distance` 别名**（单位事故） | `AppDriverLegRespVO.java:59` ← `DriverAppServiceImpl.java:1628` | `12.4` | 键不在 / `null` / 给了 `distance:8000` | `null` ⇒ `legPlanText` 该项消失；两者都缺 ⇒ **整行不出**（`Models.kt:1072-1079`） | `DriverLegRespContractTest.kt:108-122`、`DistanceCaliberContractTest.kt:51-81` |
-| `distanceKm`（用户段 `/send/legs`） | 同上 | **PRODUCER_NOT_FOUND**：`AppSendLegRespVO.java:13-37` 九个字段里没有 `distanceKm`/`durationMinutes`（DO 有：`TransportLegDO.java:40`/`:42`，但 `AppSendController.java:172-185` 没拷进 VO） | — | 恒缺失 | ⇒ `null` ⇒ 时间轴不写"本段 X km" | `DriverLegRespContractTest.kt:126-140` |
-| `durationMinutes`（段） | `Models.kt:1161` ⇒ `null` | `AppDriverLegRespVO.java:62` ← `:1629`；`/send/legs` 无 | `35` | 键不在 | `null` | 同两行 |
-| `distance` / `meters`（裸键） | `Models.kt:816` `BusLine.distanceMeters = multiNum("distance","meters")`（字段声明 `:799` 自陈"旧字段：契约里没有这两个键，只保留解析以兼容旧报文；界面一律改读 `distanceKm`"）、`Models.kt:488` `Station` 的米制候选 `distance/distanceM/meters` | **PRODUCER_NOT_FOUND**：整个 `yudao-module-transport` 里 `private … distance;` / `private … meters;` / `getDistance()` 三种形状**各 0 命中**（`grep -rEc` 实测 0/0/0；只剩 `MultiLegPlanner.java:413` 的包级 `static double distance(StationDO, StationDO)`——那是 Haversine 工具方法，不作为响应字段序列化） | — | 恒缺失 | `BusLine.distanceMeters` ⇒ **恒 0.0**，且本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**已无消费点**（线路页读 `line.distanceKm`，`BusScreen.kt:570-571` 缺键说"里程未给"）。`Station.distanceMeters` 的米制候选同样不命中，但 `:487` 的 `distanceKm` 候选**有生产者**（`AppBusNearbyRespVO.java:120`/`:138`/`:189`）⇒ `BusScreen.kt:289`/`:384`/`:389`、`HomeScreen.kt:388`、`SendScreen.kt:1154` 上的是公里×1000 换算的真值，**不是恒 0 的那一个** | `DistanceCaliberContractTest.kt:36-48`（钉的是"米制不许当公里读"，不是这条缺失面）→ 七.10 缺陷 D-⑯-5 |
-| `routeDistanceMeters` / `nextStopRoadDistanceMeters` | `Repo.kt:1110`（别名表第一位就是真名）、`Repo.kt:1127` | `AppDriverRouteRespVO.java:45`、`:81` ← `DriverAppServiceImpl.java:521`/`:717` | `24600` | 键不在 | `0` | `RouteGuideContractTest`（覆盖来源判定，不覆盖该键缺面） |
+| `distanceKm`（用户段 `/send/legs`） | 同上 | **PRODUCER_NOT_FOUND**：`AppSendLegRespVO.java:62-83` 九个字段里没有 `distanceKm`/`durationMinutes`（DO 有：`TransportLegDO.java:40`/`:42`，但 `AppSendController.java:172-185` 没拷进 VO） | — | 恒缺失 | ⇒ `null` ⇒ 时间轴不写"本段 X km" | `DriverLegRespContractTest.kt:126-140` |
+| `durationMinutes`（段） | `Models.kt:1105` ⇒ `null` | `AppDriverLegRespVO.java:62` ← `:1629`；`/send/legs` 无 | `35` | 键不在 | `null` | 同两行 |
+| `distance` / `meters`（裸键） | `Models.kt:854` `BusLine.distanceMeters = multiNum("distance","meters")`（字段声明 `:799` 自陈"旧字段：契约里没有这两个键，只保留解析以兼容旧报文；界面一律改读 `distanceKm`"）、`Models.kt:488` `Station` 的米制候选 `distance/distanceM/meters` | **PRODUCER_NOT_FOUND**：整个 `yudao-module-transport` 里 `private … distance;` / `private … meters;` / `getDistance()` 三种形状**各 0 命中**（`grep -rEc` 实测 0/0/0；只剩 `MultiLegPlanner.java:413` 的包级 `static double distance(StationDO, StationDO)`——那是 Haversine 工具方法，不作为响应字段序列化） | — | 恒缺失 | `BusLine.distanceMeters` ⇒ **恒 0.0**，且本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**已无消费点**（线路页读 `line.distanceKm`，`BusScreen.kt:570-571` 缺键说"里程未给"）。`Station.distanceMeters` 的米制候选同样不命中，但 `:487` 的 `distanceKm` 候选**有生产者**（`AppBusNearbyRespVO.java:120`/`:138`/`:189`）⇒ `BusScreen.kt:289`/`:384`/`:389`、`HomeScreen.kt:388`、`SendScreen.kt:1154` 上的是公里×1000 换算的真值，**不是恒 0 的那一个** | `DistanceCaliberContractTest.kt:36-48`（钉的是"米制不许当公里读"，不是这条缺失面）→ 七.10 缺陷 D-⑯-5 |
+| `routeDistanceMeters` / `nextStopRoadDistanceMeters` | `Repo.kt:1235`（别名表第一位就是真名）、`Repo.kt:1127` | `AppDriverRouteRespVO.java:45`、`:81` ← `DriverAppServiceImpl.java:521`/`:717` | `24600` | 键不在 | `0` | `RouteGuideContractTest`（覆盖来源判定，不覆盖该键缺面） |
 | `distanceKm`（线路级） | `Models.kt:819` ⇒ `null` | `AppBusLineRespVO.java:28` ← `AppBusServiceImpl.java:179`；`NearbyBus:138` ← `:422` | `12.4` | 键不在 | `null` | `DistanceCaliberContractTest.kt:36-48` |
 
 ### 七.6 amount / itemFee / distanceFee
@@ -203,21 +203,21 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | --- | --- | --- | --- | --- | --- | --- |
 | `amount` `itemFee` `distanceFee` `itemCount` `distanceKm` | `Models.kt:1774-1782` 五键全 `multiNumOrNull` ⇒ `null`（`:1775`/`:1776`/`:1777`/`:1780`/`:1781`） | `AppSendQuoteRespVO.java:13/16/19/22/25` ← `AppSendController.java:507-513` ← `CargoPricingService.java:53`（件数费）`:65`（里程费）`:69`（合计） | `{"amount":11.0,"itemFee":5.0,"distanceFee":6.0,"itemCount":2,"distanceKm":4.0}` | `{"itemFee":5.0,"distanceFee":6.0,"itemCount":2}` 或直接 `JSONObject()` | `"未给"` / `"金额未给"` / `"件数费未给 · 里程费未给（件数未给 · 计价里程未给）"`；`0.0` 是**真零**、与 `null` 分家（`Models.kt:1757-1758`） | `QuoteNullSafetyTest.kt:59-65`/`:69-75`/`:79-89`/`:93-101`/`:105-113`/`:117-122` |
 | 别名 `fee`/`totalPrice`/`unitFee`/`mileageFee`/`count` | 已删（`Models.kt:1718-1727` 记录） | 这些名字在 quote VO 里都不存在 | — | — | 不再被认 ⇒ `null` | `QuoteNullSafetyTest.kt:79-89` |
-| **`amount`（下单回执）** | `Repo.kt:580` `Ack(amount = o.multiNum("totalAmount"))`（寄货下单）、`Repo.kt:532` 商城下单回执**不取**金额（`AppProductOrderCreateRespVO` 只有 id/orderNo） | **键名已对齐**（㊻ 2026-10-09 实测：客户端改读 `totalAmount`，`amount`/`fee` 两个响应键**已不再被读**）；创建/轨迹返回的是 `AppSendOrderRespVO.java:63 private BigDecimal totalAmount`（`AppProductOrderRespVO.java:19` 同名）；`amount`/`fee` 作为**响应键**都不存在 | `"totalAmount":11.00` | 键不在 | ⇒ 键对上了，但缺键仍由 `multiNum` 塌 **0.0**（`Repo.kt:87` 默认值 `val amount: Double = 0.0`，同类的 `pickupCode` 在 `:86`）。今天没有消费点（`grep -rn "ack\.amount" app/src/main` → **0**），所以**还不是可见假数**；一旦有页面直接显示就是"¥0 收据" → 七.10 缺陷 D-⑯-6 | 无用例 |
+| **`amount`（下单回执）** | `Repo.kt:558` `Ack(amount = o.multiNum("totalAmount"))`（寄货下单）、`Repo.kt:532` 商城下单回执**不取**金额（`AppProductOrderCreateRespVO` 只有 id/orderNo） | **键名已对齐**（㊻ 2026-10-09 实测：客户端改读 `totalAmount`，`amount`/`fee` 两个响应键**已不再被读**）；创建/轨迹返回的是 `AppSendOrderRespVO.java:63 private BigDecimal totalAmount`（`AppProductOrderRespVO.java:19` 同名）；`amount`/`fee` 作为**响应键**都不存在 | `"totalAmount":11.00` | 键不在 | ⇒ 键对上了，但缺键仍由 `multiNum` 塌 **0.0**（`Repo.kt:87` 默认值 `val amount: Double = 0.0`，同类的 `pickupCode` 在 `:86`）。今天没有消费点（`grep -rn "ack\.amount" app/src/main` → **0**），所以**还不是可见假数**；一旦有页面直接显示就是"¥0 收据" → 七.10 缺陷 D-⑯-6 | 无用例 |
 | 列表侧订单金额 | `Models.kt:977` `SendOrder.fee = multiNum("fee","totalPrice","amount","totalAmount")` ⇒ 缺 `0.0`；`Models.kt:419` `ProductOrder.amount` 同族 | `totalAmount` ✓ 在场（见上） | `11.00` | 键不在 | `0.0` ⇒ `ParcelScreen.kt:447` 直接渲染 `¥0`；这是 §四 B/C→A 盘点里已登记的一类 | `EarningsContractTest.kt:112`/`:93`/`:143`（收益面已收口，寄货列表面未覆盖） |
 
 ### 七.7 inService / located
 
 | 字段 | Android parser | 后端 producer | 正常样例 | 缺失样例 | 缺失处理 | 测试类 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `inService` | `Repo.kt:817` `multiBoolOrNull("inService")` ⇒ `Boolean?`（`Models.kt:838`） | `AppBusNearbyRespVO.java:65` ← `AppBusServiceImpl.java:481`（有车 `STATUS_RUNNING`）否则 `:532`（当前时刻落在某班次窗口内），调用点 `:469 fillServiceWindow` | `"inService":false` | 键不在 / `null` | `null` ⇒ `isOffService = inService == false` 为 **false**（`Models.kt:863`）⇒ 走空态支而不是"非运营"支；只有真给 `false` 才允许说非运营 | `NearbyBooleanContractTest.kt:60-66`（缺键）/`:69-74`（显式 null）/`:52-57`（false 才进 off） |
-| `located` | `Repo.kt:826` 同族 ⇒ `Boolean?`（`Models.kt:853`） | `AppBusNearbyRespVO.java:45` ← `AppBusServiceImpl.java:256`，判据在 `:254-255`（经纬度非空**且**在 ±90/±180 内） | `"located":true` | 键不在 / `null` | `null` ⇒ 当前**无 UI 消费者**（`Models.kt:848-852` 自陈"默认值本身就是谎言"）⇒ 省略而非声称定位成功 | `NearbyBooleanContractTest.kt:60-66`/`:69-74` |
-| `realTransitAvailable` | `Repo.kt:816` `multiBool`（非空 ⇒ 缺 `false`），故意不给 `realTransit` 别名 | `AppBusNearbyRespVO.java:50` ← `:372` | `true` | 键不在 | `false`（保守方向） | `NearbyBooleanContractTest.kt:88-94`（别名不认） |
-| `vehicles` vs `buses` | `Repo.kt:813` `multiArr("vehicles","buses")` | 后端产 **`buses`**：`AppBusNearbyRespVO.java:27` ← `AppBusServiceImpl.java:438`；`vehicles` 作为响应键只在 admin `DispatchValidateRespVO.java:16` 与**入站**请求 `AlgorithmPlanReqDTO.java:38` | `"buses":[…]` | 两个键都不在 | 空列表（`Models.kt:95-100` `multiArr`）；别名链第一位永不命中 ⇒ 实际靠第二位读到，**功能正确但用例写的是不存在的形状** → 七.10 缺陷 D-⑯-7 | `NearbyBooleanContractTest` 全部样例写 `"vehicles":[]` |
+| `inService` | `Repo.kt:897` `multiBoolOrNull("inService")` ⇒ `Boolean?`（`Models.kt:838`） | `AppBusNearbyRespVO.java:65` ← `AppBusServiceImpl.java:481`（有车 `STATUS_RUNNING`）否则 `:532`（当前时刻落在某班次窗口内），调用点 `:469 fillServiceWindow` | `"inService":false` | 键不在 / `null` | `null` ⇒ `isOffService = inService == false` 为 **false**（`Models.kt:863`）⇒ 走空态支而不是"非运营"支；只有真给 `false` 才允许说非运营 | `NearbyBooleanContractTest.kt:60-66`（缺键）/`:69-74`（显式 null）/`:52-57`（false 才进 off） |
+| `located` | `Repo.kt:906` 同族 ⇒ `Boolean?`（`Models.kt:853`） | `AppBusNearbyRespVO.java:45` ← `AppBusServiceImpl.java:256`，判据在 `:254-255`（经纬度非空**且**在 ±90/±180 内） | `"located":true` | 键不在 / `null` | `null` ⇒ 当前**无 UI 消费者**（`Models.kt:848-852` 自陈"默认值本身就是谎言"）⇒ 省略而非声称定位成功 | `NearbyBooleanContractTest.kt:60-66`/`:69-74` |
+| `realTransitAvailable` | `Repo.kt:894` `multiBool`（非空 ⇒ 缺 `false`），故意不给 `realTransit` 别名 | `AppBusNearbyRespVO.java:50` ← `:372` | `true` | 键不在 | `false`（保守方向） | `NearbyBooleanContractTest.kt:88-94`（别名不认） |
+| `vehicles` vs `buses` | `Repo.kt:893` `multiArr("vehicles","buses")` | 后端产 **`buses`**：`AppBusNearbyRespVO.java:27` ← `AppBusServiceImpl.java:438`；`vehicles` 作为响应键只在 admin `DispatchValidateRespVO.java:16` 与**入站**请求 `AlgorithmPlanReqDTO.java:38` | `"buses":[…]` | 两个键都不在 | 空列表（`Models.kt:95-100` `multiArr`）；别名链第一位永不命中 ⇒ 实际靠第二位读到，**功能正确但用例写的是不存在的形状** → 七.10 缺陷 D-⑯-7 | `NearbyBooleanContractTest` 全部样例写 `"vehicles":[]` |
 
 ### 七.8 信封与序列化的两条全局口径（会影响"缺失样例"怎么造）
 
-1. `CommonResult.java:27/33/37`（`code/msg/data`）＋ `PageResult.java:15/18`（`total/list`）⇒ 端上 `Api.kt:160-168` 的 `list`/`total`
+1. `CommonResult.java:27/33/37`（`code/msg/data`）＋ `PageResult.java:15/18`（`total/list`）⇒ 端上 `Api.kt:173-181` 的 `list`/`total`
    读法**只对分页三处成立**（`notification/page`、`driver/messages`、`send/page`）；`driver/handovers`、`driver/legs` 的 `data` 是裸数组。
 2. 后端**没有**配 `default-property-inclusion`（`application.yaml` 内 `jackson` 段实测无该项）⇒ 声明了但没赋值的字段会以
    **显式 `null` 出现在 JSON 里**（键在场）。端上 `multiNumOrNull/multiBoolOrNull`（`Models.kt:75-93`）把"键不在"和"值为 null"
@@ -265,15 +265,15 @@ JVM 里从没渲染过，不许因为表格里有"缺失处理"这一列就读�
 
 | 字段 | Android parser | 后端 producer | 正常样例 | 缺失样例 | 缺失处理 | 测试类 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `carrierLongitude` / `carrierLatitude`（寄货轨迹的承运车辆位置） | `Repo.kt:1174` `geoOf()`：候选 `carrierLatitude,currentLatitude,latitude,lat,vehicleLatitude`（经度同族），**`lat!=0 && lng!=0` 才建 `Geo`**；消费点 `Repo.kt:726`（`vehicleGeo = geo`） | `AppSendOrderRespVO.java:100`/`:102` ← `AppSendController.java:475`/`:476`（在 `fillCarrierLiveInfo`，`:439`；由 `:262` 详情、`:371` 列表两处调用） | `{"carrierLatitude":30.5,"carrierLongitude":106.5}` | 键不在 / 显式 `null` / 两个都 `0.0` | ⇒ `Geo = null` ⇒ `TraceView.kt:122-130` 出**"暂无实时位置（后端未下发承运车辆坐标）"**；不许用 `0,0`、固定点、上一秒的点或随机点顶替 | `UserTrackingContractTest.kt:46`（读得到）、`:70`（缺键⇒null 且 `locationSource=UNKNOWN`）、`:93`（显式 0 不许画成一个真点） |
+| `carrierLongitude` / `carrierLatitude`（寄货轨迹的承运车辆位置） | `Repo.kt:1264` `geoOf()`：候选 `carrierLatitude,currentLatitude,latitude,lat,vehicleLatitude`（经度同族），**`lat!=0 && lng!=0` 才建 `Geo`**；消费点 `Repo.kt:726`（`vehicleGeo = geo`） | `AppSendOrderRespVO.java:100`/`:102` ← `AppSendController.java:475`/`:476`（在 `fillCarrierLiveInfo`，`:439`；由 `:262` 详情、`:371` 列表两处调用） | `{"carrierLatitude":30.5,"carrierLongitude":106.5}` | 键不在 / 显式 `null` / 两个都 `0.0` | ⇒ `Geo = null` ⇒ `TraceView.kt:122-130` 出**"暂无实时位置（后端未下发承运车辆坐标）"**；不许用 `0,0`、固定点、上一秒的点或随机点顶替 | `UserTrackingContractTest.kt:46`（读得到）、`:70`（缺键⇒null 且 `locationSource=UNKNOWN`）、`:93`（显式 0 不许画成一个真点） |
 | `currentLongitude` / `currentLatitude`（商城订单轨迹的车辆位置） | 同一个 `geoOf`（`:1174`），候选键里 `currentLatitude`/`currentLongitude` 排第 2 位 | `AppProductOrderTraceRespVO.java:68`/`:70` ← `ProductOrderServiceImpl.java:377`/`:378`（端点 `AppProductOrderController.java:69`）；司机侧另有 `AppDriverRouteRespVO.java:59`/`:61` ← `DriverAppServiceImpl.java:510`/`:511` | `{"currentLatitude":29.55,"currentLongitude":106.57}` | 键不在 | 同上（`null` ⇒ "暂无实时位置"） | `UserTrackingContractTest.kt:137`（商城读得到车）、`:148`（商城没有新鲜度键 ⇒ 位置读得到也不许说"实时"） |
 | `servicePointLongitude` / `servicePointLatitude` | 不在 `geoOf` 的候选里（这是**站点**坐标，不是车辆） | `AppSendOrderRespVO.java:46`/`:48` | 有 | — | 站点坐标绝不冒充车辆位置 | `UserTrackingContractTest.kt:84` |
-| `carrierLocationSource`（新鲜度） | `Repo.kt:727` → `LocationSource.of`（`Models.kt:554`，唯一解析点），落 `ParcelTrace.locationSource`（`:1205`，默认 `UNKNOWN`）；文案只从 `knownLabel`（`:543-552`）出 | `AppSendOrderRespVO.java:108` ← `AppSendController.java:474`，判据 `:473`＋阈值 `CARRIER_FRESH_MINUTES = 5`（`:114`）；值域只有 `REAL_FRESH` / `REAL_STALE` | `"carrierLocationSource":"REAL_FRESH"` ⇒ `knownLabel="实时"` | 键不在 / 后端没合并位置（`fillCarrierLiveInfo` 提前 return） | ⇒ `UNKNOWN`，`knownLabel = null` ⇒ UI 说**"新鲜度未给"**；`REAL_STALE` 只说"位置可能过期"，**不升格**成实时 | `UserTrackingContractTest.kt:59`（STALE 不升格）、`:148` |
-| `lastReportTime`（车辆上报时刻） | `Repo.kt:739` `reportTimeOf("lastReportTime","reportTime","gpsTime")`，helper 在 `Models.kt:130`：`ts(multiStr(*keys))`，**不追加 `createTime` 回落**（追加的就是 `timeOf`，`:124`） | **只有商城侧有**：`AppProductOrderTraceRespVO.java:72` ← `ProductOrderServiceImpl.java:379`（`location.getReportTime()`）。**寄货 `/send/track` 侧 PRODUCER_NOT_FOUND**：`AppSendOrderRespVO.java:100-124` 里没有任何上报时间键，`grep -rn "reportTime" controller/app/transport/send/` 只命中 `AppSendController.java:273-276` 的内部形参与判据 | 商城：`"lastReportTime":1759309920000`（epoch 毫秒，`ts()` 转可读串） | 键不在 / 寄货侧恒缺 | ⇒ `""` ⇒ `TraceView.kt:127-129` 拼**"上报时间未给"**；旧写法会拿订单创建时间当车辆上报时刻（= 造一个时刻），本轮收口 | `UserTrackingContractTest.kt:113`（缺键 ⇒ `""`，且不等于 `createTime`）、`:122`（在场 ⇒ 时区无关正则，且明确 `assertNotEquals` 创建时刻） |
-| `carrierTaskStatus`（当前任务） | `Repo.kt:740` `multiStr("carrierTaskStatus")` ⇒ `ParcelTrace.carrierTaskStatus`（`Models.kt:1225`，默认 `""`） | `AppSendOrderRespVO.java:118` ← `AppSendController.java:395`（`TaskItemStatusEnum.nameOf(status)`，码表 `TaskItemStatusEnum.java:24-32`）；前置 `:215-217`：**没有派单明细就直接 return**，所以未派单时这个键天然缺席 | `"carrierTaskStatus":"派送中"` | 键不在（未派单 / 无权看作业明细） | ⇒ `""` ⇒ `TraceView.kt:136-143` 出**"当前任务：后端未下发（尚未派单，或本单无权查看作业明细）"**；不许拿订单状态名 `statusName` 顶一个作业状态 | `UserTrackingContractTest.kt:159`（读得到）、`:171`（未派单 ⇒ 空串且 `assertNotEquals(statusName, carrierTaskStatus)`） |
-| `carrierArrivedTime` | `Repo.kt:741` `reportTimeOf("carrierArrivedTime")` ⇒ `:1230` | `AppSendOrderRespVO.java:120` ← `AppSendController.java:405`（`item.getUpdateTime()`，服务器时间） | `"carrierArrivedTime":1759312000000` | 键不在 | ⇒ `""` ⇒ "（更新于 …）"整段不出现，只留状态名 | 同 `:159` 一条里一起钉 |
-| `carrierArrived` / `driverArrived` | `Repo.kt:746` `multiBool("carrierArrived","driverArrived","arrived")` | `AppSendOrderRespVO.java:114` ← `AppSendController.java:403`；商城侧 `AppProductOrderTraceRespVO.java:46` | `true` | 键不在 | ⇒ `false`（保守方向：不说"已到达"） | `UserTrackingContractTest.kt:159` |
-| `positionSource`（**自造别名，本轮删**） | 曾是 `Repo.kt:725` 的候选之一；现在 `dataSource` 只剩 `carrierLocationSource`/`dataSource` 两键 | **PRODUCER_NOT_FOUND**：后端 VO 与 `DemoData` 两侧都 0 生产者（`grep` 实测） | — | 恒不命中 | 删掉 ⇒ 不再假装读得到一个永不存在的键；`dataSource` 保留是因为演示面 `DemoData.kt:556` 真会写它 | `UserTrackingContractTest.kt:102`（给了 `positionSource` 也不再被采纳） |
+| `carrierLocationSource`（新鲜度） | `Repo.kt:789` → `LocationSource.of`（`Models.kt:554`，唯一解析点），落 `ParcelTrace.locationSource`（`:1205`，默认 `UNKNOWN`）；文案只从 `knownLabel`（`:543-552`）出 | `AppSendOrderRespVO.java:108` ← `AppSendController.java:474`，判据 `:473`＋阈值 `CARRIER_FRESH_MINUTES = 5`（`:114`）；值域只有 `REAL_FRESH` / `REAL_STALE` | `"carrierLocationSource":"REAL_FRESH"` ⇒ `knownLabel="实时"` | 键不在 / 后端没合并位置（`fillCarrierLiveInfo` 提前 return） | ⇒ `UNKNOWN`，`knownLabel = null` ⇒ UI 说**"新鲜度未给"**；`REAL_STALE` 只说"位置可能过期"，**不升格**成实时 | `UserTrackingContractTest.kt:59`（STALE 不升格）、`:148` |
+| `lastReportTime`（车辆上报时刻） | `Repo.kt:804` `reportTimeOf("lastReportTime","reportTime","gpsTime")`，helper 在 `Models.kt:130`：`ts(multiStr(*keys))`，**不追加 `createTime` 回落**（追加的就是 `timeOf`，`:124`） | **只有商城侧有**：`AppProductOrderTraceRespVO.java:72` ← `ProductOrderServiceImpl.java:379`（`location.getReportTime()`）。**寄货 `/send/track` 侧 PRODUCER_NOT_FOUND**：`AppSendOrderRespVO.java:100-124` 里没有任何上报时间键，`grep -rn "reportTime" controller/app/transport/send/` 只命中 `AppSendController.java:273-276` 的内部形参与判据 | 商城：`"lastReportTime":1759309920000`（epoch 毫秒，`ts()` 转可读串） | 键不在 / 寄货侧恒缺 | ⇒ `""` ⇒ `TraceView.kt:127-129` 拼**"上报时间未给"**；旧写法会拿订单创建时间当车辆上报时刻（= 造一个时刻），本轮收口 | `UserTrackingContractTest.kt:113`（缺键 ⇒ `""`，且不等于 `createTime`）、`:122`（在场 ⇒ 时区无关正则，且明确 `assertNotEquals` 创建时刻） |
+| `carrierTaskStatus`（当前任务） | `Repo.kt:805` `multiStr("carrierTaskStatus")` ⇒ `ParcelTrace.carrierTaskStatus`（`Models.kt:1225`，默认 `""`） | `AppSendOrderRespVO.java:118` ← `AppSendController.java:395`（`TaskItemStatusEnum.nameOf(status)`，码表 `TaskItemStatusEnum.java:24-32`）；前置 `:215-217`：**没有派单明细就直接 return**，所以未派单时这个键天然缺席 | `"carrierTaskStatus":"派送中"` | 键不在（未派单 / 无权看作业明细） | ⇒ `""` ⇒ `TraceView.kt:136-143` 出**"当前任务：后端未下发（尚未派单，或本单无权查看作业明细）"**；不许拿订单状态名 `statusName` 顶一个作业状态 | `UserTrackingContractTest.kt:159`（读得到）、`:171`（未派单 ⇒ 空串且 `assertNotEquals(statusName, carrierTaskStatus)`） |
+| `carrierArrivedTime` | `Repo.kt:806` `reportTimeOf("carrierArrivedTime")` ⇒ `:1230` | `AppSendOrderRespVO.java:120` ← `AppSendController.java:405`（`item.getUpdateTime()`，服务器时间） | `"carrierArrivedTime":1759312000000` | 键不在 | ⇒ `""` ⇒ "（更新于 …）"整段不出现，只留状态名 | 同 `:159` 一条里一起钉 |
+| `carrierArrived` / `driverArrived` | `Repo.kt:809` `multiBool("carrierArrived","driverArrived","arrived")` | `AppSendOrderRespVO.java:114` ← `AppSendController.java:403`；商城侧 `AppProductOrderTraceRespVO.java:46` | `true` | 键不在 | ⇒ `false`（保守方向：不说"已到达"） | `UserTrackingContractTest.kt:159` |
+| `positionSource`（**自造别名，本轮删**） | 曾是 `Repo.kt:786` 的候选之一；现在 `dataSource` 只剩 `carrierLocationSource`/`dataSource` 两键 | **PRODUCER_NOT_FOUND**：后端 VO 与 `DemoData` 两侧都 0 生产者（`grep` 实测） | — | 恒不命中 | 删掉 ⇒ 不再假装读得到一个永不存在的键；`dataSource` 保留是因为演示面 `DemoData.kt:556` 真会写它 | `UserTrackingContractTest.kt:102`（给了 `positionSource` 也不再被采纳） |
 | 位置来源文案的**单一映射点** | `LocationSource.knownLabel`（`Models.kt:543-552`）+ `LocationSource.of`（`:554-562`）；`BusVehicle.sourceText`（`:632`）改为**委托**同一映射，`UNKNOWN` 故意不给文案（两侧兜底能力不同），兜底分支读 `dataSource` 里的 `STALE`/`REAL` | 公交侧对应 `AppBusNearbyRespVO.java:65`/`:45` 一族（§七.7），承运侧对应 `AppSendController.java:474` | `"REAL_FRESH"` | 键不在 | 不许再出现第二个拼码点；`BusEtaContractTest` 13 例 0 红即"委托后行为逐字未变"的证据 | `BusEtaContractTest.kt`（13/0）、`UserTrackingContractTest.kt:46`/`:59` |
 
 ### 八.1 本节新增的 OPEN_DEFECT（登记，不动判据）
@@ -426,3 +426,131 @@ JVM 里从没渲染过，不许因为表格里有"缺失处理"这一列就读�
 ⇒ 登记为判据缺口 **`D-CE-1`**：`createProductOrder` 的别名撤读没有结构判据，只有一条具名行为用例
 `商城单回执只认 orderNo（后端那个 VO 就只有 id 与 orderNo）` 钉住（先红后绿：改前那条会拿到 `SC-DEAD` / `66.0`）。
 
+## 十七、`/send/topology`「查件票面」逐字段取证（D-085，2026-10-13 实测）
+
+判据簿：`tools/check_parcel_ticket_probes.sh`（PT-a…PT-l）；负控：`tools/parcel_ticket_negative_controls.sh`（41 条破口）；
+行为用例：`app/src/test/java/com/shanxiang/buspost/ui/user/ParcelTicketContractTest.kt`（15 条）。
+生产者：`AppSendController.java:208-215`（路由与非归属分支）、`TransportTopologyServiceImpl.java:92-176`（逐段赋值条件）、
+`OrderTopologyRespVO.java:16-139`（字段与可空性）。**这一整页此前是死代码**：`Repo.parcelTopology()`（`Repo.kt:780`）全仓 0 消费者。
+
+| 键 | 后端 producer（VO 行） | 只有这些条件才非空 | 小程序 consumer | App 读法与缺失行为 |
+|---|---|---|---|---|
+| `orderNo` `orderStatus` `orderStatusName` | `:21/:23/:25` | `order != null`（`ServiceImpl:92-99`） | `parcel.js:439` 只读 legs/handovers | 新增读 `orderStatusName`；空 ⇒ 票面念「后端没给」 |
+| `originStationName` `destinationStationName` | `:27/:29` | 站点档案查不到就是 null（`:97-98`） | 不读 | 新增读法（此前 App 只认自造的 `startStation`/`endStation`）；null ⇒ 念「后端没给」，不兜站名 |
+| `planningMode` `planningModeName` `planNo` `planReason` | `:32/:34/:36/:46` | `plan != null`（`:100-109`） | `planReason` 读（`parcel.js:439-440`） | 票面抬头四行；缺席 ⇒ 念「后端没给」 |
+| `totalLegs` `transferCount` | `:38/:40` Integer | 有段时被覆盖（`:118-123`） | 不读 | `multiNumOrNull`；**缺 ≠ 0 段 / 0 次** |
+| `totalDistanceKm` | `:42` BigDecimal | 段里程和 > 0 才覆盖（`:125-129`） | 不读 | 必须带口径：段全 `AMAP` 才说真实道路；含 `ESTIMATED` 就说「含估算段，不是真实道路里程」（依据 `MultiLegPlanner.java:187` 直线估算、`transport-schema.sql:257` Haversine） |
+| `totalDurationMinutes` | `:44` Integer | **各段之和 + 每次换乘 20 分钟**（`:134`，@Schema 只写"总时长(分钟)"没提这条口径） | 不读 | 措辞强制带「含 N 次换乘、每次 20 分钟」；换乘次数没给就写「是否已计入未知」，不替后端宣布 |
+| `candidates` | `:49` List | `multiLegService.preview` 抛异常时保持 null（`:172-174`） | 不读 | 空 ⇒ 念「方案对比没给，不表示这单只有一个方案」 |
+| `Candidate.chosen` | `:69` Boolean | 可缺席 | 不读 | 三态：true/false/null 各一句，null 念「后端没说（chosen 未给）」，不许塌成"不推荐" |
+| `Candidate.durationMinutes` `distanceKm` `transferCount` | `:65/:64/:63` | 可缺席 | 不读 | 全部 `multiNumOrNull`；改前 `minutes` 塌成 0 ⇒ 票面会念「这个方案 0 分钟」 |
+| `Handover.fromPlateNo` `toPlateNo` | `:118/:119` | 未派单为 null（`:330-344`） | 不读 | **真键名**；改前认 `fromPlate`/`toPlate`/`vehiclePlate`（三面 0 生产者）⇒ 真接口下"谁交给谁"整行念空，只有演示包念得出台词 |
+| `Handover.arrivedAt` `handoverStartedAt` `handoverCompletedAt` | `:123/:124/:125` | 可缺席 | 不读 | 完成 > 开始 > 到达；改前认 `handoverTime`/`confirmTime`（三面 0 生产者）⇒ 同上 |
+| `Handover.itemCount` | `:120` Integer | 可缺席 | 不读 | `Int?`；塌成 0 会被念成「0 件」 |
+| `Handover.statusName` `exceptionReason` | `:122/:126` | 可缺席 | 不读 | 异常原因空 ⇒ 念「无异常记录」，不许念成「有异常」 |
+| `Timeline.eventTypeName` `eventTime` `detail` | `:133/:134/:135` | `order != null` 才填（`:176`） | 不读 | 新增读法（改前只认 `label/title/nodeName`、`time/createTime`）⇒ 拓扑时间线整列念空；时刻必须过 `nodeTimeOf` 归一（后端把 `LocalDateTime` 序列化成 Epoch 毫秒，裸切串会切出 `"17590"`） |
+| 非归属人访问 | `AppSendController.java:214-215` | 返回 `new OrderTopologyRespVO()` = **全字段 null 的空结构，不是错误码** | — | 票面四格之一 `Absent`：只说「后端这次没给这张单的票面内容」，绝不念成「包裹不存在」，并保留「回追踪页」出口 |
+
+复跑命令（原样可执行）：`bash tools/check_parcel_ticket_probes.sh`（本轮 rc=0：PT-f 键基数 11 / 白名单外 0、PT-l 用例 15）、
+`bash tools/parcel_ticket_negative_controls.sh`（本轮 ✔=41 ✘=0 △=0）。
+
+⚠ 三面取证的边界：本轮**没有真接口回包**（本机后端未起这张单的登录态），"票面看到 n 段真交接"这一格仍未被演示；
+页面渲染一律 `NOT VERIFIED ON DEVICE`。另记一条判据缺口 **`D-CE-2`**：`R-n3` 那条"删免责话"的负控从写下那天起
+就一直 sed 一句不存在的「不代表车辆能到」（10-12 话术收紧时改写了），静默落空被记成"判据不判"——
+本轮补了 `R-n4`（钉现存那句免责话恰好 4 处）并把注入器换成会报落空的 `swap1`，`reach` 负控由 ✘=1 转 ✘=0。
+
+
+## 十八、`earliestPickupTime`「最早取货时间」逐字段取证（D-087，2026-10-13 实测）
+
+### 18.1 键的三面（写 / 存 / 读）
+
+| 面 | 生产者 | 结论 |
+| --- | --- | --- |
+| 写入 | `AppSendOrderCreateReqVO.java:76` `private LocalDateTime earliestPickupTime`（`@Schema(description = "最早取货时间")`，无校验注解） | App 的 `/send/create` 收这个键，此前 App 从来没发过 |
+| 落库 | `TransportOrderServiceImpl.java:149` `.earliestPickupTime(reqVO.getEarliestPickupTime())` → `TransportOrderDO.java:26` → `transport_order.earliest_pickup_time`（`transport-schema.sql:148`） | 真落库，不是被丢弃的键 |
+| 消费 | `DispatchServiceImpl.java:4076-4090`（`filterByTaskWindow`，调用点 `:591`，在 `doCreateSmartPlan` 里）+ `:3513` `.readyTime(toOffset(order.getEarliestPickupTime()))` → `AlgorithmOrderDTO.java:74` | **会真的改派单**：晚于任务窗口结束 ⇒ 本批不派并记理由串；同时作为揽收下限下发算法 |
+| 回读 | `AppSendOrderRespVO.java`（`/send/page` `:139`、`/send/track` `:154` 共用 `toRespVO`）**本轮之前 0 命中** | 只写不读 ⇒ 本轮补一个键闭合（`toRespVO` 走 `BeanUtils.toBean`，同名同型自动映射） |
+
+⚠ 一条不能引用的账面结论：`V024__key_indexes_and_unique_keys.sql:10` 的**注释**写着
+`WHERE status=READY_FOR_POOL ORDER BY earliest_pickup_time`，索引确实按 `:14` 建了，
+但全仓 `grep orderByAsc(TransportOrderDO::getEarliestPickupTime)` = **0 处** ⇒ "入池按取货时间排序"这句没有代码生产者，界面与台账都不许念。
+
+### 18.2 出网格式（这一条决定了整个实现）
+
+`TimestampLocalDateTimeDeserializer.java:24-27`：
+
+```java
+return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.systemDefault());
+```
+
+- 认的是 **Long 毫秒**（`YudaoJacksonAutoConfiguration` 注册的就是这一对（de）serializer，
+  App 侧 `Models.kt:104-114` 的 `ts()` 早就按这个契约处理 13 位数字）；
+- `p.getValueAsLong()` 对**非数字串不抛错、静默返回 0** ⇒ 发 `"2026-10-13 15:00:00"` 不会 400，
+  会安静存成 **1970-01-01**，而界面上一切正常。这是本轮所有"只认数字 / 不许拼串"判据的来源；
+- `ZoneId.systemDefault()`：`deploy/docker-compose.yml:21` 与 `yudao-server/Dockerfile:12` 都是 `TZ=Asia/Shanghai`，
+  MySQL URL 亦 `serverTimezone=Asia/Shanghai` ⇒ 本机用固定 `PICKUP_ZONE = Asia/Shanghai` 生成毫秒
+  （与 `BusScreen.kt:890` 同口径），设备换时区不会把墙钟挪走。
+
+### 18.3 小程序对照
+
+`cargo-post-miniprogram` 全域 `earliestPickupTime` / `pickupTime` / 取货时间 = **0 命中** ⇒ 没有界面形状可对标。
+字段语义只有"下限"，因此界面上**不做"上午/下午"这类假装是区间的选项**，只有"哪天几点之后"。
+
+### 18.4 后端仍缺的三条（本轮没替它编）
+
+1. `@Future`/范围校验缺席（`审计报告_联动_2026-09-21.md:326` 早就登记过这一行）⇒ 填过去的时间后端照收照存；
+   App 侧只是**不发**过去，不等于后端安全。
+2. `latestDeliveryTime` 在 App 的 create VO 里**没有字段**（只有 admin 侧 `TransportOrderBaseVO` 有），
+   而 `filterByTaskWindow` 的 `expired` 那一支读的就是它 ⇒ 用户端单子的时效上限永远为 null，
+   那一支对 App 单**永不生效**。
+3. 班次/任务窗口没有任何 app-api 生产者（`currentBatch()`、`formatWindow()` 都在服务端），
+   所以界面只能说"晚于窗口结束本批不派"，不能说"你这单排到哪一班"。
+
+### 18.5 判据缺口登记
+
+**`D-CE-3`**：`earliestPickupTime` 的**回读键在部署前后形状相同**（都是"没有值"），
+本机无法区分"用户没填"与"云上还没部署回读键" ⇒ 措辞只能是一句合并的"后端没给这一项（下单时没填也会这样，本机分不开）"。
+这不是界面可以修的，要么后端给这一键加"未填也显式回 null 且带旗标"，要么接受合并格；本轮选择如实合并。
+
+## 十九、「收藏线路」三面取证：本机 / 列表 / 后端（D-088，2026-10-13 实测）
+
+### 19.1 三面里只有两面存在
+
+| 面 | 生产者 | 结论 |
+| --- | --- | --- |
+| 存储 | `Prefs.kt:228-254`（`favoriteLineIds` 逗号分隔字符串 → `Set<String>`；`toggleFavoriteLine` / `isFavoriteLine`） | 只有 id，**没有名字**；DataStore 本机私有目录 |
+| 名字 | `Repo.kt:852-857` `GET /app-api/transport/bus/lines` → `BusLine.parse`（`Models.kt:865-868`：`id = multiStr("routeId","lineId","id")`、`name = multiStr("routeName","lineName","name")`） | 名字**只在列表响应里**；列表不取就永远显不出名字 |
+| 后端 | `yudao-module-transport` 的 app 端点包 / `yudao-module-member` / transport 建表 SQL —— 对收藏 **0 命中** | **没有任何收藏接口**，因此"同步/换机恢复/云端收藏"这类话在本 App 里一律是假话 |
+
+⚠ 一条**看起来像证据但不是**的命中：`sql/mysql/ruoyi-vue-pro.sql:2667` 的 `system_menu` 里有一行名字含「收藏」。
+那是上游芋道框架自带的后台菜单种子数据（权限项），与线路收藏无关；引用它之前先看它是 `system_menu` 的 INSERT，不是业务表。
+
+### 19.2 旧形状为什么算缺陷（不是风格问题）
+
+`BusScreen.kt:657-659`：
+```kotlin
+val favIds = Prefs.favoriteLineIds
+val favLines = vm.lines.filter { it.id in favIds }
+if (favLines.isNotEmpty()) { …渲染整栏… }
+```
+`vm.lines` 来自 `Repo.busLines(geo)`（`BusScreen.kt:243-245`），而旧写法只取 `lf.items`、把 `lf.error` 丢掉。
+于是**三种完全不同的事共用一个形状**：没收藏（`favIds` 空）、线路列表这一轮没取到（error 非空）、
+收藏的线路确实不在当前列表里（下架/换号）—— 后两种都会让整栏消失，界面把"没取到"念成"没有收藏"。
+这与 D-079（政策页）、D-080（公告栏"没取到 vs 后端确实没有"）、#42（天气按角色）是同一族病。
+
+本轮的拆法：整栏闸门换成 `favoriteRowVisible(favIds.size)`（**本机记着几条**），
+未命中那一格 `favoriteUnresolvedText(idCount, resolvedCount, linesError)` 分两支，
+失败原因原样带出；`linesError` 从 `Feed.error` 接出来（`BusScreen.kt:126/246/714`）。
+
+### 19.3 用例先红的一条（红因在纯层，不在判据）
+
+`favoriteUnresolvedText(3, 1, "")` 第一版返回"可能已下架"那一支 ——
+因为纯层用 `linesError != null` 判"取失败"，而**空串是"失败但没给出原因"**，被当成"没有失败"。
+⇒ 修的是纯层（空串/空白归失败支，文案补"没给出原因"），**不是把断言放宽**。第二次跑 9 例全绿。
+⚠ 反面做法是把期望改成"空串算下架"来让它绿——那等于把语义洞抄成契约。
+
+### 19.4 登记为判据缺口
+
+**`D-CE-4`**：`check_status_probes.sh` **没有配对的负控簿**（`tools/status_negative_controls.sh` 不存在，本轮实测）。
+它对 HomeScreen 的那个"恰好 2"锚点（`when (v.status)`）只能证明"这一轮复跑没红"，不能证明"判得动"。
+⇒ 在册待补；补之前不许把 `check_status_probes.sh` 的绿当成"这一格有人管"。

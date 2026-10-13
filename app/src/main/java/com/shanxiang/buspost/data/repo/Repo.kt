@@ -125,6 +125,33 @@ object Repo {
         Api.demoSession = Api.demoAllowed && stored.startsWith("demo-")
     }
 
+    /**
+     * 静默续期（任务：登录态）。由 `Api.refresher` 在业务请求 401 时调用，也可供冷启动临期检查复用。
+     *
+     * 成功条件写死成"后端真的给了新的 accessToken"：拿不到新 token 就返回 false，
+     * 让上层按原路走"清盘跳登录" —— 带着旧 token 假装续期成功，比让用户重登更坏。
+     * 没有 refreshToken（老会话/清过盘）也直接 false，不发无意义的请求。
+     */
+    suspend fun refreshTokenOnce(): Boolean {
+        val refresh = Prefs.refreshToken
+        if (refresh.isEmpty()) return false
+        // 后端是 `@RequestParam String refreshToken` ⇒ 必须在 query，塞进 JSON body 会直接 400
+        // （同审计 §39 记的 `/send/confirm-station-action` 那条形态坑）
+        val p = attempt { Api.post("$M/auth/refresh-token", query = mapOf("refreshToken" to refresh)) }
+            .getOrNull() ?: return false
+        // 演示构建里失败的请求会回落到 DemoData —— 那种"token"是编出来的，
+        // 拿它续期等于给一个并不存在的会话续命（宁可就让用户重登）。
+        if (p.demo) return false
+        val token = p.str("accessToken").ifEmpty { p.str("token") }
+        if (token.isEmpty()) return false
+        Api.token = token
+        Prefs.token = token
+        // 后端会轮换 refreshToken；没给就沿用旧的，别把它清成空
+        Prefs.refreshToken = p.str("refreshToken").ifEmpty { refresh }
+        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
+        return true
+    }
+
     suspend fun login(mobile: String, password: String, role: Role): Account {
         val p = Api.post("$M/auth/login", mapOf("mobile" to mobile, "password" to password))
         return saveSession(p, role, mobile)
@@ -163,6 +190,10 @@ object Repo {
         Api.token = token
         Api.demoSession = p.demo
         Prefs.token = token
+        // 会话续期用的两件套：后端一直在回，此前被直接丢弃 ⇒ 30 分钟到期只能重新登录（任务：登录态）。
+        // expiresTime 只服务"临期主动续"，读不到也不影响正确性 —— 真正的兜底路径是 401 时静默续期重试。
+        Prefs.refreshToken = p.str("refreshToken")
+        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
         Prefs.userId = account.id
         Prefs.mobile = account.mobile
         Prefs.nickname = account.nickname
@@ -414,6 +445,7 @@ object Repo {
             // 界面已经明写来源"高德天气"，所以这里保持 orEmpty()，不新开一条错误通路。
             }.getOrNull().orEmpty()
             val temp = l.optString("temperature").toIntOrNull() ?: 0
+            val (userTip, driverTip) = weatherTipsFor(l.optString("weather"), temp)
             WeatherInfo(
                 text = l.optString("weather"),
                 temperature = temp,
@@ -422,7 +454,8 @@ object Repo {
                 source = "高德天气",
                 icon = l.optString("weather"),
                 humidity = l.optString("humidity").let { if (it.isEmpty()) "" else "湿度 $it%" },
-                tips = farmTips(l.optString("weather"), temp),
+                tips = userTip,
+                driverTips = driverTip,
                 forecast = forecast,
             )
         } catch (e: CancellationException) {
@@ -459,30 +492,23 @@ object Repo {
             }
         }.getOrDefault(emptyList())
         val temp = cw.optDouble("temperature", 0.0).toInt()
+        val cond = weatherText(cw.optInt("weathercode"))
+        val (userTip, driverTip) = weatherTipsFor(cond, temp)
         WeatherInfo(
-            text = weatherText(cw.optInt("weathercode")),
+            text = cond,
             temperature = temp,
             feel = temp,
             wind = "风 ${cw.optDouble("windspeed", 0.0).toInt()} km/h",
             source = "open-meteo",
-            icon = weatherText(cw.optInt("weathercode")),
-            tips = farmTips(weatherText(cw.optInt("weathercode")), temp),
+            icon = cond,
+            tips = userTip,
+            driverTips = driverTip,
             forecast = forecast,
         )
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         null
-    }
-
-    /** 农事提示：与小程序 weather.js farmTips 同口径（按现象 + 气温给建议） */
-    private fun farmTips(condition: String, temp: Int): String = when {
-        condition.contains("雨") || condition.contains("雪") -> "有降水，装车前请给山货加盖苫布"
-        condition.contains("晴") && temp >= 30 -> "气温偏高，生鲜件尽量走早班车"
-        condition.contains("晴") -> "晴好天气，适合发车与晾晒"
-        condition.contains("云") || condition.contains("阴") -> "多云，适合当日运输"
-        condition.contains("雾") -> "有雾，山路发车请减速慢行"
-        else -> "出行前留意山区路况"
     }
 
     private fun weatherText(code: Int): String = when (code) {
@@ -752,6 +778,39 @@ object Repo {
     }
 
     /**
+     * 钱包余额（`GET /app-api/transport/wallet/balance`，`AppWalletController:32-43`）。只读。
+     * 失败返回 `One(null, error)` —— 页面那一格必须能说"没取到"，不许退回显示 ¥0.00。
+     */
+    suspend fun walletBalance(): One<WalletBalance> = try {
+        val p = Api.get("$T/wallet/balance")
+        One(WalletBalance.parse(p.obj ?: JSONObject()), p.demo)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        One(null, error = errorTextOf(e))
+    }
+
+    /**
+     * 钱包流水（`GET /app-api/transport/wallet/transactions`，`AppWalletController:81-103`）。只读。
+     *
+     * ⚠ 刻意**不接**充值与余额支付两个写口（`/recharge:65-79`、`/pay:105-126`），理由记在台账 D-086：
+     * · `/recharge` 无幂等键（`V028:39` 的唯一索引只盖住流水号，不盖住请求），重复点击会**重复加余额**；
+     * · 它写入的流水与真实到账在字段上不可区分（渠道被写死 `"alipay"`、状态写死成功，
+     *   `WalletServiceImpl:53-58`；表里没有"来源/是否模拟"列）⇒ 界面无法如实标注；
+     * · `query-pay-order:59-63` 只按 orderNo 查、不校验归属人（`PayService:182`），
+     *   且在 `status=0` 时会触发放款（`:190-200`）——这是别人的单子也能被查到并推进的那一格。
+     * 展示侧只读这两条通路，写口等后端补上幂等键与来源列之后再接。
+     */
+    suspend fun walletTransactions(limit: Int = 20): One<WalletTxPage> = try {
+        val p = Api.get("$T/wallet/transactions", mapOf("limit" to limit.toString()))
+        One(WalletTxPage.parse(p.obj ?: JSONObject()), p.demo)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        One(null, error = errorTextOf(e))
+    }
+
+    /**
      * 客户确认"已按替代交接送到指定站点"。
      * 后端 `AppSendController:129` 是 `@RequestParam("orderId")`，参数必须在 query ——
      * 旧写法放进 JSON body 会稳定 400（审计 §39），而且失败被吞成演示回执，没人发现。
@@ -780,9 +839,14 @@ object Repo {
         }
         val nodes = o.multiArr("nodes", "timeline", "records").map {
             TraceNode(
-                label = it.multiStr("label", "title", "statusLabel", "nodeName"),
-                time = it.multiStr("time", "createTime", "nodeTime").substringAfter(' ').take(5),
-                hint = it.multiStr("hint", "description", "stationName", "remark"),
+                // `eventTypeName`/`detail` 是拓扑信封 `Timeline:129-137` 的真键；原来那四个键
+                // （label/title/statusLabel/nodeName 与 hint/description/stationName/remark）在这条链路上一个生产者都没有
+                // ⇒ `/send/topology` 的时间线整列念空（D-085）。放在最前面，另外两条链路的读法不受影响。
+                label = it.multiStr("eventTypeName", "label", "title", "statusLabel", "nodeName"),
+                // 后端把 LocalDateTime 注册成 EpochMillis（`Models.kt:104-107` 那条取证），所以这里必须先过 `ts()`
+                // 归一再取 HH:mm；旧写法直接 `substringAfter(' ').take(5)` 会把 13 位毫秒串切出 "17590"。
+                time = it.nodeTimeOf("eventTime", "time", "createTime", "nodeTime"),
+                hint = it.multiStr("detail", "hint", "description", "stationName", "remark"),
                 // 轨迹节点完成态的真键只有 `done`（小程序 11 处、DemoData 6 处都在写它）；
                 // `finished` 三方 0 命中，`completed` 只在后端 bigscreen 的 admin 汇总里出现过（BigScreenServiceImpl:120），
                 // 都不在这个报文里 ⇒ 撤掉，避免"节点状态"长出第二个名字。
@@ -810,9 +874,12 @@ object Repo {
             polyline = track,
             stations = stations,
             productName = o.multiStr("productName"),
-            statusName = o.multiStr("statusName"),
-            startStation = o.multiStr("startStation", "fromStation", "pickupStation"),
-            endStation = o.multiStr("endStation", "toStation"),
+            // `orderStatusName` 是拓扑信封的真键（`OrderTopologyRespVO:25`）；放在最前，另外两条链路的 `statusName` 不受影响。
+            statusName = o.multiStr("orderStatusName", "statusName"),
+            // 起讫站：拓扑给的是 `originStationName`/`destinationStationName`（`:27`/`:29`），
+            // 查不到站点档案时后端就是 null ⇒ 下面票面那一格念"后端没给"，不兜一个站名。
+            startStation = o.multiStr("originStationName", "startStation", "fromStation", "pickupStation"),
+            endStation = o.multiStr("destinationStationName", "endStation", "toStation"),
             routeName = o.multiStr("routeName", "lineName"),
             shiftCode = o.multiStr("shiftCode"),
             receiverName = o.multiStr("receiverName"),
@@ -831,6 +898,15 @@ object Repo {
             points = points,
             handovers = o.multiArr("handovers", "transfers").map { LegHandover.parse(it) },
             plans = o.multiArr("plans", "candidates", "schemes").map { TransitPlan.parse(it) },
+            // ---- 拓扑信封（OrderTopologyRespVO:32-46）：只有 /send/topology 会发，其余两条链路读到默认值 ----
+            planningMode = o.multiStr("planningMode"),
+            planningModeName = o.multiStr("planningModeName"),
+            planNo = o.multiStr("planNo"),
+            totalLegs = o.multiNumOrNull("totalLegs")?.toInt(),
+            transferCount = o.multiNumOrNull("transferCount")?.toInt(),
+            totalDistanceKm = o.multiNumOrNull("totalDistanceKm"),
+            totalDurationMinutes = o.multiNumOrNull("totalDurationMinutes")?.toInt(),
+            planReason = o.multiStr("planReason"),
         )
     }
 
@@ -1020,110 +1096,6 @@ object Repo {
 
     suspend fun submitFeedback(content: String, name: String, mobile: String): Ack =
         Ack(Api.post("$T/feedback/create", mapOf("content" to content, "name" to name, "mobile" to mobile)).demo)
-
-    // ---------- 钱包 ----------
-
-    data class WalletBalance(
-        val balance: Double,
-        val frozenAmount: Double,
-        val totalRecharge: Double,
-        val totalSpent: Double,
-    ) {
-        companion object {
-            fun parse(obj: JSONObject): WalletBalance = WalletBalance(
-                balance = obj.optDouble("balance", 0.0),
-                frozenAmount = obj.optDouble("frozenAmount", 0.0),
-                totalRecharge = obj.optDouble("totalRecharge", 0.0),
-                totalSpent = obj.optDouble("totalSpent", 0.0),
-            )
-        }
-    }
-
-    data class WalletTx(
-        val transactionNo: String,
-        val type: String,
-        val amount: Double,
-        val balanceAfter: Double,
-        val title: String,
-        val payMethod: String,
-        val status: Int,
-        val createTime: String,
-    ) {
-        companion object {
-            fun parse(obj: JSONObject): WalletTx = WalletTx(
-                transactionNo = obj.optString("transactionNo", ""),
-                type = obj.optString("type", ""),
-                amount = obj.optDouble("amount", 0.0),
-                balanceAfter = obj.optDouble("balanceAfter", 0.0),
-                title = obj.optString("title", ""),
-                payMethod = obj.optString("payMethod", ""),
-                status = obj.optInt("status", 0),
-                createTime = obj.optString("createTime", ""),
-            )
-        }
-    }
-
-    suspend fun walletBalance(): WalletBalance = try {
-        val p = Api.get("$T/wallet/balance")
-        WalletBalance.parse(p.obj ?: org.json.JSONObject())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        WalletBalance(0.0, 0.0, 0.0, 0.0)
-    }
-
-    suspend fun walletRecharge(amount: Double): WalletTx? = try {
-        val p = Api.post("$T/wallet/recharge", emptyMap(), mapOf("amount" to amount))
-        WalletTx.parse(p.obj ?: org.json.JSONObject())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
-    }
-
-    /**
-     * 创建充值支付订单。返回 { orderNo, orderString, channel, simulated }
-     * - channel=alipay 且 orderString 非空 → 客户端用 orderString 调起支付宝
-     * - simulated=true → 支付未配置，走模拟充值
-     */
-    suspend fun createPayOrder(amount: Double, channel: String = "alipay"): org.json.JSONObject? = try {
-        val p = Api.post("$T/wallet/create-pay-order", emptyMap(), mapOf("amount" to amount, "channel" to channel))
-        p.obj
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
-    }
-
-    /** 查询支付订单状态（前端轮询确认） */
-    suspend fun queryPayOrder(orderNo: String): org.json.JSONObject? = try {
-        val p = Api.get("$T/wallet/query-pay-order", mapOf("orderNo" to orderNo))
-        p.obj
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
-    }
-
-    suspend fun walletPay(amount: Double, title: String, refNo: String = ""): WalletTx? = try {
-        val p = Api.post("$T/wallet/pay", emptyMap(), mapOf("amount" to amount, "title" to title, "refNo" to refNo))
-        WalletTx.parse(p.obj ?: org.json.JSONObject())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
-    }
-
-    suspend fun walletTransactions(limit: Int = 20): List<WalletTx> = try {
-        val p = Api.get("$T/wallet/transactions", mapOf("limit" to limit))
-        p.arr?.let { arr ->
-            (0 until arr.length()).map { WalletTx.parse(arr.getJSONObject(it)) }
-        } ?: emptyList()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        emptyList()
-    }
 
     // ---------- 司机端读取 ----------
 
@@ -1539,4 +1511,30 @@ object Repo {
         s.length > 5 -> s.takeLast(5)
         else -> s
     }
+}
+
+/**
+ * 天气提示按角色分档（纯函数，JVM 用例可断言）：返回 `用户/寄件人说法 to 司机说法`。
+ *
+ * 分工的依据是**谁能改什么**：用户能改的是"什么时候把件送到站点、要不要加苫布"，
+ * 司机能改的是"怎么开"（跟车距离、雾灯、是否延后发车）。以前全工程只有一份
+ * `farmTips`（六条清一色货运口径），而司机端一处都不显示天气
+ * （`Repo.weather` 唯一的调用点在首页）⇒ 那句话实际上是"对着司机说寄件人的话"。
+ *
+ * 司机侧只写"因天气而变的操作动作"，**不声称知道路面实际状况**（我们没有路况传感，
+ * 说"路面湿滑"就是造第二条真相）；`condition` 为空（天气没取到）时两份都给空串，
+ * 页面据此不显示，而不是兜一句万能提示。
+ */
+internal fun weatherTipsFor(condition: String, temp: Int): Pair<String, String> = when {
+    condition.isEmpty() -> "" to ""
+    condition.contains("雨") || condition.contains("雪") ->
+        "有降水，装车前请给山货加盖苫布" to "降水：出发前检查苫布与刹车，山路减速、拉大跟车距离"
+    condition.contains("雾") || condition.contains("霾") ->
+        "能见度偏低，山路发车请减速慢行" to "能见度偏低：使用雾灯并降速；能见度过低时延后发车，并通知候车乘客"
+    condition.contains("晴") && temp >= 30 ->
+        "气温偏高，生鲜件尽量走早班车" to "高温：车厢通风，生鲜件尽量安排早班车"
+    condition.contains("晴") -> "晴好天气，适合发车与晾晒" to "天气晴好，按班次正常发车间"
+    condition.contains("云") || condition.contains("阴") -> "多云，适合当日运输" to "多云，按班次正常发车间"
+    temp <= 0 -> "低温，怕冻货品请提前告知" to "低温：起步放缓，留意背阴路段结冰"
+    else -> "出行前留意山区路况" to "出行前留意山区路况变化"
 }

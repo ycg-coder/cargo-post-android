@@ -151,10 +151,12 @@ swap "$REPO" 'suspend fun linePolyline(routeId: String): List<Geo> {' \
              'suspend fun linePolyline(routeId: String): List<Geo>? {'
 ctl "linePolyline 签名被改成不抛的可空形状" SA-d
 
-# 10 顺手删掉一个非 Repo 的 attempt（定位取点）：SA-d 的全 main 下限 11→10。
-#    这条防的是"迁移时被扫到一起改"——下限等于实测值（⑧ 的 7 处 + ⑨ 迁入的 4 处），所以删一处就红。
+# 10 顺手删掉一个非 Repo 的 attempt（定位取点）：SA-d 的全 main 恰好 14 → 13。
+#    ⚠ 这一条在 D-082 整批里是 **✘（没红）**，而它不是"注入没发生"（swap 会当场拒），
+#    是判据那头的下限停在 11、实测已经 14 ⇒ 删一处只差 1，离下限还差 2。
+#    修法是把判据改成恰好 14（两本同改，见 check_throwable_probes.sh 的 TH-f），不是把这条破口做大。
 swap "$LOC" 'attempt { locations(context).first() }' 'runCatching { locations(context).first() }'
-ctl "Worker/定位那几处 attempt 被顺手改掉一处（下限 11→10）" SA-d
+ctl "Worker/定位那几处 attempt 被顺手改掉一处（恰好 14→13）" SA-d
 
 # ── SA-e 页面文案 ───────────────────────────────────────────────────────────
 # 11 独立状态字段被删：失败又要去挤共享的 vm.error。
@@ -166,8 +168,10 @@ ctl "页面删掉独立的折线状态字段" SA-e
 swap "$BUS" 'polylineUnconfirmed = null' 'polylineUnconfirmed = polylineUnconfirmed'
 ctl "换线时不复位上一次的失败（两处复位少了一处）" SA-e
 
-# 13 硬编码那句假话回来：E_OLD_REASON 1 / E_NEW_REASON 0 / E_REASON 1，三条都属 SA-e。
-swap "$BUS" 'reason = if (vm.polyline.size >= 2) null else vm.polylineReason(' \
+# 13 硬编码那句假话回来：E_OLD_REASON 1 / E_NEW_REASON 0→1 少一格 / E_REASON 2→1，三条都属 SA-e。
+#    ⚠ D-082 之后重锚：旧锚点那句 `reason = if (vm.polyline.size >= 2) null else vm.polylineReason(`
+#    在 F-3 ⑤ 收口时就已经不在了（swap 当场 exit 2，整本停在这条），现在树里那两处是纯点名形状。
+swap "$BUS" 'reason = vm.polylineReason("地图服务不可用"),' \
              'reason = if (vm.polyline.size >= 2) null else "后端没有这条线路的真实道路折线",'
 ctl "请求失败又被念成「后端没有这条线路的轨迹」" SA-e
 

@@ -80,8 +80,18 @@ android {
         // 用 34 编译会在新系统上按"兼容模式"运行（界面不会真全屏、部分限制不触发），
         // 那不是"能跑"，是"跑在旧行为里"。对齐 36 才能暴露真实行为。
         targetSdk = 36
-        versionCode = ciVersionCode
-        versionName = "1.0.$ciVersionCode-android"
+        // 版本号（#48 更新通路的根）：本机与 PR 构建恒为 1；CI 的每次运行按 `GITHUB_RUN_NUMBER` 递增。
+        // 这里不能继续写死 1 —— App 内检查更新**只比 versionCode**，
+        // 所有 Release 共用 1 的话，用户永远看不到更新，而且界面上一句错都不报（它只会老实说"已是最新"）。
+        val ciRun = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.trim()?.takeIf { it.isNotEmpty() }
+        versionCode = ciRun?.toIntOrNull() ?: 1
+        versionName = if (ciRun != null) "1.0.$ciRun-android" else "1.0.0-android"
+        // 发布所在的仓库坐标：GitHub Releases 是这条通路唯一的版本事实来源（用户 2026-10-12 定的口径）。
+        // 留成可覆盖的配置项，是为了 fork / 改名时不用回来动代码，也不用发新包。
+        val updateRepo = cfg("updateRepo")
+            ?: providers.environmentVariable("BUSPOST_UPDATE_REPO").orNull
+            ?: "ycg-coder/cargo-post-android"
+        buildConfigField("String", "UPDATE_REPO", qu(updateRepo))
 
         buildConfigField("String", "BASE_URL", qu(releaseBaseUrl ?: ""))
         // Android 地图 SDK 的 key（「Android 平台」类型，绑包名 + 签名 SHA1）——注入到 manifest meta-data。

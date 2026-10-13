@@ -86,7 +86,7 @@ open(p, 'w', encoding='utf-8').write('\n'.join(L))
 PY
   ctl DA-d "在册表被删一条 ⇒ 仍可复现的可疑锚点被判成新增（闸门不许被抄近路）"
 # 反向：锚点从台账里消失（行号被改成没有行号的形式），在册条目悄悄不见也必须响
-sed -i 's/Models\.kt:469/Models 那一段/g' "$CK"
+sed -i 's/Models\.kt:497/Models 那一段/g' "$CK"
   ctl DA-d "在册锚点本次不再可疑（锚点被抹掉而不是被修好）"
 # 扫描面塌掉：文档里的 `.kt:` 全被写坏成扫不到 ⇒ 锚点总数掉下来，闸门看不到任何一条
 sed -i 's/\.kt:/\.ktZ/g' "$CL"

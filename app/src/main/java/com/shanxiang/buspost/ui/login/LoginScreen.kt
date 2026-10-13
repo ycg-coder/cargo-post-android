@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import com.shanxiang.buspost.nav.Routes
+import com.shanxiang.buspost.ui.common.LocalNavController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -149,7 +151,11 @@ fun LoginScreen(
                     // 留 8 位等于允许用户输入后端永远发不出来的长度。
                     onValueChange = { v -> vm.code = v.filter { it.isDigit() }.take(6) },
                     label = "验证码",
-                    placeholder = "6位数字",
+                    // 写"6位数字"曾经是个假承诺：local/dev 的固定码是 4 位（8888），真机上就是
+                    // "界面说 6 位、后端发 4 位"。现在后端把非生产固定码也统一成 6 位（888888），
+                    // 但文案仍按契约的**区间**写（AppAuthSmsLoginReqVO `@Length(min=4,max=6)`），
+                    // 免得下一次换部署把区间改了，UI 又是一句没人核对的断言。
+                    placeholder = "4-6 位数字",
                     icon = BusIcons.shield,
                     keyboardType = KeyboardType.Number,
                     trailing = {
@@ -209,14 +215,22 @@ fun LoginScreen(
                     onCheckedChange = { vm.agreed = it },
                     modifier = Modifier.size(28.dp),
                 )
-                Text(
-                    "我已阅读并同意《服务协议》",
-                    color = t.textSecondary,
-                    fontSize = (12 * scale).sp,
-                    modifier = Modifier
-                        .padding(start = 2.dp)
-                        .clickable { vm.agreed = !vm.agreed },
-                )
+                // 三个可点区域分开：勾选框本身、《服务协议》、《隐私政策》。
+                // 旧写法是整行一起切勾选 —— 点了书名号只会把勾去掉，正文一个字都没出现，
+                // 而当时这两份正文在 App 里根本不存在（现在由 `PolicyScreen` + `AppPolicies` 承接）。
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 2.dp),
+                ) {
+                    Text(
+                        "我已阅读并同意",
+                        color = t.textSecondary,
+                        fontSize = (12 * scale).sp,
+                        modifier = Modifier.clickable { vm.agreed = !vm.agreed },
+                    )
+                    PolicyLink("《服务协议》", Routes.TERMS)
+                    PolicyLink("《隐私政策》", Routes.PRIVACY)
+                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -319,4 +333,22 @@ private fun RoleCardSimple(
             }
         }
     }
+}
+
+
+/** 协议名就是一段可点的文字：点了真的导航到正文页，不是把勾选切一下冒充"已阅读" */
+@Composable
+private fun PolicyLink(name: String, route: String) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val nav = LocalNavController.current
+    Text(
+        name,
+        color = t.primaryOnLight,
+        fontSize = (12 * scale).sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .padding(start = 2.dp)
+            .clickable { nav.navigate(route) },
+    )
 }

@@ -82,6 +82,9 @@ object TestHost {
         Api.token = null
         Api.demoSession = false
         Api.onUnauthorized = null
+        // 续期回调是 object Api 上的进程级状态：不复位的话，上一个用例装的 refresher
+        // 会把下一个用例的 401 静默续掉，"该被踢回登录"的那条断言就永远绿不了
+        Api.refresher = null
         Api.last401At = 0L
     }
 

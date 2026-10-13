@@ -8,6 +8,12 @@ object Routes {
 
     const val GOODS_DETAIL = "goods/{id}"
     const val TRACE = "trace/{no}"
+    /**
+     * #55 查件票面：`Repo.parcelTopology()`（`GET /send/topology`，`Repo.kt:780`）此前全仓零消费者，
+     * 这一页是它唯一的读方。与 `TRACE` 是两个问题：追踪页答"走到哪了"，票面答"几段、在哪交接、为什么是这个方案"，
+     * 后三问只有拓扑端点会发（`OrderTopologyRespVO:32-53`），所以不并进 `TRACE` 也不共用它的报文。
+     */
+    const val PARCEL_TICKET = "parcelTicket/{no}"
     const val ORDER_DETAIL = "order/{id}"
     const val BUS_DETAIL = "bus/{routeId}"
     const val ADDRESS_EDIT = "addressEdit/{id}"
@@ -17,6 +23,10 @@ object Routes {
     const val ORDERS = "orders"
     /** 「快递」页在 tab 内，通过 AppState.parcelIntent 直达内层 tab */
     const val PARCEL = "parcel"
+    /** #54：`Repo.myArrangements()`（`GET /send/arrangements`）此前零消费者，这一页把它接上 */
+    const val ARRANGEMENTS = "arrangements"
+    /** #56：钱包余额与交易记录，**只读**（写口的三个理由见 `Repo.walletTransactions()` 注释与台账 D-086） */
+    const val WALLET = "wallet"
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val ADDRESS = "address"
@@ -30,12 +40,18 @@ object Routes {
     const val SEND_ADDRESS_PICKER = "sendAddressPicker"
     /** 乘车码：当地公交乘车二维码 */
     const val BUS_QR = "busQr"
-    /** 钱包：余额、充值、交易记录 */
-    const val WALLET = "wallet"
     const val FEEDBACK = "feedback"
     const val SETTINGS = "settings"
     /** 设置 → 关于 →「地图与开源许可」：OSM 署名与随包分发的第三方组件清单（指令 v2.1 ⑭） */
     const val OSS_LICENSES = "ossLicenses"
+    /**
+     * 隐私政策 / 用户协议正文页。
+     *
+     * 与 OSS_LICENSES 同属"无角色闸门"的公开页：登录页那行勾选要能点开它 ——
+     * **用户在还没有会话的时候就必须能看到自己同意的是什么**，所以这两条路由不加登录/角色闸。
+     */
+    const val PRIVACY = "privacy"
+    const val TERMS = "terms"
     const val DRIVER_NAV = "driverNav"
     /**
      * 车道级导航页（正式，非调试）。
@@ -84,6 +100,7 @@ object Routes {
     fun goodsTrace(id: Long) = "goodsTrace/$id"
     fun orderDetail(id: Long) = "order/$id"
     fun trace(no: String) = "trace/" + encodeSegment(no)
+    fun parcelTicket(no: String) = "parcelTicket/" + encodeSegment(no)
     fun busDetail(routeId: String) = "bus/" + encodeSegment(routeId)
     fun addressEdit(id: Long) = "addressEdit/$id"
 

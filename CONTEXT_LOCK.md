@@ -212,7 +212,7 @@ REAL ROAD ONLY
   这条**收窄**了 ⑪ 写的"每个构建产物各自对时间戳"：时间戳用来起疑，不用来下结论。
   ④ **"0 命中"必须连同 pattern 一起抄**（收工最后一遍抓到，起因是安全组那行台账只写了语义没写命令）：
   `AMAP_KEY` 按裸 token `grep -rn "AMAP_KEY" app/src/main` 实测 **2 命中**（`AndroidManifest.xml:55` 的注释 +
-  `DriverMissionMap.kt:71` 的 `BuildConfig.AMAP_KEY.isNotBlank()`，两处都是**引用**不是密钥值），
+  `DriverMissionMap.kt:88` 的 `BuildConfig.AMAP_KEY.isNotBlank()`，两处都是**引用**不是密钥值），
   **判据本体没坏**：审计 §55 E 那条 key 命令自带 `grep -v "@string/amap_key\|BuildConfig.AMAP_KEY"`，照原样复跑就是 **0**
   （key 真值只在 `local.properties` 的 `amap.key`，经 `app/build.gradle.kts:74` 注入 `buildConfigField`/`resValue`）；
   坏的是**状态板那行的简写**（只写"AMAP_KEY 字面量 … 全部 0 命中"没附命令）。简写行已改为"照抄 §55 E 的六条命令"。
@@ -1126,7 +1126,7 @@ bash tools/navigation_test_negative_controls.sh   # ⚠ 8 条用例级破口 M1�
 #        树干净那件事仍然是 01:25:50 那遍 **356 例 0 失败** 说的（④ 那条规矩的同轮复述，不是新证据）。
 #      · ⚠ **新登记两条"口径漂移"，都不许写成"本轮没涨/涨了"**：宽口径 **45→44** 的 −1 只能归到**文件**粒度
 #        （逐文件构成里唯一差项 `SendScreen` 2→1；无 git，那一行原文没留档 ⇒ "少了一行"是实测、"少的是哪一行"不是）；
-#        `DemoData` 文件 **3→4** 的第四个是 `ui/common/Bits.kt:39`，其 **mtime 09-28 23:58 早于**"3 文件"那次读数 ⇒
+#        `DemoData` 文件 **3→4** 的第四个是 `ui/common/Bits.kt:45`，其 **mtime 09-28 23:58 早于**"3 文件"那次读数 ⇒
 #        判为**历史 D 与现脚本 `grep -rln` 扫描面不同**，是**口径漂移不是内容增长**，登记为待核尾巴。
 #      · ⚠ **本轮自己制造的一次三口径风险，照实记**：收工时先手写 `grep -rniE "euclidean\|haversine\|straight" app/src/main --include=*.kt`
 #        量出 46（无白名单）/ 34（滤注释行），与脚本的 9/44 是**三套口径**（扫描面、pattern、白名单三处都不同）⇒ 那两个手写数**一律不采信**。
@@ -1812,6 +1812,137 @@ bash tools/navigation_test_negative_controls.sh   # ⚠ 8 条用例级破口 M1�
 #      删文件、重测同一本 ⇒ **绿**。⇒ 规矩：**"这条红是不是环境造出来的"要放在"这条红是谁的代码"之前问一次**，
 #      判据是**同一本重跑后 rc 变了**；而本轮另一次假红同源（早前那 18 处陈旧锚点顶出的 新增 298 > 闸 286），
 #      修法是逐条 grep 现读源码重锚（新增 → **0**、`ID-MISS` 286 → **278**），**不是**把闸门数字抬高。
+# ㊽ **"判据空转"这个结论本身要先被证伪：落空的注入、CRLF、低于实测的下限、写死的反向读数 —— 四种坏法都不会报错**
+#   （D-082 那 20 格的消化轮，2026-10-12 22:4x → 10-13 01:4x；台账 D-084）
+#   ① 上一轮台账写的是"13 道破口注入成功、判据照样绿"。逐条回查：**只有 1 道真是判据弱**，
+#      6 道是注入器**根本没落刀**（`drop` 在 CRLF 文件里找 `"\n}\n"`），6 道是锚点被这些天的文案改写顶掉。
+#      ⇒ 规矩：**说"这条判据不判"之前，先证明注入真的动了字节**。落空与不咬原来在日志上同形（ANCHOR-MISS 只进 stderr），
+#      现在簿子会分开说：`✘ … 锚点没命中，破口根本没注入`，且**本簿 ✘ 条数进退出码**（原来 ✘=13 仍 exit 0，
+#      "批跑完了"与"闸门全是摆设"分不出来 —— 这正是 D-082 那条读数纪律的第二种坏法）。
+#   ② **换行符是判据与负控之间的隐形第三层**：`core/navigation/NavigationEngine.kt` 工作树是 **CRLF**
+#      （`git ls-files --eol` = `i/lf w/crlf`，`core.autocrlf=true` 检出时转的），而其余 `.kt` 是被工具重写过才回到 LF。
+#      ⇒ ①"本仓 `app/src/**/*.kt` 是 LF"这条记忆**从今天起带例外**；②注入器读写一律 `newline=''`
+#      （Python 默认写模式会把 LF 文件整本刷成 CRLF —— 那会把这个问题**传给下一个文件**）；③整块删除的收尾锚点写成
+#      `\n\}\r?\n`。⚠ git 那些 "LF will be replaced by CRLF the next time Git touches it" 的 warning 不是噪音，
+#      它说的就是这条通路将来会把这个文件变成 CRLF。
+#   ③ **下限低于实测 = 一条不会红的闸门**：SA-d 与 TH-f 数同一个扫描面、都写 `-ge 11`，实测已经是 **14** ⇒
+#      "顺手删掉一处 attempt"要删**四处**才会红。⇒ 改成**恰好 N**并把 N 处**逐点枚举**；指不到具名提交的那部分
+#      写"增量未归因"（本轮 11→14 的三处只有两处有具名提交，第三处早于本仓 git 起点 `d12b419`）。
+#      ⚠ 同一扫描面被两本判据数时必须同轮改，否则一本说 14、一本说 ≥11（§八 ㉗ 的"同一个问题两个答案"）。
+#   ④ **"必须不红"那一族不许写死读数**：`runcatching` 的反向负控要求输出里出现 `sites=32|violations=0|candidates=0`，
+#      而扫描面 10-10 正常增长到 39 ⇒ 这一族从此永远报"空跑"。⇒ 把**基线那一刻的那行输出**存成期望值自锚。
+#   ⑤ **按措辞钉的判据，会在措辞被改写那天静默失去那一格**：EX-g 的 `ack.notSent` 那句 10-12 被改短，
+#      数"未发给后端"的腿从此看不见它 ⇒ 改成按**分支**钉（`EG4` 分支在场=1、`EG5` 句内不许出现"已提交/成功"=0）；
+#      MR-c 同理补 `MR_C6`（钉"这次没问到：$failure"那半句**框架**，因为括号里的免责有 `MR_C3` 钉、括号前没有）。
+#      ⇒ 判据同轮重锚了**不算收口**，要同轮 grep 所有把同一处文本当锚点的负控簿（本轮 12 条都是"判据跟了、破口没跟"）。
+#   ⑥ **一条 exit 2 早退会让整本后面的破口连跑都没跑**：`navigation_test` 停在 M14 ⇒ M15–M37 全部未验证，
+#      `mission_route`/`mission_route_test`/`shell_routing_test` 同理 ⇒ 修锚点要**整本审**，不是只修日志里那条。
+#      另：两处 `onReplan = { vm.load() },` 一模一样的那年，MR-i 按"第一处"删会删错支（判据只数失败支那 12 行）
+#      ⇒ **同形多处的注入必须按窗口/上下文定位**，`red` 的"字节变了没"挡不住打错地方。
+#   ⑦ **工具自己的读数也会造出一条假的"判据不判"**：`navigation_test` 的 `fails()` 只把 `$1` 传给 python，
+#      而 `$XML` 是两份产物 ⇒ M37 明明把 `AutoGuideDecisionTest` 打红（gradle 日志有 FAILED），计数读成 0/58，
+#      被记成 △"两者不一致"。修成 `"$@"` 后单条复跑 ✔（红了 1 例 / 共 62）——
+#      ⚠ 同书另外 37 条 ✔ 里那句"共 58"是**少数了一份产物**的读数，别再当总用例数抄进台账。
+#   ⑧ **破口没有任何用例能红 ⇒ 补用例，不撤破口**：M25（把多组车道那两个 `byte[]` 念成"第一组就是推荐车道"）
+#      跑出来是 `✘ 用例仍然全绿`。⇒ 在既有那条 `没给过与已经不给与多组车道是三种不同说法` 里补一条 `assertFalse`，
+#      **不新增 `@Test`**（637 这个数字因此没动）。本轮唯一一处 `app/src` 改动就是它，且 `app/src/main` 一字未动。
+# ㊾ **同一味病下一轮换个载体又犯一次 —— 三种"看起来在判、其实不判"的新形状**（#55 查件票面，2026-10-13 02:0x → 03:4x；台账 D-085）
+#   ① ㊽ 第 ①③ 条本轮各**第二次**兑现，而且栽在按 ㊽ 刚写的那本新簿上：
+#      `parcel_ticket_negative_controls.sh` 的注入器写成 `python … <<'PY' || MISS=1` —— bash 里赋值成功即返回 0，
+#      于是函数照样 0 ⇒ 落空被 `check` 读成"注入成功但判据不绿"。是本书自己加的 `check_miss`
+#      （拿一个不存在的锚点去注入、要求被当场拒）把它抓出来的。⇒ **注入器一律 `|| { MISS=1; return 1; }`**，
+#      且每本新簿配一条"不存在的锚点必须被拒"的自检。`≥N` 下限同理：`PT-l` 第一版写 ≥14 而现读 15，
+#      注释掉一条用例照样绿（被负控 PT-l1 抓住）⇒ **下限必须等于现读**，写 `≥` 就要在注释里写明"允许谁涨"。
+#   ② **别名判据要白名单，不要黑名单**：`PT-f` 第一版数的是"几个**已知**别名没回来"（`"fromPlate"|"handoverTime"|…`），
+#      写负控时试了个没见过的新别名（`nextDriver`）⇒ 照样绿。改成"那段解析里出现的每个键名都必须是后端 VO 的真键"
+#      （`OrderTopologyRespVO.Handover:115-126`）＋ 基数钉恰好 11 ⇒ 新键与漏读被同一条判据管住。
+#      ⚠ 白名单必须**段内取键**（`sed -n '/^data class LegHandover/,/^}/p'`）：整文件扫会把别的 VO 的真键
+#      （司机端交接单的 `handoverTime`、`SendOrder` 的 `itemCount`）判成自造键 —— 本轮实测整文件是 2、段内才是 0。
+#   ③ **文本判据看不见编译错误 ⇒ 形状本身要单独钉**：`PT-i` 只数四个"产出点"，把 `enum` 摘掉一个值它照样绿
+#      （而真实回归恰恰是"某一态被并进另一态"）⇒ enum 声明整行再钉一次；`PT-k` 只数"有没有 `return@let`"，
+#      把闸门写成 `if (false)` 照样绿 ⇒ 整句 `if (!topo) return@let it` 钉住。⇒ 凡"少一格就出事"的位置，
+#      **产出点计数 + 声明/闸门整句**两处都要钉，只钉一头就是给"改形状不改数量"留口子。
+#   ④ 本轮逐字段读生产者读出三处"真接口下永远念空"（交接的车牌与时刻认自造键、时间线认 `label/title` 而后端发
+#      `eventTypeName`/`detail`、裸切串把 Epoch 毫秒切成 `17590` 上屏）—— 三条都不是判据抓的 ⇒ "先核契约再动手"
+#      第四次坐实。同时把"非归属人后端返回全 null 空结构、不是错误码"（`AppSendController.java:214-215`）
+#      登记成票面第四格 `Absent`，并在三格里都留「回追踪页」出口（用户 10-13 要求"任务出岔子必须有东西兜底"，
+#      判据把出口数钉**恰好 3**：撤任何一处都红）。
+# ㊿ **判据簿自己也会写坏：echo 里的反引号会被 bash 执行、"恰好 N"凭手感写、台账前提没在当前树上复核**（#56 钱包，2026-10-13 04:0x–04:2x；台账 D-086）
+#   ① `check_wallet_probes.sh` 某行 echo 里写了 `` `total` `` 这种反引号 ⇒ bash 把它当**命令替换**执行，
+#      跑出 `total: command not found`，**而那一行照样打印、读数看着完全正常**。
+#      ⇒ 判据/负控簿的话术里引用代码用引号或全角，不许出现反引号；写完的验收不止看 rc，
+#      还要 grep 一遍 `not found|command substitution`。
+#   ② 正对照的期望值第二次凭手感写（写"恰好 8"、现读 6）⇒ 与 ㊾① 同一味病：**任何 N 只能由现读给出**。
+#      写错的期望会在下次真出问题时"恰好"对不上，变成新的空转或新的假红。
+#   ③ **台账前提本身也要在当前树上实测**：任务描述与 `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md:17-19`
+#      都写着"钱包/支付代码就绪"，实测那句指的是 `cargo-post-platform/android-app/` 那份**陈旧副本**
+#      （那一版还会在充值成功后 `listOf(TransactionItem("充值", …)) + transactions` 自己插一条后端没给的流水），
+#      正式仓 `cargo-post-android` 里 wallet 0 命中。⇒ 两棵同名树并存时，取证与"已完成"都必须写清是哪一棵。
+# (51) **判据抓不到的那一类"重复注入"，和 SELF-MATCH 挡不住的那一条**（#57 取件时间窗，2026-10-13 05:0x–08:2x；台账 D-087）
+#   ① 新负控第一版 24 条里有两条（PW-k2 与 PW-m1）注入的是**同一段代码**：标签那条改完只顶 PW-m 红，
+#      于是它被记成"× PW-k2 判据仍然绿"。真相不是判据空转，是**这本书给同一个破口起了两个编号**——
+#      同一段的改写只需要一条控制，第二条要么换个真不同的破口要么撤。撤之前先问"这条抓的是哪一格"，
+#      答不出就是重复，不是缺口（本轮撤掉 PW-k2， PW-m 那条保留）。
+#   ② `sub` 注入器的 SELF-MATCH 保护（替换文本里不许还留着锚点）会挡掉一类**合法**注入：
+#      想给 `.atZone(now.zone)` 后面接 `.plusMinutes(3)`，新文本必然包含旧锚点 ⇒ 注入器拒 ⇒ 负控报"锚点没命中"。
+#      这**不是 bug 的错报**，是提示换锚点：本轮改成两行锚点（`.atTime(hour, 0)` + 下一行）绕开，
+#      ⚠ 代价是锚点开始吃行尾形状（CRLF 树上会当场 MISS，不会静默），所以多行锚点只在一行确实表达不了时才用。
+#   ③ **"整点对齐"这种属性会被幂等键间接需要**：`Repo.userCreateKey` 是 SHA-256 覆盖报文每个键值，
+#      新加的键只要含"现在"的分秒，每次点击都换一把幂等键 ⇒ 本地"同一份寄货单还在创建中"那道闸形同虚设。
+#      判据（PW-n）与用例（第 17 条）钉的是**出网值的形状**，不是页面文案 —— 结构判据看不见键漂移这类后果，
+#      要有一条具名行为用例把它顶住（负控 PW-n1/PW-n2 各抓一种形状：混进分秒位移 / 不再整点对齐）。
+# (52) **注释里的路径通配会把整本文件写成"未闭合注释"，而自查工具自己也会误报；跨本回归的读数也可能是我读早了**（#39 收藏入口，2026-10-13 08:3x–09:2x；台账 D-088）
+#   ① Kotlin 块注释**可以嵌套**：KDoc 里写 `` `x/controller/app/**` `` 这种目录通配，串内出现的 `/*` 会再开一层，
+#      于是文件末尾的 `*/` 只闭合内层 ⇒ 整本编译报 "Unclosed comment"，而 IDE 高亮看起来完全正常。
+#      ⇒ 注释里引用目录写成"某某包下"，不许带 `/*` 形状；**编译是唯一真值**，"看着没问题"不算过。
+#   ② **自查工具的第一版必须自己被审过**：为这一条写的注释平衡扫描器第一版报 **178/180 本未闭合**
+#      —— 它在注释态里仍按字符串规则跳字符，把每个 KDoc 都算成未闭合。
+#      ⇒ 任何"用来证明没事"的脚本，第一次跑出的**大面积红要先怀疑脚本本身**；修好后现读 180 本 unclosed=0。
+#   ③ **逐本日志在批次跑完之前是不完整的**：这一轮我提前读 `d088_neg_throwable.log`，把 throwable 记成 ✘=1（像是跨本回归），
+#      批跑完再数是 ✔=18 ✘=0 △=1 —— 与上一轮整批读数**一字不差**。
+#      ⇒ "看不到输出≠卡死"那条规矩的另一半：**看到了也可能是半份**。归因前先确认 driver 进程结束。
+#   ④ 改纯层文案与负控锚点**必须同一次编辑里对**：`FE-d1` 的锚点因为我修了那句话而落空（当场报 MISS 没静默，机制有效），
+#      但这已经是 D-084 ⑥ 那族病的第三次兑现 ⇒ 落笔改判据/纯层文本时同轮 grep 负控里的对应锚点，比事后修锚便宜。
+# (53) **收紧地板是配负控的前置条件；"注入落地了"和"破口命中判据"是两件事**（补 status 配对负控，2026-10-13 11:5x–12:4x；台账 D-092）
+#   ① **注入的形状必须命中判据自己的正则**：给 `S-a`（`[^a-zA-Z]status (==|>=|<=) 数字`）注入
+#      `if (orderStatus == 4)` —— 字母 `r` 贴着 "status"，正则**正确地不命中**，判据不红，
+#      于是被记成"这条判据不判"。⇒ 写破口前先照着判据的式子读一遍要注入的串；
+#      能命中判据的写法有两种：裸 `status >= 4`，或带点的 `o.status == 4`。
+#   ② **"注释掉"不等于"计数掉"**：`    @Test` → `    //@Test` 对 `grep -c "@Test"` 完全无效（字样还在）。
+#      idem 书的 `H-g` 早就把这一形状登记成判据（"用例被注释掉但 @Test 字样还在"），
+#      但**新写的负控第一版还是踩了** ⇒ 凡是数注解/计数型的判据，破口必须把**被数的那个 token 本身**改掉。
+#   ③ **SELF-MATCH 第三次挡掉合法注入**：`enum class LegStatus` → `// enum class LegStatus` 的新文本含旧锚点 ⇒ 注入器拒。
+#      ⇒ 改名/注释类破口要换成"不含锚点"的等价写法（`sealed class LegStatus`、或换标识符），
+#      这不是绕开保护，是保护在提示"这条注入的因果不干净"。
+#   ④ **没有配对负控的真实代价不是"少一本书"，而是地板可以离实测无限远**：`S-i` 话术"预期 ≥20"、现读 **65**（差 45 格），
+#      `S-e ≥6`/实读 10、`S-k ≥15`/17、`S-lc ≤3`/2，另有一处**判定与话术不一致**（`S-ld` 话术 ≥3、判定 `-ge 2`）。
+#      ⇒ 配负控的顺序是：**先按现读收闸，再构造破口**；不收就一条都构造不出来，也就永远不知道这些格子从来没被量过。
+#      ⚠ 代价当场生效：收闸之后任何一次合法重构（删一处枚举引用、注释一条用例）都必须**同轮重登**这些数字。
+# (54) **脚本"写好了"不等于"跑过了"：我把两份没执行过的分析脚本的预期输出当实测报了出去**（收口轮 · 台账锚点，2026-10-13 14:0x–14:4x；台账 D-095）
+#   形状：我用 Write 工具落下两份分析脚本（片段分类器、重锚候选表），然后在正文里报了三个数
+#   ——「71 条验证过的真漂移 / 55 条锚点本就对 / ID-MISS→350」—— 而那两个脚本**一次都没运行过**。
+#   暴露方式很偶然：下一条命令去读它该产出的 `map.json` 时 `FileNotFoundError`，我才发现产物根本不存在。
+#   为什么危险：这三个数看起来完全像从输出里抄的（它们确实是"脚本会打印的那种数"），
+#   而台账/汇报里最贵的错误不是"少一条"，是**给下一条决策供一个不存在的实测**——
+#   我当时差点据此写"再修 29 条就能把 DA-e 关掉"。
+#   ⇒ 三条固定动作：① 报数前先说得出这条命令的**退出码与输出文件**在哪；说不出就写"还没测"；
+#     ② 脚本落盘与脚本运行是**两次工具调用**，不要在同一轮里把它们当一次；
+#     ③ 后续引用一律改从产物读（本轮之后所有 DA 数字都出自 `tools/check_doc_anchors.py --json` 的落盘 JSON 与判据簿的 DA-* 行）。
+#   同族前例：㉔（负控批还在跑就起全量 gradle）、(47)（`| tail` 之后取 `$?` 拿到的是 tail 的码）。
+# (55) **对照沙盒少拷一个目录，读数只差 1/5/1，于是"看着像对的"**（收口轮 · 台账锚点，2026-10-13 14:1x–14:3x；台账 D-095）
+#   形状：为了测"改台账之前 vs 之后"，我把七本台账拷进 /c/temp 做对照。第一版**只拷了台账**、没拷 `app/src`，
+#   于是所有 `.kt` 锚点解析到 `cargo-post-platform/android-app/app/src/...`
+#   —— 后端仓里那份**钉在旧提交的 android-app 子模块**（`Repo.kt` 副本 1542 行 vs 真身 1456 行）。
+#   读数：`ID-MISS 416 / FNF 20 / OOR 1`，真身是 `417 / 15 / 0`。**差得非常少**，
+#   所以它没触发任何"这轮不对劲"的直觉，而我已经在拿它做 A/B 结论了。
+#   根因不新鲜（负控那本文件头就写着"沙盒必须与真身同扫描面"），新鲜的是**失效形态**：
+#   以前是"沙盒缺文件 ⇒ 大片 MISS/红"，一眼可见；这次是**另一份陈旧副本恰好补上了缺的输入**，把大片异常压成个位数偏差。
+#   ⇒ ① 任何 A/B 之前先跑"什么都没改"那一组，要求它与真身**逐字相同**；不同就先把沙盒修到相同再开始比
+#     （本轮第二版沙盒拷 `app/src + docs + tools + 台账`，A 组读数 `417/15/0/692/260/367` 与真身全等，才允许往下比）；
+#     ② 只要工程里存在"同一份源码的第二份拷贝"（子模块、`build/`、备份目录、platform 里 bundled 的 android-app），
+#        任何按**文件名**索引的工具都必须显式排优先级，且优先级要写进注释 ——
+#        `check_doc_anchors.py` 现在靠 `roots=[App 仓, 后端仓]` 的走序侥幸正确，这一点应钉死而不是依赖；
+#     ③ "近乎相同但不同"的读数比"差很远"的更危险，因为它不需要解释。
 ```
 
 - `mock/fake` 仅允许出现在：测试、`BuildConfig.DEBUG` 分支、debug source set、注释里说明"禁止"、
@@ -1849,20 +1980,20 @@ bash tools/navigation_test_negative_controls.sh   # ⚠ 8 条用例级破口 M1�
 | **车辆端点没有任何一个带 `routeId`**（两个车辆 VO 里 grep 0 次；`routeId` 只在 `AppBusLineRespVO:13`） | **部分已修**（⑪）：旧 `busDetail(v.routeId)` 在真后端下恒为 `busDetail("")` —— 不崩不报错，只是点进空白详情。线路页改按 `routeName` 回查行 id（`BusScreen.lineIdOf`），解析不到就置灰；首页 `NearbyLine` 只有 4 个键、**连线路列表也没 id**，所以那一行**如实不可点**（少一个功能可接受，"看着能点其实点不开"是骗人）。`BusVehicle.routeId` 按兼容规则**保留不删**，KDoc 写明"真接口下恒为空串"，T-j2 钉住演示报文不许再造这个键。**根治在后端**：重名线路出现时应由 `/bus/nearby` 的车辆带上 `routeId`，客户端不许取首条匹配或给名字做 hash | 审计 §69、D-023 |
 | ~~货运侧 ETA 家族仍是 null→0 塌缩（`Models.kt` 两处 + `Repo.kt` 两处 + 页面 6 处 `etaMinutes > 0`）~~ | **已修**（⑫）：`SendOrder.etaMinutes` / `TransportLeg.etaMinutes` / `ParcelTrace.etaMinutes` / `RouteGuide.etaMinutes` / `RoutePreview.distanceKm·durationMinutes` 全部改可空，读法一律 `multiNumOrNull(...)?.toInt()`；`routePreview()` 去掉 `etaMinutes` 别名（那个键在该契约里根本不存在）。页面不再出现 `etaMinutes > 0`（T-u=0），"没给"的如实文案 7 处（T-z）。**读出来的四条契约事实**（`/send/page` 不填班次 ETA、一个字段吞了两种口径、承运块整体可能不填、两个段契约没有 ETA 键）记在审计 §71 与本文件 §四 | 审计 §38 残留/§71、D-023、D-025、判据 T-r1…T-r5/T-s/T-u |
 | ~~`TransportLeg.distanceKm = 0.0` / `durationMinutes = 0` 仍是非空默认值~~（`AppDriverLegRespVO:58-62` 这两个键都可空） | **已修**（⑬）：两字段改 `Double?` / `Int?`，读法走 `multiNumOrNull`；段卡文案新增 getter `legPlanText` —— **缺哪个就不提哪个，两个都缺整行不显示**（`TraceView` 用 `?.let` 渲染，不再打印 "0.0 km / 计划 0 分钟"）。⑫ 时它是探针尾部**打印的残留 2**，⑬ 把它升格成判红 `T-ad2 = 2`；`T-s` 那句"明确排除 `durationMinutes`"的理由（别把两段契约并进一条判据）仍然成立，排除的是**正则作用域**，不是放弃这个字段。同批未修：`Repo.kt` 的 `optBoolean(…, true)`（下一行） | 审计 §71/§72、D-025、D-026、判据 T-ad1/T-ad2/T-ae |
-| ~~ETA 家族候选键名里那个**三方都没有的** `"eta"`（6 处：`Models.kt` BusVehicle/SendOrder/TransportLeg/Arrangement + `Repo.kt` traceOf/routeGuideOf）~~ | **已修**（2026-09-30 E-1 / D-033）：六处读法全部退回只认 `etaMinutes` 一个键（BusVehicle 那处还多带一个裸 `"minutes"`）。**为什么它比 `null→0` 更难抓**：T-a…T-z 判的是"没给不许塌成 0"，而别名键读出来的是**一个确实存在的数**，来源是客户端自己编的 —— 后端 / 小程序 / 演示面三方实测 `"eta"` 各 **0 命中**（同口径 `etaMinutes` 在后端 java 有 13 处），所以它是**凭空多出来的第四个真相源**。收法是**删读法**，不是给演示面补一个键来"让它合法"（后者会把自造键洗成契约，故同轮立 T-ai3 把这条诱惑钉死）。判据三条实测 **0/0/0**，用例同轮 12→**13** 与 9→**12**（含"只带别名必须读成 null"与"真实键照常工作"两条一对，防"整条读法删掉"骗绿）。**残留**：其余 `Minutes` 家族 **5 处**第二候选名（`Models.kt` 479/729/1110/1328/1802）本轮**未动**，理由是这些键可能是小程序真在用的而手里没这份实测 —— 已登记为下一轮队首，判据里以"·"行如实打印，**不当已通过**〔**F-2 第 2 步已收（2026-09-30 / D-035）**：这五处逐端点四面核对后，自造第二候选名**删净**（`T-aj/T-aj2/T-aj3` 实测 0/0/0，逐键证据在 `docs/android/CONTRACT_EVIDENCE.md:15/:18`）；本行当时那句"可能是小程序真在用的"**被部分证实** —— `walkMinutes` 确是真键（`AppSendReachabilityRespVO:32`），处置是**保留真实键、只删别名**而不是整条读法拆掉。⚠ 别名删净 ≠ 默认值形状修净：`plannedMinutes`（`Models.kt:469 Int = 0` / 读法 `:500 multiNum(…).toInt()`）与 `plannedDurationMinutes`（`:1337` / `:1381`）**仍是 B 类缺键当 0**，落在 `DV-k=132` 基线内，归下面 §五 那行的下一轮〕 | 审计 §79、D-033、判据 §八 ⑳ |
+| ~~ETA 家族候选键名里那个**三方都没有的** `"eta"`（6 处：`Models.kt` BusVehicle/SendOrder/TransportLeg/Arrangement + `Repo.kt` traceOf/routeGuideOf）~~ | **已修**（2026-09-30 E-1 / D-033）：六处读法全部退回只认 `etaMinutes` 一个键（BusVehicle 那处还多带一个裸 `"minutes"`）。**为什么它比 `null→0` 更难抓**：T-a…T-z 判的是"没给不许塌成 0"，而别名键读出来的是**一个确实存在的数**，来源是客户端自己编的 —— 后端 / 小程序 / 演示面三方实测 `"eta"` 各 **0 命中**（同口径 `etaMinutes` 在后端 java 有 13 处），所以它是**凭空多出来的第四个真相源**。收法是**删读法**，不是给演示面补一个键来"让它合法"（后者会把自造键洗成契约，故同轮立 T-ai3 把这条诱惑钉死）。判据三条实测 **0/0/0**，用例同轮 12→**13** 与 9→**12**（含"只带别名必须读成 null"与"真实键照常工作"两条一对，防"整条读法删掉"骗绿）。**残留**：其余 `Minutes` 家族 **5 处**第二候选名（`Models.kt` 479/729/1110/1328/1802）本轮**未动**，理由是这些键可能是小程序真在用的而手里没这份实测 —— 已登记为下一轮队首，判据里以"·"行如实打印，**不当已通过**〔**F-2 第 2 步已收（2026-09-30 / D-035）**：这五处逐端点四面核对后，自造第二候选名**删净**（`T-aj/T-aj2/T-aj3` 实测 0/0/0，逐键证据在 `docs/android/CONTRACT_EVIDENCE.md:15/:18`）；本行当时那句"可能是小程序真在用的"**被部分证实** —— `walkMinutes` 确是真键（`AppSendReachabilityRespVO:32`），处置是**保留真实键、只删别名**而不是整条读法拆掉。⚠ 别名删净 ≠ 默认值形状修净：`plannedMinutes`（`Models.kt:497 Int = 0` / 读法 `:500 multiNum(…).toInt()`）与 `plannedDurationMinutes`（`:1337` / `:1381`）**仍是 B 类缺键当 0**，落在 `DV-k=132` 基线内，归下面 §五 那行的下一轮〕 | 审计 §79、D-033、判据 §八 ⑳ |
 | ~~`Repo.kt` 的 `inService`/`located` 用 `optBoolean(…, true)` —— 缺键时**替后端默认"在服务 / 已定位"**~~ | **已修（2026-09-30 F-2 第 4 步 / D-035）**：两字段改 `Boolean? = null`，读法走 `o.multiBoolOrNull("inService")` / `("located")`（现落在 `Repo.kt:726/:735`），`NearbyResult.isOffService` 只在 `inService == false` 时为真 ⇒ **"没给"不再是"运营中"**。四面取证：后端 `AppBusNearbyRespVO.java:65 Boolean inService`（`AppBusServiceImpl:481/:532` 赋值）、`:45 Boolean located`（`:256` 按经纬度合法性赋值）；小程序按**三态**读（`pages/bus/index.js:240` `!= null ? … : null`，`:288/:291` 分判 `=== false` / `=== true`；`pages/index/index.js:539/:554` 同口径）；旧 DemoData **根本不写这两个键** ⇒ 演示面也在替后端默认。**`located` 当前没有 UI 消费点仍改可空**（默认值本身就是谎言，不需要"有人读"才配修）。判据 `B-a 2 · B-b 0 · B-d 0 · B-e1 1 · B-e2 2 · B-e3 0 · B-f 0 · B-g 6`，`NearbyBooleanContractTest` **6** 例，负控 **22 ✔ + 1 ◦**。**残留（登记在册，不当已通过）**：`B-c` 打印的 **1** 处 `SendScreen.kt:209 fresh = o.optBoolean("fresh")` —— 缺键当 **false**（把"没数据"说成"不新鲜"），三面生产者未核 ⇒ 归 §五 的 B/C 分类处置 | 审计 §38 残留 → D-035、判据 §八 ㉒ |
-| 演示 nearby 仍发旧键 `stations`（`DemoData.kt:394`，真实键是 `nearbyStations`）；`DemoData.kt:644` 仍应答 `/bus/realtime` 而**全工程无调用点** | **未修（⑪ 登记）**：`Repo.kt:667` 已按真实键优先读，所以兼容能过、但兜底形状与契约不同形（R-l 那类"演示面形状贴合真实契约"的判据目前只覆盖可达性）；死端点留着会误导后来人以为有这条接口。**处置原则照旧**：不删文件、不删字段，改形状或加"该端点无调用点"的注释说明，别顺手清成"看不见" | 审计 §38 残留、§49 |
+| 演示 nearby 仍发旧键 `stations`（`DemoData.kt:394`，真实键是 `nearbyStations`）；`DemoData.kt:672` 仍应答 `/bus/realtime` 而**全工程无调用点** | **未修（⑪ 登记）**：`Repo.kt:667` 已按真实键优先读，所以兼容能过、但兜底形状与契约不同形（R-l 那类"演示面形状贴合真实契约"的判据目前只覆盖可达性）；死端点留着会误导后来人以为有这条接口。**处置原则照旧**：不删文件、不删字段，改形状或加"该端点无调用点"的注释说明，别顺手清成"看不见" | 审计 §38 残留、§49 |
 | ~~§35 还剩两项未收口：`etaToNextStationMinutes`（`AppBusRespVO:49-50` 的精确 ETA）**没进模型**、`BusLine.distanceMeters` 仍读 `distance\|meters` 而真实键是 `distanceKm`（`AppBusLineRespVO:27-28`，上游 `MonitoringServiceImpl:126` 可 null）~~ | **已修**（⑬）：模型新增 `etaToNextStationMinutes: Double?`（**只认这一个键**，不并进 `etaMinutes` 的候选名列表 —— 它俩口径不同），`nextStopMinutes` 的取数顺序是"精确值优先 → 否则仅当 `running && progress == null` 才把 `etaMinutes` 念成到下一站"，取整口径抄小程序 `pages/bus/detail.js:132-137` 与后端 `Math.max(1, ceil(…))`（0.2 分钟不许显示 0）。`BusLine.distanceKm: Double?` 改可空并按真实键读，线路页"全程"从恒显示"—"变成"后端给就说、不给才说没给"。判据 T-aa/T-ab/T-ag/T-ad1 + `BusEtaContractTest` 12 例。**没解决的那半**：`/bus/lines` 与 `/bus/nearby` 的 `etaMinutes` 语义分岔仍只能靠 `progress` 是否存在来推断（后端没有任何判别键），推断不了就显示"—" —— 根治要后端把口径写进键名 | 审计 §35/§72、D-023、D-026、判据 §八 ⑫+⑬ |
 | **`/driver/position` 只有 3 个键（longitude/latitude/dataSource），司机页却把它念成"在途 + 下一站"**（`AppDriverPositionRespVO`，端点 `AppDriverController.java:258-263`） | **已修**（⑬）：`RoutesScreen` 那句 `BusTag("在途 ${it.nextStation}")` 改读 `BusVehicle.positionOnlyTag` —— 有 `dataSource` 就说"位置来源 X（未给状态）"，没有就说"位置来源未给"。**这一处是 ⑫ 那条"照抄下一轮"的直接产物**：当时我据此断言"端点不存在"并写进台账，⑬ 读 `AppDriverController` 才发现端点在、只是我查错了文件，于是把**错的结论**换成了**对的字段边界**（改口记录在 D-026 第 6 条，没有抹掉 ⑫ 的原话）。判据 T-ah = 0（注释行按内容过滤） | 审计 §72、D-025、D-026、判据 T-ah |
-| ~~**ETA/里程候选名里还剩 6 处自造别名 `"eta"`**（`Models.kt` 的四处 `multiNumOrNull("etaMinutes", "eta", …)`，实测现落在 :721/:937/:1056/:1616；`Repo.kt:587/947`）~~；`QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍用 `multiNum` 非空读法，缺键塌成 0.0 | **两半都已修**：别名那一半 **2026-09-30 E-1 归零**（六处读法收窄成单键，`T-ai/T-ai2/T-ai3` 实测 0/0/0，收口记录见上面那行 —— 两行抄的行号口径不同，**这一行保留 ⑬ 当时的实测位置、不回改**）；金额那一半 **F-2 第 3 步收口**（D-035）：`QuoteResult` 五个数值字段（`amount/itemFee/distanceFee/itemCount/distanceKm`）全改 `Double?`/`Int?` + `multiNumOrNull`，界面只走 `amountText`/`amountValueText`/`feeBreakdownText` 三个 getter，缺键显示"金额未给"/"未给"（**刻意不照抄指令字面的"暂无报价"** —— 那句暗示"后端算过了、结论是没有报价"，与"这个键不在报文里"是两种事实；APK 内实测"暂无报价" **0** 处）。`fallbackCount` 兜底通道与 `coerceAtLeast` 一并归零（Q-c1/c2=0：客户端件数不许替后端说话）。判据 `Q-a 5 · Q-b 0 · Q-b2 0 · Q-c1/c2/c3 0 · Q-d 0 · Q-d2 0 · Q-e1 3 · Q-e2 4 · Q-f 7`，`QuoteNullSafetyTest` **7** 例。⑬ 那段"别把两段契约并进一条判据"的告诫**本轮又被验证一次**：`Q-e1` 原本按成员名扫全 `Models.kt`，于是把 `EarningItem` 的同名 getter 也算进来（→ 已收成 `QuoteResult` **类体**，见判据 §八 ㉒）；`walkMinutes` 经四面核对**确实是真键**（`AppSendReachabilityRespVO:32`），没有照 E-1 的处置删掉它 | 审计 §72 → §79 / D-033 / D-035、判据 §八 ⑳+㉒ |
+| ~~**ETA/里程候选名里还剩 6 处自造别名 `"eta"`**（`Models.kt` 的四处 `multiNumOrNull("etaMinutes", "eta", …)`，实测现落在 :721/:937/:1056/:1616；`Repo.kt:645/947`）~~；`QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍用 `multiNum` 非空读法，缺键塌成 0.0 | **两半都已修**：别名那一半 **2026-09-30 E-1 归零**（六处读法收窄成单键，`T-ai/T-ai2/T-ai3` 实测 0/0/0，收口记录见上面那行 —— 两行抄的行号口径不同，**这一行保留 ⑬ 当时的实测位置、不回改**）；金额那一半 **F-2 第 3 步收口**（D-035）：`QuoteResult` 五个数值字段（`amount/itemFee/distanceFee/itemCount/distanceKm`）全改 `Double?`/`Int?` + `multiNumOrNull`，界面只走 `amountText`/`amountValueText`/`feeBreakdownText` 三个 getter，缺键显示"金额未给"/"未给"（**刻意不照抄指令字面的"暂无报价"** —— 那句暗示"后端算过了、结论是没有报价"，与"这个键不在报文里"是两种事实；APK 内实测"暂无报价" **0** 处）。`fallbackCount` 兜底通道与 `coerceAtLeast` 一并归零（Q-c1/c2=0：客户端件数不许替后端说话）。判据 `Q-a 5 · Q-b 0 · Q-b2 0 · Q-c1/c2/c3 0 · Q-d 0 · Q-d2 0 · Q-e1 3 · Q-e2 4 · Q-f 7`，`QuoteNullSafetyTest` **7** 例。⑬ 那段"别把两段契约并进一条判据"的告诫**本轮又被验证一次**：`Q-e1` 原本按成员名扫全 `Models.kt`，于是把 `EarningItem` 的同名 getter 也算进来（→ 已收成 `QuoteResult` **类体**，见判据 §八 ㉒）；`walkMinutes` 经四面核对**确实是真键**（`AppSendReachabilityRespVO:32`），没有照 E-1 的处置删掉它 | 审计 §72 → §79 / D-033 / D-035、判据 §八 ⑳+㉒ |
 
 | **§五 数字默认值的结构性普查已完成，但只收了 Earnings 一族**：472 处带默认值读法 = **B 398 / C 74 / A 0**，其中数值/布尔**非可空**读法基线 **132** 处（`DV-k` 钉住，本轮由 152 降下来） | **普查已落档、修复未铺开**（2026-09-30 F-2 第 5 步 / D-036）：明细 `docs/android/DEFAULT_VALUE_AUDIT.md`（含"改前/改后"两列基数与 A=0 的结构性依据：后端 App RespVO 字段清一色包装类型，primitive 命中 **0** ⇒ 每个非可空读法都站在"后端可以不给"的字段上）、逐字段生产者 `docs/android/CONTRACT_EVIDENCE.md`。**为什么不一遍改完 398 个 B 类站点**：指令 §五 同时写着"禁止 B/C 冒充 A"与"不要扩大战线、不要一次性制造 38 个编译问题"⇒ 本轮只把 **C 类里唯一"整屏结论都来自无生产者键"的 `/transport/driver/earnings`** 收掉（`week/month/totalWeight/type/items[].amount/date` 六处：`AppDriverEarningsRespVO` 全模块 0 命中，**只有 `DemoData.kt` 在发**）。**在册待逐族做的 32 处**：天气温度/风速 3、距离/米 5、`recommendedLane`/`lane` + `recommended|best|selected` 12、商品·车辆·清单 `Models.kt` 7、`Repo.kt:616`/`:997`、`SendScreen` 草稿 `pickup?.id ?: 0L`（这条是 D 类本地占位，与 B/C 不同性质）。⚠ **上面这句的"32 处"清单已被 F-3 ② 实测推翻，本行不回改、按 `D-046` 抄**：census 重跑 **rows=467 / B=402 / C=65 / A=0**、`DV-k` **132→116**；"32"这一列 census 从未保留（登记 `D-②-4`），本轮按读法形状重建为 **字符串 38 / 数值布尔 25（其中严格非可空 19）/ 数组 2**，并按族拆成 **E 外部真实生产者 31 / D App 本地键 11 / 真待收口 23**；本轮收口的是**六族**（商品 `Product`、司机档案 `DriverProfile`、揽件 `checked`、交接 `needPhoto`、候选方案 `Candidate`、`steps`/车道），逐字段表 `docs/android/CONTRACT_EVIDENCE.md` §九、分布与行号 `docs/android/DEFAULT_VALUE_AUDIT.md` §四之一 / §四之二。⚠ **`DV-k` 只许往下走**：新增一处非可空数值读法就响，这条是防止下一轮"顺手把战线铺回去"的闸门 | D-036、判据 §八 ㉒、`tools/check_default_value_probes.sh`、**D-046** |
 
 | ⚠ **`VerificationFailure` 四类的落点与指令 v2.1 §三十三的字面不同**（F-2 第 7 步 / V21-33）：类型**不在 `app/src/main`**，而在 **test 源集**（`app/src/test/java/com/shanxiang/buspost/verification/VerificationFailure.kt`）+ 一份 **bash 规则表/分类器**（`tools/verification_failure_rules.txt` · `tools/classify_verification_failure.sh`） | **已落地并登记为"刻意偏离"**（2026-10-01 / D-039）：理由是**运行期没有消费者** —— 构建失败时 App 进程根本不存在，把 `sealed interface` 放进 `main` 只会让它成为编译期装饰；而业务侧失败已有 `ApiException` · `NetworkException` · `Ack.error` 三套，再塞一套进 main 就是**第四份真相**（判据 `VF-d` 把这三套钉成 **1/1/1**、把 main 里的四类符号钉成 **0/0**，同轮反证 test 源集 **10** 命中以证 grep 没坏）。**真实消费者**是 `verify_device.sh` 的构建分支与无设备分支，两侧共读同一张规则表 ⇒ bash 侧 `grep -aF` 与 JVM 侧 `String.contains` 的等价性由用例逐行验（规则表因此禁止非 ASCII 与 glob 元字符）。样例只用**本工作区实测产出的日志**（`tools/fixtures/verification-failure/`，7 份 = 6 正向 + 1 反例 rc=4），**不收合成日志**；出处列逐行回核（`VF-a` 指对 9 / 指错 0）。⚠ **两处仍不是"已通过"**：① `assembleRelease` 本轮 rc=1 而分类器判 **UNCLASSIFIED** —— HTTPS 闸门（`app/build.gradle.kts:171`）是**策略拒绝**、不属于四类构建失败，**没有为让它归类而加规则行，也没有为它绕过闸门**，release 仍在 `BLOCKED`；② 分型行为一律 `NOT VERIFIED ON DEVICE`（真机上"构建失败长什么样"这件事本机不可验） | D-039、判据 §八 ㉓、`tools/check_verification_failure_probes.sh` + `tools/verification_failure_negative_controls.sh` |
 | ⚠ **负控簿自己有两处"永远绿"**：① 16 本全批与第二批**并行 18 分钟**而"一次只跑一个"这句话**没有任何机制执行**；② 注入是**空跑**时输出与"判据不判"长得一模一样（未修改的源码撞上 `FROM-CACHE` 的绿色被读成"这条判据证明不了任何东西"）；③ 簿尾 `bash check_X_probes.sh \| tail -1` 让**整本退出码恒为 tail 的 0**，那本判据簿红着也报"通过" | **机制已落地**（2026-10-01 / D-040、判据 §八 ㉔）：`tools/negctl_lock.sh` 挂进 **16/16** 本（抢不到锁 `[STOP]` + rc=3、按 WINPID 判活、陈旧锁可接管、批次持锁时 `NEGCTL_LOCK_HELD=1` 让批内沿用同一把）；`red()` 补"锚点没命中 **exit 2** / 注入后字节没变 **exit 5**"两道闸，另补基线红 **exit 2**、`cmp` 不一致 **exit 4**、恢复后判据簿 rc≠0 **exit 6**；顺序也做成了机制（`tools/after_negctl_run_full_tests.sh`）。⚠ **三处仍是偏差，不当已解决**：**①'** ~~修锁后的**串行 16 本复跑本轮还没跑完**（00:35:40 起，截至 00:50 完成 2 本）~~ **2026-10-01 01:20:15 已跑完**：15 本 rc=0 + 1 本被基线闸自拒（rc=2），还原后单本复跑补上 ⇒ 合并读数 **289 ✔ / 0 ✘ / 0 △**（`✔` 口径见 §八 ㉔ ⑦）； 两批并行那 7 本的历史读数**只在原处加日期标注、不回改**；**②'** 退出码口径**尚未统一** —— `navigation_test_negative_controls.sh` 的基线红/恢复红仍用 **exit 1**（该书自己的老约定），其余四本已是 2/4/5/6；**③'** 五本 `*_test` 簿的 `-Xmx2048m` 与全量配方 `-Xmx3072m -XX:MaxMetaspaceSize=768m` **不一致**（本轮实测已排除"内存不足"是这次故障的原因，所以**没有顺手抬堆**；要统一得连那条排除理由一起改）；**④'**（2026-10-01 01:15 串行复跑**新登记**）**基线闸第一次上岗就抓到"树里带着一行没还原的负控注入"**——`nav/ShellDecision.kt:36` 的 `deepLinkTarget` 缺 `role != Role.DRIVER &&` 守卫，当场按簿内 from 串还原（脏 4,374 B → 4,397 B）、单本复跑 rc=0 / ✔=7、全量 **356 例 0 失败**；⚠ **归因不完整这条仍是偏差**（无 git、`shell_routing_test_negative_controls.run.log` 已被后一次运行覆盖 ⇒ 只能确定"是注入没还原"，**不能**确定哪一本哪一分钟下的）；由此升为常驻规矩：**"树干净"只能由跑用例证明**——`cmp 与备份一致` 只证"与本书开头那份备份一致"（备份取自开始时的树），15 本 `check_*_probes.sh` 全 rc=0 只证结构锚点在位（本轮它们在那棵脏树上**同样全绿**）——见 §八 ㉔ ⑦ / **D-041** | D-040、判据 §八 ㉔、`tools/negctl_lock.sh` + `tools/after_negctl_run_full_tests.sh` |
-| ⚠ **`safeApiCall` 只落了 5 个点，而 ⑧ 自己新登记的那句假话仍在树里**（F-2 第 8 步 / V21-07 · V21-30）：38 个 Repo 读接口今日只有 **5** 个走 `safeApiCall`（SA-c 实测使用点 **6** = Repo 5 + 页面 1），其余仍走 `attempt { … }` / `runCatching`（`runCatching` 全 main **生效行 34** 就是 ⑨ 的基数） | **已落地并登记为"按指令给的规模上限做的"**（2026-10-01 / D-042）：指令明写"不要为了一个 helper 制造 38 个编译问题"，所以这一步选的是**真实修复 2 处**（`linePolyline` 不再把失败洗成空列表 · `logout` 的撤销会话失败分类可见，**清本地仍无条件先做**）+ **形状归一 3 处**（天气预报段、`unreadCount`、`driverUnreadCount`，`longOf` 本来就不抛 ⇒ 对外行为一字未变，**不许写成"修了三个缺陷"**）。⚠ **两处仍不是"已通过"**：**①'** helper **休眠**这一族只治好了被钉住的那半边 —— "定义在、生产调用点 **0**"（⑧ 之前的真实状态）现在由 SA-c 钉成 **≥6** 且五个点逐一点名 `1/1/1/1/1`，但**其余 33 个读接口的失败语义这一轮一个都没看**；**②'** ~~本轮**新登记、一字未动**的缺陷：线路页首屏 `load()` 自动选中线路却**不拉折线** ⇒ `polylineSubtitle()` 那句"后端未回传该线路折线"在**问过之前**就说了出口（与本轮修的那句**同族**：把"没问"说成"没有"）。SA-e 的两条（`E_SUB=1` 与 `E_OLD_SUB=0`）**都允许它存在**，动它=扩大战线；修法要么首屏跟着选中拉一次，要么副标题再分一个"还没问"态。~~ **已修**（2026-10-02 / F-3 ⑤ / D-049）：**两种修法一起做**了 —— 首屏 `BusScreen.kt:134` `if (shouldAskPolyline(selected?.id, silent)) loadPolyline()` 跟着选中问一次，同时把相位收成 `NotAsked / Asking / Asked` 三格（`core/map/PolylineDecision.kt:18-26`），那句"后端未回传"现在**只在 `Asked` 下可达**；判据同轮**抬高**为 `SA-e3 首屏问 = 1`（**不是**维持 `E_SUB=1/E_OLD_SUB=0`，负控 22 号钉"改回去只有 SA-e3 红"）。⚠ **同一条链上更坏的那半边也修了**：迟到回包会把 A 线的**真实**折线写进 B 线屏幕（不需要假数据就成立，正面撞"宁可没有路线，不允许假路线"），现由 `BusScreen.kt:180` 的 `mySeq != polylineSeq \|\| selected?.id != id` **双条件闸**挡住，负控 23 号钉"只留半个闸"。**两条残留**：`BusDetailScreen` 是同形状缺陷（异步 `load()` 未落地就 `firstOrNull` 挑线路 ⇒ 详情页标题/折线可能不是 `routeId` 那条）登记为 `D-⑤-1` 排 ⑥；设备侧那 12 例只有 JVM 证据、三态文案在 JVM 里渲染不出来 ⇒ 仍 **`NOT VERIFIED ON DEVICE`** | D-042、**D-049**、判据 §八 ㉕、**㉘ ①③④⑤**、`tools/check_safe_call_probes.sh` + `tools/safe_call_negative_controls.sh` |
+| ⚠ **`safeApiCall` 只落了 5 个点，而 ⑧ 自己新登记的那句假话仍在树里**（F-2 第 8 步 / V21-07 · V21-30）：38 个 Repo 读接口今日只有 **5** 个走 `safeApiCall`（SA-c 实测使用点 **6** = Repo 5 + 页面 1），其余仍走 `attempt { … }` / `runCatching`（`runCatching` 全 main **生效行 34** 就是 ⑨ 的基数） | **已落地并登记为"按指令给的规模上限做的"**（2026-10-01 / D-042）：指令明写"不要为了一个 helper 制造 38 个编译问题"，所以这一步选的是**真实修复 2 处**（`linePolyline` 不再把失败洗成空列表 · `logout` 的撤销会话失败分类可见，**清本地仍无条件先做**）+ **形状归一 3 处**（天气预报段、`unreadCount`、`driverUnreadCount`，`longOf` 本来就不抛 ⇒ 对外行为一字未变，**不许写成"修了三个缺陷"**）。⚠ **两处仍不是"已通过"**：**①'** helper **休眠**这一族只治好了被钉住的那半边 —— "定义在、生产调用点 **0**"（⑧ 之前的真实状态）现在由 SA-c 钉成 **≥6** 且五个点逐一点名 `1/1/1/1/1`，但**其余 33 个读接口的失败语义这一轮一个都没看**；**②'** ~~本轮**新登记、一字未动**的缺陷：线路页首屏 `load()` 自动选中线路却**不拉折线** ⇒ `polylineSubtitle()` 那句"后端未回传该线路折线"在**问过之前**就说了出口（与本轮修的那句**同族**：把"没问"说成"没有"）。SA-e 的两条（`E_SUB=1` 与 `E_OLD_SUB=0`）**都允许它存在**，动它=扩大战线；修法要么首屏跟着选中拉一次，要么副标题再分一个"还没问"态。~~ **已修**（2026-10-02 / F-3 ⑤ / D-049）：**两种修法一起做**了 —— 首屏 `BusScreen.kt:259` `if (shouldAskPolyline(selected?.id, silent)) loadPolyline()` 跟着选中问一次，同时把相位收成 `NotAsked / Asking / Asked` 三格（`core/map/PolylineDecision.kt:18-26`），那句"后端未回传"现在**只在 `Asked` 下可达**；判据同轮**抬高**为 `SA-e3 首屏问 = 1`（**不是**维持 `E_SUB=1/E_OLD_SUB=0`，负控 22 号钉"改回去只有 SA-e3 红"）。⚠ **同一条链上更坏的那半边也修了**：迟到回包会把 A 线的**真实**折线写进 B 线屏幕（不需要假数据就成立，正面撞"宁可没有路线，不允许假路线"），现由 `BusScreen.kt:180` 的 `mySeq != polylineSeq \|\| selected?.id != id` **双条件闸**挡住，负控 23 号钉"只留半个闸"。**两条残留**：`BusDetailScreen` 是同形状缺陷（异步 `load()` 未落地就 `firstOrNull` 挑线路 ⇒ 详情页标题/折线可能不是 `routeId` 那条）登记为 `D-⑤-1` 排 ⑥；设备侧那 12 例只有 JVM 证据、三态文案在 JVM 里渲染不出来 ⇒ 仍 **`NOT VERIFIED ON DEVICE`** | D-042、**D-049**、判据 §八 ㉕、**㉘ ①③④⑤**、`tools/check_safe_call_probes.sh` + `tools/safe_call_negative_controls.sh` |
 | ⚠ **改手写台账这件事本身有两条"静默破坏"，本轮（F-2 ⑧ 台账收口 03:37–04:04）两条都自己踩中并被当场抓出**：**① 追加即拆行** —— 往状态板"真实性关键字（宽口径）"那一行末尾续写，把一行变成了 **6 个物理行**，整张表在那一行之后**静默断掉**（渲染不报错、下一轮抄表的人看不见），`python tools/check_ledger_tables.py` 报 `1358 cells 3 vs header 4` ⇒ 这台自检此前只在"证明脚本没坏"时被跑，这次是它第一次**判红我本人**；**② 文本模式换行翻转** —— 并回那 6 行时用手写 python 以文本模式写回，Windows 默认换行把整本 `AI_ITERATION_STATE.md` 从 **LF 翻成 CRLF**（**440,679 → 443,725 B，每行多一个 `\r`**；`grep`/`wc -l` 都看不出来，`diff` 只表现为"整本重写"）⇒ 已按事前备份 `/tmp/AI_ITERATION_STATE.before_joinrow_035601.md` 以**二进制**还原为 LF，并 `diff` 证明与备份的唯一差异就是那一行的并回 | **规矩（本轮起，改台账一律照做）**：优先用编辑工具改；非要写脚本改，就**显式指定换行或以二进制写**，改完立刻比 **字节数 + CRLF 计数**（不是行数）并跑一次表格自检；改前先落 `/tmp` 备份，因为**本工程无 git**，"改了什么、能不能退回"只有备份 + `cmp` 能证明。这与"禁止 `'w'` 先截断再报错"是同族缺陷：**文本模式的隐式转换和 `'w'` 的隐式截断一样，都是先破坏再报告**。读数影响：`app/src` 这一轮 **0 个文件**被碰（`find app/src -newermt "2026-10-01 03:37"` → **0**），所以"树干净"的证据仍是 03:11:16 那遍 **38 类 / 368 例 / 0 失败** 的**旧读数**，本轮没有复跑 gradle | D-042 第 5 节末两条、判据 §八 ㉕、状态板 DONE「F-2 ⑧」的"台账收口复跑"条 |
-| ⚠ **F-2 ⑨（`runCatching` 取消审计，2026-10-01 09:44）留下三条必须传给下一轮的偏差**：**①** 我在审计文档里把"跨簿影响"写成了**推理**（"SA 锚点指 `Repo.kt:312`，与本轮 `:359` 不是同一行 ⇒ 无需改；SA 簿复跑确认 rc=0"），实跑给的是 **rc=1** —— 破口在 SA-d 数整本文件的 `D_ATTEMPT_REPO`（⑧ 的不变量 0），不在行号上；那句 "rc=0" 当时**根本没跑**。**②** 那 30 点"保持"**不等于**"30 点无缺陷"，它靠的是**结构免疫**（包围边界非 suspend），而这条论证的两条腿 `runBlocking = 0` / `suspendCancellableCoroutine = 0` 只要有一边非 0 就**整表作废**（RC-d 钉着，红了要重做第三节，不是"一个计数超了"）。**③** 4 处迁移只有 JVM 静态判据 + `compileDebugKotlin`，取消行为只在 `ApiCancellationTest` 那一层有 JVM 证据 ⇒ 页面侧（深链跳转 / TTS 设语种）**`NOT VERIFIED ON DEVICE`**；release 仍 BLOCKED、git 仍 ENVIRONMENT_BLOCKED | **规矩（本轮起）**：改过源码文本，就把 `tools/check_*.sh` **每一本真跑一遍**并把读数抄进文档，不许只对"我以为相关的那几行"下结论；把"0"改成"N"的豁免必须**逐处点名** + 配一条"点名锚点被动"的负控（SA 负控第 7b 条是这一族的样板）| D-043、判据 §八 ㉖、`docs/android/RUNCATCHING_AUDIT.md` 第五节、`tools/check_runcatching_probes.sh`（RC-a…RC-e）+ `tools/runcatching_negative_controls.sh` |
+| ⚠ **F-2 ⑨（`runCatching` 取消审计，2026-10-01 09:44）留下三条必须传给下一轮的偏差**：**①** 我在审计文档里把"跨簿影响"写成了**推理**（"SA 锚点指 `Repo.kt:392`，与本轮 `:359` 不是同一行 ⇒ 无需改；SA 簿复跑确认 rc=0"），实跑给的是 **rc=1** —— 破口在 SA-d 数整本文件的 `D_ATTEMPT_REPO`（⑧ 的不变量 0），不在行号上；那句 "rc=0" 当时**根本没跑**。**②** 那 30 点"保持"**不等于**"30 点无缺陷"，它靠的是**结构免疫**（包围边界非 suspend），而这条论证的两条腿 `runBlocking = 0` / `suspendCancellableCoroutine = 0` 只要有一边非 0 就**整表作废**（RC-d 钉着，红了要重做第三节，不是"一个计数超了"）。**③** 4 处迁移只有 JVM 静态判据 + `compileDebugKotlin`，取消行为只在 `ApiCancellationTest` 那一层有 JVM 证据 ⇒ 页面侧（深链跳转 / TTS 设语种）**`NOT VERIFIED ON DEVICE`**；release 仍 BLOCKED、git 仍 ENVIRONMENT_BLOCKED | **规矩（本轮起）**：改过源码文本，就把 `tools/check_*.sh` **每一本真跑一遍**并把读数抄进文档，不许只对"我以为相关的那几行"下结论；把"0"改成"N"的豁免必须**逐处点名** + 配一条"点名锚点被动"的负控（SA 负控第 7b 条是这一族的样板）| D-043、判据 §八 ㉖、`docs/android/RUNCATCHING_AUDIT.md` 第五节、`tools/check_runcatching_probes.sh`（RC-a…RC-e）+ `tools/runcatching_negative_controls.sh` |
 
 ### 指令 v2.0 对表新增（2026-09-29 扫描实测，全部在册）
 
@@ -1886,7 +2017,7 @@ bash tools/navigation_test_negative_controls.sh   # ⚠ 8 条用例级破口 M1�
 | ⚠ **用户实时物流页那三格"后端未下发"，实际是客户端一行都没读**（F-3 ⑩⑪⑮ 实测根因） | **已修**（2026-10-01 / D-045）：`Repo.kt:traceOf` 补 `carrier*`（寄货）、`current*`（商城）、`carrierTaskStatus/carrierArrivedTime/carrierArrived` 七处读取（`:725/:726/:727/:739/:740/:741/:746`）；车辆位置只在 `geoOf`（`:1174`）的 `lat!=0 && lng!=0` 通过时成立，否则 `TraceView.kt:122-130` 直说"暂无实时位置"，**不用 `0,0`/固定点/随机点顶**；新鲜度只从 `LocationSource.knownLabel` 一处拼码（`REAL_STALE` 不升格成"实时"）；`lastReportTime` 走新 helper `reportTimeOf`（`Models.kt:130`）**不回落 `createTime`** —— 旧写法拿订单创建时间当车辆上报时刻＝造一个时刻；删掉唯一自造别名 `positionSource`（后端与 `DemoData` 两侧 0 生产者），**没删任何后端字段**。**两条残留如实记**：D-⑩⑪⑮-1（演示面没种 `carrierTaskStatus`/`carrierArrivedTime` ⇒ 演示包念"后端未下发"）、D-⑩⑪⑮-2（寄货 `/send/track` 无上报时间键，`PRODUCER_NOT_FOUND`） | 审计 §八（`CONTRACT_EVIDENCE.md`）+ 八.1、D-045、`UserTrackingContractTest` 12 例 |
 | ⚠ **新契约面只有用例在钉、没有 `tools/check_*.sh` 锚点簿**（F-3 ⑩⑪⑮ 登记，未修 = `D-⑩⑪⑮-4`） | `check_location_probes.sh` 的 L-a…L-h 钉的是坐标换算与上报**报文**，覆盖不到**读取侧**（`carrier*`/`current*`/`reportTimeOf` 不回落/`positionSource` 不认这四条现在只由 12 例用例守着）。扩 L-i…L-k 必须**同轮**在 `navigation_negative_controls.sh`（L 家族的负控在那本里）加破口，否则又造出一条"只能证明自己的判据"。**不做的事**：不为了让台账写"已判据化"而补一条没有判别力的 grep | D-045 第 6 节、`CONTRACT_EVIDENCE.md` 八.1 |
 | ⚠ **本轮插行让 §七 的 67 条 App 侧锚点只剩"范围合法"**（F-3 ⑩⑪⑮ 登记，未修 = `D-⑩⑪⑮-3`） | `Models.kt` 44 + `Repo.kt` 23 条（`tools/check_doc_anchors.py` 计数，`out_of_range=0`）里**确证已漂**的是 `Models.kt:742/:753/:757` → 现 `:761/:772/:776`；逐条**内容**重锚不能靠 grep 自证（helper 型锚点的字段名本来不出现在定义行，两种指纹都会假报），也不能靠猜填数字 ⇒ 排进 F-3 ② 与那 32 处 C 站点同批。**同轮已重锚的另一本**：`DEFAULT_VALUE_AUDIT.md` §四 的 18 条锚点逐条对齐源码文本（`out_of_range=0 / not_found=0 / miss=0`），只有"商品/车辆/清单"那一行按它自己的结论（待逐端点核对）标了旧读数口径。⚠ **F-3 ②（2026-10-01 17:5x）推进了一半，另一半仍在册**：`DEFAULT_VALUE_AUDIT.md` 已整族重写并由 `check_doc_anchors.py` 重量（**`anchors=44 out_of_range=0 miss=0`**，行号是 `default_value_census.py --write` 的 JSON 直接导出、不是手抄），"商品/车辆/清单"那行旧读数已被 §四之一/§四之二 取代；`CONTRACT_EVIDENCE.md` §九 新表也重锚过（**`anchors=304 out_of_range=0 not_found=3 miss=0`**，3 条 `not_found` 全是台账自己写的省略号路径），但 **§七 那 67 条 App 侧锚点仍只做到"范围合法"、逐条内容未重核** ⇒ `D-⑩⑪⑮-3` 维持在册，排 ⑱/⑳ 的台账收口批 | D-045 第 6 节、D-046 第 2 节、`tools/check_doc_anchors.py` 读数 |
-| ⚠ **`sourceOf` 这个名字已经不存在**（F-3 ⑩⑪⑮ 的标识更正，防止下一轮按旧名去找） | 私有 `sourceOf` 并入 `enum class LocationSource`（`Models.kt:535`）：唯一解析点 `LocationSource.of`（`:554`）、唯一拼码点 `knownLabel`（`:543-552`），`BusVehicle.sourceText`（`:632`）改为**委托**同一映射（委托后 `BusEtaContractTest` 13 例仍 0 红）。所以 `AI_ITERATION_STATE.md:2812`、`:2824`（**F-3 ⑤ 就地重锚**：原写 `:2523`/`:2535`，被后续四轮状态块各插行整体顶下去，`check_doc_anchors.py` 一路不报）与工程根的 `ANDROID_PARITY_AUDIT_V2.md:841`（**这本台账不在 `docs/android/` 下**）里写的 `sourceOf` 是**历史名**，历史行**不回改**，抄当前实现要按新名 | D-045 第 3 节 |
+| ⚠ **`sourceOf` 这个名字已经不存在**（F-3 ⑩⑪⑮ 的标识更正，防止下一轮按旧名去找） | 私有 `sourceOf` 并入 `enum class LocationSource`（`Models.kt:560`）：唯一解析点 `LocationSource.of`（`:554`）、唯一拼码点 `knownLabel`（`:543-552`），`BusVehicle.sourceText`（`:632`）改为**委托**同一映射（委托后 `BusEtaContractTest` 13 例仍 0 红）。所以 `AI_ITERATION_STATE.md:2812`、`:2824`（**F-3 ⑤ 就地重锚**：原写 `:2523`/`:2535`，被后续四轮状态块各插行整体顶下去，`check_doc_anchors.py` 一路不报）与工程根的 `ANDROID_PARITY_AUDIT_V2.md:841`（**这本台账不在 `docs/android/` 下**）里写的 `sourceOf` 是**历史名**，历史行**不回改**，抄当前实现要按新名 | D-045 第 3 节 |
 | ⚠ **"命令行 adb 可用"不是环境事实**（F-3 ⑩⑪⑮ 实测） | 本轮直接 `adb devices` → `adb: command not found`（PATH 里没有），而 `bash tools/verify_device.sh --no-build` 仍能出读数（脚本自己解析 SDK 路径）⇒ 实测 `List of devices attached` **空** → `[STOP] DEVICE_UNAVAILABLE`，新证据 `docs/device-evidence/20261001-145515/`。**下一轮别写"adb 在 PATH 里"这类前置条件**，要跑设备就调脚本 | D-045 第 2 节、本文件第六节 |
 | ⚠ **`tools/default_value_census.py` 的 B 类口径是"后端**全模块**有同名声明"，不是"本端点的 RespVO 有该键"**（F-3 ② 实测发现，登记 `D-②-1`） | census 把 `/transport/driver/profile` 的 `routeName`/`shiftCode` 判成了 B，因为 `MonitoringShiftRespVO.java:17/:20` 与 `MonitoringMapDataRespVO.java:45` 声明过同名键；而 `AppDriverProfileRespVO.java:11-23` 全文**只有 7 个键**（`driverId/name/mobile/vehicleId/plateNo/cargoCapacity/cargoCapacityKg`），这个端点根本不发那两个 ⇒ **B 会低估"这个端点其实不给"的比例**，凡按 B 下"后端有"的结论都必须回到该端点 RespVO 字段表逐条看（本轮 `CONTRACT_EVIDENCE.md` §九 就是按端点核的）。同一条坑的第二种形状：`DriverAppServiceImpl.java:167-190` 的 `fillVehicle` 只在 `ifPresent`（活跃车辆绑定）时调用 ⇒ `plateNo/cargoCapacity/cargoCapacityKg` 三个"真键"在**无绑定那次真的缺席**，census 判 B 是对的但"恒有值"是错的。**处置**：本轮把 `capacityKg`/`cargoCapacity` 改可空、`freePercent(loadedCount)`（`Models.kt:1361`）任一未给返回 `null`，让真实缺席路径显示"未给"而不是"载重 0 / 空闲 100%"；给 census 加"端点级"列要改它的扫描模型、会让 §二/§二之二/`DV-k` 的既有基线失去可比性 ⇒ **未做**，排 ⑰（与工具改动同轮） | D-046 第 3 节、`docs/android/CONTRACT_EVIDENCE.md` §九.1、`DEFAULT_VALUE_AUDIT.md` §二之二 |
 | ⚠ **`Models.kt:227` 的 `multiStr("role", "userRole")` 三面 0 生产者 ⇒ `Account.role` 恒走 `fallbackRole`**（F-3 ② 登记 `D-②-2`，**本轮刻意不动**） | `grep` 后端 `yudao-module-transport` 与 `DemoData.kt` 两侧 `"role"`/`userRole` 命中 **0** ⇒ 这个 `when` 从来没匹配上任何东西，账号"角色"一格是客户端自造的。它**不是** ② 的活：收口方式是 ③ 的 `AccountRole` 与 `ActiveDomain` 分离 + "任何情况下 accountRole 不允许因为 UI 页面切换而修改" + `DriverRoleIntegrityTest`，在 ② 里改它会和 ③ 的判据抢同一个锚点。**这条与 §九 上方"`AppRole` 不存在"那行是同一个事实的两面**：后端不回 role 键（`AppAuthLoginRespVO` 五键无 role），所以读侧恒 fallback、写侧才需要 ③ 的闸门 | D-046 第 3 节、`CONTRACT_EVIDENCE.md` §九.1、F-3 队列 ③ |

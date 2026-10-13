@@ -155,7 +155,9 @@ class NoProducerKeyFamilyContractTest {
         assertEquals("九个键名里只有 modeName 是真键", "", fake.name)
         assertNull("chosen 才是推荐标记，recommended/best/selected 都是自造名", fake.recommended)
         assertNull("legCount 才是段数", fake.legs)
-        assertEquals(0, fake.minutes)
+        // D-085：`Candidate.durationMinutes:65` 是 Integer、可以缺席。这里原来钉的是 0 ——
+        // 那钉住的正是缺陷本身（票面会把"后端没给时长"念成"这个方案 0 分钟"），现在钉"缺席就是 null"。
+        assertNull("缺 durationMinutes 不许塌成 0 分钟", fake.minutes)
         assertEquals("", fake.reason)
 
         // chosen 是 Boolean 包装类，显式 null 与缺键同结论：不许读成"不推荐"

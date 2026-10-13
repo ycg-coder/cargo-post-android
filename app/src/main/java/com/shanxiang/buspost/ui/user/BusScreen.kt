@@ -90,9 +90,46 @@ import com.shanxiang.buspost.ui.common.MapPath
 import com.shanxiang.buspost.ui.common.RouteMap
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 
+/**
+ * 实时公交页定位提示的**唯一出口**（纯函数，JVM 用例可断言）。
+ *
+ * 为什么单独拎出来：旧写法把"没授权"和"授权了但这一次没定到位"压成同一句话
+ * （`geo == null → "没拿到定位，展示全部线路。去系统设置里允许定位后刷新更准"`），
+ * 于是用户在系统里明明已经允许了，界面还在教他去开权限 —— 这正是 §51 在册的
+ * "定位三态被折叠成 me==null"。三态各有各的下一步动作，就不许共用一个号。
+ */
+internal fun locationHintFor(granted: Boolean, fix: com.shanxiang.buspost.data.model.Geo?): String = when {
+    !granted -> "未允许定位：地图不显示你的位置，已展示全部线路。点右上角可再次申请。"
+    fix == null -> "已允许定位，这次没定到（室内/冷启动常见）：先展示全部线路，稍后自动重试。"
+    else -> "已按你的位置排序"
+}
+
+/**
+ * 页头"位置口径"标签的唯一映射点（§8 同族：页面不许各自拼码）。
+ *
+ * 关键那一格是**混档**：现网一趟车里有 GPS 上报的只有本平台派出去的那几辆，其余是时刻表推算
+ * （后端优先级 `REAL > OFFLINE`，另有一层 SIMULATED 插值；`VehicleLocationProvider.java:16-20`）。
+ * 旧写法 `if (real) "实时位置"` 用的是整页 OR ⇒ 只要有一辆实时，整页顶盖都写成"实时位置"，
+ * 用户就把推算的那几辆也按实时读 —— 卡片级文案是对的（`BusVehicle.sourceText`），页头在说大话。
+ */
+internal fun positionSourceTag(realCount: Int, otherCount: Int, demo: Boolean): Pair<String, BusTone> = when {
+    realCount > 0 && otherCount == 0 -> "实时位置" to BusTone.OK
+    realCount > 0 -> "$realCount 辆实时 · 其余按时刻推算" to BusTone.WARN
+    demo -> "演示线路" to BusTone.WARN
+    otherCount > 0 -> "班次时刻（无实时位置）" to BusTone.WARN
+    // 一辆车都没显示时不许留个"班次时刻"暗示有时刻表：那是"没有可显示的位置"
+    else -> "暂无车辆位置" to BusTone.NEUTRAL
+}
+
 class BusViewModel : ScreenViewModel() {
     var nearby by mutableStateOf<NearbyResult?>(null)
     var lines by mutableStateOf<List<BusLine>>(emptyList())
+    /**
+     * 线路列表这一轮的失败原因（`Repo.busLines` 的 `Feed.error`）：收藏那一栏要拿它分两格——
+     * "没拿到列表所以显示不出来"与"拿到了但那条线路确实不在了"是两件事
+     * （旧写法直接把 `lf.items` 赋给 lines 就把失败洗成了空列表，见 FavoriteLines.kt 顶部第 3 条）。
+     */
+    var linesError by mutableStateOf<String?>(null)
     var selected by mutableStateOf<BusLine?>(null)
     var polyline by mutableStateOf<List<Geo>>(emptyList())
     /** 线路搜索关键词（对标车来了/高德的搜索框：按线路名过滤） */
@@ -181,16 +218,25 @@ class BusViewModel : ScreenViewModel() {
      */
     private var polylineSeq = 0
 
+    /**
+     * 运行时定位授权。用户端以前**从没申请过**（`RequestPermission` 只出现在司机端工作台），
+     * 而未授权时高德既不会有蓝点、`Locator.once` 也拿不到点 ⇒ "不显示我的位置"是两件事叠出来的。
+     */
+    var locationGranted by mutableStateOf(false)
+
+    /** 三态提示的唯一出口（纯函数 [locationHintFor]，JVM 用例可断言） */
+    fun onLocationPermission(granted: Boolean) {
+        locationGranted = granted
+        locationHint = locationHintFor(granted, me)
+    }
+
     fun load(context: android.content.Context, silent: Boolean = false) {
         val mySeq = ++reqSeq
         work(reset = !silent) {
             val geo = Locator.once(context)
             me = geo
             if (!silent) {
-                locationHint = when {
-                    geo == null -> "没拿到定位，展示全部线路。去系统设置里允许定位后刷新更准。"
-                    else -> "已按你的位置排序"
-                }
+                locationHint = locationHintFor(locationGranted, geo)
             }
             val one = Repo.nearbyBuses(geo, Repo.nearbyRadius(0.0))
             if (mySeq != reqSeq) return@work
@@ -198,6 +244,7 @@ class BusViewModel : ScreenViewModel() {
             val lf = Repo.busLines(geo)
             if (mySeq != reqSeq) return@work
             lines = lf.items
+            linesError = lf.error
             val target = detailTarget
             if (target != null) {
                 // 直达：只能由这批刚落地的 lines 回答"有没有这条线路"，选不中就把 selected 清空、
@@ -223,14 +270,16 @@ class BusViewModel : ScreenViewModel() {
     fun loadMyShippingOrders() {
         if (!AppState.hasUserSession) return
         work(reset = false) {
-            // 商城订单：状态为 2（已发货/运输中）
-            runCatching {
-                val productFeed = Repo.productOrders(pageNo = 1, pageSize = 50, status = 2)
+            // 这两个读接口自己就回 `Feed(error = …)`，并且**在内部把取消单独穿透**（`Repo.kt:565`/`:590`）。
+            // 旧写法在外面又套了一层 `runCatching`：那一层收下的正是被穿透上来的 CancellationException
+            // ——换页/销毁时"取消"会被读成一次普通失败（RC-b 实测点名的那两处，§三十一 的口径）。
+            // 这一格只是地图上的高亮装饰：拿不到就维持原样，不清空司机已经看到的东西。
+            val productFeed = Repo.productOrders(pageNo = 1, pageSize = 50, status = 2)
+            if (productFeed.error == null) {
                 shippingProductOrders = productFeed.items.filter { it.vehiclePlate.isNotEmpty() }
             }
-            // 寄货单：状态为 4（已发车/运输中）
-            runCatching {
-                val sendFeed = Repo.sendOrders(pageNo = 1, pageSize = 50, status = 4)
+            val sendFeed = Repo.sendOrders(pageNo = 1, pageSize = 50, status = 4)
+            if (sendFeed.error == null) {
                 shippingSendOrders = sendFeed.items.filter { it.vehiclePlate.isNotEmpty() }
             }
         }
@@ -249,7 +298,12 @@ class BusViewModel : ScreenViewModel() {
 
     /** 运营时段态：off 非运营 / empty 有站无车 / error 接口失败 / data 有车 */
     fun state(): String {
-        val r = nearby ?: return if (loading) "loading" else "error"
+        // "没拿到数据"不等于"接口失败"：失败必须有真实原因在册才允许报 error。
+        // 真机上"每次点进实时公交都显示网络不好、点重新加载才有数据"的病根是并发的
+        // `loadMyShippingOrders()` 走 `work(reset = false)`，基类在 finally 里把 loading 抢先写成 false
+        // （`ScreenViewModel.kt:42`），而主请求还在飞 ⇒ 这一刻既无数据也无失败原因，
+        // 正确的读法是"还在加载"，不是把没发生过的事说成发生过。
+        val r = nearby ?: return if (loading || error == null) "loading" else "error"
         if (error != null && r.vehicles.isEmpty() && lines.isEmpty()) return "error"
         // 只有后端真给 false 才算非运营（F-2 §四）：缺键走 empty 那一支，与小程序 index.js:554 同口径；
         // 再叠一层"必须拿到服务时段"，服务区外的空报文就不再被说成"不在运营时间"
@@ -346,6 +400,23 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
     // 收藏状态变化后触发重组（Prefs 不是 State，需要手动驱动 UI 刷新）
     var favTick by remember { mutableStateOf(0) }
 
+    // 运行时定位授权 —— 用户端以前**从没申请过**（`RequestPermission` 只在司机端工作台出现），
+    // 而未授权时高德画不出蓝点、`Locator.once` 也拿不到点 ⇒ "地图不显示我的位置"是两件事叠出来的。
+    // 进页问一次；被拒不追弹，改由 locationHintFor 说实话（"未允许定位"），线路照常给全。
+    val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        vm.onLocationPermission(granted)
+        if (granted && vm.me == null) vm.load(context)
+    }
+    LaunchedEffect(Unit) {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        vm.locationGranted = granted
+        if (!granted) askLocation.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
     LaunchedEffect(Unit) {
         if (vm.nearby == null && vm.lines.isEmpty()) vm.load(context)
     }
@@ -364,8 +435,12 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
         }
     }
 
-    val real = vm.nearby?.realTransit == true ||
-        vm.lines.any { l -> l.vehicles.any { it.isReal } || l.dataSource.contains("REAL") }
+    // 页头口径只描述**当前显示的这几辆车**（旧写法是整批 OR，见 positionSourceTag）
+    val shownVehicles = vm.vehiclesOf(vm.selected)
+    val realVehicles = shownVehicles.count { it.isReal }
+    val (sourceTag, sourceTone) = positionSourceTag(
+        realVehicles, shownVehicles.size - realVehicles, vm.demo,
+    )
 
     // 高德风格：地图为主视图 + 底部详情面板
     Column(Modifier.fillMaxSize().background(t.paper)) {
@@ -429,10 +504,7 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            BusTag(
-                if (real) "实时位置" else if (vm.demo) "演示线路" else "班次时刻",
-                tone = if (real) BusTone.OK else BusTone.WARN,
-            )
+            BusTag(sourceTag, tone = sourceTone)
             // 运营时段（对标高德/车来了：首末班时间）
             vm.nearby?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let {
                 BusTag("运营 $it", tone = BusTone.NEUTRAL)
@@ -555,6 +627,15 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 // 切线路时重置地图失败标记，让新高德有机会重新尝试
                 LaunchedEffect(line?.id) { mapFailed = false }
 
+                // 折线状态这一句必须留在**主路径**上（F-3 ⑤ / 判据 SA-e、SA-e2 的口径同源）。
+                // 7d8b819 把地图上方的 `SectionTitle(subtitle = vm.polylineSubtitle())` 撤成"地图主视图"时，
+                // 连带删掉了这句唯一出口：此后只有"高德失败转自绘 RouteMap"那一支还带 reason，
+                // 于是"还没去问 / 正在问 / 这次没问到 / 后端回了空"四种情况在主路径上又长成同一个样子。
+                SectionTitle(
+                    line?.name?.ifEmpty { null } ?: "线路地图",
+                    subtitle = vm.polylineSubtitle(),
+                )
+
                 if (mapFailed) {
                     // 高德不可用时回退到自绘地图（与 DriverMissionMap 同模式）
                     RouteMap(
@@ -571,6 +652,8 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         paths = paths,
                         modifier = Modifier.fillMaxWidth().height(320.dp),
                         fitAll = true,
+                        // 蓝点只在真拿到授权后开：没授权时开图层等于承诺一个永远不来的位置
+                        showMyLocation = vm.locationGranted,
                         onUnavailable = { mapFailed = true },
                     )
                 }
@@ -617,10 +700,12 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // 收藏线路（快速访问）
+                    // 收藏线路（快速访问）：判定与文案出处都在 FavoriteLines.kt，这里只渲染。
+                    // ⚠ 旧写法是 `if (favLines.isNotEmpty())`——线路列表取失败时这一栏整块消失，
+                    //   用户被引导成"我没有收藏"，而本机明明记着 id。现在按"收藏了几条 / 显示了几条"两格走。
                     val favIds = Prefs.favoriteLineIds
                     val favLines = vm.lines.filter { it.id in favIds }
-                    if (favLines.isNotEmpty()) {
+                    if (favoriteRowVisible(favIds.size)) {
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -632,38 +717,65 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                                 modifier = Modifier.size(14.dp),
                             )
                             Text(
-                                " 收藏线路",
+                                " " + favoriteRowTitle(favIds.size),
                                 color = t.textSecondary,
                                 fontSize = (11 * scale).sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            favLines.forEach { fl ->
-                                val on = fl.id == vm.selected?.id
-                                Column(
-                                    Modifier
-                                        .clip(RoundedCornerShape(BusRadius.m))
-                                        .background(if (on) t.goldLight else t.card)
-                                        .clickable { vm.pick(fl) }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            fl.name.ifEmpty { "未命名线路" },
-                                            color = if (on) t.goldDeep else t.ink,
-                                            fontSize = (11 * scale).sp,
-                                            fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                                            maxLines = 1,
-                                        )
+                        if (favLines.isNotEmpty()) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                favLines.forEach { fl ->
+                                    val on = fl.id == vm.selected?.id
+                                    Column(
+                                        Modifier
+                                            .clip(RoundedCornerShape(BusRadius.m))
+                                            .background(if (on) t.goldLight else t.card)
+                                            .clickable { vm.pick(fl) }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                fl.name.ifEmpty { "未命名线路" },
+                                                color = if (on) t.goldDeep else t.ink,
+                                                fontSize = (11 * scale).sp,
+                                                fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+                        // 一条都没解析出来时，未命中那一格就是这一栏唯一的内容（不许静默消失）
+                        favoriteUnresolvedText(favIds.size, favLines.size, vm.linesError)?.let {
+                            Text(
+                                it,
+                                color = t.textTertiary,
+                                fontSize = (11 * scale).sp,
+                                modifier = Modifier.padding(top = 5.dp),
+                            )
+                        }
+                        Text(
+                            " " + FAVORITE_LOCAL_NOTE,
+                            color = t.textTertiary,
+                            fontSize = (10.5 * scale).sp,
+                            modifier = Modifier.padding(top = 5.dp),
+                        )
                         Spacer(Modifier.height(12.dp))
+                    } else {
+                        favoriteEmptyText(favIds.size)?.let {
+                            Text(
+                                " " + it,
+                                color = t.textTertiary,
+                                fontSize = (10.5 * scale).sp,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
                     }
 
                     // 选中线路的 ETA 卡片（对标高德：大数字 ETA + 方向）

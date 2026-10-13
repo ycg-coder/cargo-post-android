@@ -377,6 +377,9 @@ private fun SendCard(s: SendOrder, onConfirmStation: () -> Unit, onClick: () -> 
                 CargoChip("${s.itemCount.coerceAtLeast(1)} 件")
                 if (s.volumeM3 > 0) CargoChip(String.format("%.2f m³", s.volumeM3))
                 if (s.fresh) CargoChip("生鲜冷链", gold = true)
+                // 最早取货时间：有值才加这一枚 chip。缺席刻意不显示成"随时可取"——
+                // 报文里 null 有两层含义（用户没填 / 后端没回读这一项），本机分不开就不替它挑一个。
+                s.earliestPickupMillis?.let { CargoChip("取件 ${pickupReadbackText(it)}") }
             }
 
             // 车快到了 / 司机已到达提醒条（后端 carrierApproaching / carrierArrived 驱动，不在前端自判阈值）

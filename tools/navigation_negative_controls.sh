@@ -25,6 +25,7 @@ WB="$A/ui/driver/WorkbenchScreen.kt"
 BR="$A/ui/BusPostRoot.kt"
 PF="$A/data/store/Prefs.kt"
 GD="$A/ui/user/GoodsDetailScreen.kt"
+SD="$A/ui/user/SendScreen.kt"
 HM="$A/ui/user/HomeScreen.kt"
 MP="$A/ui/user/MinePages.kt"
 BG="$SC/app/build.gradle.kts"
@@ -33,60 +34,81 @@ TP="$SC/app/src/test/java/$PKG/core/navigation/NavigationContractTest.kt"
 CLEAN=/tmp/nav_neg_clean.$$; cp -r "$SC" "$CLEAN"
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
 
-ins() { python - "$1" "$2" "$3" <<'PY'
+# ⚠ 三个改动都是 D-082 那 13 道空转闸门的根因，不是顺手美化：
+# 1) 落空必须说出口。原来这些注入函数失败时只把 ANCHOR-MISS 打到 stderr（批日志里看不到），
+#    刀没落下去 = 判据照样绿 = 日志上一句"负控制失效（exit 0）"，与"判据真的不咬"长得一模一样。
+#    现在 MISS=1 由 ctl 打点，措辞与 exception/safe_call 那几本对齐。
+# 2) 换行符不许改写。原来 `open(p,'w')` 默认 newline=None 会把整个文件重写成 CRLF；
+#    现在读与写都 newline=''，插入行按该文件自己的行尾走。
+# 3) drop 认 CRLF。`NavigationEngine.kt` 工作树是 CRLF（index 是 LF，core.autocrlf=true 检出时转的，
+#    `git ls-files --eol` 实测 i/lf w/crlf），而 drop 原来只找 "\n}\n" ⇒ 六条"整块没了"的破口
+#    （N-u×2 / N-z×2 / N-aa×2）当场静默空转了一整轮。
+MISS=0
+ins() { python - "$1" "$2" "$3" <<'PY' || MISS=1
 import sys
 p, anchor, add = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(p, encoding='utf-8').read()
+s = open(p, encoding='utf-8', newline='').read()
 i = s.find(anchor)
-if i < 0: sys.exit("ANCHOR-MISS: " + anchor)
+if i < 0: sys.exit("ANCHOR-MISS: " + anchor[:60])
+NL = '\r\n' if '\r\n' in s else '\n'
 j = s.index('\n', i) + 1
-open(p, 'w', encoding='utf-8').write(s[:j] + add + '\n' + s[j:])
+open(p, 'w', encoding='utf-8', newline='').write(s[:j] + add.replace('\n', NL) + NL + s[j:])
 PY
 }
-sub() { python - "$1" "$2" "$3" <<'PY'
+sub() { python - "$1" "$2" "$3" <<'PY' || MISS=1
 import sys
 p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(p, encoding='utf-8').read()
-if old not in s: sys.exit("ANCHOR-MISS: " + old)
-open(p, 'w', encoding='utf-8').write(s.replace(old, new, 1))
+s = open(p, encoding='utf-8', newline='').read()
+if old not in s: sys.exit("ANCHOR-MISS: " + old[:60])
+NL = '\r\n' if '\r\n' in s else '\n'
+open(p, 'w', encoding='utf-8', newline='').write(s.replace(old, new.replace('\n', NL), 1))
 PY
 }
-suball() { python - "$1" "$2" "$3" <<'PY'
+suball() { python - "$1" "$2" "$3" <<'PY' || MISS=1
 import sys
 p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(p, encoding='utf-8').read()
-if old not in s: sys.exit("ANCHOR-MISS: " + old)
-open(p, 'w', encoding='utf-8').write(s.replace(old, new))
+s = open(p, encoding='utf-8', newline='').read()
+if old not in s: sys.exit("ANCHOR-MISS: " + old[:60])
+NL = '\r\n' if '\r\n' in s else '\n'
+open(p, 'w', encoding='utf-8', newline='').write(s.replace(old, new.replace('\n', NL)))
 PY
 }
 # drop：从锚点那一行删到它自己那一层的收尾 `
 # }`（F-3 ⑭ 的负控要验"整块没了"这种破口，sed 的范围删在 Windows 换行上不可靠）
-drop() { python - "$1" "$2" <<'PY'
-import sys
+drop() { python - "$1" "$2" <<'PY' || MISS=1
+import re, sys
 p, pat = sys.argv[1], sys.argv[2]
 s = open(p, encoding='utf-8', newline='').read()
 i = s.find(pat)
-if i < 0: sys.exit("ANCHOR-MISS: " + pat)
-j = s.find("\n}\n", i)
-if j < 0: sys.exit("NO-CLOSING-BRACE: " + pat)
-open(p, 'w', encoding='utf-8', newline='').write(s[:i] + s[j + 3:])
+if i < 0: sys.exit("ANCHOR-MISS: " + pat[:60])
+m = re.compile(r'\n\}[ \t]*\r?\n').search(s, i)
+if not m: sys.exit("NO-CLOSING-BRACE: " + pat[:60])
+open(p, 'w', encoding='utf-8', newline='').write(s[:i] + s[m.end():])
 PY
 }
 # dropline：只删锚点所在的那一行。N-y 的"表被砍一行"必须是真删一行 ——
 # 改缩进或改成注释虽然也能让计数掉下来，但那证的是判据对空格敏感，不是判据抓得住破口。
-dropline() { python - "$1" "$2" <<'PY'
+dropline() { python - "$1" "$2" <<'PY' || MISS=1
 import sys
 p, needle = sys.argv[1], sys.argv[2]
-ls = open(p, encoding='utf-8').read().split("\n")
+s = open(p, encoding='utf-8', newline='').read()
+ls = s.split("\n")
 k = [i for i, x in enumerate(ls) if needle in x]
-assert k, "ANCHOR-MISS: " + needle[:60]
+if not k: sys.exit("ANCHOR-MISS: " + needle[:60])
 del ls[k[0]]
-open(p, 'w', encoding='utf-8').write("\n".join(ls))
+open(p, 'w', encoding='utf-8', newline='').write("\n".join(ls))
 PY
 }
 
+BAD=0
 ctl() { # $1=编号 $2=说明
   local out code
+  if [ "$MISS" = 1 ]; then
+    echo "✘ $1  $2 → 锚点没命中，破口根本没注入（这条负控不成立）"
+    BAD=$((BAD + 1)); MISS=0
+    rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+    return
+  fi
   out=$(BUSPOST_ANDROID="$SC" bash "$PR" 2>&1); code=$?
   if [ "$code" = 1 ] && echo "$out" | grep -q "^× $1"; then
     echo "✔ $1  $2 → exit 1：$(echo "$out" | grep "^× $1" | head -1)"
@@ -94,6 +116,7 @@ ctl() { # $1=编号 $2=说明
     echo "△ $1  $2 → exit 1，但抓到的是别的判据：$(echo "$out" | grep '^×' | head -1)"
   else
     echo "✘ $1  $2 → 负控制失效（exit $code），这条判据等于没判据"
+    BAD=$((BAD + 1))
   fi
   rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 }
@@ -102,6 +125,12 @@ LP="$SRC/tools/check_location_probes.sh"
 
 ctl_loc() { # $1=编号 $2=说明   —— 坐标系豁免这条线由 L 家族守，破口也必须在 L 家族上验
   local out code
+  if [ "$MISS" = 1 ]; then
+    echo "✘ $1  $2 → 锚点没命中，破口根本没注入（这条负控不成立）"
+    BAD=$((BAD + 1)); MISS=0
+    rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+    return
+  fi
   out=$(BUSPOST_ANDROID="$SC" bash "$LP" 2>&1); code=$?
   if [ "$code" = 1 ] && echo "$out" | grep -q "^× $1"; then
     echo "✔ $1  $2 → exit 1：$(echo "$out" | grep "^× $1" | head -1)"
@@ -109,6 +138,7 @@ ctl_loc() { # $1=编号 $2=说明   —— 坐标系豁免这条线由 L 家族�
     echo "△ $1  $2 → exit 1，但抓到的是别的判据：$(echo "$out" | grep '^×' | head -1)"
   else
     echo "✘ $1  $2 → 负控制失效（exit $code），这条判据等于没判据"
+    BAD=$((BAD + 1))
   fi
   rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 }
@@ -118,11 +148,18 @@ ctl_loc() { # $1=编号 $2=说明   —— 坐标系豁免这条线由 L 家族�
 # 只验红的那两条，判据若把第二种合法形状也读成没闸门，就会变成"永远红"，而永远红与判对了读数一样绿不起来、没人看得穿。
 ctl_loc_keep() { # $1=编号 $2=说明   —— 期望 exit 0
   local out code
+  if [ "$MISS" = 1 ]; then
+    echo "✘ $1 反证 $2 → 锚点没命中，破口根本没注入（这条负控不成立）"
+    BAD=$((BAD + 1)); MISS=0
+    rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+    return
+  fi
   out=$(BUSPOST_ANDROID="$SC" bash "$LP" 2>&1); code=$?
   if [ "$code" = 0 ]; then
     echo "✔ $1 反证 $2 → exit 0（合法形状没被判红）"
   else
     echo "✘ $1 反证 $2 → exit $code：$(echo "$out" | grep '^×' | head -1)（判据把合法形状读成破口 = 只会红错方向，真破口反而混在里面）"
+    BAD=$((BAD + 1))
   fi
   rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 }
@@ -174,12 +211,16 @@ ctl N-j "import 白名单外的 SDK 类"
 ins "$UI" 'import com.shanxiang.buspost.core.map.RouteCheck' 'import com.amap.api.navi.AMapNavi'
 ctl N-j "引擎层之外直接 import 导航 SDK"
 
-# N-k：把"高德没给"换成一句看起来更完整的谎话
-suball "$UI" '高德没给' '已到达'
+# N-k：把"没给"那一格换成一句看起来更完整的谎话
+# ⚠ D-082 空转闸门重锚：续七把正式卡片那六处「高德没给」统一改成了「暂未知」，判据 NK 同轮改成数
+#   `高德没给|暂未知` 的生效行（恰好 6），而这条破口当时没跟着动 ⇒ 它改的『高德没给』只剩两句注释，
+#   被 NC 滤掉，NK 一根手指都不动。现在砍的是**生效行里那一句**（里程那一格）。
+sub "$UI" 'else "暂未知" }' 'else "已到达" }'
 ctl N-k "没给的字段被换成断言"
 
 # N-l：依赖换了还留着"无需地图 SDK"这句旧断言（真实回归形态：把改回的文案写回副标题）
-sub "$NS" '"后端下发真实道路折线，这一屏的转向只读它"' '"后端下发真实道路折线，无需地图 SDK"'
+# ⚠ D-082 空转闸门重锚：旧锚点那句副标题已被 8387929（清除界面技术术语）改写，注入静默落空。
+sub "$NS" 'else "实际道路轨迹，这一屏的转向只读它"' 'else "实际道路轨迹，无需地图 SDK"'
 ctl N-l "旧断言回到代码里"
 
 # N-a：删用例让判据层失去行为底盘
@@ -197,7 +238,8 @@ sub "$BR" 'if (BuildConfig.DEBUG) composable(Routes.DRIVER_NAV)' 'composable(Rou
 ctl N-n "旧屏路由在正式包又注册了"
 
 # N-n：入口调用把闸拆掉（正式包跳一条没注册的路 = 运行时找不到路由）
-sub "$WB" 'onNav = { if (BuildConfig.DEBUG) nav.navigate(Routes.DRIVER_NAV) }' 'onNav = { nav.navigate(Routes.DRIVER_NAV) }'
+# ⚠ D-082 空转闸门重锚：工作台那一行的参数名是 onOpenNav（旧锚点写的 onNav 不存在，注入静默落空）。
+sub "$WB" 'onOpenNav = { if (BuildConfig.DEBUG) nav.navigate(Routes.DRIVER_NAV) },' 'onOpenNav = { nav.navigate(Routes.DRIVER_NAV) },'
 ctl N-n "工作台入口不再带 DEBUG 闸"
 
 # N-n：旧屏文件里的第二道自守被换成恒真
@@ -209,7 +251,9 @@ sub "$NS" '非真实导航：这一屏只在调试包打开' '调试屏'
 ctl N-o "旧屏的显著标注被删掉"
 
 # N-o：车道箭头的来源说明没了（猜的图形会被读成后端车道数据）
-sub "$NS" '本页按名字猜的' '按名字'
+# ⚠ D-082 空转闸门重锚：那句说明现在写作「箭头图形是按名字猜的」（判据 NO2 同轮已重锚），
+#   这条破口还指着旧句「本页按名字猜的」⇒ 注入静默落空。
+sub "$NS" '箭头图形是按名字猜的，不算车道级引导' '箭头图形来自后端的车道级引导'
 ctl N-o "车道箭头来源说明被删"
 
 # N-p：调试页又挂回引擎卡片（工作台 + 旧屏各一个 AMapNavi 实例）
@@ -239,7 +283,8 @@ sub "$UI" 'enabled = gate.canNavigate && !calculating' 'enabled = !blocked && !c
 ctl N-r "按钮 enabled 退回 !blocked（初始化中被当成可点）"
 
 # N-r：灰按钮不再说原因（用户只能猜是 App 坏了）
-sub "$UI" 'if (!gate.canNavigate) {' 'if (false) {'
+# ⚠ D-082 空转闸门重锚：这一格现在是单行 `if (!gate.canNavigate) InfoRow(…)`，旧锚点带花括号的那条不存在。
+sub "$UI" 'if (!gate.canNavigate) InfoRow("差在哪一步", gate.detail)' 'InfoRow("差在哪一步", "")'
 ctl N-r "不可点时不再显示具体缺什么"
 
 # N-s：引擎退回只挡 Blocked —— 算路与开始导航都会放行"还在等回执"的引擎
@@ -510,8 +555,10 @@ ctl_loc_keep L-f "合规文件原样在场：静态隐私开关不算第二定�
 sub "$PF" 'get() = str("currentVillage")' 'get() = str("currentVillage", "云山村")'
 ctl_loc L-v "硬编码村名回到 Prefs 的默认值（就是设备实测那条成因）"
 
-dropline "$GD" 'placeholder = "如：云山村 3 组'
-ctl_loc L-v "唯一合法的那 1 处（输入框示例）被删，计数跌到 0"
+# 2026-10-13 合并：那一句示例文案从三个页面重抄收成 `SendScreen.kt` 里一个 `ADDRESS_EXAMPLE_HINT`
+# （L-v 的"恰好 1"因此仍是 1，但**所在文件变了**）⇒ 注入点跟着搬到定义处，删掉定义才真的跌到 0。
+dropline "$SD" 'const val ADDRESS_EXAMPLE_HINT = "如：云山村 3 组'
+ctl_loc L-v "唯一合法的那 1 处（输入框示例的定义）被删，计数跌到 0"
 
 # ---- L-w（逆地理名的 g 空值闸门，设备复拍 17:09 那一族的另一半）----
 # 顶栏那句"位置未取到"只有在**没有真 fix** 时才对；一旦把闸门拆掉，没定位时县城垫子（29.5325,106.5765）
@@ -520,23 +567,38 @@ ctl_loc L-v "唯一合法的那 1 处（输入框示例）被删，计数跌到 
 # 旧锚 `if (!locationManual && g != null) locationName = rg.displayName` 在今天的源码里是 **0 命中**
 # （sub 会 ANCHOR-MISS 空跑，ctl_loc 于是念成"负控制失效"——本轮抓到的就是这个洞，见 §八 ㊼）。
 # ① 撤掉真闸门：那层判断换成常量，赋值改由 else 支无条件走到。
-sub "$HM" 'if (g == null) {' 'if (false) {'
+# 2026-10-13 合并后 `if (g == null) {` 在 HomeScreen 里成了**两处**（:172 是 16 格缩进的附近公交块、
+# :197 才是护着 `locationName = rg.displayName` 的那一层），`sub` 只替第一处 ⇒
+# 不带缩进的老锚点打到的正是**不相干那一处**，判据照旧绿，负控念成"失效（exit 0）"。
+# ⇒ 锚点带上缩进（两种缩进各恰好 1 处，实测），破口才落在被判的那一行上。
+# ⚠ 第二层坑（本轮实测）：`sub` 是**子串**替换，`            if (g == null) {`（12 格）同时是
+#   `                if (g == null) {`（16 格）的尾串 ⇒ 只带缩进仍会先打到 :172 那一行的尾巴，
+#   破口落在不相干的那一层，判据照旧绿 ⇒ 念成"负控制失效"。锚点必须**跨到上一行**才定得住身。
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (false) {'
 ctl_loc L-w "撤掉 g != null 闸门：没定位时也把垫子坐标查出的地名当用户位置念"
 
 # ② 真闸门换成**一句尾注释**（代码里是常量 `true`，`g == null` 只剩注释里那几个字）：这一条专门验新判据剔注释那一步不是多余的。
 #    不剔注释的写法在这里会读成"有闸门"⇒ exit 0 ⇒ 假绿；判据簿自己声明的那个洞只有这条负控能证它已闭合。
 #    （注入文本**不能**以 `//` 开头：Git Bash 会把 argv 开头的 `//` 折成单个 `/`，注进去的那行就不是注释了，
 #      本轮实测被这个坑跳过一次 ⇒ 改成"常量条件 + 尾注释"，两样都还在。）
-sub "$HM" 'if (g == null) {' 'if (true) { // g == null 已在上面判过'
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (true) { // g == null 已在上面判过'
 ctl_loc L-w "闸门只写在注释里、代码是常量条件：判据若按文本找 `g == null` 就会被这句话骗过去"
 
 # ③④ 反证（必须不红）：新判据把"闸门在赋值行本身"与"闸门在包住赋值的那一层"都算合法，
 #     于是这两条不是破口。本轮实测这两条各返回 exit 0，但它们当时被送进了"期待 exit 1"的 run_one，
 #     读数被打成 ✘ 负控制失效（那是**驱动的标签错**，判据本身没错）——登记进 §八 ㊼。
 #     这里用专门的 ctl_loc_keep 把它们钉在正确的一侧：以后判据若退化成只认一种形状，这两条会真红。
-sub "$HM" 'if (!locationManual) locationName = rg.displayName' 'if (!locationManual && g != null) locationName = rg.displayName'
+# 2026-10-13 合并：赋值行本身被改成 `if (rg != null && !locationManual) locationName = rg.displayName`
+#     ⇒ 旧锚点（`if (!locationManual) locationName = …`）0 命中。反证仍然是同一件事：把它换成"闸门写在赋值行"的形状，判据必须不红。
+sub "$HM" 'if (rg != null && !locationManual) locationName = rg.displayName' 'if (!locationManual && g != null) locationName = rg.displayName'
 ctl_loc_keep L-w "旧写法（闸门写在赋值行本身）仍算合法：判据若只认外层块就永远红"
-sub "$HM" 'if (g == null) {' 'if (g == null) {'
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (g == null) {'
 ctl_loc_keep L-w "原样副本：证明上面两条红不是判据恒红"
 
 # ---- L-x（村庄选择器空态，撤掉硬编码填充表之后露出的同形缺口）----
@@ -544,7 +606,9 @@ ctl_loc_keep L-w "原样副本：证明上面两条红不是判据恒红"
 ins "$HM" 'names.take(12).forEach { name ->' '                        Text("暂无可选村庄：接口未返回站点", color = t.textSecondary, fontSize = (13 * scale).sp)'
 ctl_loc L-x "同一句空态被复制进第二处（两处话术会各自漂移）"
 
-dropline "$HM" '暂无可选村庄：接口未返回站点'
+# ⚠ D-082 空转闸门重锚：这句空态在 8387929 之后只剩「暂无可选村庄」四个字（"接口未返回站点"那半句
+#   被当成技术术语清掉了），旧锚点带着那半句 ⇒ dropline 静默落空，LX 一直是 1。
+dropline "$HM" '"暂无可选村庄",'
 ctl_loc L-x "空态文案被删：后端没给站点时对话框又变回空白"
 
 # ---- N-3（赛道 ⑩：真实车道信息）的 N-z 一族 ----
@@ -741,7 +805,8 @@ sub "$UI" 'guidanceSwitchOffText("车道级指引", "这一格不显示车道")'
 ctl "N-ac 开关关着那一格又开始替高德宣告" "旧那句越界的字面回潮（NAC5 0→1，NAC2/NAC4/NAC8/NAC10 同时红）"
 
 # N-ac3：播报那一行不走出口，页面自己留一句字面（出口还在，但这一格不再受它约束）
-sub "$UI" 'guidanceSwitchOffText("语音播报", "没让高德播报（开始导航时传的就是关）")' '"本机没让高德播报"'
+# ⚠ D-082 空转闸门重锚：这一行的第二参数现在是「语音播报已关闭」（旧锚点那句已被话术改写），注入静默落空。
+sub "$UI" 'guidanceSwitchOffText("语音播报", "语音播报已关闭")' '"本机没让高德播报"'
 ctl "N-ac 页面调用开关话术的次数不是 3" "播报那一格绕开出口（NAC2 3→2，NAC9 同红）"
 
 # N-ac4：出口内部开始替高德说话 —— 两条开关句一起被改成"高德没给"，页面一个字都没动
@@ -776,3 +841,7 @@ ctl "N-ac「我的」里「到近作业播报」那一行的字面变了而卡�
 
 echo "---"
 echo "负控制跑完：上面每行都必须是 ✔（△ 说明这条破口被别的判据误抓，✘ 说明这条判据根本不判）"
+# ⚠ 退出码补登记（D-082）：这一本原来 ✘=13 仍然 exit 0 —— "批跑完了"与"闸门全是摆设"在退出码上分不出来，
+# 全靠批次脚本自己再数一遍 ✘。现在 ✘ 直接进退出码（ BAD 就是本行上面那些 ✘ 的条数，只准 0）。
+echo "[聚合] 本簿 ✘ 条数 = $BAD（预期 0）"
+[ "$BAD" = 0 ] || exit 1

@@ -19,7 +19,12 @@ MODELS=com/shanxiang/buspost/data/model/Models.kt
 EA=$(grep -rn "${KT[@]}" "\.\(unread\|driverUnread\)\.value\s*=" . \
   | grep -v "core/AppState\.kt" | grep -vE ":[0-9]+: *\*" | wc -l | tr -d ' ')
 
-# E-b 三个标量端点的读法必须走 Payload.longOf / Payload.strOf（先裸标量、后对象键）
+# E-b 标量端点的读法必须走 Payload.longOf / Payload.strOf（先裸标量、后对象键）。
+# 基数 3 → 5 的增量 = D-076 #46：登录与续期两条都要落 access token 的到期时刻，
+#   后端 `AppAuthLoginRespVO.java:28 expiresTime` 是 LocalDateTime，而 yudao 用
+#   `TimestampLocalDateTimeSerializer`（`YudaoJacksonAutoConfiguration.java:62`）序列化成 **epoch 毫秒**，
+#   所以 `Payload.longOf("expiresTime")` 是这条的正确读法（两处：`Repo.kt:151` 登录存盘、`Repo.kt:195` 续期存盘）；
+#   非数字/缺键时 `longOf` 只回 null ⇒ 落 0，用例 `expiresTime 不是数字时不得崩，也不得编一个到期时刻` 钉的就是这一格。
 EB=$(grep -nE "longOf\(|strOf\(" "$REPO" | wc -l | tr -d ' ')
 
 # E-c 旧的"按对象键读裸标量"写法不得残留（后端根本没给 count/unreadCount/url 这些键）
@@ -36,7 +41,7 @@ EE=$(grep -c 'status = o\.multiStr("statusName", "statusLabel", "status")' "$MOD
 # E-f 凭证照片必须有回读出口：模型解析 photoUrl + 页面渲染 photoUrl，两处都在才算闭环（需求 §7）
 EF=$(grep -rn "${KT[@]}" "photoUrl = o\.multiStr(\"photoUrl\"" com/shanxiang/buspost/data/model \
   | wc -l | tr -d ' ')
-EF2=$(grep -c "model = task\.photoUrl" "$HANDOVER")
+EF2=$(grep -c "url = task\.photoUrl" "$HANDOVER")
 
 # E-g 照片上传失败必须拦停提交（后端对已完成的交接幂等 return，先提交就再也补不进凭证）
 #     钉整句而不是"交接未提交"四个字——演示分支的文案里也有这四个字，会被误计。
@@ -46,7 +51,7 @@ EG=$(grep -c "凭证照片上传失败，交接未提交" "$HANDOVER")
 EH=$(grep -c "scalar = data" "$API")
 
 echo "E-a 角标外部直写        = $EA （目标 0）"
-echo "E-b Repo 标量读法调用点  = $EB （目标 3：unreadCount / driverUnreadCount / uploadPhoto）"
+echo "E-b Repo 标量读法调用点  = $EB （目标 5：unreadCount / driverUnreadCount / uploadPhoto / 登录 expiresTime / 续期 expiresTime）"
 echo "E-c 旧对象键读裸标量残留  = $EC （目标 0）"
 echo "E-d 本机改写交接状态      = $ED （目标 0）"
 echo "E-e 状态优先读 statusName = $EE （目标 1）"
@@ -56,7 +61,7 @@ echo "E-h toPayload 填 scalar   = $EH （目标 1）"
 
 fail=0
 [ "$EA" = 0 ] || { echo "× E-a 有页面直接写角标，未读又将多源打架（§52 回潮）"; fail=1; }
-[ "$EB" = 3 ] || { echo "× E-b 标量读法调用点不是 3（少了=有人退回对象键读法，多了=凭空多打接口）"; fail=1; }
+[ "$EB" = 5 ] || { echo "× E-b 标量读法调用点不是 5（少了=有人退回对象键读法，多了=凭空多打接口）"; fail=1; }
 [ "$EC" = 0 ] || { echo "× E-c 又用对象键去读后端裸标量，未读会重新恒 0"; fail=1; }
 [ "$ED" = 0 ] || { echo "× E-d 本机把交接标成已交接，后端失败也会显示成功"; fail=1; }
 [ "$EE" = 1 ] || { echo "× E-e 交接状态不再优先读 statusName，界面会渲染出数字状态"; fail=1; }

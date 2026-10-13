@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标三层（#43 方向 2）：青绿渐变底 + 白色车头/弧线前景。
+  monochrome 复用前景**是刻意的**：前景只有白色与透明镂空，themed icon 取 alpha 通道后就是正确的单色剪影；
+  旧前景里有第二层不透明的深蓝色（站牌立柱），那一版复用才会把两块东西并成一坨——换掉旧前景之后这条理由不再成立。
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/bus_launcher_bg" />
+    <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

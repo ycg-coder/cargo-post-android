@@ -785,6 +785,13 @@ class NavigationContractTest {
         val groups = laneDisplayTextOf(LaneDisplay.Groups(2))
         assertTrue(groups.contains("2 组"))
         assertFalse("多组车道那一格不许念出任何具体车道", Regex("直行|左转|右转|掉头").containsMatchIn(groups))
+        // 那两个 `byte[]` 的语义 javap 没给任何材料（`backgroundLane`/`frontLane` 只有名字与类型），
+        // 所以这一格连"哪一组是推荐"都不许说。⚠ 这条断言是 D-082 之后补的：负控 M25（把它念成
+        // "第一组就是推荐车道"）当时**没有任何用例能红** —— 句子还是那句、`2 组` 还在、方向词也没出现。
+        assertFalse(
+            "多组车道那一格不许替司机挑哪一组",
+            Regex("推荐|建议|优先|第一组|走第").containsMatchIn(groups),
+        )
     }
 
     /**

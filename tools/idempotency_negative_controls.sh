@@ -71,6 +71,17 @@ ctl() { # $1=编号 $2=说明
   fi
   rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 }
+# ⚠ 2026-10-13：这本书原来三条页面话术注入全用裸 `sed -i`——锚点被文案改写顶掉时一声不吭，
+#   批日志里只剩"负控制失效（exit 0）"，被记成判据不判（D-084 根因 #1）。改成一落空就报 OLD-MISS。
+subst() { python - "$1" "$2" "$3" <<'PY2'
+import sys
+p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(p, encoding='utf-8').read()
+if old not in s: sys.exit("OLD-MISS: " + old[:60])
+open(p, 'w', encoding='utf-8').write(s.replace(old, new, 1))
+PY2
+}
+
 inject() { python - "$1" "$2" "$3" <<'PY'
 import sys
 p, anchor, add = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -93,11 +104,11 @@ inject "$RP" "private val actionGate" '    private fun extra() = gatedAction("x:
 # I-c 把周期位置上报接进闸门 = 重复点位被当重复动作丢掉（偷点）
 sed -i 's|suspend fun reportLocation(shiftId: Long?, geo: Geo, speedKmh: Double): Ack =|suspend fun reportLocation(shiftId: Long?, geo: Geo, speedKmh: Double): Ack = gatedAction("loc:$shiftId") {|' "$RP"; ctl I-c "位置上报被接进幂等闸"
 # I-d tryLock → withLock：排队等于第一次完成后照样发给后端
-sed -i 's|if (!mutex.tryLock()) return GateResult.Duplicate|mutex.withLock {}|' "$GA"; ctl I-d "闸门改成排队语义"
+subst "$GA" 'if (!mutex.tryLock()) return GateResult.Duplicate' 'mutex.withLock {}'; ctl I-d "闸门改成排队语义"
 # I-e 交接页不再认 notSent
-sed -i '/ack.notSent -> "同一个段动作/s|ack\.notSent|ack.demo|' "$HO"; ctl I-e "页面认不出 notSent"
+subst "$HO" 'ack.notSent -> "同一个段动作' 'ack.demo -> "同一个段动作'; ctl I-e "页面认不出 notSent"
 # I-f 被拦下的那一支谎称已提交后端
-sed -i 's|本次请求未发给后端（同一个动作还在处理中），显示的是后端当前状态|已提交后端，班次与任务状态已按后端回读刷新|' "$WB"; ctl I-f "notSent 分支谎称已提交后端"
+subst "$WB" '未发给后端，显示的是当前状态' '已提交后端，班次与任务状态已按后端回读刷新'; ctl I-f "notSent 分支谎称已提交后端"
 # I-g 旗标退回 work{} 内部才置位
 python - "$RT" <<'PY'
 import sys

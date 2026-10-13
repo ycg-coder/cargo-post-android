@@ -265,7 +265,10 @@ ctl SR-n "分域深链用例被注释掉一条"
 # ⚠ `drop` 是把整行改成 `// NEG-CONTROL 摘掉：…`，字面量仍在文本里 ⇒ 判据必须剔注释才抓得到
 #   （SR-o…o3 三条都按 `NC` 剔注释，这一族注入就是它们的出生证明）。
 U="$A/ui/common/TabBar.kt"
-drop "$U" '.windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))'
+# 2026-10-13 合并：壳的 insets 基数由 `navigationBars` 换成 `systemBars`，并且先落成 `val allInsets` 再喂给
+# `windowInsetsPadding` ⇒ 老锚点（整串 `.windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))`）0 命中。
+# 注入改打**定义那一行**：摘掉它，判据的 `systemBars.union(ime)` 锚点就归 0，破口与判据仍是一对一。
+drop "$U" 'val allInsets = WindowInsets.systemBars.union(WindowInsets.ime)'
 ctl SR-o "壳里 ime 被摘掉：键盘弹起会重新盖住主操作"
 
 drop "$RT" 'com.shanxiang.buspost.ui.common.BusRouteBody {'
