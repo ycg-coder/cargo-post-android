@@ -123,6 +123,12 @@ internal fun positionSourceTag(realCount: Int, otherCount: Int, demo: Boolean): 
 class BusViewModel : ScreenViewModel() {
     var nearby by mutableStateOf<NearbyResult?>(null)
     var lines by mutableStateOf<List<BusLine>>(emptyList())
+    /**
+     * 线路列表这一轮的失败原因（`Repo.busLines` 的 `Feed.error`）：收藏那一栏要拿它分两格——
+     * "没拿到列表所以显示不出来"与"拿到了但那条线路确实不在了"是两件事
+     * （旧写法直接把 `lf.items` 赋给 lines 就把失败洗成了空列表，见 FavoriteLines.kt 顶部第 3 条）。
+     */
+    var linesError by mutableStateOf<String?>(null)
     var selected by mutableStateOf<BusLine?>(null)
     var polyline by mutableStateOf<List<Geo>>(emptyList())
     /** 线路搜索关键词（对标车来了/高德的搜索框：按线路名过滤） */
@@ -237,6 +243,7 @@ class BusViewModel : ScreenViewModel() {
             val lf = Repo.busLines(geo)
             if (mySeq != reqSeq) return@work
             lines = lf.items
+            linesError = lf.error
             val target = detailTarget
             if (target != null) {
                 // 直达：只能由这批刚落地的 lines 回答"有没有这条线路"，选不中就把 selected 清空、
@@ -653,10 +660,12 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // 收藏线路（快速访问）
+                    // 收藏线路（快速访问）：判定与文案出处都在 FavoriteLines.kt，这里只渲染。
+                    // ⚠ 旧写法是 `if (favLines.isNotEmpty())`——线路列表取失败时这一栏整块消失，
+                    //   用户被引导成"我没有收藏"，而本机明明记着 id。现在按"收藏了几条 / 显示了几条"两格走。
                     val favIds = Prefs.favoriteLineIds
                     val favLines = vm.lines.filter { it.id in favIds }
-                    if (favLines.isNotEmpty()) {
+                    if (favoriteRowVisible(favIds.size)) {
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -668,38 +677,65 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                                 modifier = Modifier.size(14.dp),
                             )
                             Text(
-                                " 收藏线路",
+                                " " + favoriteRowTitle(favIds.size),
                                 color = t.textSecondary,
                                 fontSize = (11 * scale).sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            favLines.forEach { fl ->
-                                val on = fl.id == vm.selected?.id
-                                Column(
-                                    Modifier
-                                        .clip(RoundedCornerShape(BusRadius.m))
-                                        .background(if (on) t.goldLight else t.card)
-                                        .clickable { vm.pick(fl) }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            fl.name.ifEmpty { "未命名线路" },
-                                            color = if (on) t.goldDeep else t.ink,
-                                            fontSize = (11 * scale).sp,
-                                            fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                                            maxLines = 1,
-                                        )
+                        if (favLines.isNotEmpty()) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                favLines.forEach { fl ->
+                                    val on = fl.id == vm.selected?.id
+                                    Column(
+                                        Modifier
+                                            .clip(RoundedCornerShape(BusRadius.m))
+                                            .background(if (on) t.goldLight else t.card)
+                                            .clickable { vm.pick(fl) }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                fl.name.ifEmpty { "未命名线路" },
+                                                color = if (on) t.goldDeep else t.ink,
+                                                fontSize = (11 * scale).sp,
+                                                fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+                        // 一条都没解析出来时，未命中那一格就是这一栏唯一的内容（不许静默消失）
+                        favoriteUnresolvedText(favIds.size, favLines.size, vm.linesError)?.let {
+                            Text(
+                                it,
+                                color = t.textTertiary,
+                                fontSize = (11 * scale).sp,
+                                modifier = Modifier.padding(top = 5.dp),
+                            )
+                        }
+                        Text(
+                            " " + FAVORITE_LOCAL_NOTE,
+                            color = t.textTertiary,
+                            fontSize = (10.5 * scale).sp,
+                            modifier = Modifier.padding(top = 5.dp),
+                        )
                         Spacer(Modifier.height(12.dp))
+                    } else {
+                        favoriteEmptyText(favIds.size)?.let {
+                            Text(
+                                " " + it,
+                                color = t.textTertiary,
+                                fontSize = (10.5 * scale).sp,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
                     }
 
                     // 选中线路的 ETA 卡片（对标高德：大数字 ETA + 方向）

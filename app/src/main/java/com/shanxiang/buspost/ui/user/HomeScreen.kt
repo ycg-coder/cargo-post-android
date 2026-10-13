@@ -384,8 +384,11 @@ fun HomeScreen(
             FeatureTile(BusIcons.person, "个人中心", FeatureBg.DEEP, {
                 if (guest) onLoginClick?.invoke() else onSelectTab(3)
             }, Modifier.weight(1f), 6)
-            FeatureTile(BusIcons.next, "更多功能", FeatureBg.CLAY, {
-                if (guest) onLoginClick?.invoke() else onSelectTab(3)
+            // 收藏线路：这一格读的是本机 DataStore（后端没有收藏接口），所以**不设登录闸门**——
+            // 旁边三格要 gate 是因为它们去的是账号数据。旧的"更多功能"格与"个人中心"格是同一个
+            // onSelectTab(3)，属重复入口，这一格把它换掉（不是新增第九格）。
+            FeatureTile(BusIcons.star, FAVORITE_ENTRY_LABEL, FeatureBg.CLAY, {
+                nav.navigate(Routes.BUS)
             }, Modifier.weight(1f), 7)
         }
 

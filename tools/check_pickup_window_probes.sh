@@ -54,7 +54,7 @@ PE_NOTE=$(grep -rn '填了最早取货时间，后端会按它筛' "$M" --includ
 PE_PAGE=$( { grep -n '随时可取（不限制\|后端没给这一项（下单时\|填了最早取货时间，后端会' "$SD" "$PS"; } 2>/dev/null | grep -cvE "$NC")
 PE_PAGE_PROOF=$(nc_count "$SD" 'PICKUP_DISPATCH_NOTE')
 
-# PW-f 回读只认数字：Models 里那一处 as? Number，且不许 multiNum
+# PW-f 回读只认数字：Models 里那一处 as? Number，且不许 multiNum（这一条刻意不 grep 那个函数名：函数名的括号形状会与 Kotlin 调用点差一，实测会造出假红）
 PF_NUM=$(nc_count "$MD" '(o.opt("earliestPickupTime") as? Number)')
 PF_MULTI=$(nc_count "$MD" 'multiNum("earliestPickupTime")')
 PF_PROOF=$(nc_count "$MD" 'earliestPickupMillis = (o.opt')
