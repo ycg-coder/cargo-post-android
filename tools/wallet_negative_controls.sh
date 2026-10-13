@@ -19,6 +19,7 @@ M=$SC/app/src/main/java/$PKG
 RT=$M/nav/Routes.kt
 BR=$M/ui/BusPostRoot.kt
 MS=$M/ui/user/MineScreen.kt
+HS=$M/ui/user/HomeScreen.kt
 WR=$M/ui/user/WalletRows.kt
 WS=$M/ui/user/WalletScreen.kt
 MD=$M/data/model/Models.kt
@@ -96,8 +97,11 @@ check W-a1 "× W-a 路由常量" sub "$RT" 'const val WALLET = "wallet"' 'const 
 check W-a2 "× W-a 注册点不是恰好一处" delline "$BR" '        composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }'
 check W-a3 "× W-a 有注册但没走 BusRouteBody" sub "$BR" 'composable(Routes.WALLET) { com.shanxiang.buspost.ui.common.BusRouteBody { WalletScreen() } }' 'composable(Routes.WALLET) { WalletScreen() }'
 check W-a4 "× W-a 「我的」里那个入口不是恰好一条" sub "$MS" 'nav.navigate(Routes.WALLET)' 'nav.navigate(Routes.ARRANGEMENTS)'
-check W-a5 "× W-a 全工程入口数=2" ins_after "$MS" '                MineRow(BusIcons.wallet, "我的钱包", "余额与交易记录（只读）", {' \
-  '                MineRow(BusIcons.wallet, "钱包（第二处入口）", "负控：同一页两个导航点", { nav.navigate(Routes.WALLET) })'
+# 2026-10-13 合并后基线变成"两处入口"（「我的」列表 1 + 首页宫格 1），W-a 的 per-file 那一格仍钉 MineScreen=1。
+# 老注入往 MineScreen 里再加一条 ⇒ 先咬的是 per-file 那条，念不到"全工程"这一格，破口与判据错位。
+# 现在把第三处放进**首页**：MineScreen 仍是 1，只有 WA_ENTRY_ALL 会红，点名的正是这一格。
+check W-a5 "× W-a 全工程入口数=" ins_after "$HS" 'if (guest) onLoginClick?.invoke() else nav.navigate(Routes.WALLET)' \
+  '                nav.navigate(Routes.WALLET) // 负控：同一页第三处入口'
 
 # ---------- W-b 只读：写口不许被接进来 ----------
 check W-b1 "× W-b 写口被接进了生效代码" ins_after "$RP" '    suspend fun walletBalance(): One<WalletBalance> = try {' \

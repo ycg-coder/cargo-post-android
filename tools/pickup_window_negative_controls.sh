@@ -124,9 +124,14 @@ check PW-d1 "× PW-d 候选不再按" sub "$PW" \
 check PW-d2 "× PW-d 档位→毫秒那一格不再拒过去" sub "$PW" \
   'return if (instant > now.toInstant().toEpochMilli()) instant else null' \
   'return instant'
+# 2026-10-13 合并：`SendScreen.kt` 里出现了**第二处** `.clickable(onClick = onClick)`（:1721 是对方新加的
+# 地址方式卡片，与取件整点那枚 chip 同形），`sub` 要求锚点唯一 ⇒ PW-d3 报"不唯一"。
+# 锚点带上前一行的配色表达式来定身：chip 那一处用的是 `if (on)`，卡片那一处用 `if (selected)`。
 check PW-d3 "× PW-d 改成" sub "$SD" \
-  '            .clickable(onClick = onClick)' \
-  '            .clickable(enabled = vm.pickupDay >= 0, onClick = onClick)'
+  '            .background(if (on) t.primaryLight else t.track)
+            .clickable(onClick = onClick)' \
+  '            .background(if (on) t.primaryLight else t.track)
+            .clickable(enabled = vm.pickupDay >= 0, onClick = onClick)'
 
 # ---------- PW-e 三句话各自唯一出处 ----------
 check_miss PW-e0 sub "$PW" '这一行在本仓根本不存在-NEG-CONTROL' 'x'
@@ -174,7 +179,9 @@ check PW-j1 "× PW-j 演示报文里带这个键的单数不是 1" sub "$DD" \
   '"earliestPickupTime" to if (i == 1 || i == 2) System.currentTimeMillis() + 3 * 3600_000L else null,'
 
 # ---------- PW-k 选择器接线 ----------
-check PW-k1 "× PW-k 选择器接线不齐" delline "$SD" '                        PickupWindowPicker(vm)'
+# 2026-10-13 合并：这一行被对方的 `AddressModeCard(...)` 挤到了新的缩进层（原 24 格 → 现 16 格），
+# 老锚点 0 命中 ⇒ 判据没人验。锚点按现读重取，仍只钉"选择器接线"这一格。
+check PW-k1 "× PW-k 选择器接线不齐" delline "$SD" '                PickupWindowPicker(vm)'
 check PW-l1 "× PW-l 列表那一枚 chip 不再只念回读文本" sub "$PS" \
   's.earliestPickupMillis?.let { CargoChip("取件 ${pickupReadbackText(it)}") }' \
   's.earliestPickupMillis?.let { CargoChip("取件 " + PICKUP_UNSET_TEXT) }'

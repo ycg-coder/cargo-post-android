@@ -25,6 +25,7 @@ WB="$A/ui/driver/WorkbenchScreen.kt"
 BR="$A/ui/BusPostRoot.kt"
 PF="$A/data/store/Prefs.kt"
 GD="$A/ui/user/GoodsDetailScreen.kt"
+SD="$A/ui/user/SendScreen.kt"
 HM="$A/ui/user/HomeScreen.kt"
 MP="$A/ui/user/MinePages.kt"
 BG="$SC/app/build.gradle.kts"
@@ -554,8 +555,10 @@ ctl_loc_keep L-f "合规文件原样在场：静态隐私开关不算第二定�
 sub "$PF" 'get() = str("currentVillage")' 'get() = str("currentVillage", "云山村")'
 ctl_loc L-v "硬编码村名回到 Prefs 的默认值（就是设备实测那条成因）"
 
-dropline "$GD" 'placeholder = "如：云山村 3 组'
-ctl_loc L-v "唯一合法的那 1 处（输入框示例）被删，计数跌到 0"
+# 2026-10-13 合并：那一句示例文案从三个页面重抄收成 `SendScreen.kt` 里一个 `ADDRESS_EXAMPLE_HINT`
+# （L-v 的"恰好 1"因此仍是 1，但**所在文件变了**）⇒ 注入点跟着搬到定义处，删掉定义才真的跌到 0。
+dropline "$SD" 'const val ADDRESS_EXAMPLE_HINT = "如：云山村 3 组'
+ctl_loc L-v "唯一合法的那 1 处（输入框示例的定义）被删，计数跌到 0"
 
 # ---- L-w（逆地理名的 g 空值闸门，设备复拍 17:09 那一族的另一半）----
 # 顶栏那句"位置未取到"只有在**没有真 fix** 时才对；一旦把闸门拆掉，没定位时县城垫子（29.5325,106.5765）
@@ -564,23 +567,38 @@ ctl_loc L-v "唯一合法的那 1 处（输入框示例）被删，计数跌到 
 # 旧锚 `if (!locationManual && g != null) locationName = rg.displayName` 在今天的源码里是 **0 命中**
 # （sub 会 ANCHOR-MISS 空跑，ctl_loc 于是念成"负控制失效"——本轮抓到的就是这个洞，见 §八 ㊼）。
 # ① 撤掉真闸门：那层判断换成常量，赋值改由 else 支无条件走到。
-sub "$HM" 'if (g == null) {' 'if (false) {'
+# 2026-10-13 合并后 `if (g == null) {` 在 HomeScreen 里成了**两处**（:172 是 16 格缩进的附近公交块、
+# :197 才是护着 `locationName = rg.displayName` 的那一层），`sub` 只替第一处 ⇒
+# 不带缩进的老锚点打到的正是**不相干那一处**，判据照旧绿，负控念成"失效（exit 0）"。
+# ⇒ 锚点带上缩进（两种缩进各恰好 1 处，实测），破口才落在被判的那一行上。
+# ⚠ 第二层坑（本轮实测）：`sub` 是**子串**替换，`            if (g == null) {`（12 格）同时是
+#   `                if (g == null) {`（16 格）的尾串 ⇒ 只带缩进仍会先打到 :172 那一行的尾巴，
+#   破口落在不相干的那一层，判据照旧绿 ⇒ 念成"负控制失效"。锚点必须**跨到上一行**才定得住身。
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (false) {'
 ctl_loc L-w "撤掉 g != null 闸门：没定位时也把垫子坐标查出的地名当用户位置念"
 
 # ② 真闸门换成**一句尾注释**（代码里是常量 `true`，`g == null` 只剩注释里那几个字）：这一条专门验新判据剔注释那一步不是多余的。
 #    不剔注释的写法在这里会读成"有闸门"⇒ exit 0 ⇒ 假绿；判据簿自己声明的那个洞只有这条负控能证它已闭合。
 #    （注入文本**不能**以 `//` 开头：Git Bash 会把 argv 开头的 `//` 折成单个 `/`，注进去的那行就不是注释了，
 #      本轮实测被这个坑跳过一次 ⇒ 改成"常量条件 + 尾注释"，两样都还在。）
-sub "$HM" 'if (g == null) {' 'if (true) { // g == null 已在上面判过'
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (true) { // g == null 已在上面判过'
 ctl_loc L-w "闸门只写在注释里、代码是常量条件：判据若按文本找 `g == null` 就会被这句话骗过去"
 
 # ③④ 反证（必须不红）：新判据把"闸门在赋值行本身"与"闸门在包住赋值的那一层"都算合法，
 #     于是这两条不是破口。本轮实测这两条各返回 exit 0，但它们当时被送进了"期待 exit 1"的 run_one，
 #     读数被打成 ✘ 负控制失效（那是**驱动的标签错**，判据本身没错）——登记进 §八 ㊼。
 #     这里用专门的 ctl_loc_keep 把它们钉在正确的一侧：以后判据若退化成只认一种形状，这两条会真红。
-sub "$HM" 'if (!locationManual) locationName = rg.displayName' 'if (!locationManual && g != null) locationName = rg.displayName'
+# 2026-10-13 合并：赋值行本身被改成 `if (rg != null && !locationManual) locationName = rg.displayName`
+#     ⇒ 旧锚点（`if (!locationManual) locationName = …`）0 命中。反证仍然是同一件事：把它换成"闸门写在赋值行"的形状，判据必须不红。
+sub "$HM" 'if (rg != null && !locationManual) locationName = rg.displayName' 'if (!locationManual && g != null) locationName = rg.displayName'
 ctl_loc_keep L-w "旧写法（闸门写在赋值行本身）仍算合法：判据若只认外层块就永远红"
-sub "$HM" 'if (g == null) {' 'if (g == null) {'
+sub "$HM" '            }
+            if (g == null) {' '            }
+            if (g == null) {'
 ctl_loc_keep L-w "原样副本：证明上面两条红不是判据恒红"
 
 # ---- L-x（村庄选择器空态，撤掉硬编码填充表之后露出的同形缺口）----

@@ -7121,3 +7121,60 @@ L-v 的"恰好 1"不动判据就绿（重抄三遍正是 W-c/FE-c 反复钉的"�
 合并进来的乘车码页、地址搜索页、地图选点页、自更新弹窗都**没有真机在环证据**；
 其中自更新弹窗的下载/装包路径需要一次真机（含"未授权安装"那一格）才算收口。
 
+### D-101（10-14 00:0x–00:5x）· 负控批 14 本红：根因是**行尾这一层从来没人执行**，还有一条真闸门藏在判据的正则里
+
+**批次读数**（`tools/run_all_negative_controls_batch.sh`，39 本按序跑完，日志 `allneg_merge.txt`）：
+25 本 rc=0、**14 本 rc≠0**。把每本的 ✘ 逐条抽出来，对**同一处锚点分别按 `\n` 与 `\r\n` 数命中**，
+落成三类——这个"两个数一出来就知道该改什么"的动作，比任何一条 ✘ 的解释都省时间：
+
+1. **纯行尾**（8 本）：LF 写法 0 命中 / CRLF 写法 1 命中 ⇒ `favorite_entry` FE-a3/FE-b1/FE-b2、
+   `parcel_ticket` PT-f4/PT-h3、`route_alias` RA-1、`mission_route` MT-1、`idempotency_test` IT-3、
+   `weather` WS-2、`driver_notice` DN-4。判据与注入内容**一个字都没改**，只把行尾治好。
+2. **源码文本真被合并挪走**（6 处，逐条重锚）：`pickup_window` PW-d3（`SendScreen.kt` 里出现第二处
+   `.clickable(onClick = onClick)`，而 `sub` 要求锚点唯一 ⇒ 报"不唯一"）、PW-k1（`PickupWindowPicker(vm)`
+   被对方的 `AddressModeCard` 挤到 16 格缩进）、`shell_routing` SR-o（壳的 insets 基数 `navigationBars`→`systemBars`）、
+   `wallet` W-a5（钱包入口基线 1→2）、`navigation` L-w ③（赋值行变成 `if (rg != null && !locationManual) …`）与 L-v（示例文案收成一个常量）。
+3. **产物被批内清掉**：`notify_result`、`oss_credits` 都报"真身没有 `app/build/test-results/…TEST-*.xml`"。
+   收尾那轮全量明明产出 67 份，批跑完只剩 1 份 ⇒ 是某本负控清了目录，不是代码问题；
+   补一次 `:app:testDebugUnitTest --rerun-tasks` 后复跑这两本 = `rc=0` / `RESULT=PASS`。
+
+**CRLF 是从哪来的**：这个仓**没有 `.gitattributes`**，`core.autocrlf=true` 在用户级生效，于是
+`git merge`/checkout 只把**它碰过的那些文件**写成 CRLF，没碰的留 LF ⇒ 工作树变成混行尾
+（整仓 277 个文本文件含 CRLF；`app/src` 205 个源文件里 49 个）。而注入器读文件用 `newline=''` 原样读、
+跨行锚点串里带 `\n` ⇒ 目标文件一旦是 CRLF 就恒 0 命中，念出来是"锚点没命中，破口根本没注入"。
+上一轮这批是 38/39 绿，因为那时工作树基本 LF —— **没有任何东西在执行"全仓 LF"这个前提**，
+它只是碰巧成立，合并一来就塌了。
+⇒ 治法两件一起做：工作树文本统一 LF + 落 `.gitattributes`（按扩展名 `text eol=lf`，**不用 `* text=auto`**，
+  免得 png/mp3/so/apk 被当文本参与行尾转换）。
+⚠ 一个会把人吓到的副作用实测过：改完行尾 `git status` 列出 **281 行 ` M`**，而 `git diff` 里只有 4 个文件有内容差异 ——
+HEAD 的 blob 本来就是 LF，所以那 277 个只是 stat 缓存脏（size 变了）。`git ls-files -m | xargs git update-index --really-refresh`
+把状态压回 5 行。**别在这种时候 `git add`**，否则提交面会被字节层文件灌满。
+
+**最值钱的一条不是行尾，是判据自己缺词边界**：L-w 要验的是"没定位时不许把县城垫子坐标查出来的区县名当用户位置念"，
+它的取数是"从赋值行往上 8 行里找 `g\s*(!=|==)\s*null`"。我把外层 `if (g == null)` 摘成 `if (false)` 之后判据**照旧绿**，
+第一反应是"注入打错地方了"（那确实也是真的，见下一段），但根因在正则：
+赋值行自己写着 `if (rg != null && !locationManual) locationName = rg.displayName`，
+而 `rg` 的尾巴就是 `g != null` ⇒ **这条判据在此之前是恒绿的**，摘掉任何闸门它都读成"有闸门"。
+收紧成 `(^|[^[:alnum:]_$])g\s*(!=|==)\s*null`（`g` 前面不许是单词字符），基线仍 `L-w=0`
+（真闸门 `if (g == null)` 的 `g` 前面是 `(`，仍算命中），两条破口各自重新咬住。
+⇒ 口径：**凡是"匹配一个短标识符"的判据正则，必须带词边界**，否则它会吃同文件里任何一个以它结尾的长名字；
+而这条恒绿被我发现，靠的是负控"仍然绿"这一句看似最没用的读数。
+
+**第二条口径（我自己第一版修法踩的）**：`sub` 是 `s.replace(old, new, 1)` —— **子串**替换。
+我以为把锚点写成 12 格缩进就能与 16 格那一行分开，实际 12 格那一串正好是 16 格那一行（:172，不相干的附近公交块）
+的**尾巴**，替换命中更早的那一处，被判的 :197 一字未动 ⇒ 判据绿、负控念"失效（exit 0）"。
+⇒ 口径：**缩进不算区分度**。要定身就得让"同行以外的内容"参与匹配（本轮跨到上一行的 `}`），
+或者用要求 `count==1` 的注入器（`ANCHOR-NOT-UNIQUE` 会当场拒绝，比静默打错处好）。
+
+**修完的读数**：受影响九本负控复跑 = `navigation` 聚合 `✘ 条数 = 0`，
+`favorite_entry` / `parcel_ticket` / `pickup_window` / `route_alias` / `mission_route` /
+`idempotency_test` / `weather` / `driver_notice` 全 `rc=0`；`notify_result` / `oss_credits` `RESULT=PASS`；
+全批判据簿 = **33 绿 / 1 红**（红的只有 `check_doc_anchor_probes.sh`，DA-e ID-MISS 388 > 闸门 286，#159 的账）。
+另外确认 34 本判据簿里**没有任何一本钉住 CR 字节读数**（`grep -rn "count(b'\\r')|CRLF" tools/check_*.sh` 无命中）
+⇒ 统一行尾不会把某格判据顶成假红或假绿。
+
+**顺带查出来的一条 CI 缺口（另笔处理）**：`build-and-release.yml` 的"判据簿"那步写的是
+`bash "$s" | tail -20 || rc=1` —— `||` 看的是整条管道的状态，而管道状态 = 最后一个命令 `tail` 的 = 恒 0，
+所以判据簿在 CI 里红了**也不会让作业失败**。PR #1 那轮 `verify=pass` 只能证明"单测 + debug 包"过了，
+不能证明判据过。这条与本笔同源（都是"看起来在跑，其实不咬"），修法与两条配套负控见下一笔。
+

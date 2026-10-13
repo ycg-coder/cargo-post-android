@@ -1,0 +1,20 @@
+# 行尾口径钉死：仓库里的文本文件一律 LF（工作树也 LF）。
+# 为什么写在这里：本仓的判据簿负控（tools/*_negative_controls.sh）用**跨行锚点**往沙盒副本里注入破口，
+# 注入器读文件时保留原行尾，锚点串却带 `\n` ⇒ 文件一旦是 CRLF 就 0 命中，
+# 读出来是"锚点没命中，破口根本没注入"，而那格判据其实**没人验过**（2026-10-13 合并 origin/main 后
+# 一次红掉 favorite_entry / parcel_ticket / pickup_window / route_alias / mission_route / idempotency 六本）。
+# 之前工作树是"顺手 LF"，没有东西执行它；这一份才是它的执行者。
+# 只按扩展名列，不用 `* text=auto`：二进制（png / mp3 / apk / so）不参与行尾转换。
+*.kt text eol=lf
+*.kts text eol=lf
+*.xml text eol=lf
+*.java text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
