@@ -10,7 +10,7 @@
 05a4c92a	ID-MISS	Repo.kt:933-934	ANDROID_PARITY_AUDIT_V2.md:3031	routeDistanceMeters
 0688aa83	ID-MISS	IdempotentAspect.java:52	AI_ITERATION_STATE.md:474	deleteKeyWhenException
 06ccbf71	ID-MISS	Repo.kt:1003	ANDROID_PARITY_AUDIT_V2.md:422	toPayload/Payload/JSONObject/unreadCount
-08c1ec40	ID-MISS	Repo.kt:95	DECISION_LOG.md:6903	bindDriver/notSent
+08c1ec40	ID-MISS	Repo.kt:95	DECISION_LOG.md:6904	bindDriver/notSent
 095fd93d	ID-MISS	DriverAppServiceImpl.java:1545-1546	ANDROID_PARITY_AUDIT_V2.md:885	complete/curSeq/maxSeq/throw
 097d9e3f	ID-MISS	MonitoringMapDataRespVO.java:45	AI_ITERATION_STATE.md:1794	profile
 0a96b951	ID-MISS	DemoData.kt:394	AI_ITERATION_STATE.md:4005	nearby/stations
@@ -142,7 +142,7 @@
 89a8f23c	ID-MISS	AppBusNearbyRespVO.java:65	AI_ITERATION_STATE.md:3143	AppBusServiceImpl
 89df7af5	ID-MISS	Repo.kt:616	DECISION_LOG.md:1666	Models/SendScreen/pickup
 8a5c5926	ID-MISS	Models.kt:831	DECISION_LOG.md:1610	optBoolean
-8b0ad508	ID-MISS	DriverAppServiceImpl.java:1498	DECISION_LOG.md:6909	curSeq/maxSeq
+8b0ad508	ID-MISS	DriverAppServiceImpl.java:1498	DECISION_LOG.md:6910	curSeq/maxSeq
 8c53bb12	ID-MISS	Repo.kt:833-835	ANDROID_PARITY_AUDIT_V2.md:877	currentLeg/driver/current/legId
 8c575927	ID-MISS	BusPostRoot.kt:138	CONTEXT_LOCK.md:2014	DEBUG
 8c7bf169	ID-MISS	Api.kt:184	ANDROID_PARITY_AUDIT_V2.md:1042	debug
@@ -154,7 +154,7 @@
 9393c125	ID-MISS	Models.kt:523-528	ANDROID_PARITY_AUDIT_V2.md:1971	BusVehicle/routeId
 9429b707	ID-MISS	Models.kt:1374	CONTEXT_LOCK.md:567	plateNo/busId
 952c2a47	FILE-NOT-FOUND	info.java:8	DECISION_LOG.md:2406	not_found/idempotent/package
-9554289d	ID-MISS	Models.kt:1153	DECISION_LOG.md:6895	fromLatitude/fromLatitude
+9554289d	ID-MISS	Models.kt:1153	DECISION_LOG.md:6896	fromLatitude/fromLatitude
 9634dde9	ID-MISS	WorkbenchScreen.kt:566-579	DECISION_LOG.md:2531	NoProducerKeyFamilyContractTest/DistanceCaliberContractTest
 9778cff7	ID-MISS	WorkbenchScreen.kt:822	DECISION_LOG.md:5289	check_default_value_probes
 97d230f6	ID-MISS	MinePages.kt:171	CONTEXT_LOCK.md:1133	pattern/password/mtime
@@ -199,7 +199,7 @@ bd37dbb5	ID-MISS	DriverAppServiceImpl.java:1498	AI_ITERATION_STATE.md:2589	MISSI
 bd4d70c0	ID-MISS	MultiLegServiceImpl.java:391	DECISION_LOG.md:5836	backend
 be84af89	ID-MISS	Api.kt:94	ANDROID_PARITY_AUDIT_V2.md:1088	multiStr/multiNum/Payload/total
 beff0144	ID-MISS	BusScreen.kt:180	CONTEXT_LOCK.md:1224	mySeq/polylineSeq/selected
-bf9c9f50	ID-MISS	BusScreen.kt:262	DECISION_LOG.md:6904	DECISION_LOG
+bf9c9f50	ID-MISS	BusScreen.kt:262	DECISION_LOG.md:6905	DECISION_LOG
 c00b8c5f	ID-MISS	Repo.kt:590	ANDROID_PARITY_AUDIT_V2.md:855	ParcelTrace
 c06128ba	ID-MISS	Api.kt:232	DECISION_LOG.md:2721	strict
 c0de22a9	ID-MISS	Repo.kt:780	CONTRACT_EVIDENCE.md:434	parcelTopology
