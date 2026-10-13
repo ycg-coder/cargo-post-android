@@ -17,8 +17,14 @@ AP=$M/core/about/AppPolicies.kt
 CT=app/src/test/java/com/shanxiang/buspost/core/about/AppPoliciesContractTest.kt
 KT=(--include=*.kt)
 NC='(^|[0-9]+:)[[:space:]]*(\*|//)'
-# 「字符串字面量里出现 ≥12 个连续汉字」= 一句正文。用它来判"正文有没有抄进页面"。
-PROSE='"[^"]*[一-龥]{12,}[^"]*"'
+# 「一句正文」= 字符串字面量里有句末标点（。！？）。用它判"正文有没有被抄进页面"。
+# ⚠ 2026-10-14 换写法：原来是 `"[^"]*[一-龥]{12,}[^"]*"`（≥12 个连续汉字），
+#   那是**依赖 locale 的字节区间**：实测本机 `LC_ALL=C` 下过配成 64、`C.UTF-8` 下才是 25，
+#   而 GitHub runner 上直接数出 **0**（PL-h 读成 0/0），把"这句判据没人验"伪装成"正文被删空"。
+#   换成多字节**字面量**取数后：`LC_ALL=C` 与 `C.UTF-8` 都是 43/0，两种 locale 一字不差
+#   （同一本里 PL-f/PL-g 那种字面串 grep 在 CI 一直是好的 ⇒ 坏的只有"区间"这一件事）。
+#   代价：句末标点是"一句"的定义，改正文时这个数要同轮改（原 25 → 现 43），与 SU-b 同一套摩擦设计。
+PROSE='"[^"]*。[^"]*"|"[^"]*！[^"]*"|"[^"]*？[^"]*"'
 
 for f in "$RT" "$BR" "$LS" "$MP" "$PS" "$AP" "$CT"; do
   [ -f "$f" ] || { echo "× 缺 $f：判据没有输入，本轮读数不采信"; exit 2; }
@@ -66,7 +72,7 @@ echo "PL-d 登录页 PolicyLink             = $PLD （目标 3：定义 1 + 两�
 echo "PL-e 关于页入口                    = $PLE （目标 2）"
 echo "PL-f 免责句出处                    = $PLF （目标 1：只有 AppPolicies 写它）"
 echo "PL-g 服务边界句出处                = $PLG （目标 1）"
-echo "PL-h 页面里的正文句 / 反证         = $PLH/$PLH_PROOF （目标 0/恰好 25）"
+echo "PL-h 页面里的正文句 / 反证         = $PLH/$PLH_PROOF （目标 0/恰好 43；换 locale 无关写法后由 25 重测为 43，见文件头 PROSE 注释）"
 echo "PL-i 内容契约用例数                = $PLI （目标 ≥8）"
 echo "PL-j 登录 ViewModel 的 agreed 引用  = $PLJ （目标 ≥3：状态 + 提交判定 + 用例可读）"
 
@@ -81,7 +87,7 @@ fail=0
 [ "$PLF" = 1 ] || { echo "× PL-f 免责句出现 $PLF 处：正文被抄成第二份，迟早和第一份对不上"; fail=1; }
 [ "$PLG" = 1 ] || { echo "× PL-g 服务边界句出现 $PLG 处：同一条硬规则两份文字各自漂移"; fail=1; }
 [ "$PLH" = 0 ] || { echo "× PL-h 页面里出现了 $PLH 句正文：渲染层开始自带文案（数据源那份就成了摆设）"; fail=1; }
-[ "$PLH_PROOF" = 25 ] || { echo "× PL-h 反证掉了：数据源侧正文句数不是恰好 25（现 $PLH_PROOF）——少了=正文被删空、那个 0 不可信，多了=有人往数据源外另加了一份，都要同轮改这个数"; fail=1; }
+[ "$PLH_PROOF" = 43 ] || { echo "× PL-h 反证掉了：数据源侧正文句数不是恰好 43（现 $PLH_PROOF）——少了=正文被删空、那个 0 不可信，多了=有人往数据源外另加了一份，都要同轮改这个数"; fail=1; }
 [ "$PLI" -ge 8 ] || { echo "× PL-i 内容契约用例少于 8 条（现 $PLI）：说明与现实两张皮没人钉"; fail=1; }
 [ "$PLJ" -ge 3 ] || { echo "× PL-j 登录页的 agreed 只剩 $PLJ 处引用：勾选闸门被顺手拆了"; fail=1; }
 
