@@ -6510,3 +6510,76 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 4. 整批里 `default_value ✘=3`、`idempotency ✘=1` 两笔仍未归因。
 5. 两个仓都**只本地 commit、未 push**（用户口径：所有任务完成了一起推，推前给看 diff；
    推后端仓要单独提醒"这一推会触发云端部署"）。
+
+### D-088（10-13 08:3x–09:2x）· #39 收藏线路首页入口：一个"取失败被念成没有收藏"的旧形状，顺手把首页那个重复格子换掉
+
+**契约三件事（先读再动手，这一格没有后端可依赖）**
+1. **收藏是纯本机的**：`Prefs.kt:228-254` 把 id 列表以逗号分隔存进 DataStore；
+   `yudao-module-transport` 的 app 端点包、`yudao-module-member` 模块、transport 建表 SQL 三处对收藏 **0 命中**
+   ⇒ 界面没有资格说"已同步/换机恢复"。⚠ `sql/mysql/ruoyi-vue-pro.sql:2667` 那条"收藏"是**上游自带的后台菜单种子**，
+   不是接口证据——差点被当成"后端有收藏能力"的凭据。
+2. **名字只在线路列表里**：`BusLine.parse`（`Models.kt:865-868`）的 id/name 来自 `GET /app-api/transport/bus/lines`
+   （`Repo.kt:852-857`），本地只存 id ⇒ 首页那一格**不显名字、也不显计数**
+   （要显名字就得为它另取一次列表：多一跳网络 + 撞 `MockWebServer` 按序队列那三本计数类，见记忆同族条目）。
+3. **`HomeScreen.kt` 对 favorite 此前 0 命中**，而 `BusScreen.kt:657-659` 那一栏的闸门是 `favLines.isNotEmpty()`
+   ⇒ 线路列表这一轮取失败时整栏消失，用户被引导成"我没有收藏"，本机明明记着 id。
+   这就是"没取到"被念成"没有"那一族病（D-079 政策页 / D-080 公告栏 / #42 天气同族），**本轮不是新增功能缺陷，是把这一格拆对**。
+
+**这一版做了什么**
+- 纯层 `ui/user/FavoriteLines.kt`：三句文案各自唯一出处（入口名 / 本机存储披露 / 空态提示）+
+  `favoriteRowVisible(idCount)`（整栏闸门改成"**本机记着几条**"而不是"这一轮显示出来几条"）、
+  `favoriteRowTitle`、`favoriteUnresolvedText(idCount, resolvedCount, linesError)`——**失败支与下架支两支**，
+  失败原因原样带出，绝不滑到"线路下架"那一格。
+- `HomeScreen.kt`：首页那一格复用现成的 `FeatureTile`，**刻意不设登录闸门**（它读的是本机文件，与登录态无关；
+  旁边几格要 gate 是因为它们去的是账号数据）。
+  ⚠ 旧的"更多功能"格与"个人中心"格做的是**同一个** `onSelectTab(3)` ⇒ 收藏格把那个重复入口换掉，
+  宫格总数仍是 8，不新增第九格（用户口径"尽量不要和已有的功能冲突"）。
+- `BusScreen.kt`：新增 `linesError`（旧写法只取 `lf.items`，把 `Feed.error` 洗掉了）；
+  那一栏现在三格：本机 N 条 / 这一轮显示 M 条 / 为什么显示不出来（原因照抄）。
+
+**用例先红的一条，红因是我自己纯层的洞**
+`favoriteUnresolvedText(3, 1, "")` 第一版走了"下架"那一支——纯层写的是 `linesError != null` 才算失败，
+而**空串是"取失败但没给出原因"**，被当成"没有失败"。⇒ 修的是纯层（`isNullOrBlank` 归失败支，文案补"没给出原因"），
+**不是把断言放宽**；第二次跑 9 例全绿。这条与 §八 ㊾③"文本判据看不见语义"不同：这次是断言先于判据抓到语义洞。
+
+**工具自纠两条（进 §八 (52)）**
+1. **Kotlin 块注释可以嵌套**：KDoc 里写 `` `.../controller/app/**` `` 这种目录通配，串里的 `/*` 会**再开一层注释**，
+   于是文件末尾的 `*/` 只闭合内层 ⇒ 整本文件编译报 "Unclosed comment"，而高亮看着完全正常。
+   顺手写了注释平衡扫描器自查全仓，⚠ **它第一版误报 178/180 本未闭合**（在注释态里仍按字符串规则跳字符）
+   ⇒ "用来证明没问题的脚本"第一次跑出的大面积红要先怀疑脚本。修好后现读 **180 个 .kt，unclosed=0**。
+2. **逐本日志在批跑完之前是不完整的**：这一轮我先读 `/tmp/d088_neg_*.log`，`throwable` 被记成 ✘=1（跨本回归的假象），
+   批跑完再数是 ✔=18 ✘=0 △=1 —— 与 D-087 整批那一遍**一字不差**。
+   ⇒ 归因前先确认 driver 结束（与"看不到输出≠卡死"同族的另一半：看到了也可能是半份）。
+   另：`FE-d1` 的锚点在我改纯层那句话之后落空（当场报 MISS，没静默）——D-084 ⑥ 那族病的又一次兑现，
+   机制有效，但**每次都是写负控的人重新踩**，所以本轮起：改纯层文案与负控锚点必须同一次编辑里对。
+
+**新登记的判据缺口**：`check_status_probes.sh` **没有配对的负控簿**（本轮想找 `status_negative_controls.sh` 时发现 0 个）
+⇒ 它对 HomeScreen 的那个"恰好 2"锚点只能证明"复跑没红"，不能证明"判得动"。与 §八 ㉑ 同族，待补。
+
+**读数（本轮实测）**
+- 新用例簿 `FavoriteLinesContractTest` **9 例**（XML 实测 tests=9 failures=0；第一遍 1 红，修纯层后绿）；
+  新判据 `check_favorite_entry_probes.sh`（FE-a…FE-h）rc=0；
+  新负控 `favorite_entry_negative_controls.sh` **rc=0，✔=16（14 条破口按名点名 + 基线 + "不存在的锚点必须被拒"自检）✘=0 △=0**。
+- 同轮重登：`SU-a` *Test.kt **66→67**、`SU-b` 源集文件 **68→69**（唯一增量 = 新用例簿），`@Test` 注解行 684→694；
+  `test_suite_hygiene_negative_controls.sh` 复跑 rc=0 ✔=7 ✘=0。
+- 受本轮源码文本影响的负控**逐本复跑**（`grep -l "HomeScreen\|BusScreen" tools/*_negative_controls.sh` 数出来的 6 本 + 上面两本 + `driver_notice`）：
+  `contract_defaults` 22✔/0✘、`eta` 61✔/0✘、`navigation` 143✔/0✘、`safe_call` 29✔/0✘、`shell_routing` 32✔/0✘、
+  `driver_notice` 13✔/0✘、`throwable` 18✔/0✘/**△=1**（与 D-087 整批同读数，那条 △ 是在册的 TH-e）、`test_suite_hygiene` 7✔/0✘。
+- 判据全批现读 **33 本 = 32 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，#51 三条路等用户定）。
+- 全量：`:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` **rc=0 / BUILD SUCCESSFUL in 45s / 45 actionable tasks: 45 executed**；
+  产物聚合 **67 类 / 694 例 / failures 0 / errors 0 / skipped 0**（67 份 XML，mtime 全为 `09:02:13` 一个值；685→694 = 新用例簿 9 条，其余 66 类一字未变）。
+- 产物指纹：`app-debug.apk` **117,225,666 B** / mtime `2026-10-13 09:02:06` / sha256
+  `1df8353dee936d638f8a9e1298ab6ab541ff71b04a573408efc5c2d7c0021d72`；
+  对 D-087 那包 **+16,384 B**，本轮没做类数差集 ⇒ 登记为**增量未归因**（既不写"收藏那一格值多少字节"，也不写回归）。
+  符号级实测：`Lcom/shanxiang/buspost/ui/user/FavoriteLinesKt;` 在 `classes13.dex` = **2** ⇒ 新代码真进了包。
+- 树指纹（与 D-085/D-086/D-087 同一条命令）files=**203** / sha256
+  `4c5ee97a0918188e35ccda9f7621438619aebfec6ba5bade9c95a06bc04fd066`（D-087 是 201 / `e76e2220…`，+2 = 新纯层与新用例簿）。
+
+**仍欠**
+1. **没有真机与真接口证据**：首页那一格的位置与点击落点、`linesError` 那一格的真文案，全停在 JVM 层；
+   一律 `NOT VERIFIED ON DEVICE`。
+2. 后端没有收藏接口这件事**只能披露不能修**：要真同步就得加表 + 端点 + 账号归属，属于要用户/队友拍板的共享面。
+3. `check_status_probes.sh` 没有配对负控（本轮新发现，见上）。
+4. `default_value ✘=3`、`idempotency ✘=1` 两笔历史 ✘ 仍未归因。
+5. `check_doc_anchor_probes.sh` 在册红；本轮改了 HomeScreen/BusScreen 源码文本，行号继续漂（与 D-086 第 5 条同账）。
+6. 两仓都只本地 commit、**未 push**（用户口径：所有任务完成一起推，推前给看 diff；推后端仓要单独提醒会触发云端部署）。

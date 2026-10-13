@@ -3,6 +3,32 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（上午，D-088 · **#39 收藏线路首页入口做完，用例先红抓住的是我自己纯层里的洞**）：
+契约三件事：收藏是**纯本机**（`Prefs.kt:228-254` 逗号分隔 id 存 DataStore；`yudao-module-transport` 的 app 端点包、`yudao-module-member`、
+transport 建表 SQL 三处 **0 命中** ⇒ 界面没资格说"已同步/换机恢复"；⚠ `ruoyi-vue-pro.sql:2667` 那条"收藏"是上游自带的后台菜单种子，**不是接口证据**）；
+线路**名字只在** `GET /app-api/transport/bus/lines`（`Repo.kt:852-857`）里、本地只有 id ⇒ 首页那一格不显名字也不显计数（显名字要为它多取一跳，会撞 MockWebServer 按序队列那几本计数类）；
+`BusScreen.kt:657-659` 旧闸门是 `favLines.isNotEmpty()` ⇒ 列表取失败时整栏消失，**"没取到"被界面念成"没有收藏"**（D-079/D-080/#42 同族）。
+落地：纯层 `ui/user/FavoriteLines.kt`（三句文案唯一出处 + `favoriteRowVisible`/**整栏闸门改成"本机记着几条"**/`favoriteUnresolvedText` 两支）；
+首页那一格用现成 `FeatureTile` 且**不设登录闸门**（读的是本机文件），并把与"个人中心"同做 `onSelectTab(3)` 的重复格"更多功能"换掉（宫格总数仍 8，不加第九格）；
+`BusScreen` 新增 `linesError`（旧写法只取 `lf.items`，把 `Feed.error` 洗掉了），那一栏拆成"本机 N 条 / 这一轮显示 M 条 / 为什么显示不出来"。
+**用例先红**：`favoriteUnresolvedText(3,1,"")` 第一版走"下架"支——纯层用 `linesError != null` 判失败，而**空串是"失败但没原因"**；
+修的是纯层（`isNullOrBlank` 归失败支 + 补"没给出原因"），**不是放宽断言**；第二次跑 9 例全绿。
+**工具自纠两条（§八 (52)）**：① Kotlin 块注释**可以嵌套**——KDoc 里那种 `` `.../controller/app/**` `` 路径通配串里的 `/*` 会再开一层，
+末尾 `*/` 只闭合内层 ⇒ 整本 "Unclosed comment"，而高亮看着正常；为这条写的自查扫描器**第一版误报 178/180 本**（注释态里仍按字符串规则跳），
+修好后现读 180 本 unclosed=0 ⇒ **"用来证明没问题的脚本"第一次大面积红要先怀疑脚本**；
+② **逐本日志在批跑完前是不完整的**：我先读 `d088_neg_throwable.log` 把它记成 ✘=1（跨本回归假象），批跑完再数是 ✔=18 ✘=0 △=1（与 D-087 整批一字不差）；
+另 `FE-d1` 锚点在我改纯层那句话后落空（当场报 MISS 没静默，D-084 ⑥ 同族）⇒ 规矩：**改纯层文案与负控锚点必须同一次编辑里对**。
+**新登记缺口**：`check_status_probes.sh` **没有配对负控簿** ⇒ 它对 HomeScreen 那个"恰好 2"只能证明"复跑没红"，不能证明"判得动"。
+**读数**：新用例簿 **9 例**；`check_favorite_entry_probes.sh`（FE-a…FE-h）rc=0；`favorite_entry_negative_controls.sh` **rc=0 ✔=16（14 条破口 + 基线 + 锚点自检）✘=0 △=0**；
+`SU-a` 66→67、`SU-b` 68→69、`@Test` 行 684→694；受影响负控逐本复跑 `contract_defaults` 22✔、`eta` 61✔、`navigation` 143✔、`safe_call` 29✔、`shell_routing` 32✔、
+`driver_notice` 13✔、`throwable` 18✔(△=1 在册)、`test_suite_hygiene` 7✔，全部 ✘=0；判据全批 **33 本 = 32 绿 / 1 红**（红的仍是 doc_anchor，#51 三条路等用户定）；
+全量 `--rerun-tasks` **rc=0 / 45 tasks executed / 67 类 694 例 0 失败**（67 份 XML mtime 全为 09:02:13；685→694 = 新簿 9 条）；
+APK **117,225,666 B** / mtime `09:02:06` / sha256 `1df8353d…`，对 D-087 **+16,384 B ⇒ 增量未归因**（没做类数差集，不写"收藏值多少字节"也不写回归），
+符号级 `Lcom/shanxiang/buspost/ui/user/FavoriteLinesKt;` 在 `classes13.dex` = **2**；树指纹 files=**203** / `4c5ee97a…`（D-087 是 201/`e76e2220…`）。
+仍欠：一律 `NOT VERIFIED ON DEVICE`（首页那一格没在真机上看过）；**后端没有收藏接口这件事只能披露不能修**（真同步要加表 + 端点 + 归属，是要用户/队友拍板的共享面）；
+`default_value ✘=3`/`idempotency ✘=1` 仍未归因；两仓本地已提交**未 push**。
+NEXT：① #47 分组 hub → ② #43 图标（我出 3 个候选）→ 之后是 web 后台管理平台。
+<!-- 上一条 D-087（#57 取件时间窗）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（早，D-087 · **#57 取件时间窗做完，另外把从 D-068 欠了五轮的“负控整批未跑”还上了**）：
 `earliestPickupTime` 这一格此前在 App 一条代码都没有（`buildSendForm()` 17 个键里没它），逐行读生产者读出四件事：
 **① 只写不读** —— `AppSendOrderCreateReqVO.java:76` 收、`TransportOrderServiceImpl.java:149` 落库，而 `AppSendOrderRespVO`（`/send/page` 与 `/send/track` 共用 `toRespVO`）**整本没这个键**

@@ -511,3 +511,46 @@ return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.
 **`D-CE-3`**：`earliestPickupTime` 的**回读键在部署前后形状相同**（都是"没有值"），
 本机无法区分"用户没填"与"云上还没部署回读键" ⇒ 措辞只能是一句合并的"后端没给这一项（下单时没填也会这样，本机分不开）"。
 这不是界面可以修的，要么后端给这一键加"未填也显式回 null 且带旗标"，要么接受合并格；本轮选择如实合并。
+
+## 十九、「收藏线路」三面取证：本机 / 列表 / 后端（D-088，2026-10-13 实测）
+
+### 19.1 三面里只有两面存在
+
+| 面 | 生产者 | 结论 |
+| --- | --- | --- |
+| 存储 | `Prefs.kt:228-254`（`favoriteLineIds` 逗号分隔字符串 → `Set<String>`；`toggleFavoriteLine` / `isFavoriteLine`） | 只有 id，**没有名字**；DataStore 本机私有目录 |
+| 名字 | `Repo.kt:852-857` `GET /app-api/transport/bus/lines` → `BusLine.parse`（`Models.kt:865-868`：`id = multiStr("routeId","lineId","id")`、`name = multiStr("routeName","lineName","name")`） | 名字**只在列表响应里**；列表不取就永远显不出名字 |
+| 后端 | `yudao-module-transport` 的 app 端点包 / `yudao-module-member` / transport 建表 SQL —— 对收藏 **0 命中** | **没有任何收藏接口**，因此"同步/换机恢复/云端收藏"这类话在本 App 里一律是假话 |
+
+⚠ 一条**看起来像证据但不是**的命中：`sql/mysql/ruoyi-vue-pro.sql:2667` 的 `system_menu` 里有一行名字含「收藏」。
+那是上游芋道框架自带的后台菜单种子数据（权限项），与线路收藏无关；引用它之前先看它是 `system_menu` 的 INSERT，不是业务表。
+
+### 19.2 旧形状为什么算缺陷（不是风格问题）
+
+`BusScreen.kt:657-659`：
+```kotlin
+val favIds = Prefs.favoriteLineIds
+val favLines = vm.lines.filter { it.id in favIds }
+if (favLines.isNotEmpty()) { …渲染整栏… }
+```
+`vm.lines` 来自 `Repo.busLines(geo)`（`BusScreen.kt:237-239`），而旧写法只取 `lf.items`、把 `lf.error` 丢掉。
+于是**三种完全不同的事共用一个形状**：没收藏（`favIds` 空）、线路列表这一轮没取到（error 非空）、
+收藏的线路确实不在当前列表里（下架/换号）—— 后两种都会让整栏消失，界面把"没取到"念成"没有收藏"。
+这与 D-079（政策页）、D-080（公告栏"没取到 vs 后端确实没有"）、#42（天气按角色）是同一族病。
+
+本轮的拆法：整栏闸门换成 `favoriteRowVisible(favIds.size)`（**本机记着几条**），
+未命中那一格 `favoriteUnresolvedText(idCount, resolvedCount, linesError)` 分两支，
+失败原因原样带出；`linesError` 从 `Feed.error` 接出来（`BusScreen.kt:126/246/714`）。
+
+### 19.3 用例先红的一条（红因在纯层，不在判据）
+
+`favoriteUnresolvedText(3, 1, "")` 第一版返回"可能已下架"那一支 ——
+因为纯层用 `linesError != null` 判"取失败"，而**空串是"失败但没给出原因"**，被当成"没有失败"。
+⇒ 修的是纯层（空串/空白归失败支，文案补"没给出原因"），**不是把断言放宽**。第二次跑 9 例全绿。
+⚠ 反面做法是把期望改成"空串算下架"来让它绿——那等于把语义洞抄成契约。
+
+### 19.4 登记为判据缺口
+
+**`D-CE-4`**：`check_status_probes.sh` **没有配对的负控簿**（`tools/status_negative_controls.sh` 不存在，本轮实测）。
+它对 HomeScreen 的那个"恰好 2"锚点（`when (v.status)`）只能证明"这一轮复跑没红"，不能证明"判得动"。
+⇒ 在册待补；补之前不许把 `check_status_probes.sh` 的绿当成"这一格有人管"。
