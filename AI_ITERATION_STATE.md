@@ -3,6 +3,46 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-13（早，D-087 · **#57 取件时间窗做完，另外把从 D-068 欠了五轮的“负控整批未跑”还上了**）：
+`earliestPickupTime` 这一格此前在 App 一条代码都没有（`buildSendForm()` 17 个键里没它），逐行读生产者读出四件事：
+**① 只写不读** —— `AppSendOrderCreateReqVO.java:76` 收、`TransportOrderServiceImpl.java:149` 落库，而 `AppSendOrderRespVO`（`/send/page` 与 `/send/track` 共用 `toRespVO`）**整本没这个键**
+⇒ 用户填完在“我的寄货”里查不回来，本轮把它补成可读（后端单独一个 commit，⚠ **推后端仓 = 触发云端部署**）；
+**② 它会真的改派单**（不是备注）—— `DispatchServiceImpl.java:4076-4090` `filterByTaskWindow`（调用点 `:591` 在 `doCreateSmartPlan` 里）
+晚于窗口结束就本批不派并记理由串，`:3513` 又作为 `readyTime` 下发算法；**③ 出网只能是数字毫秒** —— `TimestampLocalDateTimeDeserializer.java:24-27`
+对非数字串**不报错、静默返回 0** ⇒ 发“2026-10-13 15:00:00”不会 400，会安静存成 1970 年（回读侧同理：**只认 `Number`**，`multiNum` 把串 coerce 成 0 是同一病的另一半）；
+**④ 时区不用猜**：`docker-compose.yml:21`/`Dockerfile:12`/JDBC 三处都是 Asia/Shanghai ⇒ 本机按 `PICKUP_ZONE` 生成。
+⚠ **一句账面结论被代码否掉**：`V024:10` 注释写着入池 `ORDER BY earliest_pickup_time`、索引也建了，但全仓 `orderByAsc(...getEarliestPickupTime)` = **0 处**
+⇒ 这句不当结论引用。小程序对这个键 **0 命中** ⇒ 无界面形状可对标，字段语义只有“下限”，所以界面不做“上午/下午”那种假装成区间的选项。
+落地：纯层 `ui/user/PickupWindow.kt`（过去的整点**从候选里消失**而不是置灰、提交前再拒一次过去/零/负、三格文案、只认数字的回读）
++ `SendScreen` 的 `PickupWindowPicker`（「不限制」是唯一撤销出口；草稿只存“第几天+整点”不存绝对毫秒，隔夜恢复自动过期）
++ 成功页单独一行回执把“发没发/后端回读没回读”分开说 + `SendOrder.earliestPickupMillis`（可空）与包裹卡那枚**只在有值时出现**的 chip
++ 演示报文只给第 2 单带这个键（“有值”与“没给”两格都演到）。
+**一条结构性后果而不是文案**：`Repo.userCreateKey` 是 SHA-256 覆盖报文每个键值 ⇒ 这一键只要含“现在”的分秒，每次点击都换一把幂等键，
+「同一份寄货单还在创建中」那道本地闸就会被顶开；本轮取值按整点对齐（`plusDays` + `atTime(hour, 0)`）所以闸仍然有效，
+这个属性现在有判据（PW-n）也有具名用例（第 17 条），负控两条各抓一种破法（混进分/秒位移、不再整点对齐）。
+**负控整批第一次跑完**：`run_all_negative_controls_batch.sh` 现读 **36 本**（05:04→07:53，约 2h49m，退出码 1，逐本读数 `/tmp/d087_allneg.log`）：
+**33 本 rc=0 且 ✘=0**（含新建 `pickup_window` ✔=28、`navigation` ✔=143、`mission_route` ✔=52、`eta` ✔=61、`wallet` ✔=29、`parcel_ticket` ✔=42）；
+**2 本 rc=0 但自带 ✘**：`default_value` ✘=3、`idempotency` ✘=1 —— 就是 D-085/D-086 记的那两笔，**整批跑完没有把它们解释掉也没变多**；
+**3 本 rc=2**：`notify_result`/`oss_credits` 的红因是**产物不在场**（就地 `--tests` 过滤的几本把 `test-results/` 洗掉，这两本进门先要求指定 XML 在场、缺就拒绝而不填 0）
+⇒ 收尾重跑全量恢复产物后复跑：`notify_result` rc=0 ✔=17 ✘=0（破口=12 反向=2 预检=2|命中=16 失效=0）、`oss_credits` rc=0 ✔=20 ✘=0（13/2/4|命中=19 失效=0）
+⇒ “rc=2 是产物问题”这句现在有实测；`doc_anchor` rc=2 ✘=1 是 #51 在册红的另一种形状（`DA-f` 正控掉了），仍等用户定路线。
+**新负控抓到自己在两条（§八 (51)）**：① `PW-k2` 与 `PW-m1` 注入的是**同一段代码**（一个破口起了两个编号）⇒ 撤重复那条，
+撤之前先问“这条抓的是哪一格”；② `sub` 的 SELF-MATCH 保护挡掉了一条**合法**注入（想在 `.atZone(now.zone)` 后接 `.plusMinutes(3)`，新文本必然含旧锚点）
+⇒ 换两行锚点绕开，代价是锚点开始吃行尾形状（CRLF 树上会当场 MISS，不会静默）。
+**读数**：新用例 **17 例**；`check_pickup_window_probes.sh`（PW-a…PW-n）rc=0；`pickup_window_negative_controls.sh` **rc=0 ✔=28（26 条破口 + 基线 + 锚点自检）✘=0 △=0**；
+`SU-a` 65→66、`SU-b` 67→68（唯一增量 = 新用例簿）；同轮修掉 hygiene 那本里一条**消息里的反引号被 bash 当命令替换执行**（⚠ 这是 §八 ㊿① 的同族，
+发生在 D-086 之前就存在的那本旧簿上：它打出一行“No such file or directory”，而消息里那个文件名被吞掉，台账里留下的“新增 ，”就是它）；
+判据全批（产物恢复后）**32 本 = 31 绿 / 1 红**；全量 `--rerun-tasks` **rc=0 / BUILD SUCCESSFUL in 1m 12s / 45 tasks executed**，
+产物 **66 类 / 685 例 / 0 失败 / 0 错误**（66 份 XML mtime 全为 08:20:43；668→685 = 新簿 17 条，其余 65 类一字未变）；
+APK **117,209,282 B** / mtime `08:20:35` / sha256 `828bd62d…`：对 D-086 那包**字节相同而 sha 不同** ⇒ 同字节只说明体积没变，
+符号级凭证是 `Lcom/shanxiang/buspost/ui/user/PickupWindowKt;` 在 `classes13.dex` = **2**；树指纹 files=**201** / sha256 `e76e2220…`
+（D-086 是 199/`abb6706…`，+2 = 新纯层与新用例簿）。
+仍欠：**没有一条真接口回包**（“填了它真的被挪出当批”要真调度日志、“回读键真回来了”要云上部署那枚后端 commit）；一律 `NOT VERIFIED ON DEVICE`；
+后端那三条未动（`@Future` 缺席、App 没有 `latestDeliveryTime` 入口⇒`expired` 那一支对用户端单**永不生效**、班次窗口无 app-api 生产者）；
+`default_value ✘=3`/`idempotency ✘=1` 仍未归因；本地已提交**未 push**（App 两个 commit + 后端一个，推后端仓要单独提醒会触发云端部署）。
+NEXT：① #39 收藏首页入口（契约已先行取证：收藏是纯本地 CSV `Prefs.kt:228-254`、后端 **0** 个收藏端点、`HomeScreen.kt` 对 favorite **0** 命中、
+四本锚点落在 HomeScreen 的判据簿要逐本复跑）→ ② #47 分组 hub → ③ #43 图标（我出 3 个候选）→ 之后是 web 后台管理平台。
+<!-- 上一条 D-086（#56 钱包）及更早的「最后更新」段落保留为历史，不覆盖 -->
 最后更新：2026-10-13（凌晨续二，D-086 · **#56 钱包 / 交易记录做完，但先推翻了一条台账前提**）：
 "钱包支付代码就绪"那句（含 `docs/product/FEATURE_MARKING_SPEC_2026-10-12.md:17-19` 与我的记忆）指的是
 **`cargo-post-platform/android-app/` 那份陈旧副本**（其 `WalletScreen.kt:98` 还会在充值成功后自己插一条流水），

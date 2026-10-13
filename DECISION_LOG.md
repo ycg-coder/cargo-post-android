@@ -6411,3 +6411,102 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
    在册红那本 `check_doc_anchor_probes.sh` 的 `DA-e ID-MISS` 由 402 → **405**（`DA-d 新增可疑 113`、
    `消失 9`；本轮新增段落自己的锚点 `check_doc_anchors.py` 实测 out_of_range=0、not_found 仍 12 未涨）。
    这条不另开一轮修：它正是 #51 那三条路要一起处理的面，等用户定路线后一并重锚。
+
+### D-087（10-13 05:0x–08:2x）· #57 `earliestPickupTime` 取件时间窗：一个"只写不读"的键，接上时顺手发现它会改派单
+
+**契约先于方案**（这一格此前 App 一条代码都没有，`buildSendForm()` 17 个键里没它）：
+逐行读生产者读出四件事，其中两件直接改变实现——
+1. **只写不读**：`AppSendOrderCreateReqVO.java:76` 收，`TransportOrderServiceImpl.java:149` 落进
+   `transport_order.earliest_pickup_time`，而 `AppSendOrderRespVO.java`（`/send/page` `:139` 与 `/send/track` `:154`
+   共用 `toRespVO`）**整本没有这个键** ⇒ 用户填完在"我的寄货"里查不回自己填了什么。
+   本轮把它补成可读（后端一个字段，`toRespVO` 走 `BeanUtils.toBean` 同名同型自动映射）。
+2. **它会真的改派单**，不是备注：`DispatchServiceImpl.java:4076-4090` 的 `filterByTaskWindow`（调用点 `:591`，
+   在 `doCreateSmartPlan` 里）——晚于任务窗口结束 ⇒ 本批不派并记理由串"（取货时间晚于窗口结束）"；
+   `:3513` 又把它作为 `readyTime` 下发算法（`AlgorithmOrderDTO.java:74` 原话"没填即 null、算法不凭空判"）。
+3. **出网只能是数字毫秒**：`TimestampLocalDateTimeDeserializer.java:24-27` 走 `Instant.ofEpochMilli(p.getValueAsLong())`，
+   而 `getValueAsLong()` 对非数字串**不报错、静默返回 0** ⇒ 发 `"2026-10-13 15:00:00"` 不会 400，
+   会安静存成 **1970-01-01**，界面上一切正常。所以：写入侧唯一形状是 `Long`，回读侧**只认 `Number`**
+   （`multiNum` 会把串 coerce 成 0，就是同一个病的另一半）。
+4. **时区不用猜**：反序列化用 `ZoneId.systemDefault()`，而 `deploy/docker-compose.yml:21`、
+   `yudao-server/Dockerfile:12`、JDBC URL 三处都是 Asia/Shanghai ⇒ 本机按 `PICKUP_ZONE=Asia/Shanghai` 生成
+   （与 `BusScreen.kt:890` 同口径），设备换时区不会把墙钟挪走。
+
+⚠ **一条账面结论被代码否掉**：`V024__key_indexes_and_unique_keys.sql:10` 注释写着入池查询
+`ORDER BY earliest_pickup_time`，索引确实按 `:14` 建了，但全仓 `orderByAsc(TransportOrderDO::getEarliestPickupTime)` = **0 处**
+⇒ "入池按取货时间排序"没有代码生产者，界面与台账都不许念这句。
+另：`cargo-post-miniprogram` 对这个键 **0 命中** ⇒ 没有界面形状可对标（只当契约证据，不登记成欠账）。
+
+**这一版做了什么**
+- 纯层 `ui/user/PickupWindow.kt`（判定全在这里，页面只渲染）：候选 = 今天/明天/后天 × 整点，
+  **过去的整点直接从候选里消失**（不是置灰还能点，所以点不出过去）；档位→毫秒唯一时区源；
+  提交前再拒一次（隔夜草稿恢复出的旧时刻在这里变 null ⇒ 整个键不发，`Api.kt:308` 对 null 是**丢键**）；
+  三格文案（未选=不限制 / 回读缺席=后端没给 / 后果披露一句）；回读只认数字。
+- 寄货页 `SendScreen.kt`：`PickupWindowPicker`（「不限制」是那枚唯一的**撤销出口**）、草稿只存"第几天+整点"
+  不存绝对毫秒、成功页单独一行 `pickupSubmitConclusion` 把"发没发"与"后端回读没回读"分开说。
+- 回读侧：`SendOrder.earliestPickupMillis`（可空、只认 `Number`）+ 包裹卡那一枚 chip **只在有值时出现**
+  （缺席不许就近念成"不限制"）。演示报文只给 4 单里的第 2 单带这个键 ⇒ "有值"与"没给"两格都演到。
+- 后端（**单独 commit，⚠ 推后端仓 = 触发云端部署，要单独点名**）：`AppSendOrderRespVO` 补 `earliestPickupTime` 一个键。
+  云上没部署这一版之前，App 读到的永远是"后端没给"——那正是页面上那句话，不是 bug。
+
+**一条是"结构性后果"而不是文案的发现**：`Repo.userCreateKey` 是 SHA-256 覆盖 path+手机号+**报文每个键值**，
+所以这一键只要含"现在"的分秒，每次点击都会换一把本地幂等键 ⇒「同一份寄货单还在创建中，本次点击没有发给后端」
+那道闸会被顶开。本轮的取值是 `plusDays(day).atTime(hour, 0)`，**按整点对齐**，同一天两次点击拿到同一个 Long ⇒
+闸仍然有效。这一属性现在有判据（PW-n）也有具名用例（第 17 条），负控两条各抓一种破法
+（混进分/秒级位移、不再整点对齐）。⚠ 已知窄缝：恰好跨过所选整点那一秒再点第二次，报文确实不同、闸不拦，
+而第二次语义上是"不设下限"的另一张单，不工程化处理。
+
+**负控整批第一次跑完（这一格从 D-068 起欠了五轮）**：`run_all_negative_controls_batch.sh` 现读 **36 本**，
+批次用时约 2h49m（05:04→07:53），退出码 1。逐本读数在 `/tmp/d087_allneg.log` 与 stdout：
+- **33 本 rc=0 且 ✘=0**（含新建的 `pickup_window` ✔=28 ✘=0、`navigation` ✔=143、`mission_route` ✔=52、
+  `eta` ✔=61、`wallet` ✔=29、`parcel_ticket` ✔=42、`safe_call` ✔=29、`shell_routing` ✔=32）；
+- **2 本 rc=0 但自带 ✘**：`default_value` ✘=3、`idempotency` ✘=1 —— 就是 D-085/D-086 记的那两笔**仍未归因**，
+  整批跑完没有把它们解释掉，也没变多；
+- **3 本 rc=2**：`notify_result`、`oss_credits` 的红因是**产物不在场**（就地跑 `--tests` 过滤的那几本负控
+  会把 `test-results/` 洗掉，这两本进门先要求指定 XML 在场，缺就拒绝而不是填 0）⇒
+  收尾重跑全量把产物恢复后复跑：`notify_result` rc=0 ✔=17 ✘=0（`破口=12 反向=2 预检=2|命中=16 失效=0`）、
+  `oss_credits` rc=0 ✔=20 ✘=0（`破口=13 反向=2 预检=4|命中=19 失效=0`）⇒ **"rc=2 是产物问题"这句现在有实测**；
+  `doc_anchor` rc=2 ✘=1 是 #51 那本在册红的另一种形状（`× DA-f 带标识符且判 OK 的锚点低于 277 ⇒ 正控掉了`），仍等用户定路线。
+⇒ 台账口径改写：**"负控整批未跑"这一格从本轮起不再是欠账**，欠的是"整批里有 2 本自带 ✘ 未归因"＋"整批只在
+产物被中途洗掉的顺序下跑过一次，`notify_result`/`oss_credits` 是补跑的"。
+
+**自己这本负控抓到自己的两条（都不是判据空转）**
+1. `PW-k2` 报"仍然绿"：它和 `PW-m1` 注入的是**同一段代码**（「不限制」那枚 chip），
+   即这本书给一个破口起了两个编号 ⇒ 撤掉重复那条，保留能点名 PW-m 的那条。**先问"这条抓的是哪一格"，
+   答不出就是重复不是缺口**（记 §八 (51)①）。
+2. `PW-n1` 被 `sub` 的 SELF-MATCH 保护挡下（想给 `.atZone(now.zone)` 接 `.plusMinutes(3)`，新文本必然含旧锚点）
+   ⇒ 换成两行锚点绕开，代价是锚点开始吃行尾形状（CRLF 树上会当场 MISS、不会静默）。记 §八 (51)②。
+
+**读数（本轮实测，全部现读非回忆）**
+- 新用例簿 `PickupWindowContractTest` **17 例**（XML 实测 tests=17 failures=0）；
+  新判据 `check_pickup_window_probes.sh`（PW-a…PW-n）rc=0；新负控 `pickup_window_negative_controls.sh`
+  **rc=0，✔=28（26 条破口按名点名 + 基线 + "不存在的锚点必须被拒"自检）✘=0 △=0**。
+- 同轮重登：`SU-a` *Test.kt **65→66**、`SU-b` 源集文件 **67→68**（唯一增量 = 新用例簿），0 空壳仍 0；
+  `test_suite_hygiene_negative_controls.sh` 整批内 rc=0 ✔=7 ✘=0。
+  ⚠ 顺手修掉 `check_test_suite_hygiene_probes.sh` 里一条 §八 ㊿① 同族的病：它的 SU-b 消息里有
+  **反引号包着的文件名** ⇒ bash 当命令替换执行（跑出一行 "No such file or directory"，而消息里那个文件名被吞掉，
+  D-086 台账里那句"新增 ，"就是它留下的样子）。改成不带反引号后消息完整。
+- 判据全批（产物恢复后）现读 **32 本 = 31 绿 / 1 红**（红的仍是 `check_doc_anchor_probes.sh`，#51 三条路等用户定）。
+- 全量：`:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` **rc=0 / BUILD SUCCESSFUL in 1m 12s /
+  45 actionable tasks: 45 executed**；产物聚合 **66 类 / 685 例 / failures 0 / errors 0 / skipped 0**
+  （66 份 XML，mtime 全为 `08:20:43` 一个值）；668→685 = 新用例簿 17 条，其余 65 类一字未变。
+- 产物指纹：`app-debug.apk` **117,209,282 B** / mtime `2026-10-13 08:20:35` /
+  sha256 `828bd62d40c0a66ac1cbae6bf0a01a336c2e4605949f82f4f53ce93a850b256b`。
+  ⚠ 对 D-086 那包（同 **117,209,282 B**、sha `59086c9e…`）**字节相同而 sha 不同** ⇒ 同字节只说明体积没变，
+  不代表没重打包；符号级实测：descriptor 口径 `Lcom/shanxiang/buspost/ui/user/PickupWindowKt;` 在
+  `classes13.dex` = **2** ⇒ 新代码真进了包。对 04:59 那一包 sha **一字不差** —— 那之后只动过测试与判据文件，
+  打进 APK 的 `app/src/main` 没再变，这是**预期的一致**而不是"没重跑"（重跑凭证是 45 executed + mtime 08:20:35）。
+- 树指纹（与 D-085/D-086 同一条命令）files=**201** / sha256 `e76e22201b72060359b5ebd1925fc458f940ca774eb99de55a0afc3ca363b8d8`
+  （D-086 是 199 / `abb6706…`，+2 = `PickupWindow.kt` 与 `PickupWindowContractTest.kt`）。
+
+**仍欠**
+1. **没有一条真接口回包**：这一格最硬的两件事都没被演示过 —— "填了它后端真的把本单挪出当批"
+   需要真调度日志，"回读键真的回来了"需要云上部署后端那一枚 commit。一律 `NOT VERIFIED ON DEVICE`。
+2. 后端那三条本轮没动（都不是本机可以顺手改的共享面）：`@Future`/范围校验缺席（`审计报告_联动_2026-09-21.md:326`
+   早就登记这一行，填过去的时间后端照收照存，本机只是**不发**）；App 侧没有 `latestDeliveryTime` 入口
+   ⇒ `filterByTaskWindow` 的 `expired` 那一支对用户端单**永不生效**；班次/任务窗口没有任何 app-api 生产者
+   ⇒ 界面只能说"晚于窗口结束本批不派"，不能说"你这单排到哪一班"。
+3. `check_doc_anchor_probes.sh` 仍是那本在册红，且本轮又往 `Models.kt` 中间插字段
+   ⇒ 与 D-086 第 5 条同一条账（`DA-e ID-MISS` 会继续漂），等 #51 三条路定下来一并重锚。
+4. 整批里 `default_value ✘=3`、`idempotency ✘=1` 两笔仍未归因。
+5. 两个仓都**只本地 commit、未 push**（用户口径：所有任务完成了一起推，推前给看 diff；
+   推后端仓要单独提醒"这一推会触发云端部署"）。

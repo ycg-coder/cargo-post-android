@@ -459,3 +459,55 @@ JVM 里从没渲染过，不许因为表格里有"缺失处理"这一列就读�
 就一直 sed 一句不存在的「不代表车辆能到」（10-12 话术收紧时改写了），静默落空被记成"判据不判"——
 本轮补了 `R-n4`（钉现存那句免责话恰好 4 处）并把注入器换成会报落空的 `swap1`，`reach` 负控由 ✘=1 转 ✘=0。
 
+
+## 十八、`earliestPickupTime`「最早取货时间」逐字段取证（D-087，2026-10-13 实测）
+
+### 18.1 键的三面（写 / 存 / 读）
+
+| 面 | 生产者 | 结论 |
+| --- | --- | --- |
+| 写入 | `AppSendOrderCreateReqVO.java:76` `private LocalDateTime earliestPickupTime`（`@Schema(description = "最早取货时间")`，无校验注解） | App 的 `/send/create` 收这个键，此前 App 从来没发过 |
+| 落库 | `TransportOrderServiceImpl.java:149` `.earliestPickupTime(reqVO.getEarliestPickupTime())` → `TransportOrderDO.java:26` → `transport_order.earliest_pickup_time`（`transport-schema.sql:148`） | 真落库，不是被丢弃的键 |
+| 消费 | `DispatchServiceImpl.java:4076-4090`（`filterByTaskWindow`，调用点 `:591`，在 `doCreateSmartPlan` 里）+ `:3513` `.readyTime(toOffset(order.getEarliestPickupTime()))` → `AlgorithmOrderDTO.java:74` | **会真的改派单**：晚于任务窗口结束 ⇒ 本批不派并记理由串；同时作为揽收下限下发算法 |
+| 回读 | `AppSendOrderRespVO.java`（`/send/page` `:139`、`/send/track` `:154` 共用 `toRespVO`）**本轮之前 0 命中** | 只写不读 ⇒ 本轮补一个键闭合（`toRespVO` 走 `BeanUtils.toBean`，同名同型自动映射） |
+
+⚠ 一条不能引用的账面结论：`V024__key_indexes_and_unique_keys.sql:10` 的**注释**写着
+`WHERE status=READY_FOR_POOL ORDER BY earliest_pickup_time`，索引确实按 `:14` 建了，
+但全仓 `grep orderByAsc(TransportOrderDO::getEarliestPickupTime)` = **0 处** ⇒ "入池按取货时间排序"这句没有代码生产者，界面与台账都不许念。
+
+### 18.2 出网格式（这一条决定了整个实现）
+
+`TimestampLocalDateTimeDeserializer.java:24-27`：
+
+```java
+return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.systemDefault());
+```
+
+- 认的是 **Long 毫秒**（`YudaoJacksonAutoConfiguration` 注册的就是这一对（de）serializer，
+  App 侧 `Models.kt:104-114` 的 `ts()` 早就按这个契约处理 13 位数字）；
+- `p.getValueAsLong()` 对**非数字串不抛错、静默返回 0** ⇒ 发 `"2026-10-13 15:00:00"` 不会 400，
+  会安静存成 **1970-01-01**，而界面上一切正常。这是本轮所有"只认数字 / 不许拼串"判据的来源；
+- `ZoneId.systemDefault()`：`deploy/docker-compose.yml:21` 与 `yudao-server/Dockerfile:12` 都是 `TZ=Asia/Shanghai`，
+  MySQL URL 亦 `serverTimezone=Asia/Shanghai` ⇒ 本机用固定 `PICKUP_ZONE = Asia/Shanghai` 生成毫秒
+  （与 `BusScreen.kt:890` 同口径），设备换时区不会把墙钟挪走。
+
+### 18.3 小程序对照
+
+`cargo-post-miniprogram` 全域 `earliestPickupTime` / `pickupTime` / 取货时间 = **0 命中** ⇒ 没有界面形状可对标。
+字段语义只有"下限"，因此界面上**不做"上午/下午"这类假装是区间的选项**，只有"哪天几点之后"。
+
+### 18.4 后端仍缺的三条（本轮没替它编）
+
+1. `@Future`/范围校验缺席（`审计报告_联动_2026-09-21.md:326` 早就登记过这一行）⇒ 填过去的时间后端照收照存；
+   App 侧只是**不发**过去，不等于后端安全。
+2. `latestDeliveryTime` 在 App 的 create VO 里**没有字段**（只有 admin 侧 `TransportOrderBaseVO` 有），
+   而 `filterByTaskWindow` 的 `expired` 那一支读的就是它 ⇒ 用户端单子的时效上限永远为 null，
+   那一支对 App 单**永不生效**。
+3. 班次/任务窗口没有任何 app-api 生产者（`currentBatch()`、`formatWindow()` 都在服务端），
+   所以界面只能说"晚于窗口结束本批不派"，不能说"你这单排到哪一班"。
+
+### 18.5 判据缺口登记
+
+**`D-CE-3`**：`earliestPickupTime` 的**回读键在部署前后形状相同**（都是"没有值"），
+本机无法区分"用户没填"与"云上还没部署回读键" ⇒ 措辞只能是一句合并的"后端没给这一项（下单时没填也会这样，本机分不开）"。
+这不是界面可以修的，要么后端给这一键加"未填也显式回 null 且带旗标"，要么接受合并格；本轮选择如实合并。
