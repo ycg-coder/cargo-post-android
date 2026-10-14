@@ -72,7 +72,8 @@ SEEN=$(mktemp); : > "$SEEN"
 qfile="$OUT/queue.tsv"; : > "$qfile"
 printf '0\tstart\t\t' >> "$qfile"
 
-n=0; skipped=0; fails=0; CURD=0
+n=0; skipped=0; fails=0; CURD=0; LOGCURSOR=0
+: > "$OUT/logfindings.txt"
 while [ -s "$qfile" ] && [ "$n" -lt "$MAX" ]; do
   IFS=$'\t' read -r d path coords << EOF
 $(tail -1 "$qfile")
@@ -102,8 +103,18 @@ EOF
   NC=$(parse_nodes "$dir/dump.xml" "$dir/nodes.tsv")
   "$PY" tools/layout_audit.py "$dir/dump.xml" > "$dir/layout.txt" 2>&1 || true
   $ADB exec-out screencap -p > "$dir/screen.png" 2>/dev/null
+  # 每屏的日志证据：截图只能证明"画面在动"，不能证明"功能正常"。
+  # 所以每屏之间取一次 logcat 切片：本屏新增的 E 级行、崩溃/ANR、以及网络失败标记。
+  $ADB logcat -d 2>/dev/null | tr -d '\r' > "$OUT/logcat-full.tmp"
+  tail -n +$((LOGCURSOR + 1)) "$OUT/logcat-full.tmp" > "$dir/logcat-slice.txt"
+  LOGCURSOR=$(wc -l < "$OUT/logcat-full.tmp")
   { echo "path=$path"; echo "depth=$d"; echo "hash=$h"; echo "clickable_total=$NC"; echo "front=$(front)";
-    $ADB shell dumpsys gfxinfo $PKG 2>/dev/null | tr -d '\r' | grep -m1 -E "Janky frames"; } > "$dir/meta.txt"
+    $ADB shell dumpsys gfxinfo $PKG 2>/dev/null | tr -d '\r' | grep -m1 -E "Janky frames";
+    echo "log_lines=$(wc -l < "$dir/logcat-slice.txt")";
+    echo "E级=$(grep -cE '^[A-Z]/.*\(| E ' "$dir/logcat-slice.txt" 2>/dev/null || echo 0)";
+    echo "崩溃或ANR=$(grep -cE 'FATAL EXCEPTION|ANR in |NoSuchMethodError|DeadObject' "$dir/logcat-slice.txt" 2>/dev/null || echo 0)";
+    echo "网络/后端失败=$(grep -cE 'BUS_API|HTTP [45][0-9][0-9]|系统异常|code\":5|连接失败|Unable to resolve host' "$dir/logcat-slice.txt" 2>/dev/null || echo 0)"; } > "$dir/meta.txt"
+  grep -hE "FATAL EXCEPTION|ANR in |系统异常|BUS_API|code\":5" "$dir/logcat-slice.txt" 2>/dev/null | head -6 >> "$OUT/logfindings.txt"
   over=$(grep -cE "越过屏幕|重叠|热区" "$dir/layout.txt" 2>/dev/null || echo 0)
   printf '%-3s d=%s %-46s 可点=%-3s 布局告警=%-3s %s\n' "$n" "$d" "$slug" "$NC" "$over" "$h"
   # 出队本屏的可点项（带 label、不在 DENY、尺寸像控件）—— 逻辑在已离线验过的 tools/ui_nodes_parse.py 里
@@ -119,4 +130,9 @@ done
   echo; echo "## 逐屏告警计数"; grep -H -E "越过屏幕|重叠|热区" "$OUT"/*/layout.txt 2>/dev/null | cut -d/ -f3- | sort | uniq -c | sort -rn | head -20
 } > "$OUT/summary.md"
 cp "$SEEN" "$OUT/hashes.txt"; rm -f "$SEEN" "$qfile"
+# 收尾清理：设备侧与本机临时文件都不留（证据留在 $OUT 里，日志切片也留，全量 logcat 不留副本）
+rm -f "$OUT/logcat-full.tmp" "$OUT/tmp.xml"
+$ADB shell rm -f /sdcard/w.xml >/dev/null 2>&1
+{ echo; echo "- 清理：设备侧 /sdcard/w.xml 已删；本机全量 logcat 副本已删（每屏切片保留在 \`*/logcat-slice.txt\`）"; 
+  echo "- 汇总日志线索：\`logfindings.txt\`（$(wc -l < "$OUT/logfindings.txt" 2>/dev/null || echo 0) 行）"; } >> "$OUT/summary.md"
 echo; echo "证据目录：$OUT"; sed -n '1,8p' "$OUT/summary.md"
