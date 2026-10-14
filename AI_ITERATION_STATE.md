@@ -3,7 +3,24 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
-最后更新：2026-10-15（真机第一轮收工，D-114 · 附近线路卡重做 / 步行走真实路线 / 商品图两条病根 / 遍历器四课）
+最后更新：2026-10-15（真机第二轮收工，D-115 · **v77 已发**：两份审查报告头条被云端 63 接口实测证伪 / DemoNote 静音复活 / 明文图升 https / 换号作废判决 / 新判据簿补上"只活在注释里的规矩"那一格）
+
+## CURRENT（2026-10-15 真机第二轮收工 · 台账 D-115）
+
+- **发版**：`v77`（PR #15 + #16 已合 main@2989dfe）。第一次 dispatch 被 release 的**扫包取证**拦下
+  （`isPrivateHost()` 里的环回主机名字面量 = 包内残留本机地址），改按四段数字判后重投通过。
+  产物侧凭证：解 `classes*.dex` 数到新符号 `isPrivateHost`/`onMobileChange` 各 1 命中、四个禁词命中 0。
+  **待用户装**：APK 已 push 到手机 `/sdcard/Download/xiangyou-v77.apk`（HyperOS 只能本人点装），
+  或冷启动走 App 内自更新弹窗（D-111 恢复的那条通道）。
+- **读数**：编译 SUCCESSFUL；`tests=706 failures=0 errors=0 badfiles=0`；**36 本判据簿红 0**（含新本）；
+  新本负控 7 刀全红且各红在该管的那一格；真机用户端 16 屏 + 司机端 8 屏 `layout_audit TOTAL_ISSUES=0`。
+- **在册 OPEN 三条**：#42 遍历器 DENY 要补「确认发车」「开始车道级导航」（`walk_ui.sh` 还在未合并的 `tools/ui-walk-harness`/PR #12 上）；
+  #43 司机异常上报跨单段序歧义（后端 `legSequence` 每单各自从 1 起，两行都念"第 1 段"）；
+  #25/#31 承接上一轮。
+- **本轮证伪掉的两条假结论（别再当真账）**：① App 没有 `/app/ship/order-item/cancel` 这个调用，
+  真实 `PUT /product-order/cancel` 云端是活的；② 司机端 9 个接口早就带 `driverId`，未绑定直接抛 `DRIVER_UNBOUND`。
+- **还欠一次**：42 本负控在合并后未整批复跑（上一批 23:47–03:19 完成，5 本红为已知顺序/环境红：
+  `doc_anchor`/`envelope_signature`/`idempotency_test`/`notify_result`/`oss_credits`，均早于本轮改动）。
 
 > 上一轮：2026-10-14（傍晚续，D-110 · **用户报的"网络不好 + 新功能没通路"分成两个根因，算法时限口径收成一套**）：
 - ①"没通路"= 装的是 **v43**（03:00:30Z 打的），而 PR #4…#9 都在 03:58Z 之后才进 main ⇒ 不是通路没接，是二进制里没有。
