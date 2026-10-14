@@ -1,0 +1,10 @@
+path=route/privacy
+depth=1
+hash=78b0c019f543
+clickable_total=29
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=1740
+E级=21
+崩溃或ANR=0
+网络/后端失败=0

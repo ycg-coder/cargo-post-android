@@ -1,0 +1,81 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		0	121	1080	2400	android.widget.ScrollView
+8	False	False		20	133	152	265	android.view.View
+9	False	False	1	78	168	93	229	android.widget.TextView
+9	False	False	填货物	130	165	223	231	android.widget.TextView
+10	False	False		240	132	408	264	android.view.View
+11	False	False		390	133	522	265	android.view.View
+12	False	False	2	446	168	465	229	android.widget.TextView
+12	False	False	拍照确认	500	165	624	231	android.widget.TextView
+13	False	False		641	132	809	264	android.view.View
+14	False	False		791	133	923	265	android.view.View
+15	False	False	3	847	168	867	229	android.widget.TextView
+15	False	False	提交完成	901	165	1025	231	android.widget.TextView
+16	False	False		44	264	1036	506	android.view.View
+17	False	False		77	213	1003	345	android.view.View
+18	False	False	填写货物信息	88	312	433	386	android.widget.TextView
+19	False	False		483	283	720	415	android.view.View
+20	False	False	第 1 步 · 共 3 步	483	316	720	382	android.widget.TextView
+20	False	False	写清货物与收发站点，费用提前算给你看	88	401	718	467	android.widget.TextView
+20	False	False		88	583	992	1089	android.view.View
+21	False	False	当前位置车辆无法直接进入	168	583	612	649	android.widget.TextView
+22	False	False	推荐送站：文峰公社	168	657	465	723	android.widget.TextView
+23	False	False	约 0.44 公里（直线估算，不是道路里程） · 步行约 7 分钟	168	731	992	863	android.widget.TextView
+24	False	False	当前位置不适合车辆进入，请送到服务站点交接	168	871	819	937	android.widget.TextView
+25	True	True		168	951	992	1089	android.view.View
+26	False	True	使用推荐站点	444	987	716	1053	android.widget.TextView
+25	False	False		0	1134	110	1266	android.view.View
+26	False	False	物品信息	69	1166	245	1232	android.widget.TextView
+27	False	False		88	1309	992	2400	android.view.View
+28	False	False	货物名称 *	94	1309	260	1375	android.widget.TextView
+29	False	False		121	1389	959	1543	android.view.View
+30	False	False		69	1400	171	1532	android.view.View
+31	True	True		171	1389	959	1543	android.widget.EditText
+32	False	True		215	1401	915	1533	android.view.View
+33	False	True		215	1400	707	1532	android.view.View
+34	False	True	如：脆李、土鸡蛋、红薯粉	215	1433	707	1499	android.widget.TextView
+32	True	True	脆李	81	1560	213	1692	android.widget.TextView
+33	True	True	土鸡蛋	223	1560	372	1692	android.widget.TextView
+34	True	True	红薯粉	389	1560	538	1692	android.widget.TextView
+35	True	True	蔬菜	548	1560	680	1692	android.widget.TextView
+36	False	True	货物重量 *	94	1698	260	1764	android.widget.TextView
+37	False	True		121	1778	493	1932	android.view.View
+38	True	True		121	1778	493	1932	android.widget.EditText
+39	False	True		165	1790	449	1922	android.view.View
+40	False	True		165	1789	297	1921	android.view.View
+41	False	True	如：50	165	1822	297	1888	android.widget.TextView
+39	False	True	货物件数 *	554	1698	715	1764	android.widget.TextView
+40	True	True		554	1781	686	1913	android.view.View
+41	False	True	−	606	1814	635	1880	android.widget.TextView
+41	False	True	1 件	686	1814	860	1880	android.widget.TextView
+42	True	True		860	1781	992	1913	android.view.View
+43	False	True	+	912	1814	941	1880	android.widget.TextView
+43	False	True	货物类型	88	1960	224	2026	android.widget.TextView
+44	True	True	农产品	88	2027	256	2159	android.widget.TextView
+45	True	True	生鲜果蔬	275	2027	477	2159	android.widget.TextView
+46	True	True	日用百货	496	2027	698	2159	android.widget.TextView
+47	True	True	建材小件	717	2027	919	2159	android.widget.TextView
+48	True	True	药品	88	2144	222	2276	android.widget.TextView
+49	True	True	其他	241	2144	375	2276	android.widget.TextView
+50	False	True	长	88	2288	121	2354	android.widget.TextView
+51	False	True		121	2365	341	2400	android.view.View
+52	True	True		121	2365	341	2400	android.widget.EditText
+53	False	True		165	2377	297	2400	android.view.View
+54	False	True		128	2376	260	2400	android.view.View
+53	False	True	宽	396	2288	429	2354	android.widget.TextView
+54	False	True		429	2365	650	2400	android.view.View
+55	True	True		429	2365	650	2400	android.widget.EditText
+56	False	True		473	2377	606	2400	android.view.View
+57	False	True		436	2376	568	2400	android.view.View
+56	False	True	高	705	2288	738	2354	android.widget.TextView
+57	False	True		738	2365	959	2400	android.view.View
+58	True	True		738	2365	959	2400	android.widget.EditText
+59	False	True		782	2377	915	2400	android.view.View
+60	False	True		745	2376	877	2400	android.view.View

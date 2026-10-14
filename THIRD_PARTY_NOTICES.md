@@ -254,7 +254,7 @@ APK 体积/哈希未变（`114,437,316 B`，mtime 16:45:11），说明这批恢�
 本轮一字未动），`gradle.properties` **09-29 02:29:42**（同样未动：编码问题只在**命令行**用 `-Dorg.gradle.jvmargs` 处置，
 没把环境缺陷写进工程配置），第三方**源码引入**仍 **0 行**、**新增依赖 0 个**。
 ⚠ 本轮**没有**为幂等引任何库：闸门是 V-1 自写的 `ActionGate`（`app/src/main/java/com/shanxiang/buspost/data/repo/ActionGate.kt`，
-**本轮该类一字未改** —— 只新增了一个实例），键摘要用的是 JDK 自带 `java.security.MessageDigest`（`Repo.kt:464-476`），
+**本轮该类一字未改** —— 只新增了一个实例），键摘要用的是 JDK 自带 `java.security.MessageDigest`（`Repo.kt:500-512`），
 两者都**不产生新的许可证条目**。
 本轮**新增自写文件 1 个**：**测试期**类 `app/src/test/java/com/shanxiang/buspost/data/repo/UserCreateIdempotencyTest.kt`（10 例，
 **只在测试期存在、不进 APK**，与 §2 同一口径）。它的包内实测（**本轮把这条从"应当如此"升级成"量过"**）：

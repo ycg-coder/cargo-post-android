@@ -1,0 +1,31 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	在地图上选择位置	165	176	533	242	android.widget.TextView
+9	False	True		0	297	1080	1987	androidx.compose.ui.viewinterop.ViewFactoryHolder
+10	False	True		0	297	1080	1987	android.widget.FrameLayout
+11	False	True		0	297	1080	1987	android.view.ViewGroup
+12	False	True		0	297	1080	1987	android.view.SurfaceView
+13	False	True		0	297	1080	1987	android.view.View
+14	False	True		0	297	1080	1987	android.view.View
+15	False	True		0	297	153	450	android.widget.LinearLayout
+16	True	True		0	297	153	450	android.widget.ImageView
+16	False	True		940	1729	1080	1987	android.widget.LinearLayout
+17	True	True		940	1729	1080	1847	android.widget.ImageView
+18	True	True		940	1847	1080	1987	android.widget.ImageView
+15	True	True		904	1811	1036	1943	android.view.View
+16	False	True	回到当前位置	937	1844	1003	1910	android.view.View
+16	False	True		44	2031	1036	2356	android.view.View
+17	False	True	重庆市南岸区南山街道重庆邮电大学明志苑	116	2031	1036	2097	android.widget.TextView
+18	False	True	经度 106.606128，纬度 29.521802	100	2119	565	2185	android.widget.TextView
+19	True	True		44	2218	1036	2356	android.view.View
+20	False	True		307	2222	439	2354	android.view.View
+21	False	True	确认选择此位置	417	2254	735	2320	android.widget.TextView

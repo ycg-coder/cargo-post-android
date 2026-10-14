@@ -1,0 +1,12 @@
+path=start_______>快递
+depth=2
+hash=0312d4b75cc4
+clickable_total=38
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.08%)
+log_lines=2668
+E级=32
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

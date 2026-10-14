@@ -1,0 +1,28 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	消息中心	165	143	349	209	android.widget.TextView
+10	False	True	全部已读	165	209	297	275	android.widget.TextView
+11	True	True	全部已读	922	143	1058	275	android.widget.TextView
+11	False	True		0	297	1080	2400	android.view.View
+12	False	True		0	297	1080	1142	android.widget.ScrollView
+13	False	True		52	349	1028	481	android.view.View
+14	True	True		52	349	536	481	android.view.View
+15	False	True	全部 0	238	382	350	448	android.widget.TextView
+15	True	True		544	349	1028	481	android.view.View
+16	False	True	未读 0	731	382	842	448	android.widget.TextView
+15	False	True		463	616	617	770	android.view.View
+16	False	True		474	627	606	759	android.view.View
+16	False	True	暂无消息	458	803	622	869	android.widget.TextView
+17	False	True	到车提醒、订单动态会在这里通知你	260	883	820	949	android.widget.TextView
+16	False	True		474	176	606	308	android.view.View
+17	False	True		474	176	606	308	android.view.View
+18	False	True		518	220	562	264	android.view.View

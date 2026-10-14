@@ -313,6 +313,42 @@ object Repo {
     }
 
     /**
+     * 步行路线（高德 `direction/walking`，Web 服务 key）：**真实**步行距离与时间。
+     *
+     * 首页"最近站"与线路卡用它判可达性 —— 直线 440 米的站实际要走 1.24 公里，
+     * 按直线排会挑错站、也会把 17 分钟的路说成几分钟。
+     * 问不到路线（key 没配 / 配额限流 / 网络失败）时退回 [WalkRoute.estimated] 并如实标"按直线估算"，
+     * 只有连直线都算不出（缺坐标）才给 [WalkRoute.UNKNOWN]。
+     */
+    suspend fun walkRoute(from: Geo?, to: Geo): WalkRoute {
+        if (from == null || (from.lat == 0.0 && from.lng == 0.0) || (to.lat == 0.0 && to.lng == 0.0)) {
+            return WalkRoute.UNKNOWN
+        }
+        val straight = GeoMath.distance(from, to)
+        val key = com.shanxiang.buspost.BuildConfig.AMAP_WEB_KEY
+        if (key.isEmpty()) return WalkRoute.UNKNOWN
+        return try {
+            val root = JSONObject(
+                Api.rawGet(
+                    "https://restapi.amap.com/v3/direction/walking?key=$key" +
+                        "&origin=${from.lng},${from.lat}&destination=${to.lng},${to.lat}"
+                )
+            )
+            val path = root.optJSONObject("route")?.optJSONArray("paths")?.optJSONObject(0)
+            val meters = path?.optString("distance")?.toDoubleOrNull() ?: -1.0
+            val seconds = path?.optString("duration")?.toIntOrNull() ?: -1
+            if (meters > 0 && seconds > 0) WalkRoute(meters, seconds, routed = true)
+            // 问到了报文却没有 paths：这是"没有步行路线"，不是"没问到"
+            else if (root.optString("status") == "1") WalkRoute(0.0, 0, routed = false)
+            else WalkRoute.estimated(straight)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            WalkRoute.estimated(straight)
+        }
+    }
+
+    /**
      * 正向地理编码（高德 geo，Web 服务 key）：地址 → 坐标。
      * 用于"手动地址查公交"功能：用户输入地址，得到坐标后查附近公交。
      * 失败返回 null。

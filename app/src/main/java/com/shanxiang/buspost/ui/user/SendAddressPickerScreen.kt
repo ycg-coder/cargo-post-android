@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shanxiang.buspost.core.loc.Locator
@@ -69,18 +70,18 @@ class SendAddressPickerViewModel : ScreenViewModel() {
     fun loadNearbyStations(context: android.content.Context) = work {
         val geo = Locator.once(context)
         val f = Repo.sendStations()
-        nearbyStations = f.items
         stationsDemo = f.demo
-        // 如果有定位，按距离排序
-        if (geo != null) {
-            nearbyStations = nearbyStations.sortedBy { s ->
-                if (s.geo.lat != 0.0 || s.geo.lng != 0.0) {
-                    distanceMeters(geo.lat, geo.lng, s.geo.lat, s.geo.lng)
-                } else {
-                    Double.MAX_VALUE
-                }
+        // 距离必须**写回 Station**：旧写法只拿它排序，行里那句"距你 X 公里"因为 `distanceMeters`
+        // 恒 0 而永远不出现（真机 2026-10-14 实测：这一屏连着三行"文峰公社"、三行"吉祥路口"，
+        // 没有任何一行能区分它们）。`/send/stations` 的报文本身不带距离，所以距离只在这算一次，
+        // 排序与展示共用同一个数（写两遍算法迟早分家）。
+        nearbyStations = if (geo == null) f.items else f.items
+            .map { s ->
+                // 两个坐标都非零才算有位置：`lat != 0 || lng != 0` 会把只填了一头的脏行当成有效点
+                val hasGeo = s.geo.lat != 0.0 && s.geo.lng != 0.0
+                s.copy(distanceMeters = if (hasGeo) distanceMeters(geo.lat, geo.lng, s.geo.lat, s.geo.lng) else -1.0)
             }
-        }
+            .sortedBy { if (it.distanceMeters >= 0) it.distanceMeters else Double.MAX_VALUE }
         mergeDemo(f.demo)
         error = f.error
     }
@@ -312,9 +313,26 @@ fun SendAddressPickerScreen(
                                         fontSize = (13 * scale).sp,
                                         fontWeight = FontWeight.Medium,
                                     )
+                                    // 同名站点在后端是**不同 id 的不同点位**（实测"文峰公社"三条），
+                                    // 所以地址与距离不是装饰，是这一行唯一的区分依据；缺了就退化成
+                                    // 三行一模一样的按钮，用户点哪个全凭运气。
+                                    if (station.address.isNotEmpty()) {
+                                        Text(
+                                            station.address,
+                                            color = t.textSecondary,
+                                            fontSize = (11 * scale).sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                     if (station.distanceMeters > 0) {
                                         Text(
-                                            "距你 %.1f 公里".format(station.distanceMeters / 1000.0),
+                                            // 1 公里内用米：0.43 与 0.44 公里按一位小数都写成"0.4 公里"，
+                                            // 恰好抹平了同名站点之间唯一能分辨的那点差别
+                                            if (station.distanceMeters < 1000)
+                                                "距你 ${station.distanceMeters.toInt()} 米"
+                                            else
+                                                "距你 %.1f 公里".format(station.distanceMeters / 1000.0),
                                             color = t.textTertiary,
                                             fontSize = (11 * scale).sp,
                                         )

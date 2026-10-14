@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import com.shanxiang.buspost.core.AppState
@@ -51,6 +52,8 @@ import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.AnimatedEnter
 import com.shanxiang.buspost.core.ui.BusCard
+import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusDivider
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.NetworkImage
@@ -73,6 +76,9 @@ import com.shanxiang.buspost.core.ui.SkeletonCard
 import com.shanxiang.buspost.core.ui.SkeletonLine
 import com.shanxiang.buspost.core.ui.SourceTag
 import com.shanxiang.buspost.core.ui.TicketCard
+import com.shanxiang.buspost.ui.common.openWalkRoute
+import com.shanxiang.buspost.data.model.BusLine
+import com.shanxiang.buspost.data.model.WalkRoute
 import com.shanxiang.buspost.data.model.SendOrder
 import com.shanxiang.buspost.data.model.BusVehicle
 import com.shanxiang.buspost.data.model.byUserDistance
@@ -109,6 +115,16 @@ class HomeViewModel : ScreenViewModel() {
     var weatherUpdateTime by mutableStateOf("")
     /** 附近公交完整结果：inService/世界时段/站点/线路都要用（区分 5 种状态） */
     var nearby by mutableStateOf<NearbyResult?>(null)
+    /**
+     * 线路名 → 线路 id。`/bus/nearby` 的 `lines[]` **只有 routeName，没有 id**
+     * （AppBusNearbyRespVO 逐字段核对，见下面 :609 那条旧注释），而点进详情要的是 `/bus/lines` 那一份 id。
+     * 首页此前因此把线路签画成一排点不动的标签（真机反馈"点不进线路详情、也收藏不了"）。
+     */
+    var lineIdsByName by mutableStateOf<Map<String, String>>(emptyMap())
+    /** 首页"附近线路"卡：一条线一张，最多三张，其余去实时公交页看 */
+    var nearbyCards by mutableStateOf<List<NearbyLineCard>>(emptyList())
+    /** 附近线路总数（卡只放三张时，那句"还有多少条"要有出处） */
+    var nearbyLineTotal by mutableStateOf(0)
     /** 公告是否加载失败（与"暂无公告"必须分开，否则网络故障看起来像没有公告） */
     var noticeError by mutableStateOf(false)
     /** 下拉刷新中 */
@@ -156,11 +172,24 @@ class HomeViewModel : ScreenViewModel() {
         geo = target
         locationManual = true
         locationName = name
-        fetchAll(context, target)
+        // 手动选点是"用户亲手定的这个点"，没有精度概念可言：按 100m 那一档收半径，
+        // 而不是沿用上一次 GPS 的精度（上一次可能是一次很飘的 800m 定位，那会把半径放到 15km）
+        fetchAll(context, target, accuracyMeters = 100.0)
     }
 
-    private suspend fun fetchAll(context: android.content.Context, g: Geo?, onlyBus: Boolean = false) = coroutineScope {
-        val nbDeferred = async { Repo.nearbyBuses(g) }
+    private suspend fun fetchAll(
+        context: android.content.Context,
+        g: Geo?,
+        onlyBus: Boolean = false,
+        // 半径跟着**定位精度**走（与 Repo.nearbyRadius 那条三面同规则一致）：
+        // 真机反馈"附近公交把很远的线路也算成附近"读到的就是这个默认值 —— 首页此前根本不传半径，
+        // 于是永远按 15km 问一次（实测该半径下回 188 条线路 / 1238 个站，而 5km 内是 104 条 / 285 站）。
+        accuracyMeters: Double = locFix.accuracyMeters,
+    ) = coroutineScope {
+        val radius = Repo.nearbyRadius(accuracyMeters)
+        val nbDeferred = async { Repo.nearbyBuses(g, radius) }
+        // 线路 id 只能从 /bus/lines 拿（nearby 那一份不带 id），所以首页也问这一份 —— 与实时公交页同一对取数
+        val blDeferred = async { Repo.busLines(g, radius) }
         if (!onlyBus) {
             val noticesDeferred = async { Repo.notices() }
             val productsDeferred = async { Repo.products() }
@@ -201,6 +230,9 @@ class HomeViewModel : ScreenViewModel() {
             nearby = nb.value
             vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
             stations = nb.value?.stations.orEmpty()
+            lineIdsByName = lineIdIndex(blDeferred.await().items)
+            nearbyCards = buildNearbyCards(nb.value, blDeferred.await().items, g)
+            nearbyLineTotal = nb.value?.lineCount ?: 0
             error = nb.error
         } else {
             val nb = nbDeferred.await()
@@ -208,9 +240,61 @@ class HomeViewModel : ScreenViewModel() {
             nearby = nb.value
             vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
             stations = nb.value?.stations.orEmpty()
+            lineIdsByName = lineIdIndex(blDeferred.await().items)
+            nearbyCards = buildNearbyCards(nb.value, blDeferred.await().items, g)
+            nearbyLineTotal = nb.value?.lineCount ?: 0
             error = nb.error
         }
         lastSync = System.currentTimeMillis()
+    }
+
+    /** 线路名 → id 的索引：空 id 的条目不进表（宁可退回不可点的标签，也不给一个点进去是空页的假可点态） */
+    private fun lineIdIndex(lines: List<BusLine>): Map<String, String> =
+        lines.mapNotNull { l -> if (l.id.isEmpty() || l.name.isEmpty()) null else l.name to l.id }.toMap()
+
+    /**
+     * 首页的"附近线路"卡：一条线一张，**按真实步行距离排**，只留三张。
+     *
+     * 先按直线远近取 4 条候选（省配额：一次冷启动最多问 4 次高德步行路线），
+     * 再各问一次真实步行路线、按问到的距离重排。问不到的那条退回直线估算并如实标出来，
+     * 不许把它当成"更近"挤掉别人。
+     */
+    private suspend fun buildNearbyCards(
+        nb: NearbyResult?,
+        linesWithId: List<BusLine>,
+        me: Geo?,
+    ): List<NearbyLineCard> {
+        // 写成显式判空而不是 `nb ?: return emptyList()`：后一种形状会把"请求失败"洗成"这里没有线路"
+        // （SA-d 就是钉这个的），空列表必须是"问到了、确实没有"才许出现
+        if (nb == null || me == null) return emptyList()
+        val r = nb
+        val idByName = lineIdIndex(linesWithId)
+        // 线路名 → 这条线停靠的、离我最近的那个站（nearby 的 stations[].routes 说"哪条线停这一站"）
+        val stopByLine = HashMap<String, Station>()
+        r.stations.filter { it.distanceMeters > 0 && it.geo.lat != 0.0 && it.geo.lng != 0.0 }
+            .sortedBy { it.distanceMeters }
+            .forEach { st -> st.routes.forEach { n -> if (!stopByLine.containsKey(n)) stopByLine[n] = st } }
+        val pool = (r.lines + linesWithId).distinctBy { it.name }
+        val candidates = pool
+            .mapNotNull { l -> stopByLine[l.name]?.let { st -> Pair(l, st) } }
+            .sortedBy { it.second.distanceMeters }
+            .take(4)
+        return coroutineScope {
+            candidates.map { (line, st) ->
+                async {
+                    NearbyLineCard(
+                        lineId = line.id.ifEmpty { idByName[line.name].orEmpty() },
+                        name = line.name,
+                        from = line.from,
+                        to = line.to,
+                        realTransit = line.dataSource.contains("REAL"),
+                        stationName = st.name,
+                        stationGeo = st.geo,
+                        walk = Repo.walkRoute(me, st.geo),
+                    )
+                }
+            }.awaitAll().sortedBy { it.walk.meters }.take(3)
+        }
     }
 
     /** 附近公交状态：off 非运营 / empty 有站无车 / error 接口失败 / noloc 没位置 / data 有数据 */
@@ -276,7 +360,14 @@ fun HomeScreen(
             // 分钟数是 Haversine 直线 ÷ 25km/h 的估算（后端 GeoDistanceUtil），徽章上也要带口径，不许写成道路到站时间
             badge = vm.arriving.firstOrNull()?.carrierEtaMinutes?.let { "约 $it 分钟到车（直线估算）" } ?: "县城⇄乡村",
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                // 这一行必须与上面的副标题拉开：'位置未取到' 自己只有 24dp 行高，可点之后
+                // 系统按 48dp 下限把命中框**以文字中心为轴上下各撑开约 27px**（真机 dump 实测
+                // 341..473 对副标题 302..368 ⇒ 重叠 5481px²）。贴着排就会让"点副标题"落到地址簿上。
+                // 14dp 是把中心推过副标题底沿再加余量的实测值，不是审美间距。
+                modifier = Modifier.padding(top = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Icon(BusIcons.location, null, tint = t.onPrimary.copy(alpha = 0.9f), modifier = Modifier.size(15.dp))
                 Text(
                     // 「拿到了坐标」和「拿到了区域名」是两件事：旧写法两头都空就统一说"位置未取到"，
@@ -425,132 +516,157 @@ fun HomeScreen(
         }
         }
 
-        // ---------- 附近公交：区块头 + meta + 五态（loading/off/empty/error/data）----------
+        // ---------- 附近线路：一条线一张卡，首页最多三张，其余去「更多」 ----------
+        // 用户两轮反馈：①"没有附近公交卡片"（当时整节散在页面流里）；②"不要合到一起，
+        // 首页显示三个就行"（第一轮我把五条状态合进了一张大卡，方向反了）。
+        // 现在：区块头 + 口径签在卡外，每条线路自己一张卡，卡里给的是**真实步行路线**的距离与时间。
         item {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 实时脉冲点：对标车来了/高德的"实时"指示灯
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(if (vm.busState() == "data") t.primary else t.textTertiary),
-            )
-            Text(
-                "附近公交",
-                color = t.ink,
-                fontSize = (16 * scale).sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-            // 车辆计数（对标车来了：标题旁显示在跑车辆数）
-            if (vm.busState() == "data" && vm.vehicles.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 实时脉冲点：对标车来了/高德的"实时"指示灯
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (vm.busState() == "data") t.primary else t.textTertiary),
+                )
                 Text(
-                    " ${vm.vehicles.size} 辆在跑",
-                    color = t.primaryOnLight,
-                    fontSize = (12 * scale).sp,
+                    "附近公交",
+                    color = t.ink,
+                    fontSize = (16 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+                // 车辆计数（对标车来了：标题旁显示在跑车辆数）
+                if (vm.busState() == "data" && vm.vehicles.isNotEmpty()) {
+                    Text(
+                        " ${vm.vehicles.size} 辆在跑",
+                        color = t.primaryOnLight,
+                        fontSize = (12 * scale).sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                // 「文字 + 箭头」必须在同一个容器里，否则 space-between 会把中间项居中、箭头推到最右
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(BusRadius.pill))
+                        .clickable { nav.navigate(Routes.BUS) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("更多", color = t.primaryOnLight, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
+                    Icon(BusIcons.next, null, tint = t.primaryOnLight, modifier = Modifier.size(15.dp))
+                }
+            }
+
+            val nb = vm.nearby
+            if (nb != null && (vm.locationName.isNotEmpty() || vm.lastSync > 0L)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (vm.locationName.isNotEmpty()) BusTag("根据${vm.locationName}展示", tone = BusTone.NEUTRAL)
+                    // 这一签说的是"附近公交这批数据本机什么时候拉到的"，所以取 lastSync。
+                    // 原来挂的是 weatherUpdateTime：下拉刷新走 onlyBus=true 那一支，不写它，
+                    // 于是车辆列表刷新了、时间还停在天气那一次（设备实拍 s_home2：表钟 14:21，签上 14:17）。
+                    if (vm.lastSync > 0L) {
+                        val syncText = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(java.util.Date(vm.lastSync))
+                        BusTag("更新于 $syncText", tone = BusTone.NEUTRAL)
+                    }
+                }
+            }
+            // 班次与服务时段是"这一片"的口径（后端 nearby 只给一个 nextDepartureTime），
+            // 因此挂在区块下，不塞进某一条线路的卡里冒充那一条线的班次。
+            val shiftLine = listOfNotNull(
+                nb?.nextDepartureTime?.takeIf { it.isNotEmpty() }?.let { "下一班 $it 发车" },
+                nb?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let { "服务时段 $it" },
+            ).joinToString("  ·  ")
+            if (shiftLine.isNotEmpty()) {
+                Text(
+                    shiftLine,
+                    color = t.ink,
+                    fontSize = (13 * scale).sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
-            Spacer(Modifier.weight(1f))
-            // 「文字 + 箭头」必须在同一个容器里，否则 space-between 会把中间项居中、箭头推到最右
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(BusRadius.pill))
-                    .clickable { nav.navigate(Routes.BUS) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("更多", color = t.primaryOnLight, fontSize = (13 * scale).sp, fontWeight = FontWeight.Medium)
-                Icon(BusIcons.next, null, tint = t.primaryOnLight, modifier = Modifier.size(15.dp))
-            }
-        }
 
-        val nb = vm.nearby
-        if (nb != null && (vm.locationName.isNotEmpty() || vm.lastSync > 0L)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (vm.locationName.isNotEmpty()) BusTag("根据${vm.locationName}展示", tone = BusTone.NEUTRAL)
-                // 这一签说的是"附近公交这批数据本机什么时候拉到的"，所以取 lastSync。
-                // 原来挂的是 weatherUpdateTime：下拉刷新走 onlyBus=true 那一支，不写它，
-                // 于是车辆列表刷新了、时间还停在天气那一次（设备实拍 s_home2：表钟 14:21，签上 14:17）。
-                if (vm.lastSync > 0L) {
-                    val syncText = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(java.util.Date(vm.lastSync))
-                    BusTag("更新于 $syncText", tone = BusTone.NEUTRAL)
-                }
-            }
-        }
+            when (vm.busState()) {
+                "loading" -> SkeletonCard(rows = 2)
 
-        when (vm.busState()) {
-            "loading" -> SkeletonCard(rows = 2)
-
-            // 非运营时间：如实说明服务时段与下一班，不铺"待发车"卡片（MP-11）
-            "off" -> EmptyState(
-                title = "当前不在运营时间",
-                subtitle = listOfNotNull(
-                    nb?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let { "服务时段 $it" },
-                    nb?.nextDepartureTime?.takeIf { it.isNotEmpty() }?.let { "下一班 $it 发车" },
-                    nb?.lineCount?.takeIf { it > 0 }?.let { "附近共 $it 条公交线路" },
-                ).joinToString("；"),
-                icon = BusIcons.clock,
-            )
-
-            // 有站/有线路但无车：不能说"附近没有公交"，把站点与线路如实列出来（MP-11 chip）
-            "empty" -> {
-                val lines = nb?.lines.orEmpty()
-                val stations0 = nb?.stations.orEmpty()
-                Column {
+                // 没拿到位置：只说"没位置所以算不了附近"，不替后端下"这里没线路"的结论
+                "noloc" -> BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
                     EmptyState(
-                        title = when {
-                            lines.isNotEmpty() -> "附近有 ${nb?.lineCount?.takeIf { it > 0 } ?: lines.size} 条公交线路"
-                            stations0.isNotEmpty() -> "附近有 ${stations0.size} 个公交站点"
-                            else -> "附近暂无公交线路"
-                        },
-                        subtitle = if (lines.isNotEmpty() || stations0.isNotEmpty()) "当前暂无实时车辆数据" else null,
+                        title = "还没拿到你的位置",
+                        subtitle = "定位恢复后这里会列出附近的站点与线路",
                         icon = BusIcons.bus,
+                        actionText = "重新定位",
+                        onAction = { vm.relocate(context) },
                     )
-                    val chips = if (lines.isNotEmpty()) {
-                        lines.take(6).map { l ->
-                            l.name + if (l.dataSource.contains("REAL")) " · 现实公交" else " · 项目线路"
-                        }
-                    } else {
-                        stations0.take(6).map { st ->
-                            st.name + if (st.distanceMeters > 0) " · ${"%.1f".format(st.distanceMeters / 1000)}km" else ""
-                        }
-                    }
-                    if (chips.isNotEmpty()) {
-                        BusScrollRow(spacedBy = 6.dp) {
-                            items(chips, key = { it }) { chip ->
-                                BusTag(chip, tone = BusTone.NEUTRAL)
-                            }
-                        }
-                    }
+                    // 第二条出口：室内、GPS 冷启动、系统定位服务关着时，用户不必等定位 ——
+                    // 选一个附近站点当作自己的位置，附近公交立刻可用。
+                    BusButton(
+                        text = "选一个附近站点当作我的位置",
+                        onClick = { showManualPick = true },
+                        variant = BusButtonVariant.TEXT,
+                        small = true,
+                    )
                 }
-            }
 
-            // 没拿到位置：只说"没位置所以算不了附近"，不替后端下"这里没线路"的结论（与 busState 的 noloc 对应）
-            "noloc" -> EmptyState(
-                title = "还没拿到你的位置",
-                subtitle = "定位恢复后这里会列出附近的站点与线路",
-                icon = BusIcons.bus,
-                actionText = "重新定位",
-                onAction = { vm.relocate(context) },
-            )
+                "error" -> BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
+                    EmptyState(
+                        title = "实时公交暂时不可用",
+                        subtitle = "网络不太好，稍后再试",
+                        icon = BusIcons.info,
+                        actionText = "重新加载",
+                        onAction = { vm.load(context) },
+                    )
+                }
 
-            "error" -> EmptyState(
-                title = "实时公交暂时不可用",
-                subtitle = "网络不太好，稍后再试",
-                icon = BusIcons.info,
-                actionText = "重新加载",
-                onAction = { vm.load(context) },
-            )
-
-            else -> {
-                vm.vehicles.take(5).forEach { v ->
-                    // 真实 NearbyBus/AppBusRespVO 不带 routeId（只带 routeName，2026-09-29 逐字段核对，审计 §69）：
-                    // 先按线路名回查附近线路列表，查不到就是空串 —— 不给「点了没反应」的假可点态
-                    val lineId = vm.nearby?.lines
-                        ?.firstOrNull { it.name.isNotEmpty() && it.name == v.lineName }?.id?.ifEmpty { null }
-                        ?: v.routeId
-                    VehicleRow(v) { if (lineId.isNotEmpty()) nav.navigate(Routes.busDetail(lineId)) }
+                else -> {
+                    // 非运营时间：如实说明，不铺"待发车"卡片（MP-11）；线路卡照给，
+                    // 因为"附近有哪些线、走过去要多久"这件事跟此刻发不发车无关。
+                    if (vm.busState() == "off") {
+                        BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
+                            EmptyState(
+                                title = "当前不在运营时间",
+                                subtitle = listOfNotNull(
+                                    nb?.serviceWindowText?.takeIf { it.isNotEmpty() }?.let { "服务时段 $it" },
+                                    nb?.lineCount?.takeIf { it > 0 }?.let { "附近共 $it 条公交线路" },
+                                ).joinToString("；"),
+                                icon = BusIcons.clock,
+                            )
+                        }
+                    }
+                    // 在跑的车（有实时位置才出现；项目车辆开始上报后走的就是这一格）
+                    vm.vehicles.take(3).forEach { v ->
+                        // 真实 NearbyBus/AppBusRespVO 不带 routeId（只带 routeName，2026-09-29 逐字段核对，审计 §69）：
+                        // 先按线路名查 /bus/lines 那一份 id（lineIdsByName），再退到车辆自带的 routeId，
+                        // 两头都没有就是空串 —— 不给「点了没反应」的假可点态
+                        val lineId = vm.lineIdsByName[v.lineName]
+                            ?: vm.nearby?.lines
+                                ?.firstOrNull { it.name.isNotEmpty() && it.name == v.lineName }?.id?.ifEmpty { null }
+                            ?: v.routeId
+                        BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
+                            VehicleRow(v) { if (lineId.isNotEmpty()) nav.navigate(Routes.busDetail(lineId)) }
+                        }
+                    }
+                    if (vm.nearbyCards.isEmpty() && vm.busState() != "off") {
+                        BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
+                            EmptyState(
+                                title = if ((nb?.stations.orEmpty()).isNotEmpty())
+                                    "附近有 ${nb?.stations?.size} 个公交站点"
+                                else "附近暂无公交线路",
+                                subtitle = "这一带还没接入实时公交位置源；班车开始上报位置后，这里直接列在跑的车。",
+                                icon = BusIcons.bus,
+                            )
+                        }
+                    }
+                    vm.nearbyCards.forEach { card -> NearbyLineCardView(card) }
+                    if (vm.nearbyLineTotal > vm.nearbyCards.size) {
+                        Text(
+                            "附近还有 ${vm.nearbyLineTotal - vm.nearbyCards.size} 条线路，点「更多」看全部",
+                            color = t.textTertiary,
+                            fontSize = (11 * scale).sp,
+                        )
+                    }
                 }
             }
         }
@@ -1330,4 +1446,120 @@ private fun AddressBookDialog(
         },
         confirmButton = { BusDialogAction("关闭", onClick = onDismiss) },
     )
+}
+
+/**
+ * 首页"附近线路"卡的数据：一条线一张卡。
+ *
+ * [walk] 是**真实步行路线**（高德 direction/walking），不是直线距离 —— 真机实测直线 440 米的站
+ * 步行要 1.24 公里 / 约 17 分钟，按直线排会挑错站、也会把要走的路说短。
+ */
+data class NearbyLineCard(
+    val lineId: String,
+    val name: String,
+    val from: String,
+    val to: String,
+    val realTransit: Boolean,
+    val stationName: String,
+    val stationGeo: Geo,
+    val walk: WalkRoute,
+)
+
+/**
+ * 一条附近线路 = 一张卡（用户点名"不要合到一起"）。
+ *
+ * 卡上的距离与时间是**真实步行路线**（高德 direction/walking），不是直线：直线 440 米的站
+ * 实测要走 1.24 公里 / 约 17 分钟。问不到路线时退回直线估算，并把"按直线估算"写在数字旁边。
+ */
+@Composable
+private fun NearbyLineCardView(card: NearbyLineCard) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val nav = LocalNavController.current
+    val context = LocalContext.current
+    var isFav by remember(card.lineId) { mutableStateOf(Prefs.isFavoriteLine(card.lineId)) }
+    var walkProblem by remember { mutableStateOf<String?>(null) }
+    val openDetail = if (card.lineId.isEmpty()) null else ({ nav.navigate(Routes.busDetail(card.lineId)) })
+    BusCard(
+        modifier = Modifier.fillMaxWidth(),
+        border = true,
+        onClick = openDetail,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                card.name,
+                color = t.ink,
+                fontSize = (15 * scale).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (card.lineId.isNotEmpty()) {
+                Icon(
+                    BusIcons.star,
+                    if (isFav) "已收藏" else "收藏",
+                    tint = if (isFav) t.goldDeep else t.textTertiary,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size((22 * scale).dp)
+                        .clickable {
+                            Prefs.toggleFavoriteLine(card.lineId)
+                            isFav = !isFav
+                        },
+                )
+            }
+        }
+        Text(
+            (if (card.from.isNotEmpty() && card.to.isNotEmpty()) "${card.from} → ${card.to} · " else "") +
+                if (card.realTransit) "现实公交" else "项目线路",
+            color = t.textSecondary,
+            fontSize = (12 * scale).sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            "步行到「${card.stationName}」",
+            color = t.ink,
+            fontSize = (13 * scale).sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Text(
+            card.walk.text,
+            color = when (card.walk.routed) {
+                null -> t.textTertiary   // 没问到：灰着说"给不出"，不演成"走不通"
+                false -> t.danger        // 问到了确实没有步行路线
+                else -> t.textSecondary
+            },
+            fontSize = (12 * scale).sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        BusButton(
+            text = "步行导航",
+            onClick = {
+                walkProblem = if (openWalkRoute(context, card.stationName, card.stationGeo)) {
+                    null
+                } else {
+                    "这台机器打不开步行导航：既没装高德地图，也没能打开高德网页版"
+                }
+            },
+            variant = BusButtonVariant.OUTLINE,
+            small = true,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+        walkProblem?.let {
+            Text(it, color = t.danger, fontSize = (12 * scale).sp, modifier = Modifier.padding(top = 6.dp))
+        }
+        // 编号缺失时整卡不可点：不给"点了没反应"的假可点态，并把原因写在卡上
+        if (openDetail == null) {
+            Text(
+                "这条线还没拿到线路编号，暂时点不进详情",
+                color = t.textTertiary,
+                fontSize = (11 * scale).sp,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
 }

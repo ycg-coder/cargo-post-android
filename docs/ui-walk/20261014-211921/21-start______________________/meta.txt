@@ -1,0 +1,12 @@
+path=start>南岸区南山街道
+depth=1
+hash=7b882f16a585
+clickable_total=6
+front=Window{3560534 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 11 (0.01%)
+log_lines=3443
+E级=71
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

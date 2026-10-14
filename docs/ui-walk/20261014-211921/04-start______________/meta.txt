@@ -1,0 +1,12 @@
+path=start_______>商城
+depth=2
+hash=cf1c5eb30ad6
+clickable_total=44
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.06%)
+log_lines=2273
+E级=36
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

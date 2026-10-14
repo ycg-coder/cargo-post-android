@@ -1,0 +1,41 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	意见反馈	165	143	349	209	android.widget.TextView
+10	False	True	缺什么、想寄什么，说给站点听	165	209	627	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2088	android.widget.ScrollView
+12	False	True		0	309	110	441	android.view.View
+13	False	True	写反馈	69	341	201	407	android.widget.TextView
+14	False	True		88	484	992	1220	android.view.View
+15	False	True		121	484	959	792	android.view.View
+16	True	True		121	484	959	792	android.widget.EditText
+17	False	True		165	660	915	748	android.view.View
+18	False	True		165	528	915	660	android.view.View
+19	False	True	比如：希望每周三加一班到县城，鸡蛋太多装不下	165	528	915	660	android.widget.TextView
+17	False	True	称呼	94	820	164	886	android.widget.TextView
+18	False	True		121	900	493	1054	android.view.View
+19	True	True	用户150169	121	900	493	1054	android.widget.EditText
+20	False	True		165	912	449	1044	android.view.View
+19	False	True	电话	560	820	630	886	android.widget.TextView
+20	False	True		587	900	959	1054	android.view.View
+21	True	True	13800004021	587	900	959	1054	android.widget.EditText
+22	False	True		631	912	915	1044	android.view.View
+21	True	True		88	1082	992	1220	android.view.View
+22	False	True		375	1086	507	1218	android.view.View
+23	False	True	提交反馈	485	1118	667	1184	android.widget.TextView
+22	False	True		0	1265	110	1397	android.view.View
+23	False	True	历史反馈	69	1297	245	1363	android.widget.TextView
+24	False	True	0 条	69	1369	133	1435	android.widget.TextView
+25	False	True		463	1562	617	1716	android.view.View
+26	False	True		474	1573	606	1705	android.view.View
+26	False	True	还没有提过反馈	397	1749	684	1815	android.widget.TextView
+27	False	True	站点缺什么、服务怎么样，告诉我们	260	1829	820	1895	android.widget.TextView

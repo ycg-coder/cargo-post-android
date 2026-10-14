@@ -1,0 +1,26 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	我的钱包	165	143	349	209	android.widget.TextView
+10	False	True	余额与交易记录（只读）	165	209	528	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2067	android.widget.ScrollView
+12	False	True		469	413	612	556	android.view.View
+13	False	True		475	419	607	551	android.view.View
+13	False	True	请求地址不存在:app-api/transport/wallet/balance（点「重试」再看一次；这一版没有充值与余额支付入口）	99	584	981	782	android.widget.TextView
+14	True	True		428	821	652	953	android.view.View
+15	False	True	重新加载	461	854	619	920	android.widget.TextView
+15	False	True		469	1130	612	1273	android.view.View
+16	False	True		475	1136	607	1268	android.view.View
+16	False	True	请求地址不存在:app-api/transport/wallet/transactions（点「重试」再看一次；这一版没有充值与余额支付入口）	99	1301	981	1499	android.widget.TextView
+17	True	True		428	1538	652	1670	android.view.View
+18	False	True	重新加载	461	1571	619	1637	android.widget.TextView
+18	False	True	这一版没有充值与余额支付入口：后端的充值口不带幂等键，且模拟到账与真实到账的记录字段完全相同，界面没法如实区分，所以先只开放查询。	44	1775	1036	1973	android.widget.TextView

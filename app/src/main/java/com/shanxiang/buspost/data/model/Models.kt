@@ -357,8 +357,8 @@ data class Product(
                 // （只读 price：pages/goods/detail.js:69）与演示面三方都无生产者，留着就是第四个真相源。
                 unit = o.multiStr("unit").ifEmpty { "份" },
                 stock = o.multiNumOrNull("stock", "inventory")?.toInt(),
-                // imageUrl 是小程序 product-img.js 的首选字段，必须排在 picUrl 之前
-                image = o.multiStr("imageUrl", "picUrl", "image", "imgUrl", "avatar"),
+                // 只认 URL 形状（imageUrlOrEmpty）：`image` 列装的是 emoji，喂给加载器就是永远加载不出来的空白
+                image = o.imageUrlOrEmpty("imageUrl", "picUrl", "imgUrl", "image"),
                 category = o.multiStr("category", "categoryName", "tag"),
                 village = o.multiStr("village", "origin", "producer"),
                 intro = o.multiStr("intro", "detail", "description"),
@@ -439,7 +439,7 @@ data class ProductOrder(
                     it.multiStr("productName", "name", "goodsName"),
                     it.multiNum("count", "quantity", "num").toInt().coerceAtLeast(1),
                     it.multiNum("price", "unitPrice"),
-                    it.multiStr("productImage", "imageUrl", "picUrl", "image", "imgUrl"),
+                    it.imageUrlOrEmpty("productImage", "imageUrl", "picUrl", "imgUrl"),
                     it.multiNum("productId", "id").toLong(),
                     it.multiNum("amount", "totalPrice", "lineAmount"),
                 )
@@ -504,6 +504,8 @@ data class Station(
     val custom: Boolean? = null,
     /** 站点来源：REAL_TRANSIT 现实公交站 / 项目自建站（页面要分标签） */
     val dataSource: String = "",
+    /** 站点地址（`/send/stations` 的 `address`）：同名不同点位的站点在选站点列表里靠它区分 */
+    val address: String = "",
 ) {
     /** 现实公交站点（高德 POI），与项目自建站区分展示 */
     val isRealTransit: Boolean get() = dataSource.contains("REAL")
@@ -538,6 +540,7 @@ data class Station(
                 // custom 读法已撤（F-3 ②）：`custom`/`selfBuilt`/`isCustom` 三个键名三方都无生产者，
                 // 而全工程也没有任何 UI 读这个字段——站点类型一律按 dataSource 判（isRealTransit）。
                 dataSource = o.multiStr("dataSource", "provider"),
+                address = o.multiStr("address", "addr"),
             )
         }
     }
@@ -2307,3 +2310,75 @@ data class DriverTaskSegment(
     }
 }
 
+/**
+ * 一次步行路线的结果（高德 `direction/walking`）。
+ *
+ * 为什么要有这个类型：真机实测，直线 440 米的站，真实步行路线是 **1.24 公里 / 约 17 分钟** ——
+ * 拿直线距离当"能不能走到"会挑错站、也会把 17 分钟的路说成 4 分钟。
+ * [source] 必须随数字一起上界面：估算就是估算，不许混成实测。
+ */
+data class WalkRoute(
+    val meters: Double,
+    val seconds: Int,
+    /**
+     * 三态，不是布尔（§11 同一条规矩）：true 有路线 / false 问到了但没有步行路线 /
+     * **null 根本没问到**。把 null 塌成 false 就是拿"没发生"当"没有"。
+     */
+    val routed: Boolean?,
+    /** REAL_ROUTE 真实步行路线 / ESTIMATED 直线÷1.2m/s 估算 / UNKNOWN 两头都没有 */
+    val source: String = "REAL_ROUTE",
+) {
+    val isReal: Boolean get() = source == "REAL_ROUTE"
+    val minutes: Int get() = if (seconds <= 0) 0 else kotlin.math.ceil(seconds / 60.0).toInt()
+    val distanceText: String
+        get() = when {
+            meters <= 0 -> ""
+            meters < 1000 -> "${meters.toInt()} 米"
+            else -> "%.1f 公里".format(meters / 1000)
+        }
+    /** 卡面上的一句话：三态各有各的说法，不许把"没问到"演成"走不通" */
+    val text: String
+        get() = when {
+            routed == null -> "步行路线没问到（这一格暂时给不出可达性）"
+            routed == false -> "没查到这一趟的步行路线"
+            else -> "步行 $distanceText" + (if (minutes > 0) " · 约 $minutes 分钟" else "") +
+                if (isReal) "（真实步行路线）" else "（按直线估算）"
+        }
+
+    companion object {
+        val UNKNOWN = WalkRoute(0.0, 0, routed = null, source = "UNKNOWN")
+
+        /** 问不到真实路线时按步行 1.2m/s 估（与后端 `AppSendReachabilityService:152-154` 同一公式） */
+        fun estimated(straightMeters: Double): WalkRoute = WalkRoute(
+            meters = straightMeters,
+            seconds = kotlin.math.ceil(straightMeters / 1.2 / 60.0).toInt() * 60,
+            routed = straightMeters > 0,
+            source = "ESTIMATED",
+        )
+    }
+}
+
+/**
+ * 从报文里挑一个**真的能加载的**图片地址。
+ *
+ * 真机实测（2026-10-14）：商品表的 `image` 列装的是 emoji（桃子），`image_url` 才是图片。
+ * 旧写法 `multiStr("imageUrl","picUrl","image",…)` 在 imageUrl 为空串时会退到 `image`，
+ * 于是把 emoji 当 URL 交给图片加载器 ⇒ 永远加载失败，卡面只剩一片空白（用户反馈"没有商品图片"）。
+ * 这里只认 http(s) 与绝对路径三种形状，其余一律当"没有图"，让界面走占位。
+ */
+fun JSONObject.imageUrlOrEmpty(vararg keys: String): String {
+    for (k in keys) {
+        val v = opt(k)
+        if (v is JSONArray || v is JSONObject) continue
+        val s = v?.toString()?.trim().orEmpty()
+        if (s.isEmpty() || s == "null") continue
+        if (s.startsWith("http://") || s.startsWith("https://")) return s
+        if (s.startsWith("/")) {
+            // 相对路径按**站点根**补全，不按 API 前缀：`/images/...` 不在 `/app-api` 下面
+            val base = com.shanxiang.buspost.BuildConfig.BASE_URL
+            val host = base.substringAfter("://", "").substringBefore("/")
+            if (host.isNotEmpty()) return base.substringBefore("://") + "://" + host + s
+        }
+    }
+    return ""
+}

@@ -1,0 +1,28 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	1600	1080	2400	android.view.View
+7	False	False		0	121	1080	2400	android.view.View
+8	False	False		0	121	1080	1600	android.view.View
+9	False	False		66	187	1014	319	android.view.View
+10	True	True		66	187	198	319	android.view.View
+11	False	True	返回	102	223	163	284	android.view.View
+11	False	True	手动地址查公交	209	187	531	253	android.widget.TextView
+12	False	True	输入地址，查看该地公交与服务	209	253	671	319	android.widget.TextView
+12	False	True		88	418	992	870	android.view.View
+13	False	True	输入具体地址	88	418	316	484	android.widget.TextView
+14	False	True		121	506	959	704	android.view.View
+15	True	True		121	506	959	704	android.widget.EditText
+16	False	True		165	539	915	671	android.view.View
+17	False	True		165	517	756	649	android.view.View
+18	False	True	如：XX省XX市XX县XX镇XX村	165	550	756	616	android.widget.TextView
+16	True	True		88	732	992	870	android.view.View
+17	False	True	查询	495	768	586	834	android.widget.TextView
+16	False	True		463	1041	617	1195	android.view.View
+17	False	True		474	1052	606	1184	android.view.View
+17	False	True	输入地址后点查询	376	1228	704	1294	android.widget.TextView
+18	False	True	用于在地图上定位该村/镇，并列出附近的公交与揽收点	113	1308	967	1374	android.widget.TextView

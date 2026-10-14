@@ -169,6 +169,11 @@ object Prefs {
         get() = sp.getBoolean("notifPrompted", false)
         set(v) = sp.edit().putBoolean("notifPrompted", v).apply()
 
+    /** 更新弹窗只对"这一个版本"问一次：用户点了稍后，下次冷启动不该再拿同一个 tag 拦路 */
+    var updateSkipTag: String
+        get() = sp.getString("updateSkipTag", "") ?: ""
+        set(v) = sp.edit().putString("updateSkipTag", v).apply()
+
     /** 已提醒过的消息 id 水位，避免重启后重复轰炸 */
     var lastSeenNotifyId: Long
         get() = sp.getLong("lastSeenNotifyId", 0L)

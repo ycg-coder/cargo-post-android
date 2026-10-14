@@ -1,0 +1,47 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	297	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	选择取货地址	165	176	441	242	android.widget.TextView
+9	False	True		0	297	1080	2400	android.widget.ScrollView
+10	False	True		88	385	992	923	android.view.View
+11	False	True	手动输入地址	165	385	393	451	android.widget.TextView
+12	False	True	地址	94	479	164	545	android.widget.TextView
+13	False	True		121	559	959	757	android.view.View
+14	False	True		69	592	171	724	android.view.View
+15	True	True		171	559	959	757	android.widget.EditText
+16	False	True		215	592	915	724	android.view.View
+17	False	True		215	570	755	702	android.view.View
+18	False	True	如：云山村 3 组，村口小卖部	215	603	755	669	android.widget.TextView
+16	True	True		88	785	992	923	android.view.View
+17	False	True		375	789	507	921	android.view.View
+18	False	True	查询地址	485	821	667	887	android.widget.TextView
+17	False	True		88	1044	992	2400	android.view.View
+18	False	True	附近站点	165	1055	317	1121	android.widget.TextView
+19	False	True		357	1022	489	1154	android.view.View
+20	False	True	1805 个	367	1055	479	1121	android.widget.TextView
+20	True	True		88	1160	992	1424	android.view.View
+21	False	True	文峰公社	187	1193	327	1259	android.widget.TextView
+22	False	True	文峰公社	187	1259	307	1325	android.widget.TextView
+23	False	True	距你 436 米	187	1325	349	1391	android.widget.TextView
+23	True	True		88	1452	992	1716	android.view.View
+24	False	True	文峰公社	187	1485	327	1551	android.widget.TextView
+25	False	True	文峰公社	187	1551	307	1617	android.widget.TextView
+26	False	True	距你 436 米	187	1617	349	1683	android.widget.TextView
+26	True	True		88	1744	992	2008	android.view.View
+27	False	True	文峰公社	187	1777	327	1843	android.widget.TextView
+28	False	True	文峰公社	187	1843	307	1909	android.widget.TextView
+29	False	True	距你 443 米	187	1909	349	1975	android.widget.TextView
+29	True	True		88	2036	992	2300	android.view.View
+30	False	True	吉祥路口	187	2069	327	2135	android.widget.TextView
+31	False	True	吉祥路口	187	2135	307	2201	android.widget.TextView
+32	False	True	距你 525 米	187	2201	348	2267	android.widget.TextView
+32	True	True		88	2328	992	2400	android.view.View
+33	False	True	吉祥路口	187	2361	327	2400	android.widget.TextView

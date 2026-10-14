@@ -1,0 +1,1 @@
+thin	start______________________	clickable=6	前台=Window{3560534 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}

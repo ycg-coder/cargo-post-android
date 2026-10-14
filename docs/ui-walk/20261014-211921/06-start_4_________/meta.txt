@@ -1,0 +1,12 @@
+path=start>4日预报
+depth=1
+hash=2ff1c254a453
+clickable_total=44
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.01%)
+log_lines=9706
+E级=189
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

@@ -1,0 +1,38 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	297	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	用户协议	165	143	349	209	android.widget.TextView
+10	False	True	这个应用提供什么服务、不提供什么服务	165	209	759	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2400	android.widget.ScrollView
+12	False	True		0	309	110	441	android.view.View
+13	False	True	更新日期：2026-10-12	69	341	532	407	android.widget.TextView
+14	False	True		88	484	992	877	android.view.View
+15	False	True	一、这是什么	88	484	334	550	android.widget.TextView
+16	False	True	乡邮智联：农村客货邮一体化服务，班车顺路带货——快递进村、农产品出山、乘客照常乘车。	88	567	992	699	android.widget.TextView
+17	False	True		88	656	992	745	android.view.View
+18	False	True	本应用是运输的组织工具：下单、匹配班次、站点交接、跟踪与签收。	88	745	992	877	android.widget.TextView
+18	False	True		88	998	992	1813	android.view.View
+19	False	True	二、服务边界	88	998	334	1064	android.widget.TextView
+20	False	True	不提供网上预约乘车：班车按线路与时刻运行，逢站必停上下客，你不需要也不能在应用里「订一个座位」。	88	1081	992	1213	android.widget.TextView
+21	False	True		88	1170	992	1259	android.view.View
+22	False	True	货物随车不单独占座、不阻塞过道与车门；超限或不符合安全要求的件会被站点退回或改约。	88	1259	992	1391	android.widget.TextView
+23	False	True		88	1348	992	1437	android.view.View
+24	False	True	投递方式只有三种：县城内预约上门取件、送到乡镇/村的揽收点或公交站点自提、以及站点之间的交接运输；具体以你下单时页面显示的为准。	88	1437	992	1635	android.widget.TextView
+25	False	True		88	1592	992	1681	android.view.View
+26	False	True	本应用不是出租车/网约车平台，不做即时点对点派送承诺。	88	1681	992	1813	android.widget.TextView
+26	False	True		88	1934	992	2400	android.view.View
+27	False	True	三、你的义务	88	1934	334	2000	android.widget.TextView
+28	False	True	填写真实的寄件人、收件人与联系电话；地址不详会导致无法派送时按站点交接处理。	88	2017	992	2149	android.widget.TextView
+29	False	True		88	2106	992	2195	android.view.View
+30	False	True	不寄递违禁品、危险品与不符合运输规定的物品；生鲜、易碎件请在备注里说明。	88	2195	992	2327	android.widget.TextView
+31	False	True		88	2284	992	2400	android.view.View
+32	False	True	取件时出示取件码；他人代取的，按站点规则登记。	88	2373	939	2400	android.widget.TextView

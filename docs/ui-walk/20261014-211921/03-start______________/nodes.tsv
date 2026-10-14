@@ -1,0 +1,51 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	0	1080	2400	android.view.View
+7	False	False		0	1661	1080	2208	android.view.View
+8	False	False		0	121	1080	2208	android.view.View
+9	False	False		0	121	1080	1661	android.widget.ScrollView
+10	False	False	我的包裹	44	165	272	241	android.widget.TextView
+11	False	False	寄货 0 单 · 商城 0 单	44	249	369	315	android.widget.TextView
+12	True	True		940	175	1072	307	android.view.View
+13	True	True		44	345	1036	477	android.view.View
+14	False	True	到车提醒	155	378	947	444	android.widget.TextView
+14	False	True		77	507	836	661	android.view.View
+15	False	True		25	518	127	650	android.view.View
+16	True	True		127	507	836	661	android.widget.EditText
+17	False	True		171	519	792	651	android.view.View
+18	False	True		171	518	540	650	android.view.View
+19	False	True	输入运单号查询物流	171	551	540	617	android.widget.TextView
+17	True	True		891	527	1036	659	android.view.View
+18	False	True	查询	924	560	1003	626	android.widget.TextView
+18	False	True		52	702	1028	834	android.view.View
+19	True	True		52	702	372	834	android.view.View
+20	False	True	我的寄货	136	735	288	801	android.widget.TextView
+20	True	True		380	702	700	834	android.view.View
+21	False	True	我的购物	464	735	616	801	android.widget.TextView
+21	True	True		708	702	1028	834	android.view.View
+22	False	True	单号查询	792	735	944	801	android.widget.TextView
+21	False	True		463	969	617	1123	android.view.View
+22	False	True		474	980	606	1112	android.view.View
+22	False	True	还没有寄货记录	397	1156	684	1222	android.widget.TextView
+23	False	True	山货出山、包裹进村，点这里寄一件	260	1236	820	1302	android.widget.TextView
+24	True	True		428	1341	652	1473	android.view.View
+25	False	True	去寄一件	461	1374	619	1440	android.widget.TextView
+23	False	True		0	2208	1080	2400	android.view.View
+24	False	True		0	2144	1080	2230	android.view.View
+25	True	True		0	2230	270	2381	android.view.View
+26	False	True	首页	105	2238	166	2299	android.view.View
+27	False	True	首页	105	2307	165	2373	android.widget.TextView
+27	True	True		270	2230	540	2381	android.view.View
+28	False	True	商城	375	2238	436	2299	android.view.View
+29	False	True	商城	375	2307	435	2373	android.widget.TextView
+29	True	True		540	2230	810	2381	android.view.View
+30	False	True	快递	645	2238	706	2299	android.view.View
+31	False	True	快递	645	2307	705	2373	android.widget.TextView
+31	True	True		810	2230	1080	2381	android.view.View
+32	False	True	我的	915	2238	976	2299	android.view.View
+33	False	True	我的	915	2307	975	2373	android.widget.TextView

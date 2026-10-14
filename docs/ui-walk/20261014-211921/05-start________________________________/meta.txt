@@ -1,0 +1,12 @@
+path=start_______>取件码与物流轨迹
+depth=2
+hash=df043212278e
+clickable_total=19
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.02%)
+log_lines=8055
+E级=100
+崩溃或ANR=0
+0
+网络/后端失败=0
+0
