@@ -321,6 +321,7 @@ private fun GoodsCard(p: Product, modifier: Modifier = Modifier, onClick: () -> 
                     width = 400.dp,
                     height = 112.dp,
                     modifier = Modifier.fillMaxWidth().height(112.dp),
+                    fallbackIcon = BusIcons.leaf,
                     contentScale = ContentScale.Crop,
                 )
             } else {
