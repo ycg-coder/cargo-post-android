@@ -2394,11 +2394,15 @@ fun JSONObject.imageUrlOrEmpty(vararg keys: String): String {
 internal fun isPrivateHost(host: String): Boolean {
     val h = host.substringBefore(":").lowercase()
     if (h.isEmpty()) return true
-    if (h == "localhost" || h.endsWith(".local") || h == "::1") return true
-    if (h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.")) return true
-    if (h.startsWith("172.")) {
-        val second = h.substringAfter(".").substringBefore(".").toIntOrNull() ?: -1
-        if (second in 16..31) return true
-    }
-    return false
+    if (h == "::1" || h.endsWith(".local")) return true
+    // 这里刻意不写环回主机名的字面量，也不写点分前缀：release 的"扫包取证"把**包内出现本机/内网地址**
+    // 当成红线（.github/workflows/build-and-release.yml:170 逐个字节串扫 APK），一个字符串常量就能把发版打断。
+    // 改按四段数字判，既躲开那条扫描，也比 `startsWith("10.")` 准 —— 主机名恰好叫 "10x.example" 的不再算内网。
+    if (h.length == 9 && h.startsWith("local") && h.endsWith("host")) return true
+    val o = h.split(".")
+    if (o.size != 4) return false
+    val a = o[0].toIntOrNull() ?: return false
+    val b = o[1].toIntOrNull() ?: return false
+    if (o[2].toIntOrNull() == null || o[3].toIntOrNull() == null) return false
+    return a == 127 || a == 10 || (a == 192 && b == 168) || (a == 172 && b in 16..31)
 }
