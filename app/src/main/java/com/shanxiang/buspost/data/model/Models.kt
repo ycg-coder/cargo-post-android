@@ -255,20 +255,6 @@ data class Notice(val id: Long, val title: String, val content: String, val time
     }
 }
 
-/**
- * 首页新闻条目：每日时政/乡村新闻。
- * 后端暂无新闻接口，当前由 App 端演示数据填充（demo=true），页面须标注"演示"。
- */
-data class NewsItem(
-    val id: Long,
-    val title: String,
-    val summary: String,
-    val source: String,
-    val publishTime: String,
-    val image: String = "",
-    val category: String = "时政",
-)
-
 /** 逐日预报（高德 all 档下发；小程序首页 4 日预报同源） */
 data class WeatherDay(
     val day: String,
@@ -2321,13 +2307,3 @@ data class DriverTaskSegment(
     }
 }
 
-/** 订阅消息模板（GET /member/social-user/get-subscribe-template-list） */
-data class SubscribeTemplate(val id: String, val title: String, val type: String) {
-    companion object {
-        fun parse(o: JSONObject) = SubscribeTemplate(
-            id = o.multiStr("id", "templateId"),
-            title = o.multiStr("title", "name"),
-            type = o.multiStr("type", "templateType"),
-        )
-    }
-}

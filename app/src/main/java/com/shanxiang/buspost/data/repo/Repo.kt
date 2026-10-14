@@ -280,50 +280,6 @@ object Repo {
     }
 
     /**
-     * 首页新闻：后端暂无新闻接口，当前返回演示数据。
-     * 页面须标注"演示"，等后端上线后替换为真实 API。
-     */
-    suspend fun news(): Feed<NewsItem> {
-        kotlinx.coroutines.delay(300)
-        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format(java.util.Date())
-        val items = listOf(
-            NewsItem(
-                id = 1,
-                title = "乡村振兴再提速：2026 年城乡客货邮一体化全覆盖",
-                summary = "交通运输部发布最新规划，2026 年底前全国 80% 以上乡镇实现客货邮融合站点覆盖，打通农产品进城与工业品下乡双向通道。",
-                source = "新华社",
-                publishTime = "$today 08:30",
-                category = "时政",
-            ),
-            NewsItem(
-                id = 2,
-                title = "数字乡村建设提速：快递进村工程惠及 3 亿农民",
-                summary = "国家邮政局数据显示，今年以来快递进村已覆盖全国 95% 以上行政村，日均处理包裹超 1.2 亿件，农产品上行渠道持续拓宽。",
-                source = "人民日报",
-                publishTime = "$today 09:15",
-                category = "民生",
-            ),
-            NewsItem(
-                id = 3,
-                title = "智慧交通新突破：农村公交实时调度系统全面推广",
-                summary = "多地试点农村公交智能化调度，乘客可通过手机实时查看车辆位置与预计到站时间，候车体验大幅提升。",
-                source = "央视新闻",
-                publishTime = "$today 10:00",
-                category = "科技",
-            ),
-            NewsItem(
-                id = 4,
-                title = "春耕时节话农事：全国春耕备耕进展顺利",
-                summary = "农业农村部表示，今年春播面积稳中有增，农资供应充足，各地春耕生产有序开展。",
-                source = "农民日报",
-                publishTime = "$today 07:45",
-                category = "三农",
-            ),
-        )
-        return Feed(items, demo = true)
-    }
-
-    /**
      * 逆地理编码（高德 regeo，Web 服务 key）：坐标 → adcode / 区县 / 乡镇。
      * 天气按 adcode 查区县级更准（中国气象局数据），首页定位文案也用它。
      * 失败返回 EMPTY，调用方回落到无 adcode 的坐标级天气（open-meteo）。
@@ -1487,16 +1443,6 @@ object Repo {
      */
     suspend fun readDriverMessage(id: Long): Ack = gatedAction("read-message:$id") {
         Ack(Api.put("$T/driver/messages/read", emptyMap(), driverIdParam() + mapOf("id" to id)).demo)
-    }
-
-    /** 订阅消息模板列表（安卓侧改走系统通知，保留接口以便对齐后端契约） */
-    suspend fun subscribeTemplates(): Feed<SubscribeTemplate> = try {
-        val p = Api.get("$M/social-user/get-subscribe-template-list")
-        Feed(p.list.map { SubscribeTemplate.parse(it) }, p.demo)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        Feed(emptyList(), error = errorTextOf(e))
     }
 
     // ---------- 文件 ----------

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -55,6 +56,7 @@ import com.shanxiang.buspost.core.ui.BusSwitch
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTextField
 import com.shanxiang.buspost.core.ui.BusTheme
+import com.shanxiang.buspost.core.ui.LocalBusTouch
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.busTokens
 import com.shanxiang.buspost.core.ui.EmptyState
@@ -174,9 +176,15 @@ class ProfileViewModel : ScreenViewModel() {
                 val form = mutableMapOf<String, Any?>("nickname" to nickname.trim(), "sex" to sex)
                 if (avatar.isNotEmpty()) form["avatar"] = avatar
                 Repo.updateProfile(form)
-                Prefs.nickname = nickname.trim()
-                Prefs.sex = sex
-                saved = "已保存"
+                // 写完回读：界面显示的昵称/性别必须是服务器那一份，不是本机刚敲进去那一份。
+                // 回读失败时这句成功语不能说圆 —— 后端受理了但本机没证据它存成了什么。
+                val one = Repo.refreshUser(Prefs.role)
+                one.value?.let {
+                    nickname = it.nickname
+                    sex = it.gender
+                    if (it.avatar.isNotEmpty()) avatar = it.avatar
+                }
+                saved = if (one.value == null) "已提交，但资料没回读到" else "已保存"
             } finally {
                 saving = false
             }
@@ -381,16 +389,18 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
 class AddressViewModel : ScreenViewModel() {
     var items by mutableStateOf<List<AddressItem>>(emptyList())
 
-    fun load() = work {
+    private suspend fun readAddresses() {
         val f = Repo.addresses()
         items = f.items
         demo = f.demo
         error = f.error
     }
 
+    fun load() = work { readAddresses() }
+
     fun remove(id: Long) = work(reset = false) {
         Repo.deleteAddress(id)
-        items = items.filter { it.id != id }
+        readAddresses()
     }
 
     /** 设为默认：仅把本条目 defaultStatus 置 1，其余置 0（字段对齐小程序 address.js:202-208） */
@@ -405,7 +415,7 @@ class AddressViewModel : ScreenViewModel() {
                 "defaultStatus" to 1,
             ),
         )
-        items = items.map { it.copy(isDefault = it.id == item.id) }
+        readAddresses()
     }
 }
 
@@ -425,7 +435,9 @@ fun AddressScreen(vm: AddressViewModel = viewModel(), select: Boolean = false) {
     val nav = LocalNavController.current
     var toDelete by remember { mutableStateOf<AddressItem?>(null) }
 
-    LaunchedEffect(Unit) { if (vm.items.isEmpty()) vm.load() }
+    // 每次进这一页都回读：从"编辑地址"退回来时列表已有旧数据，只在空时才取数
+    // 等于把"刚存的那条"挡在屏幕外。
+    LaunchedEffect(Unit) { vm.load() }
 
     Column {
         BackTopBar(title = "收货地址", subtitle = "${vm.items.size} 个")
@@ -943,7 +955,7 @@ fun SettingsScreen() {
                             Box(
                                 Modifier
                                     .weight(1f)
-                                    .height(46.dp)
+                                    .defaultMinSize(minHeight = LocalBusTouch.current.min)
                                     .clip(RoundedCornerShape(BusRadius.m))
                                     .background(if (on) tok.primaryDark else tok.card)
                                     .clickable { AppState.setTheme(th) },

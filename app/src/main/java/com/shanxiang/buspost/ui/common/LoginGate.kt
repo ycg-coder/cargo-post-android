@@ -1,13 +1,11 @@
 package com.shanxiang.buspost.ui.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
@@ -95,33 +95,12 @@ fun LoginGateDialog(
 
             Spacer(Modifier.height(24.dp))
 
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .clip(RoundedCornerShape(BusRadius.btn))
-                    .background(
-                        Brush.linearGradient(listOf(t.primary, t.accent))
-                    )
-                    .clickable(onClick = onLogin),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "立即登录 / 注册",
-                    color = Color.White,
-                    fontSize = (15 * scale).sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            BusButton("立即登录 / 注册", onClick = onLogin)
 
-            Text(
+            BusDialogAction(
                 "先逛逛",
-                color = t.textTertiary,
-                fontSize = (13 * scale).sp,
-                modifier = Modifier
-                    .padding(top = 14.dp)
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                onClick = onDismiss,
+                modifier = Modifier.padding(top = 10.dp),
             )
         }
     }

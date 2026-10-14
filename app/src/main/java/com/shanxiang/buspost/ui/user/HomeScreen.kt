@@ -78,7 +78,6 @@ import com.shanxiang.buspost.data.model.BusVehicle
 import com.shanxiang.buspost.data.model.byUserDistance
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.model.Notice
-import com.shanxiang.buspost.data.model.NewsItem
 import com.shanxiang.buspost.data.model.NearbyResult
 import com.shanxiang.buspost.data.model.Product
 import com.shanxiang.buspost.data.model.Station
@@ -98,7 +97,6 @@ import com.shanxiang.buspost.ui.common.WeatherPill
 class HomeViewModel : ScreenViewModel() {
     var village by mutableStateOf(Prefs.currentVillage)
     var notices by mutableStateOf<List<Notice>>(emptyList())
-    var news by mutableStateOf<List<NewsItem>>(emptyList())
     var vehicles by mutableStateOf<List<BusVehicle>>(emptyList())
     var stations by mutableStateOf<List<Station>>(emptyList())
     var products by mutableStateOf<List<Product>>(emptyList())
@@ -165,7 +163,6 @@ class HomeViewModel : ScreenViewModel() {
         val nbDeferred = async { Repo.nearbyBuses(g) }
         if (!onlyBus) {
             val noticesDeferred = async { Repo.notices() }
-            val newsDeferred = async { Repo.news() }
             val productsDeferred = async { Repo.products() }
             val arrDeferred = async { if (Prefs.loggedIn) Repo.sendOrders() else Feed(emptyList()) }
             val weatherDeferred = async {
@@ -181,14 +178,12 @@ class HomeViewModel : ScreenViewModel() {
 
             val nb = nbDeferred.await()
             val n = noticesDeferred.await()
-            val newsResult = newsDeferred.await()
             val p = productsDeferred.await()
             val arr = arrDeferred.await()
             val (rg, w, time) = weatherDeferred.await()
 
             notices = n.items
             noticeError = n.error != null
-            news = newsResult.items
             products = p.items.take(8)
             arriving = arr.items.filter {
                 it.carrierEtaMinutes != null && it.carrierEtaMinutes in 1..45 &&
@@ -202,7 +197,7 @@ class HomeViewModel : ScreenViewModel() {
                 weather = w
                 weatherUpdateTime = time
             }
-            mergeDemo(n.demo, newsResult.demo, p.demo, nb.demo, arr.demo)
+            mergeDemo(n.demo, p.demo, nb.demo, arr.demo)
             nearby = nb.value
             vehicles = nb.value?.vehicles.orEmpty().byUserDistance()
             stations = nb.value?.stations.orEmpty()
@@ -428,32 +423,6 @@ fun HomeScreen(
                 nav.navigate(Routes.BUS)
             }, Modifier.weight(1f), 7)
         }
-        }
-
-        // ---------- 每日新闻：横向滚动新闻卡片（演示数据，页面须标注"演示"）----------
-        if (vm.news.isNotEmpty()) {
-            item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(BusIcons.bolt, null, tint = t.goldDeep, modifier = Modifier.size(17.dp))
-                Text(
-                    "每日新闻 · 乡村动态",
-                    color = t.ink,
-                    fontSize = (16 * scale).sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-                if (vm.demo) {
-                    BusTag("演示", tone = BusTone.WARN, modifier = Modifier.padding(start = 8.dp))
-                }
-            }
-            }
-            item {
-            BusScrollRow(spacedBy = 10.dp) {
-                items(vm.news, key = { it.id }) { item ->
-                    NewsCard(item)
-                }
-            }
-            }
         }
 
         // ---------- 附近公交：区块头 + meta + 五态（loading/off/empty/error/data）----------
@@ -1213,59 +1182,6 @@ private fun ProductMiniCard(p: Product, onClick: () -> Unit) {
                 color = t.textTertiary,
                 fontSize = (11 * scale).sp,
                 modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
-            )
-        }
-    }
-}
-
-/**
- * 新闻卡片：横向滚动，每张宽度 260dp。
- * 分类标签 + 标题 + 摘要 + 来源/时间，无图时显示分类图标占位。
- */
-@Composable
-private fun NewsCard(item: NewsItem) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    Column(
-        Modifier
-            .width(260.dp)
-            .clip(RoundedCornerShape(BusRadius.card))
-            .background(t.card)
-            .padding(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BusTag(item.category, tone = BusTone.PRIMARY)
-            Spacer(Modifier.weight(1f))
-            Text(
-                item.publishTime.substringAfter(" ").takeIf { it.isNotEmpty() } ?: item.publishTime,
-                color = t.textTertiary,
-                fontSize = (11 * scale).sp,
-            )
-        }
-        Text(
-            item.title,
-            color = t.ink,
-            fontSize = (14 * scale).sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            item.summary,
-            color = t.textSecondary,
-            fontSize = (12 * scale).sp,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-            Icon(BusIcons.info, null, tint = t.textTertiary, modifier = Modifier.size(11.dp))
-            Text(
-                item.source,
-                color = t.textTertiary,
-                fontSize = (11 * scale).sp,
-                modifier = Modifier.padding(start = 3.dp),
             )
         }
     }
