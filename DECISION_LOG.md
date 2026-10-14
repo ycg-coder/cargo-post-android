@@ -7408,3 +7408,34 @@ RolldownError: Attribute name cannot contain U+0022 ("), U+0027 ('), and U+003C 
 - PR #191 现状：`backend` / `algorithm` / `container-validation` / `drift-check` / `changes` 全 pass，
   只有 `algorithm-verification` 那一格在口径改完后重跑（结论见下条提交）。**合 master 会触发云部署，等用户点头。**
 
+### D-107（10-14 13:2x–14:1x）· UI 规格统一第一刀：对话框动作收口 + 新判据簿 UB-a…UB-f
+
+**用户点名的题目**：同一界面、同一行的按钮大小形状要统一。实测起点（都在本轮量出来，不是印象）：
+**34 处**裸 Material 按钮调用点全在 `AlertDialog` 的 `confirmButton` / `dismissButton` 槽里（13 个文件），
+而同一屏的主按钮走设计系统 `BusButton` ⇒ 两套高度、两套字重、两种命中区；
+另外同一 Row 内混用 2 处（其中 1 处是我自己检测器的假阳性，见下）。
+
+**做法**：设计系统新增唯一出口 `BusDialogAction`（内部就是 `BusButton` 的 TEXT 档，primary 那颗给实心板），
+把 34 处收进它；`UpdateDialog` 里"立即更新"那颗原本是裸 `BusButton(small 默认 false)`，
+与旁边的次按钮不同规格 ⇒ 一并走出口。硬编码色 `Color(0xFF6B7280)` 等随之内移（那 6 个色值本来就不在令牌里）。
+
+**新闸** `tools/check_ui_button_probes.sh`（只钉写法层，**不钉任何像素/字号** —— 无真机在环那条老规矩）：
+UB-a 裸 Material 按钮调用点 = 0（改动前 34）· UB-b 同一 Row 内种类或 `small` 混用 = 0（改动前 2）
+· UB-c 调用点自传 `shape` = 0 · UB-d 调用点写死 `minHeight` = 0 · UB-e 出口有且仅有一个 = 1
+· UB-f 反证输入面：`Bus*` 按钮调用点总数 ≥ 120（现读 128）—— 没有这一格，把组件全删空就能让 UB-a 的 0 变成假绿。
+配对负控 `tools/ui_button_negative_controls.sh`：**6 条破口全 ✔ + 1 条正控制绿，RESULT=PASS**。
+终值：`assembleDebug` + `testDebugUnitTest --rerun-tasks` ⇒ **68 份 XML / 706 例 / 0 失败 / 0 错误**，`45 actionable tasks: 45 executed`；
+35 本判据簿全 rc=0。
+
+**功能通路复核**（这一轮的另一半）：清点完登记成四条在册欠账 #29–#32，其中两条是我自己复验过的红线级：
+① `Repo.news()` 整段零网络请求、`delay(300)` 假装往返，返回 4 条硬编码新闻并以"新华社/人民日报"署名
+   （首页那个"演示"标签挂在 `mergeDemo(...)` 的**全域或运算**上，指不准这一条）；
+② 资料/密码/地址/反馈六处写完直接 `saved = "已保存"`，`Repo` 侧只读 `.demo` 不读 `CommonResult<Boolean>`
+   ⇒ 后端回 `data:false` 与 HTTP 200 在客户端不可区分，而 S-le"写操作必须回读"这道闸已经在册却漏了这几处。
+另两条是"文案承诺与能力不符"（假动作按钮、"重庆"字样、`Earnings.totalWeight` 永不出现）与三处死码/重复出口。
+
+**没有做的一件事，写清楚**：全仓 17 处硬编码色里的 11 个色值（`UpdateDialog` 6、`DriverGuideScreen` 4、
+`DriverNavScreen`/`BusQrScreen` 各 1）**没有一个存在于 `BusTheme` 令牌里** ⇒ 换成令牌会改变外观，
+而这台机器没有真机可验。我只收口了与按钮同批的那几处，其余留给设计拍板 + 真机核对，
+**不在无设备的情况下断言"换完更好看/一致"**。
+
