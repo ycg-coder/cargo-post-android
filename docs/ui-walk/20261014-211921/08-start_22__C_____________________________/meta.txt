@@ -1,0 +1,13 @@
+path=start>22°C 阴 · 南岸区南山街道
+depth=1
+hash=1f12ddc0dd19
+clickable_total=87
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.01%)
+log_lines=0
+E级=0
+0
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

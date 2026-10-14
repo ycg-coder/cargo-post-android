@@ -1,0 +1,17 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		100	600	980	1920	android.widget.FrameLayout
+1	False	False		100	600	980	1920	android.widget.FrameLayout
+2	False	False	android:id/content	100	600	980	1920	android.widget.FrameLayout
+3	False	False		100	600	980	1920	android.view.ViewGroup
+4	False	False		100	600	980	1920	android.view.View
+5	False	False		100	600	980	1920	android.view.View
+6	False	False		100	600	980	1920	android.view.View
+7	False	False		100	600	980	1920	android.view.View
+8	False	False	选择地址	166	666	362	732	android.widget.TextView
+9	False	False		166	776	914	1656	android.widget.ScrollView
+10	True	True		166	776	914	958	android.view.View
+11	False	True	手动输入地址	271	809	481	867	android.widget.TextView
+12	False	True	输入任意地址查看附近公交	271	867	631	925	android.widget.TextView
+12	False	True	暂无保存的地址，可手动输入地址查询	188	1002	749	1060	android.widget.TextView
+12	True	True		769	1722	914	1854	android.view.View
+13	False	True	关闭	802	1761	881	1816	android.widget.TextView

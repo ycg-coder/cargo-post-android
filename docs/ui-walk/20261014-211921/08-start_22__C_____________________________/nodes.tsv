@@ -1,0 +1,103 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	0	1080	2400	android.view.View
+7	False	False		0	121	1080	2208	android.view.View
+8	False	False		0	121	1080	2208	android.view.View
+9	False	False		44	165	1036	656	android.view.View
+10	False	False		77	114	1003	246	android.view.View
+11	False	False	乡邮智联	88	213	318	287	android.widget.TextView
+12	False	False		368	184	525	316	android.view.View
+13	False	False	县城⇄乡村	368	217	525	283	android.widget.TextView
+13	False	False	客货邮 · 城乡直达	88	302	371	368	android.widget.TextView
+14	True	True	南岸区南山街道	129	380	402	499	android.widget.TextView
+15	False	True	切换 ▾	402	413	482	479	android.widget.TextView
+16	True	True		88	499	992	631	android.view.View
+17	False	True	22°C 阴 · 南岸区南山街道	178	532	859	598	android.widget.TextView
+18	False	True	收起	859	532	921	598	android.widget.TextView
+17	False	True		88	728	992	1235	android.view.View
+18	False	True		88	796	220	928	android.view.View
+19	False	True	阴	118	826	190	898	android.widget.ImageView
+19	False	True	22°	250	728	364	824	android.widget.TextView
+20	False	True	阴	383	750	421	816	android.widget.TextView
+21	False	True		268	811	400	943	android.view.View
+22	False	True	湿度 82%	269	844	399	910	android.widget.TextView
+22	False	True		443	811	575	943	android.view.View
+23	False	True	风 东≤3	456	844	561	910	android.widget.TextView
+23	False	True	21:21	250	930	316	996	android.widget.TextView
+24	False	True	多云，适合当日运输	662	728	992	794	android.widget.TextView
+25	False	True	10-14	104	1029	182	1095	android.widget.TextView
+26	False	True	小雨	117	1106	169	1158	android.widget.ImageView
+27	False	True	20° 25°	88	1169	198	1235	android.widget.TextView
+28	False	True	10-15	371	1029	449	1095	android.widget.TextView
+29	False	True	阴	384	1106	436	1158	android.widget.ImageView
+30	False	True	20° 25°	355	1169	465	1235	android.widget.TextView
+31	False	True	10-16	637	1029	715	1095	android.widget.TextView
+32	False	True	小雨	650	1106	702	1158	android.widget.ImageView
+33	False	True	20° 26°	621	1169	730	1235	android.widget.TextView
+34	False	True	10-17	902	1029	978	1095	android.widget.TextView
+35	False	True	小雨	914	1106	966	1158	android.widget.ImageView
+36	False	True	18° 25°	887	1169	992	1235	android.widget.TextView
+36	False	True		44	1335	268	1602	android.view.View
+37	True	True		44	1335	268	1602	android.view.View
+38	False	True		87	1357	225	1495	android.view.View
+39	False	True	实时公交	80	1514	232	1580	android.widget.TextView
+38	False	True		301	1335	524	1602	android.view.View
+39	True	True		301	1335	524	1602	android.view.View
+40	False	True		344	1357	482	1495	android.view.View
+41	False	True	农产品	356	1514	470	1580	android.widget.TextView
+40	False	True		557	1335	780	1602	android.view.View
+41	True	True		557	1335	780	1602	android.view.View
+42	False	True		600	1357	738	1495	android.view.View
+43	False	True	我的快递	593	1514	745	1580	android.widget.TextView
+42	False	True		813	1335	1036	1602	android.view.View
+43	True	True		813	1335	1036	1602	android.view.View
+44	False	True		856	1357	994	1495	android.view.View
+45	False	True	我要寄货	849	1514	1001	1580	android.widget.TextView
+44	False	True		44	1630	268	1897	android.view.View
+45	True	True		44	1630	268	1897	android.view.View
+46	False	True		87	1652	225	1790	android.view.View
+47	False	True	乘车码	99	1809	213	1875	android.widget.TextView
+46	False	True		301	1630	524	1897	android.view.View
+47	True	True		301	1630	524	1897	android.view.View
+48	False	True		344	1652	482	1790	android.view.View
+49	False	True	消息通知	337	1809	489	1875	android.widget.TextView
+48	False	True		557	1630	780	1897	android.view.View
+49	True	True		557	1630	780	1897	android.view.View
+50	False	True		600	1652	738	1790	android.view.View
+51	False	True	钱包	631	1809	707	1875	android.widget.TextView
+50	False	True		813	1630	1036	1897	android.view.View
+51	True	True		813	1630	1036	1897	android.view.View
+52	False	True		856	1652	994	1790	android.view.View
+53	False	True	收藏线路	849	1809	1001	1875	android.widget.TextView
+52	False	True		0	1903	121	2035	android.view.View
+53	False	True	附近公交	88	1936	264	2002	android.widget.TextView
+54	True	True		881	1903	1036	2035	android.view.View
+55	False	True	更多	903	1936	973	2002	android.widget.TextView
+55	False	True		72	1991	413	2123	android.view.View
+56	False	True	根据南岸区南山街道展示	72	2024	413	2090	android.widget.TextView
+56	False	True		497	1991	670	2123	android.view.View
+57	False	True	更新于 21:21	497	2024	670	2090	android.widget.TextView
+57	False	True		463	2195	617	2230	android.view.View
+58	False	True		474	2206	606	2230	android.view.View
+56	False	True		474	0	606	132	android.view.View
+57	False	True		474	0	606	132	android.view.View
+58	False	True		518	44	562	88	android.view.View
+57	False	True		0	2208	1080	2400	android.view.View
+58	False	True		0	2144	1080	2230	android.view.View
+59	True	True		0	2230	270	2381	android.view.View
+60	False	True	首页	105	2238	166	2299	android.view.View
+61	False	True	首页	105	2307	165	2373	android.widget.TextView
+61	True	True		270	2230	540	2381	android.view.View
+62	False	True	商城	375	2238	436	2299	android.view.View
+63	False	True	商城	375	2307	435	2373	android.widget.TextView
+63	True	True		540	2230	810	2381	android.view.View
+64	False	True	快递	645	2238	706	2299	android.view.View
+65	False	True	快递	645	2307	705	2373	android.widget.TextView
+65	True	True		810	2230	1080	2381	android.view.View
+66	False	True	我的	915	2238	976	2299	android.view.View
+67	False	True	我的	915	2307	975	2373	android.widget.TextView

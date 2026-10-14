@@ -1,0 +1,10 @@
+path=route/orders
+depth=1
+hash=0148bb78b335
+clickable_total=32
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=1571
+E级=14
+崩溃或ANR=0
+网络/后端失败=0

@@ -43,6 +43,8 @@ import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.net.ApiResult
 import com.shanxiang.buspost.core.net.safeApiCall
 import com.shanxiang.buspost.core.ui.BusCard
+import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -87,6 +89,8 @@ import com.shanxiang.buspost.ui.common.DemoNote
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.MapMarker
 import com.shanxiang.buspost.ui.common.MapPath
+import com.shanxiang.buspost.ui.common.nearestWalkTarget
+import com.shanxiang.buspost.ui.common.openWalkRoute
 import com.shanxiang.buspost.ui.common.RouteMap
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 
@@ -233,15 +237,19 @@ class BusViewModel : ScreenViewModel() {
     fun load(context: android.content.Context, silent: Boolean = false) {
         val mySeq = ++reqSeq
         work(reset = !silent) {
-            val geo = Locator.once(context)
+            // 半径按**这次定位的精度**收：`nearbyRadius(0.0)` 等于永远问 15km，
+            // 真机反馈"附近公交把别处的线路也算进来"在这一页是同一个病根（首页那一处见 HomeScreen.fetchAll）
+            val fix = Locator.onceFix(context)
+            val geo = fix.geo
             me = geo
             if (!silent) {
                 locationHint = locationHintFor(locationGranted, geo)
             }
-            val one = Repo.nearbyBuses(geo, Repo.nearbyRadius(0.0))
+            val radius = Repo.nearbyRadius(fix.accuracyMeters)
+            val one = Repo.nearbyBuses(geo, radius)
             if (mySeq != reqSeq) return@work
             nearby = one.value
-            val lf = Repo.busLines(geo)
+            val lf = Repo.busLines(geo, radius)
             if (mySeq != reqSeq) return@work
             lines = lf.items
             linesError = lf.error
@@ -941,50 +949,31 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                                 },
                             )
                         }
-                        // 步行导航到站点：找最近且有坐标的站（优先 CURRENT，其次距离最短）
-                        val walkTarget = st.firstOrNull { s ->
-                            vm.me != null && s.distanceMeters > 0 && s.distanceMeters < 800
-                        } ?: st.firstOrNull { s -> s.geo.lat != 0.0 || s.geo.lng != 0.0 }
-                        if (walkTarget != null && (walkTarget.geo.lat != 0.0 || walkTarget.geo.lng != 0.0)) {
+                        // 步行导航到站点：挑站与唤起都走 ui/common/WalkToStation.kt。
+                        // 旧写法在这里自己挑"时间轴里第一个 800 米内的站，没有就退回线路起点站" ——
+                        // 起点站往往在三公里外，按钮上写的站名因此是错的。
+                        val walkTarget = nearestWalkTarget(st, vm.me)
+                        var walkProblem by remember { mutableStateOf<String?>(null) }
+                        if (walkTarget != null) {
                             val ctx = LocalContext.current
-                            Row(
-                                Modifier.fillMaxWidth().padding(top = 8.dp)
-                                    .clip(RoundedCornerShape(BusRadius.m))
-                                    .background(LocalBusTokens.current.primaryLight)
-                                    .clickable {
-                                        val uri = Uri.parse(
-                                            "amapuri://route/plan/?dlat=${walkTarget.geo.lat}&dlon=${walkTarget.geo.lng}" +
-                                                    "&dname=${Uri.encode(walkTarget.name)}&dev=0&t=2"
-                                        )
-                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                                            setPackage("com.autonavi.minimap")
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        try {
-                                            ctx.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            // 没装高德地图 → 用浏览器打开高德网页导航
-                                            val webUri = Uri.parse(
-                                                "https://uri.amap.com/navigation?to=${walkTarget.geo.lng},${walkTarget.geo.lat}," +
-                                                        "${Uri.encode(walkTarget.name)}&mode=walk&coordinate=gaode"
-                                            )
-                                            try {
-                                                ctx.startActivity(Intent(Intent.ACTION_VIEW, webUri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                            } catch (e2: Exception) {
-                                                Toast.makeText(ctx, "无法打开导航", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }.padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(BusIcons.navigation, null, tint = LocalBusTokens.current.primary, modifier = Modifier.size(16.dp))
+                            BusButton(
+                                text = "步行导航到「${walkTarget.name}」",
+                                onClick = {
+                                    walkProblem = if (openWalkRoute(ctx, walkTarget.name, walkTarget.geo)) {
+                                        null
+                                    } else {
+                                        "这台机器打不开步行导航：既没装高德地图，也没能打开高德网页版"
+                                    }
+                                },
+                                variant = BusButtonVariant.OUTLINE,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                            walkProblem?.let {
                                 Text(
-                                    " 步行导航到「${walkTarget.name}」",
-                                    color = LocalBusTokens.current.primary,
-                                    fontSize = (13 * LocalBusFontScale.current).sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                    it,
+                                    color = LocalBusTokens.current.danger,
+                                    fontSize = (12 * LocalBusFontScale.current).sp,
+                                    modifier = Modifier.padding(top = 6.dp),
                                 )
                             }
                         }
@@ -1188,11 +1177,39 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     val context = LocalContext.current
+    // 收藏：这一页此前没有入口（星标只画在实时公交页的内嵌详情里），从首页线路签点进来的人
+    // 根本没法收藏（真机反馈"也不能收藏"）。收藏表在 Prefs 里、不是 State，所以本地存一份
+    // 翻转值来驱动重组，不另造一个"tick"。
+    var isFav by remember(routeId) { mutableStateOf(Prefs.isFavoriteLine(routeId)) }
+    /** 唤起步行导航失败的原话：只在真失败时出现，不写"已为你打开导航" */
+    var walkProblem by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(routeId) { vm.openDetail(context, routeId) }
 
     Column {
-        BackTopBar(title = vm.selected?.name?.ifEmpty { null } ?: "线路详情", subtitle = routeId)
+        BackTopBar(
+            title = vm.selected?.name?.ifEmpty { null } ?: "线路详情",
+            // 原来这里直接把 routeId（一串内部编号，实测显示成"500"）挂在标题下面当副标题 ——
+            // 那是调试物，不是给用户看的信息。改成这一条线的来源口径。
+            subtitle = vm.selected?.dataSource?.takeIf { it.isNotEmpty() }
+                ?.let { if (it.contains("REAL")) "现实公交" else "项目线路" },
+            actions = {
+                if (routeId.isNotEmpty()) {
+                    Icon(
+                        BusIcons.star,
+                        if (isFav) "已收藏" else "收藏",
+                        tint = if (isFav) t.goldDeep else t.onPrimary,
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp)
+                            .size((22 * scale).dp)
+                            .clickable {
+                                Prefs.toggleFavoriteLine(routeId)
+                                isFav = !isFav
+                            },
+                    )
+                }
+            },
+        )
         BusPage(spacedBy = 12.dp) {
             DemoNote(vm.demo)
             val line = vm.selected
@@ -1225,21 +1242,45 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
                     onReplan = { vm.replan() },
                 )
                 if (vm.me != null && line.stations.isNotEmpty()) {
-                    val nearest = line.stations.minByOrNull { GeoMath.distance(vm.me!!, it.geo) }
-                    if (nearest != null) {
+                    // 挑站与唤起步行导航都走 ui/common/WalkToStation.kt 那一份口径：
+                    // 这颗按钮此前只存在于实时公交页的内嵌详情里，从首页线路签点进来的人看不到它
+                    // （真机反馈"步行导航去站点"这一格是空的）。
+                    val walkTarget = nearestWalkTarget(line.stations, vm.me)
+                    if (walkTarget != null) {
+                        val meters = GeoMath.distance(vm.me!!, walkTarget.geo)
                         BusCard(modifier = Modifier.fillMaxWidth(), warm = true) {
                             Text(
-                                "离你最近的经停站：${nearest.name}",
+                                "离你最近的经停站：${walkTarget.name}",
                                 color = t.ink,
                                 fontSize = (13.5 * scale).sp,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                "直线距离约 %.1f 公里（仅表示远近，不是道路里程）".format(GeoMath.distance(vm.me!!, nearest.geo) / 1000.0),
+                                "直线距离约 %.1f 公里（仅表示远近，不是道路里程）".format(meters / 1000.0),
                                 color = t.textSecondary,
                                 fontSize = (12 * scale).sp,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
+                            BusButton(
+                                text = "步行导航到「${walkTarget.name}」",
+                                onClick = {
+                                    walkProblem = if (openWalkRoute(context, walkTarget.name, walkTarget.geo)) {
+                                        null
+                                    } else {
+                                        "这台机器打不开步行导航：既没装高德地图，也没能打开高德网页版"
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 10.dp),
+                            )
+                            // 失败必须留在页面上：唤起类动作点了没动静，用户只会以为是自己没点到
+                            walkProblem?.let {
+                                Text(
+                                    it,
+                                    color = t.danger,
+                                    fontSize = (12 * scale).sp,
+                                    modifier = Modifier.padding(top = 6.dp),
+                                )
+                            }
                         }
                     }
                 }

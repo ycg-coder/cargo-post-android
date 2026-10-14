@@ -1,0 +1,77 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	297	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	设置	165	143	257	209	android.widget.TextView
+10	False	True	主题、提醒与导航偏好	165	209	495	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2400	android.widget.ScrollView
+12	False	True		0	309	110	441	android.view.View
+13	False	True	站牌配色	69	341	245	407	android.widget.TextView
+14	False	True		88	484	992	1040	android.view.View
+15	True	True		88	484	296	616	android.view.View
+16	False	True	山野绿	141	517	243	583	android.widget.TextView
+16	True	True		321	484	528	616	android.view.View
+17	False	True	陶土橙	374	517	476	583	android.widget.TextView
+17	True	True		553	484	760	616	android.view.View
+18	False	True	山泉蓝	606	517	708	583	android.widget.TextView
+18	True	True		785	484	992	616	android.view.View
+19	False	True	中国红	838	517	940	583	android.widget.TextView
+19	False	True		88	579	992	711	android.view.View
+20	False	True	深色站牌	88	696	240	762	android.widget.TextView
+21	False	True	夜间候车不刺眼	88	768	305	834	android.widget.TextView
+22	True	True		849	699	992	831	android.view.View
+23	False	True		827	699	959	831	android.view.View
+24	False	True		849	721	992	809	android.view.View
+24	False	True		88	791	992	923	android.view.View
+25	False	True	适老大字	88	880	240	946	android.widget.TextView
+26	False	True	字号放大 22%，按钮更高	88	952	437	1018	android.widget.TextView
+27	True	True		849	883	992	1015	android.view.View
+28	False	True		827	883	959	1015	android.view.View
+29	False	True		849	905	992	993	android.view.View
+28	False	True		0	1085	110	1217	android.view.View
+29	False	True	提醒	69	1117	157	1183	android.widget.TextView
+30	False	True		88	1260	992	1944	android.view.View
+31	False	True	后台消息提醒	88	1282	316	1348	android.widget.TextView
+32	False	True	每 15 分钟检查一次订单与班次	88	1354	509	1420	android.widget.TextView
+33	True	True		849	1285	992	1417	android.view.View
+34	False	True		882	1285	1014	1417	android.view.View
+35	False	True		849	1307	992	1395	android.view.View
+35	False	True		88	1377	992	1509	android.view.View
+36	False	True	到车提醒	88	1466	240	1532	android.widget.TextView
+37	False	True	车到前 10 分钟通知栏提醒	88	1538	449	1604	android.widget.TextView
+38	True	True		849	1469	992	1601	android.view.View
+39	False	True		882	1469	1014	1601	android.view.View
+40	False	True		849	1491	992	1579	android.view.View
+40	False	True		88	1561	992	1693	android.view.View
+41	False	True	天气预警	88	1650	240	1716	android.widget.TextView
+42	False	True	雨雪、大雾、高温等恶劣天气推送提醒	88	1722	615	1788	android.widget.TextView
+43	True	True		849	1653	992	1785	android.view.View
+44	False	True		882	1653	1014	1785	android.view.View
+45	False	True		849	1675	992	1763	android.view.View
+45	False	True		88	1745	992	1812	android.view.View
+46	True	True		88	1812	992	1944	android.view.View
+47	False	True		36	1812	168	1944	android.view.View
+48	False	True	系统通知权限	138	1845	384	1911	android.widget.TextView
+49	False	True	去开启	417	1851	948	1906	android.widget.TextView
+50	False	True		910	1812	1042	1944	android.view.View
+49	False	True		0	1989	110	2121	android.view.View
+50	False	True	司机导航偏好（司机端生效）	69	2021	641	2087	android.widget.TextView
+51	False	True		88	2164	992	2400	android.view.View
+52	False	True	语音播报	88	2186	240	2252	android.widget.TextView
+53	False	True	高德导航自带的转弯口令	88	2258	429	2324	android.widget.TextView
+54	True	True		849	2189	992	2321	android.view.View
+55	False	True		827	2189	959	2321	android.view.View
+56	False	True		849	2211	992	2299	android.view.View
+56	False	True		88	2281	992	2400	android.view.View
+57	False	True	车道级指引	88	2370	278	2400	android.widget.TextView
+58	True	True		849	2373	992	2400	android.view.View
+59	False	True		882	2373	992	2400	android.view.View
+60	False	True		849	2395	992	2400	android.view.View

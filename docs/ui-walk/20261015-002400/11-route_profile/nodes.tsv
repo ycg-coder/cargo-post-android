@@ -1,0 +1,64 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	297	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	个人资料	165	143	349	209	android.widget.TextView
+10	False	True	13800004021	165	209	376	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2400	android.widget.ScrollView
+12	False	True		0	309	110	441	android.view.View
+13	False	True	基本资料	69	341	245	407	android.widget.TextView
+14	False	True		88	484	992	1343	android.view.View
+15	False	True		88	484	231	627	android.view.View
+16	False	True	用	138	523	182	589	android.widget.TextView
+16	False	True	头像	264	490	334	556	android.widget.TextView
+17	False	True	未设置头像	264	556	419	622	android.widget.TextView
+18	True	True		768	490	992	622	android.view.View
+19	False	True	更换头像	801	523	959	589	android.widget.TextView
+19	False	True	昵称	94	655	164	721	android.widget.TextView
+20	False	True		121	735	959	889	android.view.View
+21	False	True		69	746	171	878	android.view.View
+22	True	True	用户150169	171	735	959	889	android.widget.EditText
+23	False	True		215	747	915	879	android.view.View
+22	False	True	性别	88	934	588	1000	android.widget.TextView
+23	True	True	男	588	901	706	1033	android.widget.TextView
+24	True	True	女	706	901	838	1033	android.widget.TextView
+25	True	True	保密	839	901	975	1033	android.widget.TextView
+26	False	True		88	1045	992	1177	android.view.View
+27	False	True		36	1045	168	1177	android.view.View
+28	False	True	手机号	138	1078	261	1144	android.widget.TextView
+29	False	True	13800004021	294	1084	992	1139	android.widget.TextView
+29	True	True		88	1205	992	1343	android.view.View
+30	False	True		375	1209	507	1341	android.view.View
+31	False	True	保存资料	485	1241	667	1307	android.widget.TextView
+30	False	True		0	1388	110	1520	android.view.View
+31	False	True	修改密码	69	1420	245	1486	android.widget.TextView
+32	False	True		88	1563	992	2400	android.view.View
+33	False	True	验证码	94	1563	199	1629	android.widget.TextView
+34	False	True		121	1643	701	1797	android.view.View
+35	True	True		121	1643	701	1797	android.widget.EditText
+36	False	True		165	1655	657	1787	android.view.View
+37	False	True		165	1654	370	1786	android.view.View
+38	False	True	短信验证码	165	1687	370	1753	android.widget.TextView
+36	True	True	获取验证码	756	1614	992	1746	android.widget.TextView
+37	False	True	新密码	94	1825	199	1891	android.widget.TextView
+38	False	True		121	1905	959	2059	android.view.View
+39	True	True		121	1905	959	2059	android.widget.EditText
+40	False	True		165	1917	915	2049	android.view.View
+41	False	True		165	1916	425	2048	android.view.View
+42	False	True	4-16 位新密码	165	1949	425	2015	android.widget.TextView
+40	False	True	确认密码	94	2087	234	2153	android.widget.TextView
+41	False	True		121	2167	959	2321	android.view.View
+42	True	True		121	2167	959	2321	android.widget.EditText
+43	False	True		165	2179	915	2311	android.view.View
+44	False	True		165	2178	452	2310	android.view.View
+45	False	True	再次输入新密码	165	2211	452	2277	android.widget.TextView
+43	True	True		88	2349	992	2400	android.view.View
+44	False	True	修改密码	449	2385	631	2400	android.widget.TextView

@@ -1,0 +1,29 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	乘车码	165	143	303	209	android.widget.TextView
+10	False	True	本机没有卡务接口 · 扫码乘车走支付宝官方码	165	209	829	275	android.widget.TextView
+10	True	True		44	341	1036	561	android.view.View
+11	False	True		77	385	209	517	android.view.View
+12	False	True	支	121	418	165	484	android.widget.TextView
+12	False	True	重庆公交乘车码	231	385	518	451	android.widget.TextView
+13	False	True	支付宝官方 · 可用线路以支付宝页面为准	231	451	829	517	android.widget.TextView
+14	False	True	打开 →	877	418	992	484	android.widget.TextView
+14	False	True		88	644	992	868	android.view.View
+15	False	True	本机不出乘车码	88	644	354	710	android.widget.TextView
+16	False	True	后台还没有卡务/闸机接口，这一页没有可刷新的二维码。要扫码乘车请走下面那张「支付宝官方乘车码」，扣费与线路以支付宝页面显示为准。	88	727	992	868	android.widget.TextView
+16	True	True		44	951	523	1089	android.view.View
+17	False	True	支付宝乘车码	148	987	420	1053	android.widget.TextView
+17	True	True		556	951	1036	1089	android.view.View
+18	False	True	扫码付款	705	987	887	1053	android.widget.TextView
+18	False	True		88	1172	992	1455	android.view.View
+19	False	True	使用须知	88	1172	240	1238	android.widget.TextView
+20	False	True	· 本页不代扣车费，票价与优惠按承运方规则结算&#10;· 能坐哪几路、怎么刷卡，以支付宝乘车码页面显示为准&#10;· 线路与班次在「实时公交」那一页读的是后台下发，不在这页手写	88	1255	992	1455	android.widget.TextView

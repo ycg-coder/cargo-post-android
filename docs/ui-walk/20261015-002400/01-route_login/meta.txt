@@ -1,0 +1,10 @@
+path=route/login
+depth=1
+hash=ef4d5ff9302b
+clickable_total=26
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=168278
+E级=2594
+崩溃或ANR=15
+网络/后端失败=1

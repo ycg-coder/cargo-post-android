@@ -1,0 +1,38 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	1810	android.view.View
+7	False	False		0	121	1080	2400	android.view.View
+8	False	False	实时公交	44	154	264	228	android.widget.TextView
+9	False	False	已按你的位置排序	44	234	284	300	android.widget.TextView
+10	False	False	00:26:20 更新	780	194	940	260	android.widget.TextView
+11	True	True		940	162	1072	294	android.view.View
+12	False	True		61	350	1019	504	android.view.View
+13	False	True		94	350	986	504	android.view.View
+14	False	True		42	361	144	493	android.view.View
+15	True	True		144	350	986	504	android.widget.EditText
+16	False	True		188	362	942	494	android.view.View
+17	False	True		188	361	434	493	android.view.View
+18	False	True	搜索线路名称	188	394	434	460	android.widget.TextView
+15	False	True		0	521	1080	653	android.widget.HorizontalScrollView
+16	False	True		72	521	258	653	android.view.View
+17	False	True	暂无车辆位置	72	554	258	620	android.widget.TextView
+17	False	True		333	521	589	653	android.view.View
+18	False	True	运营 06:30–23:52	333	554	589	620	android.widget.TextView
+18	False	True		664	521	894	653	android.view.View
+19	False	True	附近 260 个站点	664	554	894	620	android.widget.TextView
+19	False	True		969	521	1080	653	android.view.View
+20	False	True	80 条线路	969	554	1080	620	android.widget.TextView
+19	False	True		88	714	992	924	android.view.View
+20	False	True	当前不在运营时段	171	714	451	780	android.widget.TextView
+21	False	True	运营时间：06:30–23:52	171	786	495	852	android.widget.TextView
+22	False	True	下一班发车：06:30	171	858	433	924	android.widget.TextView
+22	False	True		463	1079	617	1233	android.view.View
+23	False	True		474	1090	606	1222	android.view.View
+23	False	True	当前不在运营时间	376	1266	704	1332	android.widget.TextView
+24	False	True	服务时段 06:30–23:52；下一班 06:30 发车	201	1346	879	1412	android.widget.TextView
+25	False	True		0	1810	1080	2400	android.widget.ScrollView

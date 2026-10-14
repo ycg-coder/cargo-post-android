@@ -52,12 +52,25 @@ class MainActivity : ComponentActivity() {
             // app 内自更新：冷启动查一次 GitHub Release，**只有真读到"有可用新版本"才弹窗**。
             // 查询失败 / 仓库还没发布过 都不弹任何东西 —— 但这里也不说"已是最新"：
             // 要说这句话得去「设置 → 关于 → 检查更新」，那一格才把原话摆出来（#48 的诚实分格）。
+            // 2026-10-14 真机两条规矩：
+            // ① 同一个 tag 只拦一次：用户点了"稍后再说"，下次冷启动不该再拿同一个版本堵门
+            //    （此前每次冷启动都盖住首页，这才是"弹窗骚扰"的真身）；
+            // ② 调试包也照常提示（用户当日点名"还是把自动更新开启"）：本地包 versionCode 恒为 1，
+            //    跟任何正式版都比"旧"，所以它一定会提示 —— 装不上是签名的事，由弹窗里那句原话承担，
+            //    不在这里替用户决定"你不需要知道有新版本"。
             var updateRelease by remember { mutableStateOf<Release?>(null) }
             LaunchedEffect(Unit) {
-                updateRelease = (AppUpdater.check() as? UpdateOutcome.Available)?.release
+                val latest = (AppUpdater.check() as? UpdateOutcome.Available)?.release ?: return@LaunchedEffect
+                if (latest.tagName != Prefs.updateSkipTag) updateRelease = latest
             }
             updateRelease?.let { release ->
-                UpdateDialog(release = release, onDismiss = { updateRelease = null })
+                UpdateDialog(
+                    release = release,
+                    onDismiss = {
+                        Prefs.updateSkipTag = release.tagName
+                        updateRelease = null
+                    },
+                )
             }
 
             BusAppTheme(theme = theme, dark = nightUi, elderly = elderly, driving = driving) {

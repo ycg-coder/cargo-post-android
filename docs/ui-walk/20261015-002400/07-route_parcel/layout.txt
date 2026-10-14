@@ -1,0 +1,3 @@
+== docs/ui-walk/20261015-002400/07-route_parcel/dump.xml: 40 节点 / 13 段文字 / 屏幕 1080x2400 ==
+  无越界 / 无兄弟重叠 / 热区达标
+TOTAL_ISSUES=0

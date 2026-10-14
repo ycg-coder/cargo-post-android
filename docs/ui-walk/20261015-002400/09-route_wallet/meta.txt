@@ -1,0 +1,10 @@
+path=route/wallet
+depth=1
+hash=04a2fab38d46
+clickable_total=17
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=1544
+E级=14
+崩溃或ANR=0
+网络/后端失败=0

@@ -1,0 +1,10 @@
+path=route/notifications
+depth=1
+hash=df043212278e
+clickable_total=19
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=0
+E级=0
+崩溃或ANR=0
+网络/后端失败=0

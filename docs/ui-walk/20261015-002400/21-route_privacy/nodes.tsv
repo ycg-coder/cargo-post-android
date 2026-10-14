@@ -1,0 +1,38 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	297	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	隐私政策	165	143	349	209	android.widget.TextView
+10	False	True	这个应用会拿到什么、存在哪、谁能看到	165	209	759	275	android.widget.TextView
+10	False	True		0	297	1080	2400	android.view.View
+11	False	True		0	297	1080	2400	android.widget.ScrollView
+12	False	True		0	309	110	441	android.view.View
+13	False	True	更新日期：2026-10-12	69	341	532	407	android.widget.TextView
+14	False	True		88	484	992	1055	android.view.View
+15	False	True	一、登录用的信息	88	484	416	550	android.widget.TextView
+16	False	True	手机号与短信验证码：用来建立账号与会话；验证码由平台后端下发与校验。	88	567	992	699	android.widget.TextView
+17	False	True		88	656	992	788	android.view.View
+18	False	True	昵称、性别、头像：你可以不填，填了可以随时改。	88	745	939	811	android.widget.TextView
+19	False	True		88	768	992	857	android.view.View
+20	False	True	会话令牌存在本机应用的私有存储里（含刷新令牌与到期时间），用于免重复登录；退出登录或令牌失效即清除。	88	857	992	1055	android.widget.TextView
+20	False	True		88	1176	992	1925	android.view.View
+21	False	True	二、寄件与取件用的信息	88	1176	539	1242	android.widget.TextView
+22	False	True	地址簿：你自己新增/修改的收寄地址，存在平台后端，用来算距离与选班次。	88	1259	992	1391	android.widget.TextView
+23	False	True		88	1348	992	1437	android.view.View
+24	False	True	运单信息：寄件人与收件人姓名、电话、地址，物品名称、类别、重量、件数，以及目的站点。	88	1437	992	1569	android.widget.TextView
+25	False	True		88	1526	992	1615	android.view.View
+26	False	True	货物照片：只有你主动拍并点提交时才上传；提交失败就是失败，不会把没上传成功的照片当成已入库。	88	1615	992	1747	android.widget.TextView
+27	False	True		88	1704	992	1793	android.view.View
+28	False	True	取件码与签收凭证：用于站点交接与到件核对，只在你的这一单里出现。	88	1793	992	1925	android.widget.TextView
+28	False	True		88	2046	992	2400	android.view.View
+29	False	True	三、位置	88	2046	252	2112	android.widget.TextView
+30	False	True	用户端定位只用于三件事：找附近的公交站点与线路、按你所在区县查天气、把「取货/送达」的地图点位画出来。	88	2129	992	2327	android.widget.TextView
+31	False	True		88	2284	992	2373	android.view.View
+32	False	True	司机端在你登录并且当班期间，会用前台服务持续上报车辆位置给调度，用于实时公交与交接核对；本班收口后停止上报。	88	2373	992	2400	android.widget.TextView

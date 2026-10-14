@@ -1,0 +1,10 @@
+path=route/driverGuide
+depth=1
+hash=1f3e42987b24
+clickable_total=29
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=1558
+E级=16
+崩溃或ANR=0
+网络/后端失败=0

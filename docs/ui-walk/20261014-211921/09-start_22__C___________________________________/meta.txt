@@ -1,0 +1,12 @@
+path=start_22__C_____________________________>小雨
+depth=2
+hash=4b462d590c2d
+clickable_total=46
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.01%)
+log_lines=3521
+E级=54
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

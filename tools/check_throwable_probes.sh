@@ -184,7 +184,8 @@ echo "TH-a 行为用例条数（隔离/取消）      = $TA/$TA2 （目标 ≥7/
 echo "TH-b DemoData 回落点/自带开关闸     = $TB/$TB2 （目标 4/4）"
 echo "TH-c catch(Throwable) 全 main/Api.kt/白名单 = $TC_ALL/$TC_API/$TC_WL （目标 2/0/2）"
 echo "TH-d Repo Exception/取消配对         = $TD1/$TD2 （目标 38/38）"
-echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/3：豁免只有那两处 startActivity + 一处纯 JSON 解析）"
+echo "TH-e 未配对的 Exception 出口         = $TE_N （目标 0）｜挂起形状/豁免 = $TE_S/$TE_K （目标 ≥48/2：豁免只剩一处 startActivity + 一处纯 JSON 解析。2026-10-14 步行导航收进 ui/common/WalkToStation.kt 时，
+#   那处 startActivity 的 `catch (Exception)` 换成只接 ActivityNotFoundException ⇒ 豁免面 3→2，见 D-114）"
 echo "TH-f attempt 调用点/helper 穿透      = $TF/$TF2 （目标 恰好 16/1）"
 echo "TH-g 挂起形状 runCatching 残留       = $TG （目标 0）"
 echo "TH-h 缺陷话术（登录/上报/日志）      = $TH/$TH2/$TH3 （目标 ≥2/1/≥2）"
@@ -218,7 +219,7 @@ fail=0
 #   `parseRelease` 是**普通函数**（不是 suspend、块内无任何挂起点），catch 完直接 `return null` 交给
 #   `decideUpdate` 落成"没查到"，所以 §三十一"suspend 不许吞取消"在这里同样没有适用对象。
 #   仍然逐处点名、数量钉死恰好 3：再加第四处就得当场改这一行并说明为什么。
-[ "$TE_K" = 3 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 3 处：豁免面变大了，请连同 D-034 一起复核"; fail=1; }
+[ "$TE_K" = 2 ]  || { echo "× TH-e 免检（无挂起点）的 Exception 出口不是 2 处：豁免面变了（变大=有人新塞了宽口径 catch；变小=有人把 catch 改窄了，那要连 D-034/D-114 一起确认是哪一处），请逐点复核"; fail=1; }
 [ "$TF" = 16 ] || { echo "× TH-f attempt 调用点不是恰好 16（现 $TF）：少了=有人把取消可达作用域里的挂起形状改回了 runCatching（F-2 ⑨ 迁的那 4 处与 ⑧ 剩的那 7 处都在这个数里，逐点表见 check_safe_call_probes.sh 的 SA-d 注释，2026-10-14 重量后是 16 处），多了=新开了一处不走 safeApiCall 的网络读；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删一到三处都不红（D-082）"; fail=1; }
 [ "$TF2" = 1 ]   || { echo "× TH-f attempt 自己不再先穿透取消：它退化成另一个 runCatching"; fail=1; }
 [ "$TG" = 0 ]    || { echo "× TH-g 挂起代码里残留 $TG 处 runCatching：取消会被读成一次普通失败"; fail=1; }

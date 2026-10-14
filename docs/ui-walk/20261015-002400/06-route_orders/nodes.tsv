@@ -1,0 +1,41 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		22	143	1058	275	android.view.View
+8	True	True		22	143	154	275	android.view.View
+9	False	True	返回	58	179	119	240	android.view.View
+9	False	True	我的订单	165	143	349	209	android.widget.TextView
+10	False	True	商城订单 · 大巴带货到家	165	209	532	275	android.widget.TextView
+11	True	True	刷新	929	143	1061	275	android.widget.TextView
+11	False	True		0	297	1080	2400	android.view.View
+12	False	True		0	297	1080	1486	android.view.View
+13	False	True		52	349	1028	481	android.view.View
+14	True	True		52	349	536	481	android.view.View
+15	False	True	商城订单	218	382	370	448	android.widget.TextView
+15	True	True		544	349	1028	481	android.view.View
+16	False	True	寄货订单	710	382	862	448	android.widget.TextView
+15	False	True		44	545	1036	677	android.view.View
+16	True	True		44	545	202	677	android.view.View
+17	False	True	全部	88	578	158	644	android.widget.TextView
+17	True	True		224	545	417	677	android.view.View
+18	False	True	待发货	268	578	373	644	android.widget.TextView
+18	True	True		439	545	632	677	android.view.View
+19	False	True	已发货	483	578	588	644	android.widget.TextView
+19	True	True		654	545	847	677	android.view.View
+20	False	True	已完成	698	578	803	644	android.widget.TextView
+20	True	True		869	545	1036	677	android.view.View
+21	False	True	已取消	913	578	1018	644	android.widget.TextView
+20	False	True		463	799	617	953	android.view.View
+21	False	True		474	810	606	942	android.view.View
+21	False	True	还没有订单	438	986	643	1052	android.widget.TextView
+22	False	True	去逛逛山货集市，看中了大巴给你捎回家	225	1066	855	1132	android.widget.TextView
+23	True	True		448	1171	632	1303	android.view.View
+24	False	True	去逛逛	481	1204	599	1270	android.widget.TextView
+22	False	True		474	176	606	308	android.view.View
+23	False	True		474	176	606	308	android.view.View
+24	False	True		518	220	562	264	android.view.View

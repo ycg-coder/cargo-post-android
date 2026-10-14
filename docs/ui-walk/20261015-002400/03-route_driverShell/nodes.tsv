@@ -1,0 +1,39 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	121	1080	2400	android.view.View
+7	False	False		0	121	1080	2400	android.widget.ScrollView
+8	False	False		452	286	628	462	android.view.View
+9	False	False	乡邮智联	408	495	672	583	android.widget.TextView
+10	False	False	客货邮 · 城乡直达	399	594	682	660	android.widget.TextView
+11	False	False	选择身份	55	748	219	814	android.widget.TextView
+12	True	True		55	847	1025	991	android.view.View
+13	False	True	我是用户	188	886	352	952	android.widget.TextView
+13	True	True		55	1019	1025	1163	android.view.View
+14	False	True	我是司机	188	1058	352	1124	android.widget.TextView
+14	False	True	手机号	61	1229	166	1295	android.widget.TextView
+15	False	True		88	1309	992	1463	android.view.View
+16	False	True		36	1320	138	1452	android.view.View
+17	True	True	13800004021	138	1309	992	1463	android.widget.EditText
+18	False	True		182	1321	948	1453	android.view.View
+17	False	True	密码	61	1496	131	1562	android.widget.TextView
+18	False	True		88	1576	992	1730	android.view.View
+19	False	True		36	1587	138	1719	android.view.View
+20	True	True		138	1576	992	1730	android.widget.EditText
+21	False	True		182	1588	948	1720	android.view.View
+22	False	True		182	1587	387	1719	android.view.View
+23	False	True	请输入密码	182	1620	387	1686	android.widget.TextView
+21	True	True		409	1747	672	1879	android.view.View
+22	False	True	验证码登录	442	1780	639	1846	android.widget.TextView
+22	True	True		29	1892	161	2024	android.widget.CheckBox
+23	True	True	我已阅读并同意	138	1891	369	2023	android.widget.TextView
+24	True	True	《服务协议》	375	1891	564	2023	android.widget.TextView
+25	True	True	《隐私政策》	570	1891	759	2023	android.widget.TextView
+26	True	True		55	2050	1025	2188	android.view.View
+27	False	True	登录	495	2086	586	2152	android.widget.TextView
+27	True	True		55	2205	1025	2337	android.view.View
+28	False	True	大字模式	499	2238	631	2304	android.widget.TextView

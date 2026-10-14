@@ -1,0 +1,13 @@
+path=start_22__C_____________________________>切换 ▾
+depth=2
+hash=bcbf9e7cb824
+clickable_total=30
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.00%)
+log_lines=0
+E级=0
+0
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

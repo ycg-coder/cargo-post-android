@@ -1,0 +1,65 @@
+depth	node_clickable	eff_clickable	label	x1	y1	x2	y2	class
+0	False	False		0	0	1080	2400	android.widget.FrameLayout
+1	False	False		0	0	1080	2400	android.widget.LinearLayout
+2	False	False	android:id/content	0	0	1080	2400	android.widget.FrameLayout
+3	False	False		0	0	1080	2400	androidx.compose.ui.platform.ComposeView
+4	False	False		0	0	1080	2400	android.view.View
+5	False	False		0	0	1080	2400	android.view.View
+6	False	False		0	0	1080	2400	android.view.View
+7	False	False		0	121	1080	2208	android.view.View
+8	False	False		0	121	1080	363	android.view.View
+9	False	False		33	70	1047	202	android.view.View
+10	False	False	山货集市	44	169	274	243	android.widget.TextView
+11	False	False		290	140	422	258	android.view.View
+12	False	False	商城	324	173	387	239	android.widget.TextView
+12	False	False	村里直发 · 今日班车直达县城共配仓	44	258	607	324	android.widget.TextView
+12	False	False		0	363	1080	2208	android.view.View
+13	False	False		0	363	1080	1739	android.view.View
+14	False	False		61	424	1019	578	android.view.View
+15	False	False		94	424	986	578	android.view.View
+16	False	False		42	435	144	567	android.view.View
+17	True	True		144	424	986	578	android.widget.EditText
+18	False	True		557	474	942	529	android.view.View
+19	False	True		188	435	557	567	android.view.View
+20	False	True	搜名称、产地或村庄	188	468	557	534	android.widget.TextView
+17	False	False		44	628	1036	760	android.view.View
+18	True	True		44	628	202	760	android.view.View
+19	False	True	全部	88	661	158	727	android.widget.TextView
+19	True	True		224	628	382	760	android.view.View
+20	False	True	水果	268	661	338	727	android.widget.TextView
+20	True	True		404	628	562	760	android.view.View
+21	False	True	蔬菜	448	661	518	727	android.widget.TextView
+21	True	True		584	628	742	760	android.view.View
+22	False	True	禽蛋	628	661	698	727	android.widget.TextView
+22	True	True		764	628	922	760	android.view.View
+23	False	True	茶叶	808	661	878	727	android.widget.TextView
+23	True	True		944	628	1076	760	android.view.View
+24	False	True	干货	988	661	1036	727	android.widget.TextView
+23	True	True	综合	45	774	177	906	android.widget.TextView
+24	True	True	价格↑	189	774	344	906	android.widget.TextView
+25	True	True	价格↓	361	774	516	906	android.widget.TextView
+26	True	True	销量	528	774	660	906	android.widget.TextView
+27	False	True	共 0 件	933	807	1030	873	android.widget.TextView
+28	False	True		463	1047	617	1201	android.view.View
+29	False	True		474	1058	606	1190	android.view.View
+29	False	True	山货还没上新	417	1234	663	1300	android.widget.TextView
+30	False	True	农户正在备货，过会儿再来看看	295	1314	785	1380	android.widget.TextView
+31	True	True		428	1419	652	1551	android.view.View
+32	False	True	清空筛选	461	1452	619	1518	android.widget.TextView
+30	False	True		474	242	606	374	android.view.View
+31	False	True		474	242	606	374	android.view.View
+32	False	True		518	286	562	330	android.view.View
+31	False	True		0	2208	1080	2400	android.view.View
+32	False	True		0	2144	1080	2230	android.view.View
+33	True	True		0	2230	270	2381	android.view.View
+34	False	True	首页	105	2238	166	2299	android.view.View
+35	False	True	首页	105	2307	165	2373	android.widget.TextView
+35	True	True		270	2230	540	2381	android.view.View
+36	False	True	商城	375	2238	436	2299	android.view.View
+37	False	True	商城	375	2307	435	2373	android.widget.TextView
+37	True	True		540	2230	810	2381	android.view.View
+38	False	True	快递	645	2238	706	2299	android.view.View
+39	False	True	快递	645	2307	705	2373	android.widget.TextView
+39	True	True		810	2230	1080	2381	android.view.View
+40	False	True	我的	915	2238	976	2299	android.view.View
+41	False	True	我的	915	2307	975	2373	android.widget.TextView

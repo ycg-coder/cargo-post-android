@@ -1,0 +1,13 @@
+path=start_22__C_____________________________>阴
+depth=2
+hash=97be3261f33a
+clickable_total=46
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.01%)
+log_lines=0
+E级=0
+0
+崩溃或ANR=0
+0
+网络/后端失败=0
+0

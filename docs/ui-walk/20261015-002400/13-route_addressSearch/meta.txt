@@ -1,0 +1,10 @@
+path=route/addressSearch
+depth=1
+hash=4958779f04f2
+clickable_total=17
+front=Window{23b2b55 u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 12 (0.00%)
+log_lines=1711
+E级=20
+崩溃或ANR=0
+网络/后端失败=0

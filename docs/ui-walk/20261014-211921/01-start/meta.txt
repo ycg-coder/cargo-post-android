@@ -1,0 +1,10 @@
+path=start
+depth=0
+hash=38049a02732f
+clickable_total=74
+front=Window{430acc u0 com.shanxiang.buspost/com.shanxiang.buspost.MainActivity}
+Janky frames: 9 (0.29%)
+log_lines=80279
+E级=2934
+崩溃或ANR=2
+网络/后端失败=1
