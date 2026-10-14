@@ -7546,3 +7546,56 @@ APK **117,358,172 B @ 15:45 / sha256 `ff08bd1c6031efc396de02a1951857656748c9eec0
 **终值**：判据 35 本全 rc=0（含 S-m）；`status_negative_controls.sh` 计数 **23 条按名点名变红 / 0 不成立**；
 全量用例与 APK 读数见下（本轮只动一个页面文件 + 两本工具，源码行号漂移不涉及台账锚点：
 `grep AddressSearchScreen.kt:行号` 七本台账现读 **0** 处）。设备仍未接 ⇒ 该页三态的**视觉效果** `NOT VERIFIED ON DEVICE`。
+
+### D-110（10-14 16:3x–17:2x）· 云上三个 500 的根因 = 迁移没跑（不是代码坏了）+ 算法时限口径收成一套 + 发 v54
+
+**用户报的两件事**：① "没改这次 UI 之前就下载了最新 app，有些最新的功能没有实现通路"；② "显示网络不好"。
+两边都量了，结论是**两个独立原因**，谁也不能替谁解释：
+
+**① 装的是 v43（今天 03:00:30Z 打的），而 #4…#9 都在 03:58Z 之后才进 main** ⇒ 那些功能不在这个二进制里，
+不是"通路没接"。 remedy = 重新派发 release；已 dispatch（run 38535345775，5m57s 成功）⇒ **v54 已发布**，
+资产 `app-release.apk` **109,936,996 B**，`releases/latest` 从 v43 变 v54，`versionCode` 54 > 43 ⇒
+装了旧包的用户走「设置 → 关于 → 检查更新」就能就地升级（D-105 那条通道第一次被真实消费）。
+
+**② "网络不好"是真的，但根因在数据库结构不在网络。** 同一批 GET 逐条实测（都带时间戳可复现）：
+
+| 端点 | 云上 | 本机 48080 |
+| --- | --- | --- |
+| `/app-api/transport/notice/list` | `code:0` 正常 | `code:0` |
+| `/app-api/transport/product/list` | `code:0` 正常 | `code:0` |
+| `/app-api/transport/send/stations` | **`{"code":500,"msg":"系统异常"}`**（HTTP 200，0.4s 回） | `code:0` |
+| `/app-api/transport/bus/nearby` | **`code:500`** | `code:0` |
+| `/app-api/transport/bus/lines` | **`code:500`** | — |
+
+⇒ 服务活着、库也连着（两个老端点正常），**只有站点域的新列读不到**。
+对照 `sql/incremental/V033__station_pickup_attrs.sql` 的自述：它给 `transport_station` 补
+联系人 / 联系电话 / 营业时间 / 电商站点四列，且文件里明写
+「未执行之前……会因缺列报错——所以『云上这一格可用』要等它被执行」。
+本机树里这些端点正常，是因为**本机库已经执行过这些脚本**（`project-local-backend-divergent-layers` 那条的镜像形态：
+这次不是"工作树超前 / jar 滞后"，而是**新代码 + 旧库结构**）。
+
+**给用户的待执行清单（顺序无依赖，都可安全重复执行；`V029` 刻意不在内，它是裸 ALTER，第二次必红）**：
+`V028__wallet_tables.sql`、`V030__execution_writeback_guarded.sql`、`V031__wallet_menu.sql`、
+`V032__pricing_rule_menu.sql`、`V033__station_pickup_attrs.sql`、`V034__handover_sign_url.sql`、
+`V035__pay_order_request_no.sql`。我不碰共享库（规矩不变），执行完我可以在线复验这三条端点。
+
+**App 侧顺带确认一件事**：这个措辞不是 bug —— HTTP 200 + `code:500` 走 `ApiException(500,"系统异常")`
+念后端原文；只有 HTTP 5xx 才映射成 `NetworkException("服务暂时不可用（HTTP …）")`，
+IOException 才是"网络连接失败"。所以"网络不好"那一句来自用户装包时**正赶上服务重启的窗口**，
+而现在的 500 会念成"系统异常"。两者都是真话，不合并。
+
+**算法侧（用户明确授权我按效果决定）**：两件事不是二选一 —— 已开 **PR #193**（未合，等点头，合 = 重启云服务）。
+实测破口：`app/solver.py` 里**零**时间管线；BASELINE 一批里 OR-Tools 最多被调 `(MAX_REROUTE_ITERATIONS+1)×2` 次、
+每次写死 5s ⇒ 整批 **10.00s** 对声明 5.0s（`limit=1→2.01s / 5→10.00s / 10→20.00s`，倍数可复现）。
+做法：**终止的正常依据是评估计数**（与机器无关），**墙钟是保险丝**且现在在请求边界真兑现
+（HACO 钳到剩余量、OR-Tools 每次搜索领剩余量、HYBRID 两臂共享一只表），
+不可中断的固定开销**不藏**：`OVERALL_LIMIT_S` / `ELAPSED_MS` / 越界 `OVERALL_FUSE_TRIPPED=+Nms`。
+`ITERATION_COUNT` 从"0 条断言在读"变成有读者（lab 台账 `iterations` + 基准断言"haco 版本可行解 ≥1 代完整迭代"，
+0 代 = 交付的其实是贪心种子）。口径的唯一权威说明落在 `docs/algorithm-integration.md` §时限与终止口径，
+连第三个数（HTTP 层"计算超时 10 秒"是任务级、含排队与固定开销）也一并收进同一套说法。
+读数：`pytest -m "not slow"` ⇒ **820 passed / 3 skipped**；新簿 `tests/test_overall_time_fuse.py` 3 passed
+（其中一条是**结构**断言而不是毫秒读数：两次搜索之和不得回到 `2×常量`）；`test_haco_141_benchmark.py` 16 passed。
+⚠ 一处实现细节值得记：protobuf `Duration.FromSeconds` **只收整数秒**（实测传 float 直接 `TypeError`），
+所以预算走 `FromMilliseconds`；且领到 0 会让 OR-Tools 一次都不迭代 ⇒ 把"预算用尽"伪装成"无解"，
+`reason_code` 跟着说谎，故设 50ms 下限。
+本轮算法改动在 **worktree** 里做（后端主树有 106 个未提交文件，是他人状态，一个字没动）。
