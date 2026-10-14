@@ -128,7 +128,7 @@ fun LoginScreen(
             // 登录表单
             BusTextField(
                 value = vm.mobile,
-                onValueChange = { v -> vm.mobile = v.filter { it.isDigit() }.take(11) },
+                onValueChange = { v -> vm.onMobileChange(v) },
                 label = "手机号",
                 placeholder = "请输入手机号",
                 icon = BusIcons.phone,

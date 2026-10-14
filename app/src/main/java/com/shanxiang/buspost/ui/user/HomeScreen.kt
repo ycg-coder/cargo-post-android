@@ -1376,12 +1376,17 @@ private fun AddressBookDialog(
     val scale = LocalBusFontScale.current
     var addresses by remember { mutableStateOf<List<com.shanxiang.buspost.data.model.AddressItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         try {
             val result = com.shanxiang.buspost.data.repo.Repo.addresses()
             addresses = result.items
-        } catch (_: Exception) { }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            failed = true
+        }
         loading = false
     }
 
@@ -1415,6 +1420,14 @@ private fun AddressBookDialog(
 
                 if (loading) {
                     Text("加载中…", color = t.textSecondary, fontSize = (12 * scale).sp, modifier = Modifier.padding(8.dp))
+                } else if (failed) {
+                    // 取失败不许念成"你没有存过地址"：那是替后端下结论。
+                    Text(
+                        "地址簿没取到，检查网络后重新打开这一格",
+                        color = t.danger,
+                        fontSize = (12 * scale).sp,
+                        modifier = Modifier.padding(8.dp),
+                    )
                 } else if (addresses.isEmpty()) {
                     Text(
                         "暂无保存的地址，可手动输入地址查询",

@@ -2372,7 +2372,14 @@ fun JSONObject.imageUrlOrEmpty(vararg keys: String): String {
         if (v is JSONArray || v is JSONObject) continue
         val s = v?.toString()?.trim().orEmpty()
         if (s.isEmpty() || s == "null") continue
-        if (s.startsWith("http://") || s.startsWith("https://")) return s
+        if (s.startsWith("https://")) return s
+        if (s.startsWith("http://")) {
+            // 正式版 `usesCleartextTraffic=false`：明文图**永远加载不出来**，只会留一张占位。
+            // 所以公网地址一律升到 https（升不上去就退回原样，由 Coil 的 error 占位接住）；
+            // 本机/局域网的后端通常只有 http，升了反而全灭，那一类保持原样。
+            val host = s.substringAfter("://").substringBefore("/")
+            return if (isPrivateHost(host)) s else "https://" + s.substringAfter("://")
+        }
         if (s.startsWith("/")) {
             // 相对路径按**站点根**补全，不按 API 前缀：`/images/...` 不在 `/app-api` 下面
             val base = com.shanxiang.buspost.BuildConfig.BASE_URL
@@ -2381,4 +2388,17 @@ fun JSONObject.imageUrlOrEmpty(vararg keys: String): String {
         }
     }
     return ""
+}
+
+/** 本机 / 内网主机：这些后端通常只有 http，升到 https 会全灭，保持明文原样 */
+internal fun isPrivateHost(host: String): Boolean {
+    val h = host.substringBefore(":").lowercase()
+    if (h.isEmpty()) return true
+    if (h == "localhost" || h.endsWith(".local") || h == "::1") return true
+    if (h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.")) return true
+    if (h.startsWith("172.")) {
+        val second = h.substringAfter(".").substringBefore(".").toIntOrNull() ?: -1
+        if (second in 16..31) return true
+    }
+    return false
 }

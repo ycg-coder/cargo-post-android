@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -39,47 +40,45 @@ val LocalNavController = compositionLocalOf<NavHostController> {
 }
 
 /**
- * 数据来源诚实标注：接口不通回落到本地演示集时，页面顶部必须出现这条，
+ * 数据来源诚实标注：接口不通回落到本地演示集时，页面必须出现这一行，
  * 不能让用户把演示数据当成真实班次（小程序里没有这个约束）。
- * 
- * 注意：根据UI复刻方案，演示数据横幅已移除，但保留DemoData.kt作为离线兜底。
- * 如需重新启用，取消下方return语句即可。
+ *
+ * 2026-10-15 复活：UI 复刻方案撤掉的是"黄色警告横幅"这种**样式**，不是撤掉这句话。
+ * 上一版直接把函数体 `return` 掉，等于全站 20 处各自写好的诚实文案一起失声，
+ * 59 处算出来的 `demo` 标志没人读 —— 演示数据被念成真数据，比丑横幅严重得多。
+ * 这里换成一行说明文字（无底色块、无告警条），既守住"不承诺做不到的事"，也不破坏版面。
  */
 @Composable
 fun DemoNote(demo: Boolean, label: String = "演示数据", text: String = "当前为演示模式，展示本地演示数据，仅用于查看交互效果。") {
-    // UI复刻方案要求：移除黄色警告横幅，改为静默降级
-    // 演示数据仍在后台使用，但不向用户展示提示
-    return
-    /*
     if (!demo) return
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(BusRadius.m))
-            .background(t.goldLight)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.Top,
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(t.gold),
+        )
         Text(
             label,
             color = t.goldDeep,
             fontSize = (11 * scale).sp,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            modifier = Modifier
-                .clip(RoundedCornerShape(BusRadius.s))
-                .background(t.gold.copy(alpha = 0.25f))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(start = 6.dp),
         )
         Text(
-            text,
-            color = t.goldDeep,
-            fontSize = (12 * scale).sp,
-            modifier = Modifier.padding(start = 8.dp),
+            " · " + text,
+            color = t.textSecondary,
+            fontSize = (11 * scale).sp,
+            modifier = Modifier.padding(start = 2.dp),
         )
     }
-    */
 }
 
 /** 首页功能入口格子 */

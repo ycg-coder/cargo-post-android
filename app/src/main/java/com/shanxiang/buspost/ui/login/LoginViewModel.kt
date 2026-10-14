@@ -42,8 +42,23 @@ class LoginViewModel : ViewModel() {
         get() = mobile.length == 11 && agreed && !busy &&
             (if (mode == 0) password.length >= 6 else code.length in 4..6)
 
-    fun sendSms() {
-        if (mobile.length != 11) {
+    /**
+     * 改手机号 = 换了一个人：上一位留下的"验证码已发送"、倒计时、失败原因全部作废。
+     * 真机实测（2026-10-15，v70）：先用 13800000000 以司机身份登录被拒（"该账号未绑定司机档案"），
+     * 把号码改成司机号 13800138001 之后，那句判决还挂在输入框下面 —— 界面在拿**另一个人**的
+     * 后端结论回答这一位。倒计时同理：60 秒是给上一个号码的，留着它等于这一位永远点不到"获取"。
+     */
+    fun onMobileChange(next: String) {
+        val cleaned = next.filter { it.isDigit() }.take(11)
+        if (cleaned == mobile) return
+        mobile = cleaned
+        code = ""
+        notice = null
+        error = null
+        countdown = 0
+    }
+
+    fun sendSms() {        if (mobile.length != 11) {
             error = "先填写 11 位手机号"
             return
         }
