@@ -7339,3 +7339,45 @@ RolldownError: Attribute name cannot contain U+0022 ("), U+0027 ('), and U+003C 
 平白造出"整本文件都像被改过"的差异（正是本笔上面那条 DA-a 空转负控同一族的"看起来对、其实没人验过"）。
 三处写入统一加 `newline="\n"`，实测重写后 `CR 0 / 248 行`，锚点簿与那本负控复跑仍 `RESULT=PASS`。
 
+### D-105（10-14 11:5x–12:0x）· 更新通道第一次真发布：App 现在真的查得到一个版本了
+
+**为什么这一笔值得单记**：#48 那套自更新通路（取 latest release → 判定 → 下载 → 唤起安装器）从写完到本轮，
+**仓库里的 Release 数一直是 0**。那不是"还没测"，而是 App 那一问只能得到 404，
+于是界面只能老实念"还没发布过可更新的版本"——通路是对的，可它从来没有过一次真读数。
+本轮按用户口径（GitHub Releases 是这条通路唯一的版本事实来源）派发了一次 `workflow_dispatch`。
+
+**实测读数**（跑的是 main 的 HEAD，事件 `workflow_dispatch`，作业结论 success）：
+
+- Release：**乡邮智联 v43**，tag `v43`，`draft=false`、`prerelease=false` ⇒ `releases/latest` 由 404 变 200。
+- 资产：`app-release.apk`，`state=uploaded`，**109,953,380 B**，下载地址挂在 release 页上。
+- 出包前那道取证闸：`源码树内 jks/keystore 命中数（必须 0）：0`；作业成功 ⇒
+  扫 dex 那一步（包内必须命中给定的 https 后端、且不许残留 `127.0.0.1` / `localhost` / `10.0.2.2` / 旧公网 IP）是通过的，
+  它是 exit 1 型断言，不会静默放行。这次发布用的后端地址是 `https://api.qwer2333.com/api`（dispatch 输入框的默认值）。
+- 出包后的回读取证那一步原话：**"回读通过：latest = v43，且带 app-release.apk（App 侧 releaseCodeOf 认的就是这个 tag）"**
+  —— 这条是本笔最硬的证据：它不是"我建了个 Release"，而是"App 那一问真的查到了这一版"。
+- **只取到这些**：扫包步骤打印的"命中 = N"那两行数字我在日志里没刮出来（日志前缀把脚本回显与输出混在一起），
+  所以这里不写具体次数，只写"作业 success ⇒ 那道断言已过"。**没有把它写成"已验过包内地址命中数"**。
+
+**三条边界，不说就是骗人**：
+
+1. **签名不同源 ⇒ 装不上是必然，不是 bug**。设备上现在装的是 debug 包（另一把签名），
+   点更新走系统安装器会 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。要验真更新，必须先装一次 release 签名的包，
+   之后"内部收到更新并装上"这条路才真的通。这一条决定了队友第一次拿到 v43 时该怎么做。
+2. **`versionCode` 取自 `GITHUB_RUN_NUMBER`** ⇒ v43 的 versionCode = 43；本机 debug 包没有这个环境变量所以是 1。
+   低版本看得到高版本，这条天然满足，但也意味着**同一个 run 号重复出包会得到相同 versionCode**，
+   想让老包看到更新必须是一次新的 run。
+3. **这台机器没有真机在环** ⇒ 发布之后能验的只有"接口回读 + 包内取证"这两格，
+   **屏上是否弹框、下载进度是否动、系统安装器是否被唤起**三格仍是 `NOT VERIFIED ON DEVICE`。
+   这三格要连设备一起做，走 `tools/verify_device.sh`。
+
+**同轮的另一件事（后端侧未提交批次的处置）**：本机 `cargo-post-platform` 压着 106 项未提交，
+按"只提交该提交的"筛成两笔重放到 master，开了 **PR #191**（后端契约面 / 度量台与 15 本规格测试）。
+证据：`mvn -o -B -pl yudao-module-transport test` = **367 例 / 0 失败**；
+在一棵**没有题集缓存**的树上 `pytest -m "not slow"` = **796 passed / 2 skipped / 0 failed**（同一棵树改前 10 failed）。
+那道题集缺失没有靠 skip 糊过去，改成按 `_stable_seed` 确定性现算（断言一个字没动）。
+**排除在外的面**也写进 PR 了：两个 341MB / 692MB 的 pkl（超 GitHub 单文件硬限）、训练 zip 与解压重复、
+跑出来的 `benchmarks/lab/cache/` 482 个 JSON（已改为 `.gitignore`，且实测它比当前构建器旧）、
+`.github/skills` 等本地 agent 工具、六个一次性改源码的刷子脚本、`miniprogram/` 与 `css/`、`js/`（范围外）、
+以及 `response.mp3` 的删除（合理但不属于这两笔，留着单独立一笔）。
+台账里那条"5 个未提交测试文件的归属"到此有答案：它们属于这批的后端契约面，已随 PR #191 进评审，不再挂着。
+
