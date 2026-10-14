@@ -1260,6 +1260,7 @@ private fun ProductMiniCard(p: Product, onClick: () -> Unit) {
                 width = 400.dp,
                 height = 100.dp,
                 modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(BusRadius.m)),
+                fallbackIcon = BusIcons.leaf,
                 contentScale = ContentScale.Crop,
             )
         } else {

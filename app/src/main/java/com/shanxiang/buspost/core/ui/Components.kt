@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,6 +79,7 @@ fun NetworkImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     placeholder: Painter? = null,
+    fallbackIcon: ImageVector? = null,
 ) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
@@ -99,6 +101,10 @@ fun NetworkImage(
         modifier = modifier,
         contentScale = contentScale,
         placeholder = placeholder,
+        // 加载失败必须落到一个**有设计的占位**，不是一片空白：release 包禁明文，
+        // 而商品种子图片现在还是 http://IP（真机 2026-10-14 实测），失败是常态而不是意外。
+        error = fallbackIcon?.let { rememberVectorPainter(it) },
+        fallback = fallbackIcon?.let { rememberVectorPainter(it) },
     )
 }
 

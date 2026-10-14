@@ -7722,7 +7722,7 @@ V032 的两行也在 ⇒ "6920 这一行没落库"成立，**为什么没落库�
    现在只认 http(s)/绝对路径，相对路径按**站点根**补全（`/images/...` 不在 `/app-api` 下）。
    ② 数据侧云上 `image_url` 是 `http://1.15.29.107/images/products/*.jpg`——**明文 IP**，
    而 release 包 `usesCleartextTraffic=false`，正式包根本加载不出来。同一张图走
-   `https://api.qwer2333.com/images/products/plum.jpg` 实测 200 / image/jpeg / 209156 B（与明文同源同字节）
+   `https://api.qwer2333.com/images/products/plum.jpg` 实测 200 / image/jpeg / 209156 B（与明文同源同字节）。**v67 发出去后立刻发现这一格只修了一半**：release 包禁明文，云上种子仍是 http://IP，加载失败时 AsyncImage 什么都不画 ⇒ 卡面还是空白。补法不是放行明文，而是让"加载失败"落到有设计的占位：`NetworkImage` 新增 `fallbackIcon`（同时喂 error 与 fallback），商城卡 / 商品详情 / 首页农产品三处传 BusIcons.leaf，随 v68 发。
    ⇒ 该改的是种子 URL 换成 https 域名那一份，这是后端数据面的活，已记进欠账。
    本机开发库那 12 行是旧种子（status=0 下架、image_url 空或 `cdn.example.com`），本轮已就地补齐成
    https 那一份以便真机验证——**只动了本机库，云上没动**。

@@ -214,6 +214,7 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                                 width = 400.dp,
                                 height = 230.dp,
                                 modifier = Modifier.fillMaxWidth().height(230.dp),
+                                fallbackIcon = BusIcons.leaf,
                                 contentScale = ContentScale.Crop,
                             )
                             Icon(
