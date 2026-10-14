@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -195,12 +195,15 @@ fun OrderDetailScreen(id: Long, vm: OrderDetailViewModel = viewModel()) {
             title = { Text("取消这笔订单") },
             text = { Text("取消后班车不再配送，货款不发生。确定取消 ${o?.orderNo ?: ""} 吗？") },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.confirmCancel = false
-                    vm.cancel(id)
-                }) { Text("取消订单") }
+                BusDialogAction(
+                    "取消订单",
+                    onClick = {
+                        vm.confirmCancel = false
+                        vm.cancel(id)
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { vm.confirmCancel = false }) { Text("保留") } },
+            dismissButton = { BusDialogAction("保留", onClick = { vm.confirmCancel = false }) },
         )
     }
 }

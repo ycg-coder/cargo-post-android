@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.ui.driver
 
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -142,13 +142,16 @@ fun SignaturePadDialog(
         },
         dismissButton = {
             Row {
-                TextButton(onClick = {
-                    done.clear()
-                    live.clear()
-                    inked = 0
-                    problem = null
-                }) { Text("清除重签", color = t.textSecondary) }
-                TextButton(onClick = onCancel) { Text("不签了", color = t.textSecondary) }
+                BusDialogAction(
+                    text = "清除重签",
+                    onClick = {
+                        done.clear()
+                        live.clear()
+                        inked = 0
+                        problem = null
+                    },
+                )
+                BusDialogAction(text = "不签了", onClick = onCancel)
             }
         },
     )

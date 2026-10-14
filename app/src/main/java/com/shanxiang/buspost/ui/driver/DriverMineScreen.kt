@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppDomain
 import com.shanxiang.buspost.core.AppState
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.BusAvatar
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
@@ -147,13 +147,16 @@ fun DriverMineScreen() {
             title = { Text("退出登录") },
             text = { Text("退出后本地会话清空，后台提醒会停止。已保存的草稿与地址不受影响。") },
             confirmButton = {
-                TextButton(onClick = {
-                    confirmLogout = false
-                    scope.launch { Repo.logout() }
-                    AppState.kickToLogin()
-                }) { Text("退出") }
+                BusDialogAction(
+                    "退出",
+                    onClick = {
+                        confirmLogout = false
+                        scope.launch { Repo.logout() }
+                        AppState.kickToLogin()
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("再想想") } },
+            dismissButton = { BusDialogAction("再想想", onClick = { confirmLogout = false }) },
         )
     }
 }

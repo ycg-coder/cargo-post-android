@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.core.AppState
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
@@ -279,20 +279,15 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
                                 fontSize = (11.5 * scale).sp,
                             )
                         }
-                        TextButton(
+                        BusDialogAction(
+                            text = if (vm.uploadingAvatar) "上传中" else "更换头像",
                             enabled = !vm.uploadingAvatar,
                             onClick = {
                                 avatarPicker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                                 )
                             },
-                        ) {
-                            Text(
-                                if (vm.uploadingAvatar) "上传中" else "更换头像",
-                                color = t.primary,
-                                fontSize = (13 * scale).sp,
-                            )
-                        }
+                        )
                     }
                     BusTextField(
                         value = vm.nickname,
@@ -515,12 +510,15 @@ fun AddressScreen(vm: AddressViewModel = viewModel(), select: Boolean = false) {
             title = { Text("删除地址") },
             text = { Text("确定删除「${a.name} ${a.detail}」吗？") },
             confirmButton = {
-                TextButton(onClick = {
-                    toDelete = null
-                    vm.remove(a.id)
-                }) { Text("删除") }
+                BusDialogAction(
+                    "删除",
+                    onClick = {
+                        toDelete = null
+                        vm.remove(a.id)
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("取消") } },
+            dismissButton = { BusDialogAction("取消", onClick = { toDelete = null }) },
         )
     }
 }
@@ -711,16 +709,19 @@ private fun AreaPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val province = provinces.getOrNull(provinceIdx)
-                val city = province?.children?.getOrNull(cityIdx)
-                val district = city?.children?.getOrNull(districtIdx)
-                val id = district?.id ?: city?.id ?: province?.id ?: ""
-                val text = listOfNotNull(province?.name, city?.name, district?.name).joinToString(" ")
-                onConfirm(id, text)
-            }) { Text("确定") }
+            BusDialogAction(
+                "确定",
+                onClick = {
+                    val province = provinces.getOrNull(provinceIdx)
+                    val city = province?.children?.getOrNull(cityIdx)
+                    val district = city?.children?.getOrNull(districtIdx)
+                    val id = district?.id ?: city?.id ?: province?.id ?: ""
+                    val text = listOfNotNull(province?.name, city?.name, district?.name).joinToString(" ")
+                    onConfirm(id, text)
+                }
+            )
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { BusDialogAction("取消", onClick = onDismiss) },
     )
 }
 

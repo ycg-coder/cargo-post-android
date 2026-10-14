@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
@@ -425,10 +425,13 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.submitted = null
-                    nav.popBackStack()
-                }) { Text("知道了") }
+                BusDialogAction(
+                    "知道了",
+                    onClick = {
+                        vm.submitted = null
+                        nav.popBackStack()
+                    }
+                )
             },
         )
     }
@@ -440,13 +443,16 @@ fun GoodsDetailScreen(id: Long, vm: GoodsDetailViewModel = viewModel()) {
             title = { Text("需要登录") },
             text = { Text("下单前请先登录或注册，登录后即可享受完整的购物功能。") },
             confirmButton = {
-                TextButton(onClick = {
-                    showLoginDialog = false
-                    nav.navigate(Routes.LOGIN)
-                }) { Text("去登录") }
+                BusDialogAction(
+                    "去登录",
+                    onClick = {
+                        showLoginDialog = false
+                        nav.navigate(Routes.LOGIN)
+                    }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showLoginDialog = false }) { Text("先逛逛") }
+                BusDialogAction("先逛逛", onClick = { showLoginDialog = false })
             },
         )
     }

@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
@@ -311,12 +311,15 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.confirm(context, task, picked, remark, signPng)
-                    target = null
-                }) { Text("提交交接") }
+                BusDialogAction(
+                    "提交交接",
+                    onClick = {
+                        vm.confirm(context, task, picked, remark, signPng)
+                        target = null
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { target = null }) { Text("取消") } },
+            dismissButton = { BusDialogAction("取消", onClick = { target = null }) },
         )
     }
 

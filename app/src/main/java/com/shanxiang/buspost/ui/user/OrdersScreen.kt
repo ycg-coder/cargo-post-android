@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -35,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.NetworkImage
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.graphics.Color
@@ -316,12 +316,15 @@ fun OrdersScreen(vm: OrdersViewModel = viewModel()) {
             title = { Text("取消订单") },
             text = { Text("确定取消该订单吗？") },
             confirmButton = {
-                TextButton(onClick = {
-                    toCancel = null
-                    vm.cancel(o.id)
-                }) { Text("确认取消") }
+                BusDialogAction(
+                    "确认取消",
+                    onClick = {
+                        toCancel = null
+                        vm.cancel(o.id)
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { toCancel = null }) { Text("再想想") } },
+            dismissButton = { BusDialogAction("再想想", onClick = { toCancel = null }) },
         )
     }
 }

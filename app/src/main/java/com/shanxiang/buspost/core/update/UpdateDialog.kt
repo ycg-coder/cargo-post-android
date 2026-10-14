@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.core.update
 
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -130,15 +130,15 @@ fun UpdateDialog(
                     }
                     else -> {
                         Row(modifier = Modifier.fillMaxWidth()) {
-                            TextButton(
+                            BusDialogAction(
+                                text = "稍后再说",
                                 onClick = onDismiss,
                                 modifier = Modifier.weight(1f),
-                            ) {
-                                Text("稍后再说", color = Color(0xFF6B7280))
-                            }
+                            )
                             Spacer(Modifier.width(8.dp))
-                            BusButton(
+                            BusDialogAction(
                                 text = "立即更新",
+                                primary = true,
                                 onClick = {
                                     downloading = true
                                     scope.launch {
