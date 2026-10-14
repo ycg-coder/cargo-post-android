@@ -3,6 +3,24 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-14（傍晚，D-109 · **功能通路第三查：手动地址查公交页原来只有"加载中"一格**）：
+- 扫法（可复现）：`*Screen.kt` 里"渲染 BusPage/BusLazyPage" + "有 Repo 读点或 load()" + "整文件零 ErrorState/.error"。
+  第一版口径宽（12 本命中，多数是脚手架/纯渲染器，错误在别处出口），收窄后只剩两本：
+  `ui/user/AddressSearchScreen.kt` 真缺陷、`ui/driver/DriverMineScreen.kt` 唯一的 `Repo.` 是 `logout()`（写操作，不是缺陷）。
+- 缺陷：该页读 `Repo.forwardGeo` + `Repo.nearbyBuses`，**失败时 `vm.error` 有值但页面一个字不念**、
+  "没解析出来"同样是空白、加载态还是手搓圆点卡 ⇒ 用户看到的等价于"按钮没反应"。
+  与 S-le"写完必须回读"是同一族的另一半：**读不到也要说一句**。
+- 改：加 `searched` 区分"还没查过/查了没结果"，三格各一句（`LoadingState` / `ErrorState(onRetry=…)` / `EmptyState`），
+  未查过也给引导不为空白；手搓转圈与三个只服务它的 import 删掉。
+- 新闸 **S-m**：`ErrorState` 恰好 1 / `EmptyState` 恰好 4（还没查过·没解析出来·无公交·无揽收点，不许并格）/
+  `LoadingState` 恰好 1 / `CircularProgressIndicator` = 0；配 `status_negative_controls.sh` 两条注入各咬 ✔（整本 23 条点名变红 / 0 不成立）。
+  ⚠ S-m 的 `EmptyState` 目标值我第一次写成 **2**、实测 **4** —— "判据下限只能实测不许推算"这条第五次被踩，
+  这次是负控的"基线自拒"在落盘前拦住（前四次：D-082 / D-084 / #51 / ⑪）。
+- 终值：判据 **35 本全 rc=0**；`assembleDebug` + `testDebugUnitTest --rerun-tasks` ⇒ **68 份 XML / 706 例 / 0 失败 / 0 错误**
+  （`45 tasks executed`）；APK **117,358,172 B @16:08 / sha256 前缀 `7cf186bc`**（与 15:45 那份 `ff08bd1c…` **同字节数而 sha 变**，
+  第七次实测"字节数不是内容指纹"）；`check_ledger_tables.py` TOTAL FLAGS **0**；锚点无新增（七本台账里指向该页的 `:行号` 现读 0 处）。
+  设备仍未接 ⇒ 该页三态的视觉那一半 `NOT VERIFIED ON DEVICE`。
+
 最后更新：2026-10-14（下午续二，D-108 · **UI 规格第二刀：热区收进令牌 + 无生产者的新闻面撤除 + 三处死码**）：
 - **同一题目的下半**：D-107 收"种类"，这一刀收**热区**与"这句话有没有生产者"。实测起点 `.height(<48.dp)` 且同链
   `.clickable` 的手搓按钮状块 1 处（登录闸门 46dp 渐变 CTA）+ 3 处文字块热区不足 ⇒ 全部走 `BusButton` /

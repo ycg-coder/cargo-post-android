@@ -145,6 +145,12 @@ check S-ld1 "× S-ld 司机页面退回本地状态判断" subst1 "$RT" 'DriverL
 check S-le1 "× S-le 段动作入口数量变了（核对是否漏了回读）" subst1 "$HO" 'val ack = Repo.legAction(' 'val ack2 = Repo.legAction('
 check S-le21 "× S-le2 这些页面写完不回读" killread "$DE"
 
+# S-m：手动地址查公交页的三态。这一页旧写法只有"加载中"一格，失败与"没解析出来"都是整屏空白。
+AS=$A/ui/user/AddressSearchScreen.kt
+[ -f "$AS" ] || { echo "✘ 沙盒缺 $AS：S-m 的注入等于没注入"; exit 2; }
+check S-m1 "× S-m 手动地址查公交页的错误出口不是恰好一处" delline "$AS" 'item { ErrorState(e, onRetry = { vm.search() }) }'
+check S-m2 "× S-m 这一页又长出自己画的加载块" ins_after "$AS" '    var searched by mutableStateOf(false)' '    private val handSpunLoader = CircularProgressIndicator()'
+
 check_miss S-x0 subst1 "$SS" '这一行在本仓根本不存在-NEG-CONTROL' 'x'
 
 echo "---"

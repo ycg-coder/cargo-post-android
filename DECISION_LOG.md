@@ -7517,3 +7517,32 @@ APK **117,358,172 B @ 15:45 / sha256 `ff08bd1c6031efc396de02a1951857656748c9eec0
 跨 10-09…10-14 六天的合并，**本轮未做差量实验 ⇒ 仍记未归因，挂 #140**（"APK 字节数不是内容指纹"这条继续有效）。
 `check_ledger_tables.py` TOTAL FLAGS **0**；设备：本轮未接（用户 2026-10-13 那句"先不真机检验"仍生效）
 ⇒ 视觉/热区那一半全部 `NOT VERIFIED ON DEVICE`。
+
+### D-109（10-14 16:3x–17:0x）· 功能通路第三查：手动地址查公交页原来只有"加载中"一格
+
+**这是 D-108 那句"复核功能通路"的下一半**，题目不是规格而是**失败可见性**。扫法（可复现）：
+取所有 `*Screen.kt`，要求同时满足"渲染 `BusPage`/`BusLazyPage`" + "有 `Repo.<read>` 或 `load()`" + "整文件零 `ErrorState`/`.error` 引用"。
+第一版口径太宽（12 本命中，里面 `DriverShell`/`UserShell`/`MissionMarkers`/`ParcelTicket`/`DriverWeatherTip` 这些
+要么不是页面、要么错误在别处出口），收窄到"成页 + 取数 + 零错误出口"后**只剩两本**：
+`ui/user/AddressSearchScreen.kt`（真缺陷）与 `ui/driver/DriverMineScreen.kt`（唯一的 `Repo.` 是 `logout()`，写操作，**不是缺陷**）。
+
+**缺陷形状**：这一页读 `Repo.forwardGeo` 与 `Repo.nearbyBuses`，
+- 失败时 `work` 把原因写进 `vm.error`，但页面**一个字都不念** ⇒ 整屏仍是空白；
+- 地址没解析出来（`searchResult == null` 且没异常）同样是空白；
+- "加载中"那一格是自己画的圆点卡，不是设计系统的 `LoadingState`。
+⇒ 用户点了"查询"之后看到的等价于**按钮没反应**。这与 S-le"写完必须回读"是同一族的另一半：**读不到也要说一句**。
+
+**改了什么**：加 `searched` 一格区分"还没查过"与"查了没解析出来"；三格各一句
+（`LoadingState("正在查询地址…")` / `ErrorState(e, onRetry = …)` / `EmptyState("这个地址没解析出来", …)`），
+未查过那一格也给一句引导而不是空白；手搓的转圈卡删掉，三个只用于它的 import 一并删（`Box`/`clip`/`background` 现读零引用）。
+
+**新闸** `S-m`（配 `status_negative_controls.sh` 两条注入，S-m1 删错误出口 / S-m2 重新长出手搓加载块，各咬 ✔）：
+`ErrorState` 恰好 1、`EmptyState` 恰好 4（还没查过 / 没解析出来 / 该地无公交 / 无揽收点，四格各一句，不许并格）、
+`LoadingState` 恰好 1、`CircularProgressIndicator` = 0。
+⚠ **`EmptyState` 的目标值我第一次写成 2、实测是 4** —— 页面本来还有"无公交""无揽收点"两格空态是我没数进去的。
+这是"判据下限只能实测、不许推算"这条在册规矩第五次被踩（前四次记在 D-082/D-084/#51/⑪），
+差别在于这次**基线自拒**（负控第一遍 `✘ 基线未通过`）把它拦在了落盘之前，没写成红。
+
+**终值**：判据 35 本全 rc=0（含 S-m）；`status_negative_controls.sh` 计数 **23 条按名点名变红 / 0 不成立**；
+全量用例与 APK 读数见下（本轮只动一个页面文件 + 两本工具，源码行号漂移不涉及台账锚点：
+`grep AddressSearchScreen.kt:行号` 七本台账现读 **0** 处）。设备仍未接 ⇒ 该页三态的**视觉效果** `NOT VERIFIED ON DEVICE`。

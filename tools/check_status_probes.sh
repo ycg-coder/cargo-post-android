@@ -75,6 +75,16 @@ echo "S-lc 段动作字面量出现的文件数: $lc   （预期 ≤2：现读 2
 echo "S-ld 司机页引用 DriverLegStateMapper 的文件数: $ld   （预期 ≥3：RoutesScreen + HandoverScreen + DriverExceptionScreen）"
 echo "S-le 页面直调 Repo.legAction 点数: $le   （预期 3，且每处后面都必须回读）"
 echo "S-le2 不回读的写操作页        : ${ler:-无} （预期 无）"
+# S-m 手动地址查公交页的三态：这一页读 Repo.forwardGeo + Repo.nearbyBuses，
+# 旧写法只有"加载中"那一格（还是手搓的圆点卡），失败与"没解析出来"都是**整屏空白** ⇒
+# 用户看到的等价于"按钮没反应"。三格各钉一个物理出口，少一格就红。
+ASS=$A/ui/user/AddressSearchScreen.kt
+[ -f "$ASS" ] || { echo "× S-m 判据文件缺失：$ASS（先确认工程根，别把缺文件读成 0）"; exit 2; }
+sm_err=$(grep -c "ErrorState(" "$ASS")
+sm_empty=$(grep -c "EmptyState(" "$ASS")
+sm_load=$(grep -c "LoadingState(" "$ASS")
+sm_hand=$(grep -c "CircularProgressIndicator" "$ASS")
+echo "S-m  地址查公交页 ErrorState/EmptyState/LoadingState/手搓转圈 : $sm_err/$sm_empty/$sm_load/$sm_hand （预期恰好 1/4/1/0）"
 echo "--- 残留段状态机位置（供复核，不判红）---"
 grep -rnE "\.(status|orderStatus) (==|>=|<=|!) =? ?[0-9-]|[^a-zA-Z]status (==|>=|<=) [0-9-]" $UI_CORE | no_comment || true
 
@@ -98,6 +108,9 @@ ok=1
 [ "$ld" -ge 3 ] || { echo "× S-ld 司机页面退回本地状态判断（现读 3 个页面；原判定 ≥2 与话术 ≥3 不一致，本轮对齐成 3）"; ok=0; }
 [ "$le" = 3 ] || { echo "× S-le 段动作入口数量变了（核对是否漏了回读）"; ok=0; }
 [ -z "$ler" ] || { echo "× S-le2 这些页面写完不回读：$ler（本机自封状态 = 假闭环）"; ok=0; }
+[ "${sm_err:-0}" = 1 ] || { echo "× S-m 手动地址查公交页的错误出口不是恰好一处（现 $sm_err）：取数失败必须有一句话，不许整屏空白"; ok=0; }
+[ "${sm_empty:-0}" = 4 ] || { echo "× S-m 手动地址查公交页的空态不是恰好四处（现 $sm_empty）：还没查过 / 查了没解析出来 / 该地无公交 / 无揽收点，四格各一句，不许并成一格"; ok=0; }
+[ "${sm_hand:-0}" = 0 ] || { echo "× S-m 这一页又长出自己画的加载块（现 $sm_hand）：加载态只有 LoadingState 一个出口"; ok=0; }
 
 [ "$ok" = 1 ] || { echo "状态映射判据失败"; exit 1; }
 echo "状态映射判据通过"
