@@ -1792,6 +1792,12 @@ data class HandoverTask(
      * 交接提交的回执只认这个回读值，不认"本机上传成功了"（需求 §7：重新查询仍能看到照片才算闭环）。
      */
     val photoUrl: String = "",
+    /**
+     * 后端已入库的**手写签名**图地址（`AppDriverHandoverRespVO.signUrl`，V034 的 `sign_url` 列）。
+     * 与 `photoUrl` 各回读各说各的：照片回答"货长什么样"，签名回答"谁认了这笔交接"，
+     * 回执要能分开"两个都在 / 只有照片 / 只有签名 / 都没有"这四种，合成一列就全塌成一句。
+     */
+    val signUrl: String = "",
 ) {
     companion object {
         fun parse(o: JSONObject) = HandoverTask(
@@ -1816,6 +1822,7 @@ data class HandoverTask(
             transferStation = o.multiStr("transferStation", "handoverStation", "stationName"),
             handoverTime = o.timeOf("handoverTime", "confirmTime"),
             photoUrl = o.multiStr("photoUrl", "handoverPhotoUrl"),
+            signUrl = o.multiStr("signUrl"),
         )
     }
 }

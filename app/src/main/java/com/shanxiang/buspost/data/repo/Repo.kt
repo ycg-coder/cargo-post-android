@@ -1437,12 +1437,20 @@ object Repo {
             Ack(Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra).demo)
         }
 
-    suspend fun confirmHandover(handoverId: Long, photoUrl: String, remark: String): Ack =
+    /**
+     * 交接确认。照片与签名**各自一条 URL、各自可缺**：
+     * 后端 `HandoverServiceImpl.confirmHandover:241-243` 对 `signUrl` 的纪律是"没带就不写"（不落空串），
+     * 所以这里空串 = 这一格什么都不说，不能读成"核对过、这人确实没签"。
+     */
+    suspend fun confirmHandover(handoverId: Long, photoUrl: String, remark: String, signUrl: String = ""): Ack =
         gatedAction("handover-confirm:$handoverId") {
             Ack(
                 Api.post(
                     "$T/driver/handover/confirm",
-                    driverIdParam() + mapOf("handoverId" to handoverId, "photoUrl" to photoUrl, "remark" to remark),
+                    driverIdParam() + mapOf(
+                        "handoverId" to handoverId, "photoUrl" to photoUrl,
+                        "remark" to remark, "signUrl" to signUrl,
+                    ),
                 ).demo,
             )
         }

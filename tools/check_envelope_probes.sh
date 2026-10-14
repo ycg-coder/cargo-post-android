@@ -13,6 +13,12 @@ REPO=com/shanxiang/buspost/data/repo/Repo.kt
 STATE=com/shanxiang/buspost/core/AppState.kt
 HANDOVER=com/shanxiang/buspost/ui/driver/HandoverScreen.kt
 MODELS=com/shanxiang/buspost/data/model/Models.kt
+SIG=com/shanxiang/buspost/ui/driver/HandoverSignature.kt
+SIGTEST=$ROOT/app/src/test/java/com/shanxiang/buspost/ui/driver/HandoverSignatureContractTest.kt
+# 输入面守卫：这两个文件被搬走时，E-i 的每一格都会静默读 0 —— 而"读 0"与本簿要抓的"机制被拆"同形。
+for f in "$SIG" "$SIGTEST"; do
+  [ -f "$f" ] || { echo "× E-i 缺输入 $f：这一格的 0 是扫描面塌了，不是机制被拆"; exit 2; }
+done
 
 # E-a 未读角标只能有一个写入口：AppState 之外的 `.unread.value =` / `.driverUnread.value =` 必须为 0
 #     （§52 的病根就是三个页面各写一次，恒 0 的那个把真值抹掉 → 红点"自己闪没"）
@@ -69,6 +75,33 @@ fail=0
 [ "$EF2" = 1 ] || { echo "× E-f 页面不再渲染后端回读的 photoUrl，凭证有库也看不见"; fail=1; }
 [ "$EG" = 1 ] || { echo "× E-g 照片上传失败不再拦停提交，凭证会永久丢失"; fail=1; }
 [ "$EH" = 1 ] || { echo "× E-h 信封不再保留标量，§22 的恒 0/恒空全部回潮"; fail=1; }
+
+# E-i 签收签名（#20 阶段 B）：模型解析 + 页面渲染 + 上传拦停 + 门槛在纯层，各钉一格。
+#    为什么不并进 E-f：照片与签名是两列、两种语义（"货长什么样" / "谁认了这笔交接"），
+#    并成一格就会让"照片在、签名没了"读起来和"两个都在"一样 —— V034 分列就是为了分开说（D-099）。
+EI_MODEL=$(grep -c 'signUrl = o\.multiStr("signUrl"' "$MODELS")
+EI_RENDER=$(grep -c "url = task\.signUrl" "$HANDOVER")
+EI_BLOCK=$(grep -c "HandoverSignature.shouldBlockSubmit(signed" "$HANDOVER")
+EI_GATE=$(grep -cE 'const val MIN_POINTS_PER_STROKE|const val MIN_STROKES' "$SIG")
+# 同文件正对照：证明上面那几格不是"没扫到这个文件"
+EI_PROOF=$(grep -c "InkPoint" "$SIG")
+# E-i2 提交口两格必须分开传：并成一列就等于回到 V034 之前
+EI_PHOTOKEY=$(grep -c '"photoUrl" to photoUrl,' "$REPO")
+EI_SIGNKEY=$(grep -c '"signUrl" to signUrl,' "$REPO")
+# E-i3 纯层用例条数（下限 = 现读 12，只许升不许降；D-085 ㊾①同一条规矩）
+EI_TEST=$(grep -cE '^[[:space:]]*@Test' "$SIGTEST")
+
+echo "E-i 签名 模型/渲染/拦停/门槛/正对照   = $EI_MODEL/$EI_RENDER/$EI_BLOCK/$EI_GATE/$EI_PROOF （目标 1/1/1/2/≥3：正对照是**下界**，只要证明扫描看得到那个文件；现读 3）"
+echo "E-i2 提交口两格分开传（photo / sign） = $EI_PHOTOKEY/$EI_SIGNKEY （目标 1/1）"
+echo "E-i3 签名纯层契约用例数               = $EI_TEST （目标 ≥12 = 现读）"
+
+[ "$EI_MODEL" = 1 ] || { echo "× E-i 模型不再解析后端 signUrl：签名有没有入库在 App 侧失去出口"; fail=1; }
+[ "$EI_RENDER" = 1 ] || { echo "× E-i 页面不再渲染后端回读的 signUrl：签名图有库也看不见"; fail=1; }
+[ "$EI_BLOCK" = 1 ] || { echo "× E-i 签名上传失败不再拦停提交：已完成的交接补不进签名，凭证永久丢（与照片同一条事故路径）"; fail=1; }
+[ "$EI_GATE" = 2 ] || { echo "× E-i 签成门槛的常量不齐（现 $EI_GATE/2）：少一个就是有人把「几划算签」搬回 UI 各写一套"; fail=1; }
+[ "$EI_PROOF" -ge 3 ] || { echo "× E-i 同文件正对照掉了（InkPoint 在纯层出现 $EI_PROOF 次，现读 3）：上面那几个读数可能是没扫到这个文件"; fail=1; }
+{ [ "$EI_PHOTOKEY" = 1 ] && [ "$EI_SIGNKEY" = 1 ]; } || { echo "× E-i2 提交口把照片与签名并成一格了（$EI_PHOTOKEY/$EI_SIGNKEY，目标 1/1）"; fail=1; }
+[ "$EI_TEST" -ge 12 ] || { echo "× E-i3 签名纯层用例少于 12 条（现 $EI_TEST）：门槛、拦停、四分支回执、回读缺键没人钉"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "契约信封判据通过"; else echo "契约信封判据失败"; fi
 exit "$fail"
