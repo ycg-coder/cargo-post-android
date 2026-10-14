@@ -24,6 +24,12 @@
 #    不是把登录态、充值单、删除操作真的执行一遍。
 set -uo pipefail
 
+# ⚠ Git Bash / MSYS 会把形如 /sdcard/w.xml 的参数当成本地路径改写（实测变成
+#   "C:/Program Files/Git/sdcard/w.xml"）⇒ uiautomator dump 写到别处、adb pull 拿不到文件，
+#   整轮遍历会"每一步都成功"地什么证据都没留。关掉路径转换，别用双斜杠的土办法（漏一处就复发）。
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ADB="${ADB:-/c/Users/袁/AppData/Local/Android/Sdk/platform-tools/adb.exe}"
 [ -x "$ADB" ] || ADB="$(command -v adb || true)"
