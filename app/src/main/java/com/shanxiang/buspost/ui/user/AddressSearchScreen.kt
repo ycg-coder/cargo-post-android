@@ -1,8 +1,6 @@
 package com.shanxiang.buspost.ui.user
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +31,8 @@ import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTextField
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.EmptyState
+import com.shanxiang.buspost.core.ui.ErrorState
+import com.shanxiang.buspost.core.ui.LoadingState
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.SectionTitle
@@ -57,12 +56,16 @@ class AddressSearchViewModel : ScreenViewModel() {
     var searching by mutableStateOf(false)
     var locationName by mutableStateOf("")
 
+    // 区分"还没查过"与"查过但没解析出来"：后者必须有一句话，否则用户看到的是按钮没反应
+    var searched by mutableStateOf(false)
+
     fun search() = work {
         if (address.isBlank()) return@work
         searching = true
         try {
             val result = Repo.forwardGeo(address)
             searchResult = result
+            searched = true
             if (result != null) {
                 locationName = result.formatted
                 val nb = Repo.nearbyBuses(result.geo)
@@ -148,22 +151,32 @@ fun AddressSearchScreen(
         }
 
         if (vm.searching) {
+            item { LoadingState("正在查询地址…") }
+        }
+
+        // 失败与"没解析出来"是两件事，都必须有出口：旧写法这两格都是空白，
+        // 用户点了"查询"看到的就是"按钮没反应"。
+        if (!vm.searching && !vm.searched) {
             item {
-                BusCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .size(20.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(t.primary.copy(alpha = 0.2f)),
-                        )
-                        Text(
-                            " 正在查询地址...",
-                            color = t.textSecondary,
-                            fontSize = (13 * scale).sp,
-                        )
-                    }
-                }
+                EmptyState(
+                    title = "输入地址后点查询",
+                    subtitle = "用于在地图上定位该村/镇，并列出附近的公交与揽收点",
+                    icon = BusIcons.search,
+                )
+            }
+        }
+        vm.error?.let { e ->
+            if (!vm.searching) {
+                item { ErrorState(e, onRetry = { vm.search() }) }
+            }
+        }
+        if (!vm.searching && vm.error == null && vm.searched && vm.searchResult == null) {
+            item {
+                EmptyState(
+                    title = "这个地址没解析出来",
+                    subtitle = "换一种写法再试，例如补上县/镇一级；也可以从首页定位那里选点",
+                    icon = BusIcons.warning,
+                )
             }
         }
 
