@@ -143,15 +143,17 @@ class HandoverViewModel : ScreenViewModel() {
     }
 
     /**
-     * 交接确认闭环（需求 §7）：选照片 → `/infra/file/upload` 拿**真实 URL** → 提交 handover/confirm
-     * → 重新回读 `/driver/handovers`，回执只写后端回读到的事实。
+     * 交接确认闭环（需求 §7）：选照片（可再手写签名）→ `/infra/file/upload` 拿**真实 URL** →
+     * 提交 handover/confirm → 重新回读 `/driver/handovers`，回执只写后端回读到的事实。
      *
-     * 两条硬约束：
+     * 三条硬约束：
      * · 附了照片但拿不到 URL 时**不提交** —— `HandoverServiceImpl.confirmHandover:196-197` 对已完成的交接直接
      *   return（幂等），先落"交接完成"就再也补不进 photoUrl，凭证会永久丢失；
+     * · 签名同一条纪律（判据在 [HandoverSignature.shouldBlockSubmit]）：签了却没传上去也不提交，
+     *   绝不退化成"当成没签名继续提交"——那等于替后端把这一格记成"这人确实没签"；
      * · 本机不再自己把条目改写成"已交接"（审计 §26 修改方案 ②），状态一律以回读为准。
      */
-    fun confirm(context: Context, task: HandoverTask, uri: Uri?, remark: String) {
+    fun confirm(context: Context, task: HandoverTask, uri: Uri?, remark: String, signaturePng: ByteArray? = null) {
         if (busy) return
         busy = true
         work(reset = false) {
@@ -169,20 +171,33 @@ class HandoverViewModel : ScreenViewModel() {
                     receipt = "凭证照片上传失败，交接未提交——请重新选一次照片再确认"
                     return@work
                 }
-                val ack = Repo.confirmHandover(task.id, uploaded, remark)
+                val signed = signaturePng != null
+                val signUploaded = if (signed) {
+                    attempt { Repo.uploadPhoto(signaturePng!!, "handover-${task.id}-sign.png").url }
+                        .getOrDefault("")
+                } else {
+                    ""
+                }
+                if (HandoverSignature.shouldBlockSubmit(signed, signUploaded)) {
+                    receipt = "签名上传失败，交接未提交——签名补不进已完成的交接，请重签一次再确认"
+                    return@work
+                }
+                val ack = Repo.confirmHandover(task.id, uploaded, remark, signUploaded)
                 val feed = Repo.driverHandovers()
                 items = feed.items
                 mergeDemo(ack.demo, feed.demo)
                 val onServer = feed.items.firstOrNull { it.id == task.id }
                 val photoStored = onServer?.photoUrl?.isNotEmpty() == true
+                val signStored = onServer?.signUrl?.isNotEmpty() == true
                 receipt = when {
                     ack.notSent -> "本次确认未发送（同一个交接单还在处理中），以下为当前状态"
                     ack.demo -> "交接已记录，系统同步中"
                     feed.error != null -> "已提交，但未能回读确认，请下拉刷新核对"
                     uploaded.isNotEmpty() && !photoStored -> "已提交，但回读里没有凭证照片，请稍后刷新核对或补拍"
-                    uploaded.isNotEmpty() && photoStored -> "交接已提交，凭证照片已入库"
+                    signUploaded.isNotEmpty() && !signStored -> "已提交，但回读里没有签名图，请稍后刷新核对或重签一次"
                     onServer == null -> "已提交，该交接单已不在司机列表中，请下拉刷新核对"
-                    else -> "已提交，当前状态「${onServer.status}」（未附凭证照片）"
+                    else -> "已提交，当前状态「${onServer.status}」。" +
+                        HandoverSignature.receiptFor(photoStored, signStored)
                 }
             } finally {
                 busy = false
@@ -202,6 +217,9 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
     var target by remember { mutableStateOf<HandoverTask?>(null) }
     var picked by remember { mutableStateOf<Uri?>(null) }
     var remark by remember { mutableStateOf("") }
+    /** 已导出的签名 PNG 字节；null = 这一单还没签。只在本机活着，提交失败不假装"已签过" */
+    var signPng by remember { mutableStateOf<ByteArray?>(null) }
+    var showPad by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> picked = uri }
 
@@ -240,7 +258,7 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
         if (list.isEmpty() && !vm.loading) {
             EmptyState(title = "暂无交接单", subtitle = "到达换乘站后由系统派发", actionText = "刷新", onAction = { vm.load() })
         }
-        list.forEach { task -> HandoverCard(task = task, busy = vm.busy, onConfirm = { target = task; picked = null; remark = "" }) }
+        list.forEach { task -> HandoverCard(task = task, busy = vm.busy, onConfirm = { target = task; picked = null; remark = ""; signPng = null }) }
     }
 
     if (target != null) {
@@ -270,16 +288,45 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
                         small = true,
                         onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     )
+                    // 签收人手写签名（#20 阶段 B）。不签也能提交 —— 后端那一格"没带就不写"，
+                    // 但一旦签了却没传上去，提交会被拦下来（[HandoverSignature.shouldBlockSubmit]），
+                    // 因为已完成的交接补不进签名。
+                    BusButton(
+                        text = when (signPng) {
+                            null -> "手写签收签名"
+                            else -> "已签（${signPng!!.size / 1024 + 1} KB），点击重签"
+                        },
+                        variant = BusButtonVariant.OUTLINE,
+                        small = true,
+                        onClick = { showPad = true },
+                    )
+                    if (signPng == null) {
+                        Text(
+                            "本单未附手写签名；提交后这一格在后端仍是空，不会被念成「已核对过签名」。",
+                            color = t.textTertiary,
+                            fontSize = (11 * scale).sp,
+                        )
+                    }
                     BusTextField(value = remark, onValueChange = { remark = it }, label = "备注", placeholder = "件数/包装情况", minLines = 2)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.confirm(context, task, picked, remark)
+                    vm.confirm(context, task, picked, remark, signPng)
                     target = null
                 }) { Text("提交交接") }
             },
             dismissButton = { TextButton(onClick = { target = null }) { Text("取消") } },
+        )
+    }
+
+    if (showPad) {
+        SignaturePadDialog(
+            onCancel = { showPad = false },
+            onSigned = { png ->
+                signPng = png
+                showPad = false
+            },
         )
     }
     }
@@ -358,6 +405,20 @@ private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Uni
                         .height(120.dp)
                         .clip(RoundedCornerShape(BusRadius.m)),
                     contentScale = ContentScale.Crop,
+                )
+            }
+            // 签收签名同一条口径：只画后端回读出来的 signUrl（V034 的 sign_url 列），
+            // 本机签过但没入库的那张不在这里冒充凭证 —— 与照片各画各的，两格不合并。
+            if (task.signUrl.isNotEmpty()) {
+                NetworkImage(
+                    url = task.signUrl,
+                    contentDescription = "签收手写签名图",
+                    width = 200.dp,
+                    height = 94.dp,
+                    modifier = Modifier
+                        .padding(top = 9.dp)
+                        .clip(RoundedCornerShape(BusRadius.m)),
+                    contentScale = ContentScale.Fit,
                 )
             }
             if (task.time.isNotEmpty()) {
