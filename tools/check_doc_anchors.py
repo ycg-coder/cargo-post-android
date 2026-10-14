@@ -214,7 +214,10 @@ def main():
                     records.append(rec)
 
     if args.json_out:
-        with open(args.json_out, "w", encoding="utf-8") as fh:
+        # newline="\n"：本仓 `.gitattributes` 钉的是"仓库与工作树都 LF"，而 Windows 上文本模式写会产出 CRLF
+        # ⇒ 这两个输出文件（在册表 / 判决 JSON）只要被本工具重写一次，工作树就变 CRLF，
+        #    下一次 git 触碰又换回 LF —— 平白造出一整本"看起来像改动"的差异（D-101 那轮的同一族）。
+        with open(args.json_out, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(records, fh, ensure_ascii=False, indent=1)
     # 同一个 aid 可能出现多次（同一条锚点在文档里引用了几处）：取最坏的那个判决代表它
     worst = {}
@@ -225,7 +228,7 @@ def main():
         if cur is None or RANK[r["verdict"]] > RANK[cur["verdict"]]:
             worst[r["aid"]] = r
     if args.pin_write:
-        with open(args.pin_write, "w", encoding="utf-8") as fh:
+        with open(args.pin_write, "w", encoding="utf-8", newline="\n") as fh:
             fh.write("# 由 check_doc_anchors.py --pin-write 生成，人只下调不重抄\n")
             fh.write("# aid\tverdict\t锚点\t文档:行\t判给它的标识符\n")
             for aid in sorted(worst):

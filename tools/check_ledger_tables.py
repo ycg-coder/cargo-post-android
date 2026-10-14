@@ -72,7 +72,7 @@ def main(argv):
     out.append("TOTAL FLAGS %d  （0 = 五本台账的表格行结构完好）" % total)
     print(NL.join(out))
     if not argv[1:]:  # 只在"查五本台账"时落报告；负控注入的是临时副本，不该覆盖在册报告
-        with io.open(REPORT, "w", encoding="utf-8") as handle:
+        with io.open(REPORT, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(NL.join(out) + NL)
     return 1 if total else 0
 

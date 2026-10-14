@@ -74,7 +74,7 @@ printf '| DvProbeOutOfRangeMarker Models.kt:999999 | 负控注入：行号越过
 printf '| DvProbeNoSuchFileMarker NoSuchLedgerFile.kt:12 | 负控注入：文件名写错 |\n' >> "$TN"
   ctl DA-c "FILE-NOT-FOUND 回涨到 16（本轮基线 15，只降不升）"
 printf '| DvProbeDriftedIdentifierZzz Repo.kt:453 | 负控注入：标识符不在那一行 |\n' >> "$TN"
-  ctl DA-e "ID-MISS 回涨到 287：改过源码却没人重量台账锚点"
+  ctl DA-e "ID-MISS 回涨一条就到 274（闸门 273，2026-10-14 由 286 下调）：改过源码却没人重量台账锚点"
 # 在册表少一条：同一批可疑锚点立刻变成"新增"，闸门比的是 aid 集合而不是文档
 python - "$PINF" <<'PY'
 import sys
@@ -89,7 +89,12 @@ PY
 sed -i 's/Models\.kt:497/Models 那一段/g' "$CK"
   ctl DA-d "在册锚点本次不再可疑（锚点被抹掉而不是被修好）"
 # 扫描面塌掉：文档里的 `.kt:` 全被写坏成扫不到 ⇒ 锚点总数掉下来，闸门看不到任何一条
-sed -i 's/\.kt:/\.ktZ/g' "$CL"
+# 扫描面塌掉：**七本台账一起**把 `.kt:` 写坏成扫不到 ⇒ 锚点总数掉下来，DA-a 才响。
+# 只改 CONTEXT_LOCK 一本时 anchors 仍 >1216（本轮基数 1457，闸门 1216，中间有 241 的余量），
+# 抓到它的是 DA-d 的"消失"而不是 DA-a 的"没有输入" —— 那条注入证明不了它标注的那道闸（原来是 △，现在补齐）。
+for d in "$SC"/*.md "$SC"/docs/android/*.md; do
+  [ -f "$d" ] && sed -i 's/\.kt:/\.ktZ/g; s/\.java:/\.javaZ/g' "$d"
+done
   ctl DA-a "台账锚点被写坏成扫不到（anchors 从 1216 掉下来=复核没有输入）"
 # 反证判据：把工具取标识符的正则改坏，miss 会掉到 0 看着更绿，只有 DA-f 会响
 subst "$AT" 'TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_]{4,}")' 'TOKEN = re.compile(r"zzNeverToken")'

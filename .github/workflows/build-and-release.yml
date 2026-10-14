@@ -71,13 +71,15 @@ jobs:
               case "$s" in
                 tools/check_doc_anchor_probes.sh)
                   hit_anchor=1
-                  echo '（豁免：台账锚点 #159 未清 ⇒ DA-e 现读高于闸门 286；且 CI 只 checkout 了 App 一个仓，'
-                  echo ' 没有 cargo-post-platform 那一面，DA-c 的 FILE-NOT-FOUND 在 CI 里必然虚高（本机实测 15）。'
+                  echo '（豁免：**CI 只 checkout 了 App 一个仓** ⇒ 台账里所有 `*.java:N` 锚点在这一格里找不到文件，'
+                  echo ' DA-c 的 FILE-NOT-FOUND 必然虚高（本机 15 / CI 实测 407），DA-d 的"新增"跟着虚高到几百条。'
+                  echo ' ⚠ #159 那一半已经还掉了（2026-10-14：本机 DA-e 273 ≤ 闸门 273，D-104），留在名单上的理由只剩环境。'
                   echo ' 读数照常打在上方 —— 这是"这一格在 CI 判不动"，不是"判过了"。）' ;;
                 tools/check_default_value_probes.sh)
                   hit_census=1
                   echo '（豁免：三面普查要同时读后端 VO 与小程序面，CI 里没有那两面 ⇒ DV-u 自己就判"不采信"。'
-                  echo ' 这一本在**本机全绿**（34 本里 33 绿 1 红，红的只有上面那本），所以免的是环境不是账。）' ;;
+                  echo ' 这一本在**本机全绿**（2026-10-14 现数：34 本 check_*.sh 全 exit 0，台账锚点那本也绿），'
+                  echo ' 所以这里免的是环境不是账。）' ;;
                 *)
                   failed="$failed $s"
                   rc=1 ;;
@@ -85,7 +87,7 @@ jobs:
             fi
           done
           # 名单点齐性：本轮没红的豁免项要打出来提醒"要么已还掉、要么环境变了"，不静默。
-          [ "$hit_anchor" = 1 ] || echo '（提醒：check_doc_anchor_probes.sh 本轮没红 —— #159 若已清完或 CI 面变了，就把那条豁免删掉）'
+          [ "$hit_anchor" = 1 ] || echo '（提醒：check_doc_anchor_probes.sh 本轮没红 —— 留在豁免名单上的理由只剩"CI 没有后端那一面"；若哪天 CI 把 cargo-post-platform 一起 checkout 了，这条豁免就该撤掉）'
           [ "$hit_census" = 1 ] || echo '（提醒：check_default_value_probes.sh 本轮没红 —— 若 CI 已经能拿到后端面，这条豁免该撤）'
           if [ -n "$failed" ]; then
             echo "× 红的簿子：$failed"
