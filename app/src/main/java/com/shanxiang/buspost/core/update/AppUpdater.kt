@@ -118,7 +118,13 @@ object AppUpdater {
                     }
                 }
             } catch (e: IOException) {
-                throw NetworkException(e.message ?: "安装包下载失败", e)
+                // 这一串会**原样上屏**（更新弹窗与「设置 → 关于 → 检查更新」都读它）。
+                // OkHttp 的原文长这样，是真机 2026-10-15 上屏过的：
+                //   failed to connect to github.com/20.205.243.166 (port 443) from /10.17.200.82 (port 38122) after 20000ms
+                // 内网地址、随机源端口、毫秒超时数对用户没有信息量，只显得像坏了 ——
+                // 原文留在 cause 里进 logcat，上屏只给"连不上谁 + 现在能干什么"。
+                val host = url.substringAfter("://", "").substringBefore("/").ifEmpty { "更新服务器" }
+                throw NetworkException("安装包没下载下来：连不上 $host。换一张能出网的 SIM/Wi-Fi 再点一次「立即更新」，或让站点帮忙装。", e)
             }
         }
 
