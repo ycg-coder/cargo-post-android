@@ -22,7 +22,13 @@ ub_a=$(grep -rn --include=*.kt -E "(^|[^A-Za-z])(TextButton|OutlinedButton|Fille
   | grep -v "$M/core/ui/" | grep -vE "^[^:]+:[0-9]+: *(//|\*)" | wc -l)
 printf 'UB-a 裸 Material 按钮调用点        : %s （目标 0；本轮改动前实测 34）\n' "$ub_a"
 
-ub_b=$(python - <<'PY'
+# 解释器按本仓既有写法现找（`check_runcatching_probes.sh` / `check_oss_credits_probes.sh` 同一手法）：
+# runner 上可能只有 python3，而 `python` 不存在时 heredoc 会展开成空 ⇒ UB-b 读成空串，
+# `[ "$ub_b" = 0 ]` 当场红 —— 那是"跑不了"被读成"有破口"，两样都不许。
+PY=$(command -v python || command -v python3)
+[ -n "$PY" ] || { echo "× 找不到 python：UB-b 的同行检测无法执行，不许把'跑不了'读成 0"; exit 2; }
+
+ub_b=$("$PY" - <<'PY'
 import io, os, re
 ROOT = "app/src/main/java/com/shanxiang/buspost"
 ROW = re.compile(r"^\s*(?:\w+\.)*Row\s*[({]")
