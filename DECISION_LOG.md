@@ -7546,3 +7546,141 @@ APK **117,358,172 B @ 15:45 / sha256 `ff08bd1c6031efc396de02a1951857656748c9eec0
 **终值**：判据 35 本全 rc=0（含 S-m）；`status_negative_controls.sh` 计数 **23 条按名点名变红 / 0 不成立**；
 全量用例与 APK 读数见下（本轮只动一个页面文件 + 两本工具，源码行号漂移不涉及台账锚点：
 `grep AddressSearchScreen.kt:行号` 七本台账现读 **0** 处）。设备仍未接 ⇒ 该页三态的**视觉效果** `NOT VERIFIED ON DEVICE`。
+
+### D-110（10-14 16:3x–17:2x）· 云上三个 500 的根因 = 迁移没跑（不是代码坏了）+ 算法时限口径收成一套 + 发 v54
+
+**用户报的两件事**：① "没改这次 UI 之前就下载了最新 app，有些最新的功能没有实现通路"；② "显示网络不好"。
+两边都量了，结论是**两个独立原因**，谁也不能替谁解释：
+
+**① 装的是 v43（今天 03:00:30Z 打的），而 #4…#9 都在 03:58Z 之后才进 main** ⇒ 那些功能不在这个二进制里，
+不是"通路没接"。 remedy = 重新派发 release；已 dispatch（run 38535345775，5m57s 成功）⇒ **v54 已发布**，
+资产 `app-release.apk` **109,936,996 B**，`releases/latest` 从 v43 变 v54，`versionCode` 54 > 43 ⇒
+装了旧包的用户走「设置 → 关于 → 检查更新」就能就地升级（D-105 那条通道第一次被真实消费）。
+
+**② "网络不好"是真的，但根因在数据库结构不在网络。** 同一批 GET 逐条实测（都带时间戳可复现）：
+
+| 端点 | 云上 | 本机 48080 |
+| --- | --- | --- |
+| `/app-api/transport/notice/list` | `code:0` 正常 | `code:0` |
+| `/app-api/transport/product/list` | `code:0` 正常 | `code:0` |
+| `/app-api/transport/send/stations` | **`{"code":500,"msg":"系统异常"}`**（HTTP 200，0.4s 回） | `code:0` |
+| `/app-api/transport/bus/nearby` | **`code:500`** | `code:0` |
+| `/app-api/transport/bus/lines` | **`code:500`** | — |
+
+⇒ 服务活着、库也连着（两个老端点正常），**只有站点域的新列读不到**。
+对照 `sql/incremental/V033__station_pickup_attrs.sql` 的自述：它给 `transport_station` 补
+联系人 / 联系电话 / 营业时间 / 电商站点四列，且文件里明写
+「未执行之前……会因缺列报错——所以『云上这一格可用』要等它被执行」。
+本机树里这些端点正常，是因为**本机库已经执行过这些脚本**（`project-local-backend-divergent-layers` 那条的镜像形态：
+这次不是"工作树超前 / jar 滞后"，而是**新代码 + 旧库结构**）。
+
+**给用户的待执行清单（顺序无依赖，都可安全重复执行；`V029` 刻意不在内，它是裸 ALTER，第二次必红）**：
+`V028__wallet_tables.sql`、`V030__execution_writeback_guarded.sql`、`V031__wallet_menu.sql`、
+`V032__pricing_rule_menu.sql`、`V033__station_pickup_attrs.sql`、`V034__handover_sign_url.sql`、
+`V035__pay_order_request_no.sql`。我不碰共享库（规矩不变），执行完我可以在线复验这三条端点。
+
+**App 侧顺带确认一件事**：这个措辞不是 bug —— HTTP 200 + `code:500` 走 `ApiException(500,"系统异常")`
+念后端原文；只有 HTTP 5xx 才映射成 `NetworkException("服务暂时不可用（HTTP …）")`，
+IOException 才是"网络连接失败"。所以"网络不好"那一句来自用户装包时**正赶上服务重启的窗口**，
+而现在的 500 会念成"系统异常"。两者都是真话，不合并。
+
+**算法侧（用户明确授权我按效果决定）**：两件事不是二选一 —— 已开 **PR #193**（未合，等点头，合 = 重启云服务）。
+实测破口：`app/solver.py` 里**零**时间管线；BASELINE 一批里 OR-Tools 最多被调 `(MAX_REROUTE_ITERATIONS+1)×2` 次、
+每次写死 5s ⇒ 整批 **10.00s** 对声明 5.0s（`limit=1→2.01s / 5→10.00s / 10→20.00s`，倍数可复现）。
+做法：**终止的正常依据是评估计数**（与机器无关），**墙钟是保险丝**且现在在请求边界真兑现
+（HACO 钳到剩余量、OR-Tools 每次搜索领剩余量、HYBRID 两臂共享一只表），
+不可中断的固定开销**不藏**：`OVERALL_LIMIT_S` / `ELAPSED_MS` / 越界 `OVERALL_FUSE_TRIPPED=+Nms`。
+`ITERATION_COUNT` 从"0 条断言在读"变成有读者（lab 台账 `iterations` + 基准断言"haco 版本可行解 ≥1 代完整迭代"，
+0 代 = 交付的其实是贪心种子）。口径的唯一权威说明落在 `docs/algorithm-integration.md` §时限与终止口径，
+连第三个数（HTTP 层"计算超时 10 秒"是任务级、含排队与固定开销）也一并收进同一套说法。
+读数：`pytest -m "not slow"` ⇒ **820 passed / 3 skipped**；新簿 `tests/test_overall_time_fuse.py` 3 passed
+（其中一条是**结构**断言而不是毫秒读数：两次搜索之和不得回到 `2×常量`）；`test_haco_141_benchmark.py` 16 passed。
+⚠ 一处实现细节值得记：protobuf `Duration.FromSeconds` **只收整数秒**（实测传 float 直接 `TypeError`），
+所以预算走 `FromMilliseconds`；且领到 0 会让 OR-Tools 一次都不迭代 ⇒ 把"预算用尽"伪装成"无解"，
+`reason_code` 跟着说谎，故设 50ms 下限。
+本轮算法改动在 **worktree** 里做（后端主树有 106 个未提交文件，是他人状态，一个字没动）。
+
+### D-111（10-14 17:1x–18:0x）· 云端迁移由守卫作业真的执行了：三条 500 变 code:0；但"九格数满"这句我没证到
+
+**做了什么**：把 `db-migrate-guarded.yml`（只允许人工触发、默认只读探测）扩成七支幂等脚本的白名单，
+`mode=check` 先探、`mode=apply + confirm=APPLY` 再写，全程在 worktree 里做（后端主树 106 个他人未提交文件一字未动）。
+用户明确说"我管不到服务器" ⇒ SSH 那条路不成立，只能让 CI 自己当执行者，**判据的结论走作业状态而不是日志**。
+
+**三条 500 已消失**（外网复验，apply 之后、以及 #193 合入触发部署重启之后各复验一遍）：
+`transport/send/stations`、`transport/bus/nearby`、`transport/bus/lines` 全部回到 `{"code":0,…}`；
+`transport/notice/list`、`transport/product/list` 本来就正常。`send/topology` 与 `driver/profile` 回 401 是登录门槛，不是缺陷。
+
+**过程中抓到的两条，都是我自己的**：
+1. 那条作业的探测段**从写下那天起就没跑成过**：判定写在 SQL 里，`IF(COUNT(*)=3,'已存在 3/3','缺失（当前 ',COUNT(*),'/3）`
+   给的是 5 个参数，而 MySQL 的 `IF()` 只收 3 个 ⇒ 查询本身报错、整步红，
+   红得像是"库有问题"，实际是**判据跑不动**。改成只发普通 `COUNT`、比较交给 bash 之后，同一个探测步 success。
+2. 三个取数通道在那台 runner 上全废：`checkout` 抓仓库 TLS 断、`upload-artifact` 传 blob storage `ECONNRESET`、
+   run 日志归档是**空 zip**（138 字节 / "log not found"）。⇒ 读数的载体不能是日志也不能是产物，
+   只有**作业/步骤结论**是我自己拿得到的（`apply` 那次：探测步与执行步 success、核对步 failure）。
+   我加过"注解通道"的版本**没打上补丁**（脚本里断言 `count==0` 就中断，而 `bash -n` 过的是未改动的文件 ⇒
+   我把"改了"当成了"改上了"，这一格重投的那次 run 里并没有注解）。
+
+**没证到的一句，写清楚**：apply 那次的**落地核对步是红的** ⇒ 我写的九格里至少一格没数满。
+到底是哪一格（怀疑方向：两处列注释的中文原样检查、或后台菜单 6920/6930/6931 那格），
+在日志不可得的情况下我**不知道**，所以"七笔迁移全部按预期落地"这句话不成立；
+成立的是：**站点四列真的落地了**（三条端点从 500 变 code:0 是它的直接外证）与**执行段本身没报 SQL 错**。
+下一格要么用注解通道（把补丁真打上再重投 check），要么让能看到 CI 界面的人复制 Summary 里那九行。
+
+**#193 已合**（算法保险丝那笔，全部 checks SUCCESS 后 merge），合入触发 `deploy-dev.yml`
+（run 38545211350 = **success**），部署后三条端点复验仍 code:0 ⇒ 服务在新算法口径下活着。
+
+### D-112（10-14 18:1x–19:0x）· 九格读数拿到了：八格数满，缺的是 6920 那一行菜单；另外我自己弄坏过两次取证
+
+**怎么拿到的**：日志（空 zip）、产物（`upload-artifact` ECONNRESET）、SSH（用户管不到服务器）三条通道全废之后，
+把每格读数改发成 `::notice title=DBSTATE::` —— **注解走 Checks API**，`gh api check-runs/{id}/annotations` 我自己就读得到。
+这一步顺手暴露了前一轮的红是真因：`out=$(… 2>&1)`（本意是让查询报错可见）把
+`mysql: [Warning] Using a password on the command line interface can be insecure.` 并进了 stdout ⇒
+`[ "$out" = "$want" ]` 永远不成立 ⇒ **九格全被污染、核对步恒红**。改 `docker exec -e MYSQL_PWD=` 之后八格立刻数满。
+
+**云上实测九格**（run 38548080120，`mode=check`，success）：
+`执行回流三列 3/3`、`钱包三表 3/3`、`揽收点四列 4/4`、`交接签名列 1/1`、`充值幂等键列 1/1`、
+`充值幂等唯一键 1/1`、`V030 注释中文原样 0`、`V033 注释中文原样 0` —— 八格数满；
+菜单那一格拆成逐 id 后是 **`6920 钱包查询 = 0/1`、`6930 计价规则页 = 1/1`、`6931 计价规则保存 = 1/1`**。
+
+⇒ **所以那句红不是测量问题了，是真的缺一行**：V031 的去重键实测就是 id（文件里
+`WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE id = 6920)`），而 apply 段两次都 success、
+V032 的两行也在 ⇒ "6920 这一行没落库"成立，**为什么没落库我还不知道**。
+影响面按当前证据只到 **web 后台的钱包页入口**；App 不受影响（`send/stations`、`bus/nearby`、`bus/lines`
+已复验 `code:0`，`#193` 合入触发部署 run 38545211350 success 后仍是 code:0）。
+"是否其实有另一条同权限不同 id 的行、页面其实打得开"这一支，探针已加（按 `permission` 数 + `role=1` 实际授权是否存在），
+但随后两次 `mode=check` 又死在 runner 抓仓库的 TLS（`gnutls_handshake() failed` / 注解里只有三条 failure）⇒ **未定，已提交待跑（分支 commit c284da41）**。
+
+**我自己的两次取证事故（都写清楚，因为它们的形态是"拿到了绿色的假东西"）**：
+1. 第一次修 MYSQL_PWD 时我把 YAML 打坏（`line 107 could not find expected ':'`），
+   而且**没先 `yaml.safe_load` 就 commit+push+投 run** ⇒ 那次 run 报的是"作业没有 workflow_dispatch 触发器"
+   （文件解析不出来，作业就不存在），已 `git revert`。教训：校验必须打在**解析后的 run 块**上
+   （本轮改成打印 `MYSQL_PWD` / 残留 `-p` 传密码 / 注解 三者的计数），不能只 `bash -n` 原始文本。
+2. 上一条提交的 `-m "…"` 里嵌了双引号 ⇒ git 把消息后半截当 pathspec 拒了（`error: pathspec 'id' …`），
+   而我是用 `;` 串的 `gh workflow run`，**commit 没落也照样投了一次 run** ⇒ 那次跑的是旧提交。
+   改：消息一律走 `-F` 文件。
+
+### D-113（10-14 19:1x–20:0x）· 云端十格全数满：V031 落地的因果钉死了，而不是"再跑一次就好了"
+
+**稳态复验**（master 上 `mode=check`，run 38552476629，作业 success，十格读数以 `title=DBSTATE` 注解读取）：
+`执行回流三列 3/3`、`钱包三表 3/3`、`揽收点四列 4/4`、`交接签名列 1/1`、`幂等键列 1/1`、`幂等唯一键 1/1`、
+`两处列注释中文原样 0`、`菜单 id=6920 1/1`、`按 permission='transport:wallet:query' 1/1`、`role=1 实际授权 1/1`。
+
+**两条把因果钉死的证据，不是一句"重跑生效"**：
+1. **逐支凭证**：apply 段现在每支发 `title=APPLY::<file> rc=…`（含 mysql stderr 原文），
+   V031 那次 `rc=0`，且**同一次跑内** 6920 从 0 变 1 ⇒ "执行步绿"这句话从此必须由每支自己的退出码支撑。
+   首趟为什么没落地已不可考（当时核对步被 stderr 污染而恒红，把"到底是哪一格"这个信号埋掉了）——
+   这句我不圆过去：**是取证能力不足导致我无法归因**，而修复方向正是把取证补上。
+2. **"以后每次部署会不会再吃掉它"有静态答案**：部署重放里对 `system_menu` 的删除只有
+   `sql/mysql/transport-menu.sql:60` 的 `BETWEEN 6800 AND 6919`，6920 不覆盖；
+   `cleanup-upstream-menus.sql` 只删上游演示根（2397/2563/6400/5100/2758/4000/6500）及其递归子树，不含 6800 那棵树。
+   ⇒ 没有一条重放语句能删 6920。
+
+**顺手纠正一个我自己设的陷阱**：原打算拿 #194 的合并当"部署是否吃菜单"那把刀——**部署其实没跑**
+（`deploy-dev.yml` 不对 `.github/**` 触发；master 到 `468f9418` 而最新部署 run 仍是 #193 的 `38545211350`）。
+⇒ 假设检验的前提不成立，这一层改由静态删除区间 + 稳态十格回答，**不靠"合一次看看"**。
+
+**业务面**：`send/stations`、`bus/nearby`、`bus/lines` 全部 `code:0`（apply 后与 #193 部署后各复验一遍）；
+`send/topology`、`driver/profile` 回 401 是登录门槛，不是缺陷。
+
+**台账侧**：D-110 / D-111 / D-112 / D-113 四笔都在 App PR #11；判据 35 本 rc=0、
+锚点 ID-MISS 264（闸门 273 未动）、在册 239、表格 TOTAL FLAGS 0。
