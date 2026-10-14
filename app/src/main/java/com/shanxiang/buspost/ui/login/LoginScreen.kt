@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,7 @@ import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusSegmented
 import com.shanxiang.buspost.core.ui.BusTextField
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
+import com.shanxiang.buspost.core.ui.LocalBusTouch
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.Signpost
 import com.shanxiang.buspost.data.model.Role
@@ -159,15 +161,13 @@ fun LoginScreen(
                     icon = BusIcons.shield,
                     keyboardType = KeyboardType.Number,
                     trailing = {
-                        Text(
+                        BusButton(
                             if (vm.countdown > 0) "${vm.countdown}s" else "获取",
-                            color = if (vm.countdown > 0) t.textTertiary else t.primaryOnLight,
-                            fontSize = (13 * scale).sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(BusRadius.pill))
-                                .clickable(enabled = vm.countdown == 0) { vm.sendSms() }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            onClick = { vm.sendSms() },
+                            variant = BusButtonVariant.TEXT,
+                            enabled = vm.countdown == 0,
+                            small = true,
+                            fullWidth = false,
                         )
                     },
                 )
@@ -178,15 +178,12 @@ fun LoginScreen(
                 Modifier.fillMaxWidth().padding(top = 6.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Text(
+                BusButton(
                     if (vm.mode == 0) "验证码登录" else "密码登录",
-                    color = t.primary,
-                    fontSize = (14 * scale).sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(BusRadius.pill))
-                        .clickable { vm.mode = if (vm.mode == 0) 1 else 0 }
-                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                    onClick = { vm.mode = if (vm.mode == 0) 1 else 0 },
+                    variant = BusButtonVariant.TEXT,
+                    small = true,
+                    fullWidth = false,
                 )
             }
 
@@ -245,15 +242,12 @@ fun LoginScreen(
 
             // 演示入口：release 构建（DEMO_ALLOWED=false）不出现这个按钮，也不存在演示会话
             if (vm.demoEntryAvailable) {
-                Text(
+                BusButton(
                     "体验模式",
-                    color = t.textTertiary,
-                    fontSize = (12 * scale).sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                        .clickable { vm.demoEnter(onEntered) },
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    onClick = { vm.demoEnter(onEntered) },
+                    variant = BusButtonVariant.TEXT,
+                    small = true,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
 
@@ -262,6 +256,7 @@ fun LoginScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .defaultMinSize(minHeight = LocalBusTouch.current.min)
                     .padding(top = 12.dp)
                     .clickable { AppState.setElderly(!elderly) },
                 horizontalArrangement = Arrangement.Center,

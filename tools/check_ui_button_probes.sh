@@ -93,12 +93,60 @@ printf 'UB-e 设计系统里有且仅有一个对话框动作出口 : %s （目�
 ub_f=$(grep -rn --include=*.kt -c "BusButton(\|BusDialogAction(" "$M"/ui "$M"/core/update 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
 printf 'UB-f 反证输入面：Bus 按钮调用点总数 : %s （下限 120；把组件全删空会让 UB-a 的 0 变成假绿）\n' "$ub_f"
 
+# UB-g / UB-h：命中下限这一族。UB-d 钉的是 defaultMinSize 写死数字，这两格钉同一族里
+# 用 .height(N.dp) 把"按钮状可点块"卡到 48dp 以下的写法 —— 本轮实测的三处（登录闸门 46dp 的渐变块、
+# 站牌配色格 46dp、体验模式/获取那类无垂直热区的文字块）全是这一形。
+# 视口（HorizontalPager 的 modifier 参数）单独一格 UB-h：抬它改的是排版而不是热区写法，
+# 本机无设备 ⇒ 只能登记成在册残留（D-UI-1），但**数量**能钉死，新增一条就红。
+ub_gh=$("$PY" - <<'PY'
+import io, os, re
+ROOT = "app/src/main/java/com/shanxiang/buspost"
+SKIP = os.path.join(ROOT, "core", "ui")
+H = re.compile(r"\.height\((\d+(?:\.\d+)?)\.dp\)")
+g = []
+g2 = []
+for dp, _, fs in os.walk(ROOT):
+    if dp.startswith(SKIP):
+        continue
+    for fn in sorted(fs):
+        if not fn.endswith(".kt"):
+            continue
+        p = os.path.join(dp, fn)
+        src = io.open(p, encoding="utf-8", errors="replace").read().split("\n")
+        for i, l in enumerate(src):
+            m = H.search(l)
+            if not m:
+                continue
+            h = float(m.group(1))
+            if h <= 0 or h >= 48 or "Spacer(" in l:
+                continue
+            win = "\n".join(src[max(0, i - 8): i + 9])
+            if ".clickable" not in win:
+                continue
+            if l.strip().startswith("modifier = Modifier"):
+                g2.append("%s:%d" % (p, i + 1))
+            elif ".clip(" in win or ".background(" in win:
+                g.append("%s:%d" % (p, i + 1))
+print(len(g))
+print(len(g2))
+for x in g:
+    print("G " + x, file=__import__("sys").stderr)
+for x in g2:
+    print("H " + x, file=__import__("sys").stderr)
+PY
+)
+ub_g=$(head -1 <<<"$ub_gh"); ub_h=$(sed -n '2p' <<<"$ub_gh")
+printf 'UB-g 低于 48dp 的手搓按钮状块      : %s （目标 0；本轮改动前实测 1 处 + 同类文字块 3 处）\n' "$ub_g"
+printf 'UB-h 低于 48dp 的轮播视口          : %s （在册恰好 2 = D-UI-1，抬它要真机复核排版）\n' "$ub_h"
+
 [ "$ub_a" = 0 ] || { echo "× UB-a 有裸 Material 按钮 ⇒ 同一行必然出现两种高度/字重/命中区"; ok=0; }
 [ "$ub_b" = 0 ] || { echo "× UB-b 有同一 Row 内按钮混用：这就是「一排按钮一大一小」的形状"; ok=0; }
 [ "$ub_c" = 0 ] || { echo "× UB-c 调用点绕开令牌自己传圆角"; ok=0; }
 [ "$ub_d" = 0 ] || { echo "× UB-d 调用点写死命中高度，驾驶模式的 56dp 下限会失效"; ok=0; }
 [ "$ub_e_ok" = 1 ] || { echo "× UB-e 对话框动作出口没了或被重复定义（重复定义=同一问题两个答案）"; ok=0; }
 [ "$ub_f" -ge 120 ] || { echo "× UB-f Bus 按钮调用点掉到 120 以下 ⇒ 扫描面或组件被拆，UB-a 的 0 不再有意义"; ok=0; }
+[ "$ub_g" = 0 ] || { echo "× UB-g 有低于 48dp 的手搓按钮状块：驾驶模式 56dp 下限对它完全不生效"; ok=0; }
+[ "$ub_h" = 2 ] || { echo "× UB-h 轮播视口数不是恰好 2（现 $ub_h）：多了=新增长在这种视口里的可点块，少了=那两条被抬高了（那要连 D-UI-1 一起销账，不许顺手改闸）"; ok=0; }
 
 [ "$ok" = 1 ] || exit 1
-echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d，Bus 按钮调用点 $ub_f 处）"
+echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处）"

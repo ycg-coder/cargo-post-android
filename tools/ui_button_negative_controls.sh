@@ -102,6 +102,37 @@ find "$PROBE/ui" -name "*.kt" -exec sed -i 's/BusButton(/XxxButton(/g; s/BusDial
 grep -rq "XxxButton(" "$PROBE/ui" && ctl UB-f "组件调用点被拆空 ⇒ 扫描面没了，UB-a 的 0 不算证据"
 rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 
+# ⑦ 低于命中下限的手搓按钮状块回来了（本轮真身里那三处的形状）
+injected ui/NegctlProbeG.kt 'package com.shanxiang.buspost.ui
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+@Composable fun NegctlG() { Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(8.dp)).background(Color.White).clickable { }) }' \
+  && ctl UB-g "按钮状可点块把高度写死成 46dp ⇒ BusTouch 的 48/56dp 下限整条失效"
+
+# ⑧ 轮播视口里长出第三条可点块（在册 2 条是被登记的，不是被豁免的）
+injected ui/NegctlProbeH.kt 'package com.shanxiang.buspost.ui
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+@Composable fun NegctlH() { androidx.compose.foundation.pager.HorizontalPager(
+        state = null,
+        modifier = Modifier.fillMaxWidth().height(40.dp),
+) { p -> Row(Modifier.fillMaxWidth().clickable { }) {} } }' \
+  && ctl UB-h "轮播视口数从在册 2 变 3 ⇒ 又有一条热区被视口钉住"
+
 # 正控制：改一颗按钮的文案与 onClick 内容 —— 规格没动，不该红
 injected ui/NegctlProbePos.kt 'package com.shanxiang.buspost.ui
 import androidx.compose.runtime.Composable

@@ -90,7 +90,8 @@ fun BusQrScreen() {
                     }
                     Column(Modifier.padding(start = 12.dp).weight(1f)) {
                         Text("重庆公交乘车码", color = t.ink, fontSize = (15 * scale).sp, fontWeight = FontWeight.Bold)
-                        Text("支付宝官方 · 全市公交通用", color = t.textSecondary, fontSize = (12 * scale).sp)
+                        // "全市公交通用"本机无从核实：支付宝乘车码的可用线路与扣费只在支付宝那一侧决定。
+                        Text("支付宝官方 · 可用线路以支付宝页面为准", color = t.textSecondary, fontSize = (12 * scale).sp)
                     }
                     Text("打开 →", color = t.primaryOnLight, fontSize = (13 * scale).sp, fontWeight = FontWeight.Bold)
                 }
