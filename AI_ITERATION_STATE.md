@@ -3,6 +3,20 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-14（中午续，D-105 · **更新通道第一次真发布 + 本机后端未提交批次筛过一遍开 PR #191**）：
+- **自更新通路现在有真读数了**：派发一次 `workflow_dispatch` ⇒ Release **乡邮智联 v43**（非 draft、非 prerelease），
+  资产 `app-release.apk` **109,953,380 B** `state=uploaded`；`releases/latest` 由 **404 变 200**；
+  出包后回读那一步原话"回读通过：latest = v43，且带 app-release.apk"。签名材料零残留那道闸也过了。
+  ⚠ **但"能在内部收到并装上"还差一次换签安装**：设备上是 debug 包，与 release 不同源 ⇒ 直接点更新必然
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`；弹框/进度/安装器三格仍是 `NOT VERIFIED ON DEVICE`（本机无设备）。
+- **本机后端那 106 项未提交**按"只提交该提交的"筛成两笔，开 **PR #191**：`mvn` **367 例 0 失败**、
+  无缓存树上 `pytest -m "not slow"` **796 passed / 2 skipped / 0 failed**（改前 10 failed —— 题集 cache 没入库，
+  改成按 `_stable_seed` 现算而不是 skip）。**没提交**：341MB/692MB 的 pkl、训练 zip 与解压重复、
+  `benchmarks/lab/cache/` 482 个跑出来的 JSON（已 .gitignore，实测它比当前构建器旧）、`.github/skills` 等本地 agent 工具、
+  六个一次性刷子脚本、`miniprogram/`/`css/`/`js/`、以及 `response.mp3` 的删除（留着单独立一笔）。
+  台账那条"5 个未提交测试文件归属"到此结案：属于 #191 的后端契约面。
+- ⚠ **#191 合 master 会触发云部署**，且 dev/local 固定验证码从 8888 变 **888888** ⇒ 部署后队友登录要用 6 位。
+
 最后更新：2026-10-14（上午续，D-104 + 后端 #23 · **收口两件事：#159 台账锚点内容级重锚搬回 117 条；充值页欠账的后端那半落地**）：
 - **后端 PR #190**（分支 `feat/pay-hardening`，worktree 起于 master）：`createPayOrder` 加客户端幂等键
   （同一 `(user, requestNo)` 不新增订单行，待支付重发调起参数、已支付回执 alreadyPaid、换金额换渠道直接拒），
