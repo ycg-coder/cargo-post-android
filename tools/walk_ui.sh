@@ -31,12 +31,13 @@ ADB="${ADB:-/c/Users/袁/AppData/Local/Android/Sdk/platform-tools/adb.exe}"
 PY="$(command -v python || command -v python3 || true)"
 [ -n "$PY" ] || { echo "× 找不到 python：nodes 解析与几何自检跑不了，不许把'跑不了'读成'没问题'"; exit 2; }
 
-DEPTH=3; MAX=60; FROM=""; ROUTES_ONLY=0
+DEPTH=3; MAX=60; FROM=""; ROUTES_ONLY=0; KEEP_SHOTS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --depth) DEPTH="$2"; shift 2;;
     --max) MAX="$2"; shift 2;;
     --from) FROM="$2"; shift 2;;
+    --keep-shots) KEEP_SHOTS=1; shift;;
     --list-routes) ROUTES_ONLY=1; shift;;
     *) echo "未知参数：$1"; exit 2;;
   esac
@@ -133,6 +134,18 @@ cp "$SEEN" "$OUT/hashes.txt"; rm -f "$SEEN" "$qfile"
 # 收尾清理：设备侧与本机临时文件都不留（证据留在 $OUT 里，日志切片也留，全量 logcat 不留副本）
 rm -f "$OUT/logcat-full.tmp" "$OUT/tmp.xml"
 $ADB shell rm -f /sdcard/w.xml >/dev/null 2>&1
-{ echo; echo "- 清理：设备侧 /sdcard/w.xml 已删；本机全量 logcat 副本已删（每屏切片保留在 \`*/logcat-slice.txt\`）"; 
-  echo "- 汇总日志线索：\`logfindings.txt\`（$(wc -l < "$OUT/logfindings.txt" 2>/dev/null || echo 0) 行）"; } >> "$OUT/summary.md"
+SHOTS_KB=$(du -sk "$OUT" 2>/dev/null | awk '{print $1}')
+if [ "$KEEP_SHOTS" = 0 ]; then
+  # 截图是这次跑里最大的一块，而判据不靠它：越界/重叠/热区都出自 dump.xml 的数字（layout.txt、nodes.tsv），
+  # 功能与否出自 logcat 切片 ⇒ 结论落盘后默认删图，要人眼复核再加 --keep-shots。
+  N_PNG=$(find "$OUT" -name 'screen.png' | wc -l)
+  find "$OUT" -name 'screen.png' -delete
+  SHOT_NOTE="已删 ${N_PNG} 张截图（判据来自 dump 的几何数字与 logcat 切片，不依赖图）；需要人眼复核用 --keep-shots"
+else
+  SHOT_NOTE="保留截图（--keep-shots）"
+fi
+{ echo; echo "- 清理：设备侧 /sdcard/w.xml 已删；本机全量 logcat 副本已删（每屏切片保留在 \`*/logcat-slice.txt\`）";
+  echo "- $SHOT_NOTE";
+  echo "- 汇总日志线索：\`logfindings.txt\`（$(wc -l < "$OUT/logfindings.txt" 2>/dev/null || echo 0) 行）";
+  echo "- 证据目录占用：${SHOTS_KB} KB（删图后）"; } >> "$OUT/summary.md"
 echo; echo "证据目录：$OUT"; sed -n '1,8p' "$OUT/summary.md"
