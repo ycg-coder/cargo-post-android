@@ -340,6 +340,7 @@ fun HomeScreen(
     var showAddressBook by remember { mutableStateOf(false) }
     /** 天气详情卡是否展开（对应小程序 weatherExpanded） */
     var weatherExpanded by rememberSaveable { mutableStateOf(false) }
+    var readingNotice by remember { mutableStateOf<Notice?>(null) }
 
     LaunchedEffect(Unit) {
         if (vm.lastSync == 0L) vm.load(context)
@@ -417,7 +418,7 @@ fun HomeScreen(
             }
             // 公告轮播融入站牌底部：不再单独占一整行，作为 Signpost 内的一条小滚动条
             if (vm.notices.isNotEmpty()) {
-                NoticeCarouselStrip(vm.notices) { nav.navigate(Routes.NOTIFICATIONS) }
+                NoticeCarouselStrip(vm.notices) { readingNotice = it }
             }
         }
         }
@@ -769,6 +770,36 @@ fun HomeScreen(
         )
     }
 
+    // 公告正文就地可读。以前点这一条只把人丢到「消息中心」，而那一页读的是 /notification/page
+    // （平台发给我的通知），跟 /notice/list（站点公告）是两张表 —— 于是接口一直有给的公告正文
+    // （`Notice.content`）在用户侧**没有任何一格能读到**，反倒是司机端同一条接口能看正文。
+    readingNotice?.let { n ->
+        AlertDialog(
+            onDismissRequest = { readingNotice = null },
+            confirmButton = {
+                BusButton(
+                    text = "知道了",
+                    onClick = { readingNotice = null },
+                    variant = BusButtonVariant.PRIMARY,
+                )
+            },
+            title = { Text(n.title, color = t.ink, fontSize = (16 * scale).sp) },
+            text = {
+                Column(Modifier.padding(top = 4.dp)) {
+                    Text(n.content, color = t.ink, fontSize = (13.5f * scale).sp)
+                    if (n.time.isNotEmpty()) {
+                        Text(
+                            n.time,
+                            color = t.textTertiary,
+                            fontSize = (11 * scale).sp,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
+                    }
+                }
+            },
+        )
+    }
+
     if (showVillages) {
         val names = vm.stations.map { it.name }.distinct()
         // 后端没给站点时不再用硬编码村名填空：那会让用户"选中"一个后端不存在的村庄（设备实测 16:42 加州定位点暴露）。
@@ -1009,7 +1040,7 @@ private fun LocationHintBar(
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun NoticeCarouselStrip(notices: List<Notice>, onClick: () -> Unit) {
+private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     if (notices.isEmpty()) return
@@ -1036,7 +1067,7 @@ private fun NoticeCarouselStrip(notices: List<Notice>, onClick: () -> Unit) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .clickable { onClick(n) }
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
