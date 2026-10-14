@@ -134,6 +134,10 @@ class GoodsViewModel : ScreenViewModel() {
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
+            // 翻页失败必须把页码退回去：`loadMore()` 是先 +1 再发请求，留着这个 +1 就等于
+            // 下一次"加载更多"直接跳过这一页 —— 那一页的货在这个会话里永远出不来，
+            // 用户只会说"商城少了几件"，而没有任何一格记下为什么。
+            if (!reset) pageNo -= 1
             loadError = true
             error = e.message
         } finally {
@@ -283,10 +287,6 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                                 .padding(vertical = 12.dp),
                             textAlign = TextAlign.Center,
                         )
-                    }
-                    item {
-                        LaunchedEffect(vm.pageNo, vm.categoryIndex, search) { vm.loadMore() }
-                        Spacer(Modifier.height(1.dp))
                     }
                 } else if (vm.shown.isNotEmpty()) {
                     item { ListEndNote() }

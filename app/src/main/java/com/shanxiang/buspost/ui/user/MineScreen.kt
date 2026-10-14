@@ -225,7 +225,9 @@ fun MineScreen(vm: MineViewModel = viewModel()) {
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "语音下单 · 大巴承运 · 直达城里",
+                    // 这一行原来写"语音下单"，而全工程没有任何语音下单入口（卡片里唯一的动作是"我要寄货"）——
+                    // 界面不许承诺做不到的动作。改成这一格真正走通的那条链路：站点交接 + 大巴承运。
+                    "农产品进城 · 大巴承运 · 站点交接",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 3.dp),

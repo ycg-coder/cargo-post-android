@@ -73,18 +73,29 @@ fun DriverMineScreen() {
 
     BusPage(spacedBy = 12.dp) {
         // 用户卡：与用户端 MineScreen 同构（头像 + 昵称 + 手机号 + 角色签）
+        //
+        // 排班档案名与账号昵称是**后端两张表里的两个值**，云端实测（13800138001）就是不一致的：
+        // 会员表 nickname=张建国，司机档案 name=周建国。以前这一格只念账号昵称，
+        // 而工作台念档案名 —— 同一个司机在两块屏上叫两个名字，谁都不知道哪个是真的。
+        // 现在以"今天开哪台车的名字"为主（工作台/交接单都用它），账号名如实标成第二行。
         BusCard(modifier = Modifier.fillMaxWidth()) {
+            val rosterName = Prefs.driverName
+            val accountName = Prefs.nickname
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BusAvatar(name = Prefs.nickname.ifEmpty { "司机" }, url = Prefs.avatar.ifEmpty { null })
+                BusAvatar(name = rosterName.ifEmpty { accountName }.ifEmpty { "司机" }, url = Prefs.avatar.ifEmpty { null })
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(
-                        Prefs.nickname.ifEmpty { "司机" },
+                        rosterName.ifEmpty { accountName }.ifEmpty { "司机" },
                         color = t.ink,
                         fontSize = (17 * scale).sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        Prefs.mobile.ifEmpty { "未绑定手机号" },
+                        listOfNotNull(
+                            accountName.takeIf { it.isNotEmpty() && rosterName.isNotEmpty() && it != rosterName }
+                                ?.let { "账号 $it" },
+                            Prefs.mobile.ifEmpty { "未绑定手机号" },
+                        ).joinToString(" · "),
                         color = t.textSecondary,
                         fontSize = (12.5 * scale).sp,
                         modifier = Modifier.padding(top = 3.dp),
