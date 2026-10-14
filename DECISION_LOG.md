@@ -7628,3 +7628,33 @@ IOException 才是"网络连接失败"。所以"网络不好"那一句来自用�
 
 **#193 已合**（算法保险丝那笔，全部 checks SUCCESS 后 merge），合入触发 `deploy-dev.yml`
 （run 38545211350 = **success**），部署后三条端点复验仍 code:0 ⇒ 服务在新算法口径下活着。
+
+### D-112（10-14 18:1x–19:0x）· 九格读数拿到了：八格数满，缺的是 6920 那一行菜单；另外我自己弄坏过两次取证
+
+**怎么拿到的**：日志（空 zip）、产物（`upload-artifact` ECONNRESET）、SSH（用户管不到服务器）三条通道全废之后，
+把每格读数改发成 `::notice title=DBSTATE::` —— **注解走 Checks API**，`gh api check-runs/{id}/annotations` 我自己就读得到。
+这一步顺手暴露了前一轮的红是真因：`out=$(… 2>&1)`（本意是让查询报错可见）把
+`mysql: [Warning] Using a password on the command line interface can be insecure.` 并进了 stdout ⇒
+`[ "$out" = "$want" ]` 永远不成立 ⇒ **九格全被污染、核对步恒红**。改 `docker exec -e MYSQL_PWD=` 之后八格立刻数满。
+
+**云上实测九格**（run 38548080120，`mode=check`，success）：
+`执行回流三列 3/3`、`钱包三表 3/3`、`揽收点四列 4/4`、`交接签名列 1/1`、`充值幂等键列 1/1`、
+`充值幂等唯一键 1/1`、`V030 注释中文原样 0`、`V033 注释中文原样 0` —— 八格数满；
+菜单那一格拆成逐 id 后是 **`6920 钱包查询 = 0/1`、`6930 计价规则页 = 1/1`、`6931 计价规则保存 = 1/1`**。
+
+⇒ **所以那句红不是测量问题了，是真的缺一行**：V031 的去重键实测就是 id（文件里
+`WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE id = 6920)`），而 apply 段两次都 success、
+V032 的两行也在 ⇒ "6920 这一行没落库"成立，**为什么没落库我还不知道**。
+影响面按当前证据只到 **web 后台的钱包页入口**；App 不受影响（`send/stations`、`bus/nearby`、`bus/lines`
+已复验 `code:0`，`#193` 合入触发部署 run 38545211350 success 后仍是 code:0）。
+"是否其实有另一条同权限不同 id 的行、页面其实打得开"这一支，探针已加（按 `permission` 数 + `role=1` 实际授权是否存在），
+但随后两次 `mode=check` 又死在 runner 抓仓库的 TLS（`gnutls_handshake() failed` / 注解里只有三条 failure）⇒ **未定，已提交待跑（分支 commit c284da41）**。
+
+**我自己的两次取证事故（都写清楚，因为它们的形态是"拿到了绿色的假东西"）**：
+1. 第一次修 MYSQL_PWD 时我把 YAML 打坏（`line 107 could not find expected ':'`），
+   而且**没先 `yaml.safe_load` 就 commit+push+投 run** ⇒ 那次 run 报的是"作业没有 workflow_dispatch 触发器"
+   （文件解析不出来，作业就不存在），已 `git revert`。教训：校验必须打在**解析后的 run 块**上
+   （本轮改成打印 `MYSQL_PWD` / 残留 `-p` 传密码 / 注解 三者的计数），不能只 `bash -n` 原始文本。
+2. 上一条提交的 `-m "…"` 里嵌了双引号 ⇒ git 把消息后半截当 pathspec 拒了（`error: pathspec 'id' …`），
+   而我是用 `;` 串的 `gh workflow run`，**commit 没落也照样投了一次 run** ⇒ 那次跑的是旧提交。
+   改：消息一律走 `-F` 文件。
