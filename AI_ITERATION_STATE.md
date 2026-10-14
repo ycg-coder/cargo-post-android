@@ -3,6 +3,22 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-14（下午续，D-107 · **UI 规格统一第一刀 + 功能通路复核登记四条欠账**）：
+- **题目**：用户要求"同一界面/同一行按钮大小形状统一"。实测起点 **34 处**裸 Material 按钮全在
+  `AlertDialog` 的 confirm/dismiss 槽（13 个文件）⇒ 与同行走设计系统的主按钮是两套高度与命中区。
+- **做法**：设计系统新增唯一出口 `BusDialogAction`（内部是 `BusButton` 的 TEXT 档），34 处收进去；
+  `UpdateDialog` 那颗默认尺寸的"立即更新"也一并统一。新闸 `check_ui_button_probes.sh`（UB-a…UB-f）
+  只钉写法层、**不钉像素**；配对负控 `ui_button_negative_controls.sh` = **6 ✔ + 正控制绿，RESULT=PASS**。
+- **终值**：`assembleDebug` + `testDebugUnitTest --rerun-tasks` ⇒ **68 份 XML / 706 例 / 0 失败 / 0 错误**（`45 tasks executed`）；
+  判据簿现读 **35 本全 rc=0**；`check_ledger_tables.py` TOTAL FLAGS 0；锚点 records 1457 / ID-MISS 273（本轮正文零新增行号引用）。
+- **功能通路复核**（同一轮的另一半）登记成 #29–#32 四条在册欠账，其中两条我复验过原文：
+  `Repo.news()` 是零网络请求 + `delay(300)` 的 4 条硬编码新闻（还署"新华社/人民日报"的名）；
+  资料/密码/地址/反馈六处写完直接念"已保存"，`Repo` 只读 `.demo` 不读后端 `data:Boolean`
+  ⇒ S-le"写操作必须回读"这道在册闸漏了这几面。
+- **有意没做**：11 个硬编码色值**没有一个在 `BusTheme` 里** ⇒ 换成令牌会改外观，本机无真机 ⇒ 不在这里断言"换了更统一"，
+  留给设计拍板 + 上机核对。
+- ⚠ **#191 仍未合**（等用户点头，合 = 云部署）；#159 仍 OPEN（248 条在册）。
+
 最后更新：2026-10-14（中午续，D-105 · **更新通道第一次真发布 + 本机后端未提交批次筛过一遍开 PR #191**）：
 - **自更新通路现在有真读数了**：派发一次 `workflow_dispatch` ⇒ Release **乡邮智联 v43**（非 draft、非 prerelease），
   资产 `app-release.apk` **109,953,380 B** `state=uploaded`；`releases/latest` 由 **404 变 200**；

@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +41,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.loc.Locator
 import com.shanxiang.buspost.core.net.Api
@@ -1432,7 +1432,7 @@ private fun StationPicker(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { BusDialogAction("关闭", onClick = onDismiss) },
     )
 }
 
@@ -1684,7 +1684,8 @@ private fun AddressModeCard(
                 }
             },
             confirmButton = {
-                TextButton(
+                BusDialogAction(
+                    "查询",
                     onClick = {
                         if (searchInput.isNotBlank()) {
                             onSearchAddress(searchInput)
@@ -1692,10 +1693,10 @@ private fun AddressModeCard(
                             searchInput = ""
                         }
                     },
-                ) { Text("查询") }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showSearchDialog = false }) { Text("取消") }
+                BusDialogAction("取消", onClick = { showSearchDialog = false })
             },
         )
     }

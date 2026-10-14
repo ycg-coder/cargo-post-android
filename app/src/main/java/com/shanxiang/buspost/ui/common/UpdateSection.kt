@@ -9,10 +9,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.core.net.attempt
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.InfoRow
 import com.shanxiang.buspost.core.update.AppUpdater
@@ -80,16 +80,19 @@ fun UpdateCheckRow() {
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    downloading = true
-                    scope.launch {
-                        val r = attempt { installOrAskPermission(context, o.release) }
-                        downloading = false
-                        r.exceptionOrNull()?.let { problem = it.message ?: "更新没成功" }
+                BusDialogAction(
+                    "立即更新",
+                    onClick = {
+                        downloading = true
+                        scope.launch {
+                            val r = attempt { installOrAskPermission(context, o.release) }
+                            downloading = false
+                            r.exceptionOrNull()?.let { problem = it.message ?: "更新没成功" }
+                        }
                     }
-                }) { Text("立即更新") }
+                )
             },
-            dismissButton = { TextButton(onClick = { outcome = null }) { Text("稍后再说") } },
+            dismissButton = { BusDialogAction("稍后再说", onClick = { outcome = null }) },
         )
 
         else -> Unit
@@ -100,7 +103,7 @@ fun UpdateCheckRow() {
             onDismissRequest = { problem = null },
             title = { Text("这次没更新成") },
             text = { Text(reason) },
-            confirmButton = { TextButton(onClick = { problem = null }) { Text("知道了") } },
+            confirmButton = { BusDialogAction("知道了", onClick = { problem = null }) },
         )
     }
 }

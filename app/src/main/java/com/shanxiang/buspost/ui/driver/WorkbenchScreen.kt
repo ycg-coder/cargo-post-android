@@ -28,7 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.BuildConfig
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
@@ -1109,12 +1109,15 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    vm.verify(verifyTarget!!, code)
-                    verifyTarget = null
-                }) { Text("核验") }
+                BusDialogAction(
+                    "核验",
+                    onClick = {
+                        vm.verify(verifyTarget!!, code)
+                        verifyTarget = null
+                    }
+                )
             },
-            dismissButton = { TextButton(onClick = { verifyTarget = null }) { Text("取消") } },
+            dismissButton = { BusDialogAction("取消", onClick = { verifyTarget = null }) },
         )
     }
 
@@ -1153,7 +1156,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { scanSheet = false }) { Text("取消") } },
+            confirmButton = { BusDialogAction("取消", onClick = { scanSheet = false }) },
         )
     }
 
@@ -1188,7 +1191,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { noticeSheet = false }) { Text("关闭") } },
+            confirmButton = { BusDialogAction("关闭", onClick = { noticeSheet = false }) },
         )
     }
 }

@@ -203,6 +203,33 @@ fun BusButton(
     }
 }
 
+/**
+ * 对话框动作：`AlertDialog` 的 confirm/dismiss 槽以前各写各的裸 `TextButton`（实测 34 处、13 个文件），
+ * 于是同一屏里"主按钮走设计系统、次按钮走 Material 默认"——字号不吃 `BusFontScale`、
+ * 命中区也不到驾驶模式的 56dp 下限，两颗并排时高矮胖瘦必然分叉。
+ * 现在只准这一条路：内部就是 `BusButton` 的 TEXT 档（primary 那颗给实心板），
+ * 所以圆角、命中下限、字重、按压缩放与全应用同源。
+ * ⚠ 视觉结果（对话框页脚因此变高一点）没有真机在环 ⇒ 只算"写法统一"已验，像素未验。
+ */
+@Composable
+fun BusDialogAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    enabled: Boolean = true,
+) {
+    BusButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        variant = if (primary) BusButtonVariant.PRIMARY else BusButtonVariant.TEXT,
+        enabled = enabled,
+        fullWidth = false,
+        small = true,
+    )
+}
+
 /** 主券式卡片：等价 .card 表面色 + 圆角 + 阴影；可点击时带按压下沉 */
 @Composable
 fun BusCard(

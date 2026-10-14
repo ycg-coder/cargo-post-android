@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +48,7 @@ import kotlinx.coroutines.coroutineScope
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.loc.LocFix
 import com.shanxiang.buspost.core.loc.Locator
+import com.shanxiang.buspost.core.ui.BusDialogAction
 import com.shanxiang.buspost.core.ui.AnimatedEnter
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
@@ -680,7 +680,7 @@ fun HomeScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showManualPick = false }) { Text("取消") } },
+            confirmButton = { BusDialogAction("取消", onClick = { showManualPick = false }) },
         )
     }
 
@@ -719,7 +719,7 @@ fun HomeScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showVillages = false }) { Text("关闭") } },
+            confirmButton = { BusDialogAction("关闭", onClick = { showVillages = false }) },
         )
     }
 
@@ -1412,6 +1412,6 @@ private fun AddressBookDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { BusDialogAction("关闭", onClick = onDismiss) },
     )
 }
