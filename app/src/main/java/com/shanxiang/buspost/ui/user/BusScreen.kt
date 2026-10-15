@@ -525,17 +525,6 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             }
         }
 
-        // 站牌（本轮补的那一根轴）：以前只能"选一条线路、看它停哪些站"，
-        // 而用户在站台上要问的是反过来的那句 —— 我站的这一站，有哪几路会停、大概几点到。
-        // 数据一直都在（`BusLine.stations` 由 points 解出、站上带 plannedMinutes），只是没人按站聚合过。
-        vm.nearby?.stations?.firstOrNull()?.let { stop ->
-            StationBoardCard(
-                station = stop,
-                arrivals = stationBoard(vm.lines, stop.name),
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-        }
-
         // 非运营时段提示卡（对标高德：明确告知用户何时可乘车）
         if (vm.state() == "off" && vm.nearby != null) {
             BusCard(
@@ -687,6 +676,20 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
+            // 站牌（本轮补的那一根轴）：以前只能"选一条线路、看它停哪些站"，而用户在站台上要问的是
+            // 反过来的那句 —— 我站的这一站，有哪几路会停、大概几点到。数据一直都在
+            // （`BusLine.stations` 由 points 解出、站上带 plannedMinutes），只是没人按站聚合过。
+            //
+            // ⚠ 必须放在**这一块**里：上面那个 `Column(Modifier.weight(1f))`（:462）没有 verticalScroll，
+            //   第一版把卡插在头部，内容一被加高就把下面整段顶出屏幕 —— 真机症状是"页面滑不动、
+            //   收藏点不到"（我自己引入的回归，用户报上来的）。滚动区只有这一处。
+            vm.nearby?.stations?.firstOrNull()?.let { stop ->
+                StationBoardCard(
+                    station = stop,
+                    arrivals = stationBoard(vm.lines, stop.name),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
             when (vm.state()) {
                 "loading", "off", "empty", "error" -> Unit // 已在地图区域显示
 
