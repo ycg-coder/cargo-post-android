@@ -2375,10 +2375,18 @@ fun JSONObject.imageUrlOrEmpty(vararg keys: String): String {
         if (s.startsWith("https://")) return s
         if (s.startsWith("http://")) {
             // 正式版 `usesCleartextTraffic=false`：明文图**永远加载不出来**，只会留一张占位。
-            // 所以公网地址一律升到 https（升不上去就退回原样，由 Coil 的 error 占位接住）；
-            // 本机/局域网的后端通常只有 http，升了反而全灭，那一类保持原样。
-            val host = s.substringAfter("://").substringBefore("/")
-            return if (isPrivateHost(host)) s else "https://" + s.substringAfter("://")
+            // ⚠ 上一轮"只把 scheme 换成 https"是错的，实测过才承认：图片主机是**裸 IP**，
+            //   证书无法对 IP 有效 ⇒ 严格校验必失败（`https://<IP>/...` → CERTIFICATE_VERIFY_FAILED），
+            //   Coil 拿到的还是 error，界面还是那张占位叶形 —— 修了等于没修。
+            // 真走得通的一条：这些图在 **API 自己那台 nginx** 上有同名路径且证书有效
+            //   （实测 `https://api.qwer2333.com/images/products/plum.jpg` → 200 image/jpeg，严格校验通过）。
+            //   所以换的是**主机**、不是 scheme，路径原样带过去。
+            // 本机/内网后端不这么干：debug 允许明文，且换主机等于拿线上去找开发机的图 —— 保持原样。
+            val base = com.shanxiang.buspost.BuildConfig.BASE_URL
+            val apiHost = base.substringAfter("://", "").substringBefore("/")
+            val rest = s.substringAfter("://").substringAfter("/", "")
+            if (apiHost.isEmpty() || rest.isEmpty() || isPrivateHost(apiHost)) return s
+            return "https://$apiHost/$rest"
         }
         if (s.startsWith("/")) {
             // 相对路径按**站点根**补全，不按 API 前缀：`/images/...` 不在 `/app-api` 下面

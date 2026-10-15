@@ -70,8 +70,8 @@ sub "$HS" 'item { DemoNote(vm.demo) }' 'item { }' && expect_red "NC-2 少一处�
 sub "$WB" 'DemoNote(true, text =' 'DemoNote(false, text =' && expect_red "NC-3 写死 false" "DD-c "
 
 # NC-4 明文图不再升 https（退回"原样返回"）⇒ 调用点与升级分支同时掉
-sub "$MD" 'return if (isPrivateHost(host)) s else "https://" + s.substringAfter("://")' 'return s' \
-  && expect_red "NC-4 撤掉 http→https" "DD-e2"
+sub "$MD" 'return "https://$apiHost/$rest"' 'return s' \
+  && expect_red "NC-4 撤掉换主机这条" "DD-e3"
 
 # NC-5 页面绕过 onMobileChange 直接改号码 ⇒ 口子引用掉 0、裸写回到 1
 sub "$LSC" 'onValueChange = { v -> vm.onMobileChange(v) },' 'onValueChange = { v -> vm.mobile = v.filter { it.isDigit() }.take(11) },' \

@@ -75,10 +75,10 @@ say DD-d "$DD_FLAG" 177 "全站 .demo 读数"
 
 # DD-e 明文图升 https：判定函数与调用点各恰好一份，且退回分支保住本机 http
 DD_DEF=$(nc_count "$MD" 'internal fun isPrivateHost')
-DD_USE=$(nc_count "$MD" 'if (isPrivateHost(host))')
-DD_HTTPS=$(nc_count "$MD" '"https://" + s.substringAfter')
+DD_USE=$(nc_count "$MD" 'isPrivateHost(apiHost)')
+DD_HTTPS=$(nc_count "$MD" '"https://$apiHost/$rest"')
 sayx DD-e "$DD_DEF" 1 "isPrivateHost 定义"
-sayx DD-e2 "$DD_USE" 1 "imageUrlOrEmpty 里的调用"
+sayx DD-e2 "$DD_USE" 1 "imageUrlOrEmpty 里对 API 主机的判定（本机/内网不换主机）"
 sayx DD-e3 "$DD_HTTPS" 1 "公网 http 升 https"
 
 # DD-f 换手机号作废上一位的验证码状态：VM 一处定义、页面一处引用，
