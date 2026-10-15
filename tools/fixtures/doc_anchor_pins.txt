@@ -60,6 +60,7 @@
 3f032758	ID-MISS	Repo.kt:869-871	ANDROID_PARITY_AUDIT_V2.md:877	currentLeg/driver/current/legId
 429cae57	ID-MISS	Repo.kt:1325	DECISION_LOG.md:1704	actionGate/userCreateGate
 43adfe46	ID-MISS	Models.kt:1521	AI_ITERATION_STATE.md:3028	photoRequired/isProduct/workbench/DRIVER_CARGO_PHOTO_REQUIRED
+45e2e31f	ID-MISS	BusScreen.kt:715-717	AI_ITERATION_STATE.md:298	favLines/isNotEmpty
 46c68206	ID-MISS	ReviewReasonCodeEnum.java:15-25	ANDROID_PARITY_AUDIT_V2.md:1928	Android
 471fe4ab	ID-MISS	ApiTest.kt:165	CONTEXT_LOCK.md:941	typed
 4878e396	ID-MISS	OrderDetailScreen.kt:99	ANDROID_PARITY_AUDIT_V2.md:628	DEMO_ALLOWED/DemoData/Payload/DemoNote
@@ -132,6 +133,7 @@
 8b0ad508	ID-MISS	DriverAppServiceImpl.java:1498	DECISION_LOG.md:6910	curSeq/maxSeq
 8b45e6d9	ID-MISS	BusScreen.kt:579	ANDROID_PARITY_AUDIT_V2.md:772	multiNum
 8c7bf169	ID-MISS	Api.kt:184	ANDROID_PARITY_AUDIT_V2.md:1042	debug
+8c9e985d	ID-MISS	BusScreen.kt:1124	DECISION_LOG.md:5624	SourceTag/sourceText
 8ca577b5	ID-MISS	DriverShell.kt:39	AI_ITERATION_STATE.md:3705	driver/AppState/setRole
 8cd4d6b9	ID-MISS	Models.kt:1955	DECISION_LOG.md:2678	haversine/HAVERSINE/EUCLIDEAN
 8d8f9c3d	ID-MISS	OAuth2TokenServiceImpl.java:64	DECISION_LOG.md:5571	expiresTime
