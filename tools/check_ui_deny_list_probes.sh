@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# UI 遍历「绝不点」清单的判据（配 tools/ui_deny_list_negative_controls.sh）
+#
+# 为什么要有这一本：2026-10-15 真机第二轮，我在测登录流程时一个坐标点偏，
+# 把司机端云端真实班次从「未发车」推成了「在途」—— 而这条按钮**根本不在任何 DENY 表里**：
+# 遍历器的 DENY 集合当时只活在 `walk_ui.sh` 的一行正则字面量里（且那本脚本还在未合并的分支上），
+# 我临时写的扫描脚本各抄各的、谁也没被管住。跟 DemoNote 那次同形：**规矩没有落在一处可判的地方**。
+# 现在清单是单一真值文件，这一本管四件事：清单不许被削、两条真踩到的必须在、
+# 旧集合一条不许少、以及不许有人再抄第二份硬编码 DENY。
+#
+# 用法：bash tools/check_ui_deny_list_probes.sh        退出码非 0 = 这一格被拆了
+# 写法沿用本仓规矩：按内容过滤不按行号；"目标 0"配同文件正对照；下限一律等于现读。
+set -u
+ROOT="${BUSPOST_ANDROID:-$(cd "$(dirname "$0")/.." && pwd)}"
+cd "$ROOT" || exit 2
+DL=tools/ui_deny_list.txt
+[ -f "$DL" ] || { echo "× 清单 $DL 读不到：判据没有输入，本轮不采信"; exit 2; }
+
+FAIL=0
+sayx() { [ "${2:-x}" = "${3:-1}" ] && echo "✔ $1 = $2（恰好 $3）$4" || { echo "× $1 = $2（恰好 $3）$4"; FAIL=1; }; }
+say()  { [ "${2:-0}" -ge "${3:-1}" ] && echo "✔ $1 = $2（下限 $3）$4" || { echo "× $1 = $2（下限 $3）$4"; FAIL=1; }; }
+has()  { grep -c "^$1$" "$DL" || true; }
+
+# DL-a 清单非空且不许被削：现读 22 条
+ENTRIES=$(grep -vE '^#|^$' "$DL" | wc -l | tr -d ' ')
+say DL-a "$ENTRIES" 22 "清单条目数（只会加不会减；要减必须带理由改这一行并写进台账）"
+
+# DL-b 本轮真踩到的两条必须在，且各恰好一处
+sayx DL-b1 "$(has 确认发车)" 1 "确认发车（无按钮可回退，直接把班次推成在途）"
+sayx DL-b2 "$(has 开始车道级导航)" 1 "开始车道级导航（会把遍历带离待验屏）"
+sayx DL-b3 "$(has 全部已读)" 1 "全部已读（按一次，之后所有拿未读数当证据的轮次读到假象）"
+
+# DL-c 旧集合一条不许少：遍历器原来那 12 个词逐个点名
+MISS=0
+for k in 退出登录 注销 删除 确认收货 确认支付 立即支付 充值 立即更新 清空 解除绑定 提交并支付 签收确认; do
+  [ "$(has "$k")" = 1 ] || { echo "  缺 $k"; MISS=$((MISS+1)); }
+done
+sayx DL-c "$MISS" 0 "旧 DENY 12 词逐个点名"
+
+# DL-d 单一真值：不许有人再抄第二份硬编码 DENY 正则进 tools/（正对照：清单本身被数到 >0）
+# 排除本簿与自己的负控：判据的模式串就写在这两个文件里，不排除就是"自己抓自己"的假红
+DUP=$(grep -rln "DENY='" tools/ 2>/dev/null | grep -v "deny_list" | wc -l | tr -d ' ')
+SELF=$(grep -c "确认发车" "$DL")
+sayx DL-d "$DUP" 0 "tools/ 里第二份硬编码 DENY（正对照：下一行 DL-d2 数到本清单命中 >0）"
+say DL-d2 "$SELF" 1 "本清单自己确实在被数"
+
+echo
+[ "$FAIL" = 0 ] && { echo "✅ ui_deny_list：$ENTRIES 条在岗，旧集合齐、无第二份副本"; exit 0; } || { echo "❌ ui_deny_list：有格被拆，见上面 ×"; exit 1; }
