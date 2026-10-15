@@ -378,7 +378,7 @@ sha256 `59086c9e…`（对上一包 +32,768 B 登记为增量未归因）。
 NEXT：③ `earliestPickupTime` 取件时间窗 → ④ #39 收藏首页入口 → ⑤ #47 分组 hub → ⑥ #43 图标（我出 3 个候选）
 → 之后是 web 后台管理平台。
 <!-- 上一条 D-085（#55 票面）及更早的「最后更新」段落保留为历史，不覆盖 -->
-最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:906`，
+最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:918`，
 `GET /app-api/transport/send/topology`）此前全仓 0 消费者 ⇒ 补的是读它的那一页（判定全在纯层 `ui/user/ParcelTicket.kt`，
 页面 `ParcelTicketScreen.kt` 只渲染，入口是追踪页那一行「看联运票面」、全工程恰好一个导航调用点）。
 逐字段读生产者读出**三处真接口下永远念空/念错**：交接的车牌与时刻认的是自造键（后端发 `fromPlateNo`/`toPlateNo`/
@@ -2701,7 +2701,7 @@ N-1（路线图第 8 步 · 可插拔导航引擎）的记录在 DONE 的「N-1�
 V-2b（两轮前 · 冷启动角色与后端画像同源）的记录在 DONE 的「V-2b」一节与审计 §76、`DECISION_LOG.md` D-030；
 **它的四条纪律仍然有效**：
 ① **"未知"与"否定"必须是两个值，而"否定长什么样"只能由后端定**：本轮实测后端的否定是 `{"code":0,"data":null}`，
-而 `Api.kt:396-397` 把它读成**空 `JSONObject`** ⇒ 工程里原有的 `data 非空` 前置条件不是保守，是**把唯一能生效的那条
+而 `Api.kt:486-487` 把它读成**空 `JSONObject`** ⇒ 工程里原有的 `data 非空` 前置条件不是保守，是**把唯一能生效的那条
 清绑定分支变成不可达**（撤档永不生效）；
 ② **判据的入参必须是调用方当场观测得到的量** —— 本轮第一版发明了 `ProfileAnswer` + `deniedByServer` 中间态，
 读完 `Api` 之后**当场整块回退**（要调用方猜的中间态就是第二个真相源，实测现在全工程 0 命中）；
@@ -3282,7 +3282,7 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
 1. **`UP-TO-DATE` / `executed` / `BUILD SUCCESSFUL` 三种打印都不是包内新鲜的证明**：21:08 那次 `assembleDebug` 打印 `packageDebug` 执行过，但 `outputs/apk/debug/app-debug.apk` 仍是 **19:33:42 / 113,863,001 B**，`unzip` 出的 15 个 dex 里 `userCreateGate` **0** 命中；同时 `intermediates/dex/debug/mergeProjectDexDebug` 是 **21:08:18** 且**有新符号** ⇒ 陈旧在打包环节的 up-to-date 记账，不在编译。`:app:assembleDebug --rerun-tasks`（**37 actionable tasks: 37 executed**，21:13:59）后包内实测 `userCreateGate 1 · gatedUserCreate 4 · "create:" 1 · 两条新文案各 1`，旧串 `gatedAction 4 · 本次请求未发给后端 1` 仍在（分域在包里也成立），`UserCreateIdempotencyTest` **0**（测试类不进包）。⚠ 先证方法再信 0：同一批 grep 若连已知串都数不到，0 就是工具坏了而不是内容旧——这次 `gatedAction 4` 命中，所以那个 0 是真的。
 2. **判据编号互为前缀时，负控断言必须锚定分隔符**：`ctl` 原来用 `grep -q "^× $1"`，于是 `× U-c2 …` 会被当成"U-c 也咬住了"⇒ **假 ✔**。改成 `grep -q "^× $1 "`（编号后必须有空格），三条 `U-c/U-c2/U-c3` 各有自己的破口、互不顶名。同轮把沙盒从"只拷两个用户页"改成 **`cp ui/user/*.kt` 整目录**（`I-e` 那次的教训在用户域原样重演：用户页还在涨，部分 copy 会把"下限"变成"沙盒的巧合"）。
 
-**已知未收（登记，不说成已完成）**：① 取消路径的放闸**不在用户域重复钉**（`Api.kt:239/:295` 在 `withContext(Dispatchers.IO)` 里阻塞 `execute()`，JVM 用例无法确定性地"在途取消"；语义钉在 `ActionGateTest`，两域同一个类）；
+**已知未收（登记，不说成已完成）**：① ~~取消路径的放闸**不在用户域重复钉**（`Api.kt:239/:295` 在 `withContext(Dispatchers.IO)` 里阻塞 `execute()`，JVM 用例无法确定性地"在途取消"；语义钉在 `ActionGateTest`，两域同一个类）~~ **已收口（2026-10-16 D-124）**：三条发请求通路改走 `callCancellable`（`enqueue` + `invokeOnCancellation { call.cancel() }`），"在途取消"从此能被 JVM 用例**确定性**钉住 —— `NetHygieneContractTest` 压一条 30 秒延迟的响应，实测取消在数百毫秒内收场；`ActionGateTest` 那两域的放闸语义不动；
 ② `app/build/outputs/apk` 只有单份通用包（无分 ABI apk）；③ 真机连点与 900 文案渲染 `NOT VERIFIED ON DEVICE`；
 ④ **`ActionGate.kt:13` 那句类注释现在是过时的** —— 写的是"**司机动作**的本地幂等闸（V-1 / 指令 §52）"，而这个类今天被**两把实例**共用
 （`U-c` 实测实例数 2）。**本轮没顺手改它**：改注释也是**内容改动**，会让刚立起来的"包内新鲜度"证据（21:13:59 那份 `03ab6172…`）作废，
@@ -3634,7 +3634,7 @@ APK 23:59:33 / 57,941,374 B）；`:app:lintDebug` **真重跑**（8 executed，*
    **复用既有 `@Valid AppDriverLegActionReqVO`，不新增字段、不新增服务层逻辑**。
    ⚠ **该改动跨仓、未提交（本工作区无 git）、未部署** ⇒ "异常真落库/真推通知"**端到端未验**，见下面尾巴①。
    其余动作是**一个动作一个 endpoint**（`/leg/accept` … `/leg/complete`，`:163-224`）⇒ **动作名走 URL path，不在报文里**
-   （Android 侧 `Repo.kt:1056-1059`：`Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra)`）。
+   （Android 侧 `Repo.kt:1494`：`Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra)`）。
 3. 请求契约 `AppDriverLegActionReqVO.java:9-23` 是**四个键**：`driverId` / `legId`（**唯一 `@NotNull`**）/ `photoUrl` / `remark`，
    且 `remark` 的 `@Schema` 原话就是"备注（**异常/争议原因**）"—— §54 的自由文本**有既有落点，不是新造字段**。
    异常上报发其中**三个**（`driverId + legId + remark`，**不带** `photoUrl`：异常动作不需要凭证照片）。
@@ -4004,7 +4004,7 @@ key/凭证**字面量**0（⚠ 按裸 token `grep -rn "AMAP_KEY" app/src/main` �
 `--rerun` 只作用于命名到的那个任务，不会带着依赖一起重跑 —— 想真重跑要 `--rerun-tasks`）。
 
 **尾巴（登记不冒充已修）**：① ETA/里程候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt` 四处 + `Repo.kt:623/947`，
-其中 `Repo.kt:1241` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
+其中 `Repo.kt:1253` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 **0.0**，
 `distanceFee > 0` 才显示"里程费" ⇒ 同病不同族（金额不是 ETA），并入下一轮；
 ③ `TransportLeg` 的 `navigationPolyline/fromGeo/toGeo` 后端**不下发**（⑫ 实测），段卡"在途进度"仍是状态驱动的示意，
@@ -4164,7 +4164,7 @@ T-l 锚点是已被替换掉的 `Text(v.etaCaptionText`、T-o2 的 `sed` 只替�
   `etaMinutes > 0` 仍是 null→0 塌缩，⑪ 的 T-a 口径只覆盖公交链路，所以它们现在是**打印残留**、⑫ 判红；
 - `Arrangement.etaMinutes` 保留可空类型但真后端下恒 null（§68），到站提醒仍未迁数据源；
 - `Repo.kt:714/687` 的 `inService`/`located` 用 `optBoolean(…, true)` —— 缺键时**替后端默认"在服务/已定位"**，与 §14 同一类，登记未修；
-- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:960` 已按真实优先读，能兼容但不成形）；
+- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:972` 已按真实优先读，能兼容但不成形）；
 - ~~演示面那条 `/bus/realtime` 分支全工程**没有任何调用点**（死端点，留着会误导后来人以为有这条接口）~~ **已收口（2026-10-15 D-120）**：分支删掉，并把这条规矩立成判据 `tools/check_demo_path_reachability_probes.sh`（DP-a…DP-d：孤儿必须 0，有理由留的进 `tools/fixtures/demo_path_exempt.txt` 点名）；端点本身**不接** —— `/nearby` 就是拿同一个 `getRealtimeBuses(mapData)` 算出来的，`AppBusRespVO` 是 `NearbyBus` 的字段子集且没有 radius 过滤（每次刷新多一条更大的 REST 换三个字段，不值）。
 - `AppBusNearbyRespVO:128-129` 的 `@Schema` 与实现不一致（说 AMAP/EUCLIDEAN，实现发 SCHEDULE），只在 Android 侧按实现记账。
 
@@ -4428,7 +4428,7 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
 - **§29 ① 角色切换入口**：`MineScreen.kt:163` 的"切换为司机模式"改走 `MineViewModel.enterDriverMode`(`:85-97`) ——
   先 `Repo.bindDriver()`，后端没授予 `driverId` 就**不进司机域**，页面内显示"该账号未绑定司机档案…"。
   与 `LoginViewModel` 从此是同一条纪律（此前工程里存在"登录有校验、切换没有"两套标准）。
-- **§29 ② `Repo` 层结构守卫**：新增 `driverIdParam()`(`Repo.kt:1103`) + `DriverUnboundException`(`:65`) +
+- **§29 ② `Repo` 层结构守卫**：新增 `driverIdParam()`(`Repo.kt:1115`) + `DriverUnboundException`(`:65`) +
   `DRIVER_UNBOUND`(`:68`)，19 个司机调用点全部改走它。`mapOf("driverId" to driverId)` 字面量实测 **0** 处。
   守卫抛在**参数求值之前**，所以 `driverId=0` 的 URL 是"构造不出来"而不是"发了被拦"；
   四个身份引导接口（profile/shifts/pickups/earnings，按 token 识别）**不加守卫**，否则绑定永远不会发生。

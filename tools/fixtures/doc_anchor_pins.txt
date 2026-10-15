@@ -9,7 +9,6 @@
 02875ea7	ID-MISS	AmapNavigationEngine.kt:152	DECISION_LOG.md:2232	daily
 02b247df	ID-MISS	Models.kt:1447	DECISION_LOG.md:758	Models
 02df974a	ID-MISS	Models.kt:997	ANDROID_PARITY_AUDIT_V2.md:3356	goodsName/cargoName/itemCount/count
-037569eb	ID-MISS	Api.kt:314-315	CONTEXT_LOCK.md:2068	Prefs
 06970c0c	ID-MISS	Models.kt:758-760	ANDROID_PARITY_AUDIT_V2.md:570	handover/accept/navigate/arrive
 06ecab9a	ID-MISS	HomeScreen.kt:1163	ANDROID_PARITY_AUDIT_V2.md:826	etaMinutes/danger
 0763e795	ID-MISS	Repo.kt:387-394	DECISION_LOG.md:5837	d8b819
@@ -31,7 +30,7 @@
 146f1343	ID-MISS	Models.kt:1377	CONTEXT_LOCK.md:2072	eta_negative_controls
 15b6259e	ID-MISS	ApiTest.kt:165	ANDROID_PARITY_AUDIT_V2.md:3157	throw/typed
 168ffaf5	ID-MISS	AppSendArrangementRespVO.java:8-43	DECISION_LOG.md:819	etaMinutes
-17208d94	ID-MISS	Repo.kt:1325	AI_ITERATION_STATE.md:3256	actionGate/gatedAction/UserCreateIdempotencyTest/ActionGate
+17208d94	ID-MISS	Repo.kt:1325	AI_ITERATION_STATE.md:1960	GeoMath
 17307254	ID-MISS	GeoDistanceUtil.java:6	ANDROID_PARITY_AUDIT_V2.md:1942	GeoDistanceUtil/computeKmAndMinutes
 18e1abac	ID-MISS	AppSendOrderCreateReqVO.java:60	AI_ITERATION_STATE.md:2777	DECISION_LOG
 19dd05b5	ID-MISS	AlertEngine.kt:69	DECISION_LOG.md:5666	AlertEngine
@@ -58,7 +57,6 @@
 39dbd7a2	ID-MISS	Api.kt:60	ANDROID_PARITY_AUDIT_V2.md:3156	unified/helper/apiCall/suspend
 3a04f92e	ID-MISS	HandoverServiceImpl.java:222-223	ANDROID_PARITY_AUDIT_V2.md:426	HandoverScreen/confirm/photoUrl/confirmHandover
 3b11d7ea	ID-MISS	OpenSourceCredits.kt:27	THIRD_PARTY_NOTICES.md:455	about
-3f032758	ID-MISS	Repo.kt:869-871	ANDROID_PARITY_AUDIT_V2.md:877	currentLeg/driver/current/legId
 429cae57	ID-MISS	Repo.kt:1325	DECISION_LOG.md:1704	actionGate/userCreateGate
 43adfe46	ID-MISS	Models.kt:1521	AI_ITERATION_STATE.md:3028	photoRequired/isProduct/workbench/DRIVER_CARGO_PHOTO_REQUIRED
 45e2e31f	ID-MISS	BusScreen.kt:715-717	AI_ITERATION_STATE.md:298	favLines/isNotEmpty
@@ -126,7 +124,7 @@
 81766142	ID-MISS	TransportOrderServiceImpl.java:149	AI_ITERATION_STATE.md:322	AppSendOrderRespVO/track/toRespVO
 84466aaf	ID-MISS	DriverShell.kt:38	ANDROID_PARITY_AUDIT_V2.md:220	Intent
 85bc0bf0	ID-MISS	SendScreen.kt:132	AI_ITERATION_STATE.md:1003	AutoboxingStateCreation
-87acfb91	ID-MISS	Repo.kt:1039	ANDROID_PARITY_AUDIT_V2.md:422	toPayload/Payload/JSONObject/unreadCount
+87acfb91	ID-MISS	Repo.kt:1039	ANDROID_PARITY_AUDIT_V2.md:1140	AppState/driverUnread
 87c04e12	ID-MISS	Api.kt:269	DECISION_LOG.md:738	TransportOrderServiceImpl
 87d6e962	ID-MISS	Models.kt:1275	CONTRACT_EVIDENCE.md:130	remark/orderNo
 88d3abb7	ID-MISS	Repo.kt:428	CONTEXT_LOCK.md:2056	runCatching/D_ATTEMPT_REPO/suspend/runBlocking

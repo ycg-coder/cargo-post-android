@@ -148,4 +148,86 @@ class SessionRefreshContractTest : ServerTest() {
         assertFalse(Repo.refreshTokenOnce())
         assertEquals("续期失败不得覆写现有 token", "expired-token", Api.token)
     }
+
+    @Test
+    fun `本机已知到期时刻过期时先静默续期再发业务，不等那个必然的 401`() = runBlocking {
+        // 缺陷 #79 第四格：expiresTime 一直在落盘，却从没被读过 ⇒ 明知过期也照样发，
+        // 等一个必然的 401 才被踢回登录页。这里断言的是**请求顺序**：续期在业务之前。
+        TestHost.strictBackend()
+        var kicked = 0
+        Api.onUnauthorized = { kicked++ }
+        Api.token = "old-token"
+        Prefs.refreshToken = "refresh-1"
+        Api.refresher = { Repo.refreshTokenOnce() }
+        Api.tokenExpiresAt = System.currentTimeMillis() - 1L   // 后端早说过这个 token 死了
+
+        val freshExpiry = System.currentTimeMillis() + 1_800_000
+        respondData("""{"userId":1,"accessToken":"fresh-token","refreshToken":"refresh-2","expiresTime":$freshExpiry}""")
+        respondData("""{"list":[{"id":9}],"total":1}""")       // 业务请求一次就成
+
+        val payload = Api.get("/app-api/transport/send/page")
+
+        assertEquals(1, payload.list.size)
+        assertEquals("续期 + 业务两跳，不该再有一条 401 往返", 2, server.requestCount)
+        assertFalse("主动续期成功后还被踢，说明 401 出口没被绕过", kicked > 0)
+        assertEquals("fresh-token", Api.token)
+        assertEquals(
+            "新到期时刻必须回写，否则下一条请求又当成过期，等于每次都要先续一遍",
+            freshExpiry, Api.tokenExpiresAt
+        )
+        val first = server.takeRequest(1, TimeUnit.SECONDS)!!
+        assertTrue("第一条请求必须是续期：${first.path}",
+            first.path!!.startsWith("/app-api/member/auth/refresh-token"))
+    }
+
+    @Test
+    fun `主动续期一分钟内只做一次，时钟偏快不能把每条请求都变成续期`() = runBlocking {
+        // 设备时钟快过真实时间（或后端给的 expiresTime 本身就偏）时，"已过期"会**永远成立**。
+        // 没有这道闸就是每条请求前面多打一次 /auth/refresh-token —— 比原来的 401 更糟。
+        TestHost.strictBackend()
+        Api.token = "old-token"
+        Prefs.refreshToken = "refresh-1"
+        Api.refresher = { Repo.refreshTokenOnce() }
+        Api.tokenExpiresAt = System.currentTimeMillis() - 1L
+
+        respondData("""{"userId":1,"accessToken":"fresh-token","refreshToken":"refresh-2","expiresTime":1}""")
+        respondData("""{"list":[{"id":9}],"total":1}""")
+        Api.get("/app-api/transport/send/page")
+        assertEquals(2, server.requestCount)
+
+        // 续期报文里 expiresTime=1（已过期，且刻意不用未来值）⇒ 回写后仍是"过期"状态；
+        // 第二条业务请求必须**不再**触发续期，只能自己那一跳。
+        val before = server.requestCount
+        respondData("""{"list":[{"id":10}],"total":2}""")
+        val second = Api.get("/app-api/transport/order/list")
+        assertEquals(1, second.list.size)
+        assertEquals("一分钟内第二次过期判定不得再续期", before + 1, server.requestCount)
+        // 按到达顺序出队：续期 → 业务一 → 业务二。只认最后一条的话，前两条的形态就看不见。
+        val renewed = server.takeRequest(1, TimeUnit.SECONDS)!!
+        val page1 = server.takeRequest(1, TimeUnit.SECONDS)!!
+        val page2 = server.takeRequest(1, TimeUnit.SECONDS)!!
+        assertTrue("第一条必须是续期：${renewed.path}",
+            renewed.path!!.startsWith("/app-api/member/auth/refresh-token"))
+        assertTrue("第二条必须是原那条业务：${page1.path}",
+            page1.path!!.startsWith("/app-api/transport/send/page"))
+        assertTrue("第三条不得是续期：${page2.path}",
+            page2.path!!.startsWith("/app-api/transport/order/list"))
+        assertEquals("Bearer fresh-token", page2.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `认证接口自己不得触发主动续期，否则续期套续期`() = runBlocking {
+        // 续期走 /auth/，所以 /auth/ 路径上的请求必须绕过那段护栏 —— 少了它就是一个递归。
+        TestHost.strictBackend()
+        var refreshes = 0
+        Api.token = "old-token"
+        Api.tokenExpiresAt = System.currentTimeMillis() - 1L
+        Api.refresher = { refreshes++; false }
+
+        respondData("""{"userId":1,"accessToken":"t","refreshToken":"r","expiresTime":1}""")
+        Api.post("/app-api/member/auth/sms-login", mapOf("mobile" to "13900001003", "code" to "8888"))
+
+        assertEquals(0, refreshes)
+        assertEquals("登录只发一跳", 1, server.requestCount)
+    }
 }

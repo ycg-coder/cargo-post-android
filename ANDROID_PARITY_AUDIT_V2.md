@@ -180,7 +180,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 |---|---|---|---|---|
 | 商品列表/分页/详情 | `api.js:220/225/230` | `Repo.kt:356/372/379` | `/product/list`、`/product/page`、`/product/get` | `REAL_COMPLETE` |
 | 下单 | `api.js:237` | `Repo.kt:384-401` | `POST /product-order/create` | `REAL_COMPLETE` |
-| 我的订单分页（含 status） | `orders.js:104-107` 传 `status` | `Repo.kt:638-639` 传 `status` | `AppProductOrderController.java:48` 支持 status | `REAL_COMPLETE` |
+| 我的订单分页（含 status） | `orders.js:104-107` 传 `status` | `Repo.kt:651-652` 传 `status` | `AppProductOrderController.java:48` 支持 status | `REAL_COMPLETE` |
 | 取消商城订单 | `api.js:247` `?id=` query | `Repo.kt:413-414`（`Api.put(path, body, query)`，id 在 query） | `AppProductOrderController.java:58-61 @RequestParam("id")` | `REAL_COMPLETE` |
 | 订单溯源 | `api.js:213` | `Repo.kt:416-417` | `GET /product-order/trace?id=` | `REAL_COMPLETE` |
 | 状态文案 | 优先后端 `statusName`（`parcel.js:617`） | `Models.kt:860` 优先 `statusName`，兜底 `productStatusLabel`：1→"配送中" | `ProductOrderStatusEnum:14-20`：1 = **已发货** | `REAL_PARTIAL`（兜底文案漂移）→§33 |
@@ -601,7 +601,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **① 角色切换入口**：`MineViewModel.enterDriverMode(onGranted)`(`MineScreen.kt:112-124`) 先 `Repo.bindDriver()`，
   `(bound.value?.driverId ?: 0L) <= 0L` 时写 `error` 并 `return@work`，**不进司机壳**；`MineRow` 的点击实参已换成它，
   错误按 danger 色渲染在"我的服务"卡片内。与 `LoginViewModel` 走的是同一个后端档案，不再是两套纪律。
-- **② `Repo` 层守卫**：新增 `driverIdParam()`(`Repo.kt:1101`)，未绑定（`Prefs.driverId <= 0`）直接抛
+- **② `Repo` 层守卫**：新增 `driverIdParam()`(`Repo.kt:1113`)，未绑定（`Prefs.driverId <= 0`）直接抛
   `DriverUnboundException`(`:65`) → `errorTextOf`(`:53`) 翻成 `DRIVER_UNBOUND`(`:68`)。
   19 个司机请求调用点全部改走它，`mapOf("driverId" to driverId)` 字面量拼装实测 **0** 处；
   抛异常发生在参数求值之前，所以 `driverId=0` 的 URL **构造不出来**，不是"构造了但被拦住"。
@@ -649,7 +649,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **文件**：`app/src/main/java/com/shanxiang/buspost/ui/user/OrderDetailScreen.kt`
 - **类 / 函数**：`OrderDetailViewModel.cancel`(`:76-85`)、渲染处(`:101-103`)
 - **当前行为**：`Repo.cancelProductOrder(id)` → 成功后重新 `productOrders(pageSize=50)` 与 `productOrderTrace(id)` **回读后端**，然后 `cancelled = true`；UI 只要 `cancelled` 就固定显示"已在演示模式下取消，真实环境需后端确认。"
-- **后端真实行为**：`AppProductOrderController.java:58-61` `@PutMapping("/cancel") @RequestParam("id")`，Android 走 `Api.put(path, emptyMap(), mapOf("id" to id))`(`Repo.kt:413-414`) 参数位置正确；取消后订单 `status=3` (`ProductOrderStatusEnum.CANCELLED`)。
+- **后端真实行为**：`AppProductOrderController.java:58-61` `@PutMapping("/cancel") @RequestParam("id")`，Android 走 `Api.put(path, emptyMap(), mapOf("id" to id))`(`Repo.kt:661`) 参数位置正确；取消后订单 `status=3` (`ProductOrderStatusEnum.CANCELLED`)。
 - **小程序行为**：`api.js:247 cancelProductOrder(id)` 同样 query；`orders.js:80-110` 取消后重载列表。
 - **问题**：写路径本身是**合规**的（以后端回读为唯一真值），但提示语在真实构建里谎称"演示模式"，用户会以为这次取消没生效、去重复取消或打电话问站点。属于文案与 `ack.demo` 脱钩的诚实性缺陷——与 §24 相反的另一种失真：把真的说成假的。
 - **修改方案**：`cancelled` 改为携带演示位：`var cancelDemo by mutableStateOf(false)`，`cancel()` 里 `cancelDemo = 回读到的那条 order?.status == 3` 且 `demo` 标志；文案分三支：真实且已取消 →"已取消（后端确认）"；真实但状态未变 →"后端未受理取消：${order?.statusLabel}"；演示 → 现有文案。判断一律基于**回读状态**，不基于请求是否抛错。
@@ -852,7 +852,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   ④ **未采纳**"用 `etaToNextStationMinutes` 取整顶上去"：`AppBusRespVO:49-50` 那个键在 nearby 端点根本没有（`NearbyBus` 20 个字段里没有它），
   而语义是"车→它的下一站"，不是"车→用户在等的那站"；拿它填 `etaMinutes` 等于换个方向再编一次。
   现在 `SCHEDULE` 如实标成"按班次计划时长估算"（`providerText`），`EUCLIDEAN` 标成"来源未识别"，都不说成真实路网。
-  **范围**：本轮只做**公交**ETA 族。`SendOrder`(`Models.kt:878`)、`TransportLeg`(`:968`)、`ParcelTrace`(`Repo.kt:650`/`:950`)
+  **范围**：本轮只做**公交**ETA 族。`SendOrder`(`Models.kt:878`)、`TransportLeg`(`:968`)、`ParcelTrace`(`Repo.kt:663`/`:950`)
   仍是 `etaMinutes: Int` + `multiNum`，页面侧还有 6 处 `etaMinutes > 0`（`TraceView:64/65/186`、`DriverNavScreen:424`、`RoutesScreen:301`、`ParcelScreen:431`），
   已作为**残留**打印在 `tools/check_eta_probes.sh` 的输出里（判据 T-e 只覆盖 notify/widget/data，故意不把货运侧的旧口径混进来充数）。
   **新增判据**：`tools/check_eta_probes.sh` T-a…T-q 共 25 条，负控制 `tools/eta_negative_controls.sh` 25 条全部 exit 1 且报对本条
@@ -1009,7 +1009,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
     与原方案相比少了一个能力（续报），多了一个保证（不制造虚假实时性）。这个取舍记在 D-019，不写成"队列已完成"。
   - **顺带修掉本条第 ② 点**：上报的坐标现在已是 GCJ-02（§17），队列里"存了两套系的点"这个风险不复存在 ——
     因为不存队列，每个 `TrackFix` 出厂即 GCJ-02（`Locator.trackFixes` → `fixOf` → `gcjOf`）。
-  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1411-1412` 注释已写明"，
+  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1423-1424` 注释已写明"，
     那条**注释是陈旧的**：后端已把 `shiftId` 改为可选（`AppDriverLocationReqVO` 无 `@NotNull`，
     服务层 `currentLegShiftId()` 按当前活跃段兜底）。Android 侧原来 `Running.shiftId <= 0` 就一句不发，
     实际后果是**运输段模式（无班次）的司机永远不上报**，监控上看是车凭空消失。
@@ -1039,7 +1039,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：① `lineOf` 在相邻两站之间**插两个带侧向偏移的伪点**，注释写"模拟山路弯曲"——这是纯生成的假道路几何（比直线更坏，因为它看起来像真路）；② 逐转向 steps 里给每个 `icon` 配 `lanes`（"左转专用/公交专用/应急车道"）与 `recommendedLane`，`distanceMeters` 用 `GeoMath.distance`（Haversine）算；③ 造 `MP2026…` 运单号、`渝A·8K231` 车牌、`K1-0830` 班次、`6174` 取件码；④ 造 token 与 refreshToken。
 - **后端真实行为**：真实几何只来自 `algorithm/app/routing`（AMAP → GraphHopper/RoadGraph → `available=false`）与 `RealRoadProviders` 白名单标签；`AppDriverRouteRespVO` **无 steps/lanes**；运单号/取件码由服务端生成并落库；登录 token 由 `member/auth` 签发。
 - **小程序行为**：小程序没有离线演示回落，所有号码都是后端的。
-- **问题**：`DEMO_ALLOWED` 是唯一的防线（`app/build.gradle.kts:92` debug 可读工程外配置但**默认 false**、`:104` release 硬编码 `false`；闸门读点是 `Api.kt:225`，回落构造入口 `Api.kt:457-460` 在非演示构建里直接 `throw IllegalStateException("生产构建禁止演示数据")`）。**机制是对的**，但只要 debug 包流出去（现在 `app-debug.apk` 就在仓库根，见 §57），这些假几何/假车道/假取件码就会以"真数据的样子"出现在屏幕上。⚠ 原行的两处引用是旧的（`:91`/`:103`/`Api.kt:184`），㊶ 现读更正；旧句里"§47 的横幅又被注释掉了"那半属 §47 在册项，不随本行改。
+- **问题**：`DEMO_ALLOWED` 是唯一的防线（`app/build.gradle.kts:92` debug 可读工程外配置但**默认 false**、`:104` release 硬编码 `false`；闸门读点是 `Api.kt:274`，回落构造入口 `Api.kt:457-460` 在非演示构建里直接 `throw IllegalStateException("生产构建禁止演示数据")`）。**机制是对的**，但只要 debug 包流出去（现在 `app-debug.apk` 就在仓库根，见 §57），这些假几何/假车道/假取件码就会以"真数据的样子"出现在屏幕上。⚠ 原行的两处引用是旧的（`:91`/`:103`/`Api.kt:184`），㊶ 现读更正；旧句里"§47 的横幅又被注释掉了"那半属 §47 在册项，不随本行改。
 - **修改方案**：① `lineOf` 的侧向偏移点**删掉**：演示线路要么用后端缓存过的真实折线（若有），要么只给站点顺序、`polyline` 留空，让 `RouteUnavailableState` 正常显示；② `guideOf` 不再造 `lanes/recommendedLane`，`distanceMeters` 也不由 Haversine 造——演示态就直接显示"演示：无逐转向数据"；③ 演示的运单号/取件码统一加 `DEMO-` 前缀（例如 `DEMO-MP2026…`），让人一眼不可能误认，同时保留可解析结构；④ 演示 token 前缀已是 `demo-` ✔（`Repo.saveSession:118` 与 `LoginViewModel:115` 都按前缀判定，这条纪律要留在 §56 清单里）；⑤ 演示数据只在 `BuildConfig.DEMO_ALLOWED` 为真时**编进** APK（用 `sourceSets` 排除而非运行时判断更佳）；⑥ 上述改动全部要过 `RealRoadRouteValidator` 的既有测试，证明"演示几何缺席"不会让地图崩成空白。
 - **测试方案**：① 单测：`RealRoadRouteValidatorTest` 断言 `lineOf` 不再产出侧向偏移点（对同一站序列，产物点数 == 站数）；② 契约测试：`DemoData` 里不存在键名 `lanes`/`recommendedLane`（grep 断言，防回潮）；③ JVM 测试：所有演示运单号断言以 `DEMO-` 开头；④ 构建测试：`DEMO_ALLOWED=false` 的构建里 `DemoData` 不可达（`Api.kt:184` 抛错路径有单测覆盖）；⑤ 自检 grep 见 §56。
 
@@ -1960,7 +1960,7 @@ bash tools/check_eta_probes.sh
   而 `AppBusNearbyRespVO` 的 `NearbyLine` 内部类只有 `routeName/startStation/endStation/dataSource` 四个键 ——
   **连首页"线路"列表也没有 id**。
 - **口径冲突的额外一步**：行 VO 的 `routeId` 是 `Long`，`BusLine.parse`（`Models.kt:868`）用
-  `multiStr("routeId","lineId","id")` 读成字符串，`/bus/line-polyline` 又按 `routeId` 字符串查询（`Repo.kt:688-689`），
+  `multiStr("routeId","lineId","id")` 读成字符串，`/bus/line-polyline` 又按 `routeId` 字符串查询（`Repo.kt:1014`），
   数值→字符串这条转换只有一处，留在 `BusLine` 里是对的，不要在页面再转一次。
 - **本轮处置**：
   - 车辆卡按名字回查行 id：`ui/user/BusScreen.kt` 的 `lineIdOf(v)` =
@@ -2228,7 +2228,7 @@ T-ah 0（位置报文不许渲染成"在途"）。**T-c 8 → 9**（BusVehicle �
 测试 XML 逐份加总仍是 **`suites=21 tests=233 skipped=0 failures=0 errors=0`**（21 份 mtime 17:58:22），APK **57,941,278 B**。
 
 **未收口的同族尾巴（不冒充已修）**：① ETA 候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt:702/929/1048/1608`、
-`Repo.kt:579/947`）—— 其中 `Repo.kt:1241` 的 `RouteGuide` 读的是**导航引擎自己的报文**，不是 app VO，
+`Repo.kt:579/947`）—— 其中 `Repo.kt:1253` 的 `RouteGuide` 读的是**导航引擎自己的报文**，不是 app VO，
 改之前必须先核那份契约（这正是 §71 里 `T-s` 排除 `durationMinutes` 的同一理由：别把两段契约并进一条判据）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 0.0，
 `distanceFee > 0` 才显示"里程费"—— 同病不同族（金额不是 ETA）；③ `TransportLeg` 的
@@ -3028,7 +3028,7 @@ D-003 原文要求"在页面上显著标注"。落三处，判据 N-o 钉 ≥2/1
   "所以读 `eta` 也合理"的依据 —— 过期注释是这类缺陷的孵化器。
 - **顺手核清的一条口径（与 §77 二那条单位未验是同一条线的不同事实）**：`roadEtaSeconds` / `roadDistanceMeters`
   是**客户端字段名，不是 JSON 键**；真实键是 `routeDurationSeconds`（`AppDriverRouteRespVO:48`）与
-  `routeDistanceMeters`（`:45`），`Repo.kt:1277-1278` 的读法**已经**以真实键打头（本轮实测该行仍是这两个键在第一候选位）
+  `routeDistanceMeters`（`:45`），`Repo.kt:1289-1290` 的读法**已经**以真实键打头（本轮实测该行仍是这两个键在第一候选位）
   ⇒ 正式包的全程分钟只可能来自通过校验的真实道路耗时，与 #51 的"release 导航面"结论接得上。
 
 ### 五、"打印不判红"的残留升格成三条判据，同轮抬两条计数下限

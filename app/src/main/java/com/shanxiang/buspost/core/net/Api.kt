@@ -9,7 +9,12 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -194,11 +199,32 @@ internal object NetTestOverride {
 }
 
 /**
- * 网络拦截器：给 GET 响应加 Cache-Control，让 OkHttp 磁盘缓存生效。
- * 后端没返回 Cache-Control 时，默认缓存 60 秒 —— 列表/详情类数据在这个时间窗口内不会变。
- * POST/PUT/DELETE 不加缓存头（幂等性不保证，每次都该走网络）。
+ * 缓存策略按端点**白名单**给，不再一刀切 60 秒（缺陷 #79 的第一格）。
+ *
+ * 旧写法给每一条 GET 都盖 `max-age=60`，于是"写完立刻回读"这一族会读到 60 秒内的旧答案 ——
+ * 而全站的状态口径是"以回读为准"（§26/§27：段状态、交接状态、未读数都由回读决定）：
+ * 司机点完"到达"后那一轮回读如果命中缓存，界面就把**刚才那一次动作**整个抹掉了，
+ * 回执还写着"后端回读：运输中"，看着像后端没接受，其实是我们没去问。
+ * 所以默认 no-store，只有"browse 类"（变化慢、重复进页面会重取）列进白名单。
+ *
+ * 独立成 `internal` 函数是为了能被用例直接判（`private class` 那个拦截器在 JVM 用例里摸不到）——
+ * 不是为将来的调用方留口子：除拦截器外它没有别的调用点。
  */
-private class CacheControlInterceptor : Interceptor {
+private val CacheableGetPaths: Set<String> = setOf(
+    "/transport/notice/list",
+    "/transport/weather",
+    "/transport/bus/lines",
+    "/transport/bus/nearby",
+    "/transport/product/list",
+    "/transport/product/page",
+    "/transport/product/get",
+    "/transport/send/stations",
+)
+
+internal fun cachePolicyFor(path: String): String =
+    if (CacheableGetPaths.any { suffix -> path.endsWith(suffix) }) "max-age=60" else "no-store"
+
+internal class CacheControlInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val response = chain.proceed(request)
@@ -206,10 +232,33 @@ private class CacheControlInterceptor : Interceptor {
         if (response.cacheControl.noStore) return response
         return response.newBuilder()
             .removeHeader("Pragma")
-            .header("Cache-Control", "max-age=60")
+            .header("Cache-Control", cachePolicyFor(request.url.encodedPath))
             .build()
     }
 }
+
+/**
+ * 挂起地发一次请求，并让**协程取消穿透到 socket**（缺陷 #79 的第二格）。
+ *
+ * 旧形状是 `withContext(Dispatchers.IO) { newCall(request).execute() }`：线程阻塞在 `execute()` 里，
+ * 协程被取消（用户离开这一屏）时**没人去取消这条 Call** —— 请求照样跑完，占着连接池与流量，
+ * 弱网下最坏一次能把三四个已离场页面的请求全拖在网上。`enqueue` + `invokeOnCancellation { cancel() }`
+ * 才是"取消 = 这一次不该再有结果"的落地；被取消后到达的响应直接 close，不进任何人手里。
+ */
+private suspend fun OkHttpClient.callCancellable(request: Request): Response =
+    suspendCancellableCoroutine { cont ->
+        val call: Call = newCall(request)
+        cont.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (cont.isActive) cont.resume(response) else response.close()
+            }
+        })
+    }
 
 object Api {
     private const val TAG = "BUS_API"
@@ -256,6 +305,35 @@ object Api {
             httpCache = Cache(File(context.cacheDir, "http_cache"), CACHE_SIZE)
         }
     }
+
+    /**
+     * 换人/退登时清掉磁盘响应缓存（缺陷 #79 的第三格）。
+     *
+     * 以前 `Prefs.clearSession()` 只清 token 与档案，`cacheDir/http_cache` 里上一位的
+     * 班次、订单、地址还要按 `max-age` 再活一会儿 —— 同设备换账号登录时，第一屏能看到**别人的**数据。
+     * 这是会话卫生问题，不是性能问题，所以清不干净不能靠"反正缓存会过期"。
+     *
+     * ⚠ 只做 `evictAll()`，不删目录、也不换新实例：`http` 是 `by lazy`，客户端一旦建成就长期引用
+     * 这一个 `Cache`。删掉目录会让它往不存在的 journal 上写（OkHttp 把整个缓存标成 fatal，之后所有
+     * GET 再也存不进去，等于悄悄把缓存关掉）；换实例则会有两个 `Cache` 抢同一份 journal。
+     */
+    fun clearCache() {
+        val cache = httpCache ?: return
+        runCatching { cache.evictAll() }
+            .onFailure { Log.w(TAG, "HTTP 缓存没清干净：${it.javaClass.simpleName} ${it.message}") }
+    }
+
+    /**
+     * access token 的到期时刻（毫秒，0=没记过）。由 `Prefs.expiresAt` 在登录/续期两处一起写入。
+     * 缺陷 #79 的第四格：后端一直在发 `expiresTime`，本机存了却**从没读过** ——
+     * 于是明知过期也照样发出去，等一个必然的 401 才被踢回登录页，用户看到的是"没退出却要重登"。
+     */
+    @Volatile
+    var tokenExpiresAt: Long = 0L
+
+    /** 上一次"按 expiresAt 主动续期"的时刻：挡住时钟偏快时的续期风暴（见 rawExecute 那三重心护栏） */
+    @Volatile
+    internal var lastProactiveRenewAt = 0L
 
     private val http by lazy {
         OkHttpClient.Builder()
@@ -326,6 +404,18 @@ object Api {
         attempt: Int = 0,
     ): Payload {
         if (baseUrl.isEmpty()) throw NetworkException("未配置后端地址（local.properties 的 buspost.baseUrl）")
+        // 本机已经知道这个 access token 过期了（后端一直发 expiresTime，此前只写不读）：
+        // 先静默续一次再发，省掉"必然 401 → 清盘 → 跳登录"那一整圈。
+        // 三重护栏：① 认证接口自己不触发（续期走 /auth/，否则递归）；② 只在一分钟内主动续一次 ——
+        // 设备时钟快过真实时间时，"已过期"会每条请求都成立，没有这道闸就是一请求一次续期的风暴；
+        // ③ 续不上也无所谓，照旧发出去走原来的 401 出口（那条路是现成的，不会因为这里改了而变弱）。
+        val nowMillis = System.currentTimeMillis()
+        if (attempt == 0 && !path.contains("/auth/") &&
+            tokenExpiresAt in 1..nowMillis && nowMillis - lastProactiveRenewAt > 60_000L
+        ) {
+            lastProactiveRenewAt = nowMillis
+            if (refresher?.invoke() == true) Log.i(TAG, "$path 按 expiresAt 判定会话已过期 —— 已先静默续期")
+        }
         val url = buildString {
             append(baseUrl)
             append(path)
@@ -359,7 +449,7 @@ object Api {
             .build()
 
         val response = try {
-            http.newCall(request).execute()
+            http.callCancellable(request)
         } catch (e: IOException) {
             throw NetworkException(e.message ?: "网络连接失败", e)
         }
@@ -425,7 +515,7 @@ object Api {
     /** 绝对地址的裸 GET（天气等第三方开放接口用，不带 Authorization 头） */
     suspend fun rawGet(url: String): String = withContext(Dispatchers.IO) {
         val resp = try {
-            http.newCall(Request.Builder().url(url).get().build()).execute()
+            http.callCancellable(Request.Builder().url(url).get().build())
         } catch (e: IOException) {
             throw NetworkException(e.message ?: "网络连接失败", e)
         }
@@ -461,7 +551,7 @@ object Api {
         }
     }
 
-    private fun rawUpload(path: String, bytes: ByteArray, fileName: String): Payload {
+    private suspend fun rawUpload(path: String, bytes: ByteArray, fileName: String): Payload {
         if (baseUrl.isEmpty()) throw NetworkException("未配置后端地址（local.properties 的 buspost.baseUrl）")
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", fileName, bytes.toRequestBody("application/octet-stream".toMediaType()))
@@ -472,7 +562,7 @@ object Api {
             .apply { token?.takeIf { it.isNotEmpty() }?.let { header("Authorization", "Bearer $it") } }
             .build()
         val resp = try {
-            http.newCall(request).execute()
+            http.callCancellable(request)
         } catch (e: IOException) {
             throw NetworkException(e.message ?: "上传连接失败", e)
         }

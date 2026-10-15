@@ -149,7 +149,7 @@ object Repo {
         Prefs.token = token
         // 后端会轮换 refreshToken；没给就沿用旧的，别把它清成空
         Prefs.refreshToken = p.str("refreshToken").ifEmpty { refresh }
-        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
+        setSessionExpiry(p.longOf("expiresTime") ?: 0L)
         return true
     }
 
@@ -194,7 +194,7 @@ object Repo {
         // 会话续期用的两件套：后端一直在回，此前被直接丢弃 ⇒ 30 分钟到期只能重新登录（任务：登录态）。
         // expiresTime 只服务"临期主动续"，读不到也不影响正确性 —— 真正的兜底路径是 401 时静默续期重试。
         Prefs.refreshToken = p.str("refreshToken")
-        Prefs.expiresAt = p.longOf("expiresTime") ?: 0L
+        setSessionExpiry(p.longOf("expiresTime") ?: 0L)
         Prefs.userId = account.id
         Prefs.mobile = account.mobile
         Prefs.nickname = account.nickname
@@ -249,14 +249,22 @@ object Repo {
         One(null, error = errorTextOf(e))
     }
 
+    /**
+     * 会话到期时刻只有一个落点：`Prefs`（跨进程重启还在）与 `Api.tokenExpiresAt`（网络层要读的）。
+     * 缺陷 #79 的第四格就是这两处没连起来 —— 后端一直在发 `expiresTime`，本机存了但从没读过，
+     * 于是明知过期也照发，等一个必然的 401 才被踢回登录页。
+     */
+    private fun setSessionExpiry(millis: Long) {
+        Prefs.expiresAt = millis
+        Api.tokenExpiresAt = millis
+    }
+
     /** 退出登录：先尽力通知后端撤销会话，再无条件清本地。清不掉就是"没退出"，下一个人会看到上一个人的数据 */
     suspend fun logout() {
         // F-2 第 8 步迁点：**哪一类失败**要可见（401 / 业务码 / 传输层三种以前都落进同一个静默分支），
         // 但清本地照旧**无条件**执行——会话卫生优先于分类，反过来就是把登录态留在设备上。
         val result = safeApiCall { Api.post("$M/auth/logout") }
-        Api.token = null
-        Api.demoSession = false
-        Prefs.clearSession()
+        clearSessionLocal()
         if (result !is ApiResult.Success) {
             android.util.Log.w("AUTH_LOGOUT", "后端未确认撤销会话：$result")
         }
@@ -266,6 +274,10 @@ object Repo {
     fun clearSessionLocal() {
         Api.token = null
         Api.demoSession = false
+        Api.tokenExpiresAt = 0L
+        // 缺陷 #79 的第三格：以前只清会话，磁盘响应缓存里上一位的班次/订单/地址还活着，
+        // 同设备换账号登录的第一屏就能看到别人的数据。
+        Api.clearCache()
         Prefs.clearSession()
     }
 

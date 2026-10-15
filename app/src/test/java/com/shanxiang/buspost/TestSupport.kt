@@ -86,6 +86,12 @@ object TestHost {
         // 会把下一个用例的 401 静默续掉，"该被踢回登录"的那条断言就永远绿不了
         Api.refresher = null
         Api.last401At = 0L
+        // 会话到期时刻与"主动续期"的节流同样是 object Api 上的进程级状态（#79 新读的那一格）。
+        // 不复位的话：上一个用例登录拿到的 expiresTime 已经过去，下一个用例的第一条业务请求
+        // 会先替它发一次静默续期 —— MockWebServer 按到达顺序出队，队列整体错位，
+        // 红因看着像"重试没发生"（实测就是这样吃掉一次红，见 D-046 同族那条纪律）。
+        Api.tokenExpiresAt = 0L
+        Api.lastProactiveRenewAt = 0L
     }
 
     /**

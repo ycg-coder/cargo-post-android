@@ -108,7 +108,7 @@ done
 
 # SU-b 的期望值只有这一处定义：上一轮把它写成"echo 念 72、断言比 72、失败消息还留着 71"三个地方，
 # 下一次读失败消息的人会照 71 去核，核半天发现断言根本不是那个数（同一个问题两个答案 = 本仓 §八 ㉗ 那条）。
-SUSB_EXPECT=75
+SUSB_EXPECT=76
 
 echo "SU-a *Test.kt 文件数 / 其中 0 条 @Test 的空壳 = $SUA_FILES/$SUA_EMPTY （目标 ≥47/0：凑数空类归零）$SUA_EMPTY_LIST"
 echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 $SUSB_EXPECT/2：同一机制数得出 0 条，SU-a 的 0 不是空跑）"
@@ -119,7 +119,7 @@ echo "SU-e 归位表落点类存在                            = $SUE_PRESENT �
 fail=0
 [ "$SUA_FILES" -ge 47 ] || { echo "× SU-a *Test.kt 少于 47 本：有落点类被删了（归位表随之念空）"; fail=1; }
 [ "$SUA_EMPTY" = 0 ] || { echo "× SU-a 出现 0 条 @Test 的 *Test.kt（=$SUA_EMPTY 本：$SUA_EMPTY_LIST）——为凑数新建的空壳"; fail=1; }
-[ "$SUSB_ALL" = "$SUSB_EXPECT" ] || { echo "× SU-b 反证的源集文件数变了（现 $SUSB_ALL，预期恰好 $SUSB_EXPECT）：先核对改动面再重测这条，别顺手改闸（D-085 65→66 票面簿；D-086 66→67 钱包簿 ui/user/WalletRowsContractTest.kt；67→68 取件时间窗簿；68→69 收藏入口簿；69→70 签名纯层簿；70→71 站牌纯层簿 ui/user/StationBoardTest.kt；71→72 任务段站序同源簿 core/navigation/NavigationStopsTest.kt（5 条 @Test）；72→73 全任务段计划簿 core/navigation/NavigationPlanTest.kt（10 条 @Test，钉"超上限退回逐站而不是裁掉中间站"那一格）；73→74 交接终态簿 data/model/HandoverTaskStatusTest.kt（4 条 @Test，钉"超时/取消/异常不再可提交、文案不参与判定"）；74→75 商城与未读口径簿 ui/user/GoodsScopeContractTest.kt（5 条 @Test，钉"全店口径才排序"与"空态三分说法不许出现『没货』"）—— SU-a 同轮复量空壳仍为 0）"; fail=1; }
+[ "$SUSB_ALL" = "$SUSB_EXPECT" ] || { echo "× SU-b 反证的源集文件数变了（现 $SUSB_ALL，预期恰好 $SUSB_EXPECT）：先核对改动面再重测这条，别顺手改闸（D-085 65→66 票面簿；D-086 66→67 钱包簿 ui/user/WalletRowsContractTest.kt；67→68 取件时间窗簿；68→69 收藏入口簿；69→70 签名纯层簿；70→71 站牌纯层簿 ui/user/StationBoardTest.kt；71→72 任务段站序同源簿 core/navigation/NavigationStopsTest.kt（5 条 @Test）；72→73 全任务段计划簿 core/navigation/NavigationPlanTest.kt（10 条 @Test，钉"超上限退回逐站而不是裁掉中间站"那一格）；73→74 交接终态簿 data/model/HandoverTaskStatusTest.kt（4 条 @Test，钉"超时/取消/异常不再可提交、文案不参与判定"）；74→75 商城与未读口径簿 ui/user/GoodsScopeContractTest.kt（5 条 @Test，钉「全店口径才排序」与「空态三分说法不许出现『没货』」）；75→76 网络卫生簿 core/net/NetHygieneContractTest.kt（5 条 @Test，其中三条真发请求：回读那一族第二次必须打到后端、白名单那一族第二次必须命中缓存、协程取消要掐断那条请求）—— SU-a 同轮复量空壳仍为 0）"; fail=1; }
 [ "$SUSB_NOTEST" = 2 ] || { echo "× SU-b 反证掉了（无 @Test 的文件数=$SUSB_NOTEST≠2）：SU-a 那个 0 无法证明是归零还是没命中"; fail=1; }
 [ "$SUC_IGNORE" = 0 ] || { echo "× SU-c 出现 @Ignore（$SUC_IGNORE 行）：被挂起的用例是永远绿的那种假绿"; fail=1; }
 [ "$SUC_TESTLINES" -ge 476 ] || { echo "× SU-c 反证掉了（@Test 注解行数=$SUC_TESTLINES）：SU-c 的 0 无法证明机制命中过注解行"; fail=1; }

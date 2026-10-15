@@ -23,6 +23,7 @@ S=app/src/main/java/com/shanxiang/buspost
 DET="$ROOT/tools/runcatching_detector.py"
 DOC=docs/android/RUNCATCHING_AUDIT.md
 REPO="$S/data/repo/Repo.kt"
+API="$S/core/net/Api.kt"
 NAV="$S/core/navigation/AmapNavigationEngine.kt"
 ROOTUI="$S/ui/BusPostRoot.kt"
 DNS="$S/ui/driver/DriverNavScreen.kt"
@@ -48,6 +49,11 @@ echo "检测器原始行                 = $SUM"
 num() { printf '%s\n' "$SUM" | tr '|' '\n' | grep "^$1=" | cut -d= -f2; }
 D_SITES=$(num sites); D_VIOL=$(num violations); D_CAND=$(num candidates)
 D_NAMES=$(num suspend_names); D_RB=$(num run_blocking); D_SCC=$(num scc)
+# #79 起 `Api.callCancellable` 是工程里唯一的 `suspendCancellableCoroutine`：那条"非 suspend 结构免疫"的
+# 前提降级成"按作用域逐点核"，所以这里直接把那个构造器自己的块体切出来数 runCatching（切不到块 ⇒ 反证红）。
+SCC_BLOCK=$(sed -n '/private suspend fun OkHttpClient.callCancellable/,/^$/p' "$API")
+D_SCC_RC=$(printf '%s\n' "$SCC_BLOCK" | grep -c 'runCatching')
+D_SCC_SELF=$(printf '%s\n' "$SCC_BLOCK" | grep -c 'suspendCancellableCoroutine')
 
 # ---------- RC-a 基数与口径 ----------
 RA_ACTIVE=$(grep -rn 'runCatching' "$S" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
@@ -73,13 +79,14 @@ DOC_MIG=$(grep -c '^| .* | 已迁 attempt |' "$DOC")
 ROWS=$((KEEP + DOC_MIG))
 MIG_PROOF=$(grep -c '已迁 attempt\| RC-ROWS-BEGIN' "$DOC")
 
-echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标恰好 40/18/61/26）"
+echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标恰好 41/18/62/26）"
 echo "RC-a2 反证：同一 NC 管道的 attempt 行数   = $RA_PROOF （必须 >0，否则 RC-a 的数不可信）"
 echo "RC-b 块内含挂起调用（unsafe/violation）  = $D_VIOL （目标 0）"
 echo "RC-b2 检测器 sites/候选待复核/挂起名面     = $D_SITES/$D_CAND/$D_NAMES"
 echo "RC-c 四处迁移点字面量                     = $CC1$CC2$CC3$CC4 / 回退残留 $CC_BACK/$CC_BACK2 （目标 1111 / 0/0）"
-echo "RC-d 免疫前提 runBlocking/suspendCancellableCoroutine = $D_RB/$D_SCC （目标 0/0）"
-echo "RC-e 分类表行/其中已迁                    = $ROWS/$DOC_MIG （目标 44/4）"
+echo "RC-d 免疫前提 runBlocking/suspendCancellableCoroutine = $D_RB/$D_SCC （目标 0/2，#79 起那条前提改按作用域核）"
+echo "RC-d 挂起构造器内 runCatching/同块自证       = $D_SCC_RC/$D_SCC_SELF （目标 0/1）"
+echo "RC-e 分类表行/其中已迁                    = $ROWS/$DOC_MIG （目标 45/4）"
 
 fail=0
 # 基数 38 → 39 的逐点归因（2026-10-12 续七，按本簿自己的规矩"连同 RUNCATCHING_AUDIT 第三节一起数"）：
@@ -89,7 +96,7 @@ fail=0
 #          内部已穿透取消，外层 runCatching 收下的就是取消 ⇒ RC-b 实测点名的 violations=2）。
 #   ⇒ 38 + 3 - 2 = 39；剩下的那一处是 `BusScreen.kt` 里 `val millis = runCatching {` 的**非挂起**解析，
 #     它同时就是"生效文件 17 → 18"的唯一增量（BusScreen.kt 以前没有生效行）。
-[ "$RA_ACTIVE" = 40 ] || { echo "× RC-a 生效 runCatching 行不是恰好 40（实测 $RA_ACTIVE）：F-2 ⑨ 迁走 4 处后是 30，F-3 ⑭ 读回 SDK 当前路径 +1 ⇒ 31，N-2 把语音开关交给高德 +1 ⇒ 32，2026-10-10 收未入账那一片 +6 ⇒ 38（AmapNavigationEngine.kt 的 prepare() released 出口摘监听 +1、loadOnce() 预加载 .so +1；新一屏 ui/driver/DriverGuideScreen.kt 的 AndroidView factory/update/onDispose 两步 +4）；2026-10-15 地图黑屏那一刀 -1 ⇒ 38（BusMap.kt 的 factory 里 runCatching{onCreate} 换成 try/catch 以便把异常留在 logcat，同文件另一处 runCatching{ view.map } 仍在）；同日 #49 全任务段导航 +2 ⇒ 40（`ui/driver/DriverGuideScreen.kt` 里把任务点标记贴到 `AMapNaviView.getMap()` 的两处：:448 整批贴放、:463 onDispose 收回 —— 两块块体都是 SDK 同步句柄，`getMap/addMarker/Marker.remove` 一个都不是挂起函数，RC-b 实测 violations 仍为 0；写之前先按 N-z 那条 token 判据把 `forEachIndexed` 换成 `indexOfFirst`，没有为新增点开任何豁免）；再变就要连同 docs/android/RUNCATCHING_AUDIT.md 第三节与 D-043/D-053 一起逐点归因"; fail=1; }
+[ "$RA_ACTIVE" = 41 ] || { echo "× RC-a 生效 runCatching 行不是恰好 41（实测 $RA_ACTIVE）：F-2 ⑨ 迁走 4 处后是 30，F-3 ⑭ 读回 SDK 当前路径 +1 ⇒ 31，N-2 把语音开关交给高德 +1 ⇒ 32，2026-10-10 收未入账那一片 +6 ⇒ 38（AmapNavigationEngine.kt 的 prepare() released 出口摘监听 +1、loadOnce() 预加载 .so +1；新一屏 ui/driver/DriverGuideScreen.kt 的 AndroidView factory/update/onDispose 两步 +4）；2026-10-15 地图黑屏那一刀 -1 ⇒ 38（BusMap.kt 的 factory 里 runCatching{onCreate} 换成 try/catch 以便把异常留在 logcat，同文件另一处 runCatching{ view.map } 仍在）；同日 #49 全任务段导航 +2 ⇒ 40（`ui/driver/DriverGuideScreen.kt` 里把任务点标记贴到 `AMapNaviView.getMap()` 的两处：:448 整批贴放、:463 onDispose 收回 —— 两块块体都是 SDK 同步句柄，`getMap/addMarker/Marker.remove` 一个都不是挂起函数，RC-b 实测 violations 仍为 0；写之前先按 N-z 那条 token 判据把 `forEachIndexed` 换成 `indexOfFirst`，没有为新增点开任何豁免）；同日 #79 网络卫生 +1 ⇒ 41（`core/net/Api.kt` 的 `fun clearCache()` 里 `runCatching { cache.evictAll() }`：包围点是 `object Api` 的非 suspend 成员函数，块内是 OkHttp 同步 IO，RC-b 仍 0；逐点归因写在 docs/android/RUNCATCHING_AUDIT.md 第一节末那条 ⚠，表里也补了行）；再变就要连同 docs/android/RUNCATCHING_AUDIT.md 第三节与 D-043/D-053 一起逐点归因"; fail=1; }
 # 基数 17 → 18：唯一增量同上，`ui/user/BusScreen.kt`（7d8b819 那轮带进来的那一处非挂起解析）。
 [ "$RA_FILES" = 18 ]   || { echo "× RC-a 生效文件数不是恰好 18（实测 $RA_FILES）：16→17 的唯一增量是新增那本 ui/driver/DriverGuideScreen.kt；BusPostRoot.kt 的那一处仍是迁走的（少的那一个文件是谁？）"; fail=1; }
 # 基数 56 → 58：+3（7d8b819 的三处）−2（本轮摘掉的整行）+1（本轮注释里点名 runCatching 说明为什么摘）。
@@ -98,7 +105,7 @@ fail=0
 #   `ui/common/UpdateSection.kt` 的**注释**里点名 runCatching 两次（"为什么这里必须用 attempt 而不是 runCatching"），
 #   生效行与生效文件都没变（39/18）⇒ 这本账要区分"代码里真用"与"注释里解释为什么不用"。
 #   含注释文件数 24 → 25 → 26 的第二次增量就是这一本 UpdateSection.kt。
-[ "$RA_RAW" = 61 ]     || { echo "× RC-a 出现次数不是恰好 61（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56；2026-10-15 #49 两处生效 + 紧邻那两行的新注释各 1 ⇒ 62；同日 D-120 删掉首页那个**零调用点**的旧轮播渲染件 ⇒ 61，掉的那一处是它注释里"旧写法一个 runCatching 把三者混成没事发生"那句，生效行 40 一字未动）"; fail=1; }
+[ "$RA_RAW" = 62 ]     || { echo "× RC-a 出现次数不是恰好 62（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56；2026-10-15 #49 两处生效 + 紧邻那两行的新注释各 1 ⇒ 62；同日 D-120 删掉首页那个**零调用点**的旧轮播渲染件 ⇒ 61，掉的那一处是它注释里"旧写法一个 runCatching 把三者混成没事发生"那句，生效行 40 一字未动；#79 的 clearCache 那处生效 +1 ⇒ 62，同轮 `Api.kt` 的 clearCache 注释里没再提这个词）"; fail=1; }
 # 基数 24 → 25：唯一增量仍是 `ui/user/BusScreen.kt`（现在既有那处非挂起解析，也有注释点名它）。
 [ "$RA_ALLFILES" = 26 ] || { echo "× RC-a 含注释文件数不是恰好 26（实测 $RA_ALLFILES）：23→24 的唯一增量是 ui/driver/DriverGuideScreen.kt；生效文件仍须是 17"; fail=1; }
 [ "$RA_PROOF" -gt 0 ]  || { echo "× RC-a2 反证失败：同一套管道连 attempt 都数不出来，那 RC-a 的 38 不可信"; fail=1; }
@@ -111,9 +118,13 @@ fail=0
 [ "$CC_BACK" = 0 ] || { echo "× RC-c 有 nav.navigate 回到 runCatching（$CC_BACK 处）"; fail=1; }
 [ "$CC_BACK2" = 0 ] || { echo "× RC-c 有 engine?.setLanguage 回到 runCatching（$CC_BACK2 处）"; fail=1; }
 [ "$D_RB" = 0 ]  || { echo "× RC-d 出现了 runBlocking（$D_RB）：'非 suspend 函数不可能挂起'这条免疫前提作废，32 点'保持'的分类必须整表重做"; fail=1; }
-[ "$D_SCC" = 0 ] || { echo "× RC-d 出现了 suspendCancellableCoroutine（$D_SCC）：同上，免疫前提作废"; fail=1; }
+[ "$D_SCC" = 2 ] || { echo "× RC-d 的 suspendCancellableCoroutine 不是 2（实测 $D_SCC）：#79 起这**不是** 0 —— `Api.callCancellable`（1 处 import + 1 处本体）就是那条免疫前提失效的地方。当时按 40 行逐点重判过：唯一落在 Api.kt 的是 `JSONObjectOrNull`（非 suspend、块内 `JSONObject(text)`），新挂起点在它之外，所以没有一行翻成"是"。多一处说明有人另开了挂起入口，少一处说明它被换成了别的挂起形状（两种都得重新逐点核，判据见 RUNCATCHING_AUDIT.md 第一节末那条 ⚠）"; fail=1; }
+# 前提降级成"按作用域逐点核"：那个挂起构造器**自己**的块体内不许有 runCatching（有就是把取消收进 Result），
+# 反证是同一段里数得出 `suspendCancellableCoroutine` 本身 —— 否则这个 0 可能是 sed 没截到块。
+[ "$D_SCC_RC" = 0 ] || { echo "× RC-d 的挂起构造器里长出 runCatching（$D_SCC_RC）：取消会被收进 Result，下游读成一次普通失败"; fail=1; }
+[ "$D_SCC_SELF" = 1 ] || { echo "× RC-d 反证掉了：没截到 callCancellable 那个块（现 $D_SCC_SELF，期望 1），上面那个 0 是空跑"; fail=1; }
 [ "$D_NAMES" -ge 98 ] || { echo "× RC-d 挂起名面小于 98（实测 $D_NAMES）：闭包判定的输入面缩水了（删了 suspend 函数还是改了收集规则？）"; fail=1; }
-[ "$ROWS" = 44 ] || { echo "× RC-e 分类表不是 44 行（实测 $ROWS）：34（F-2 ⑨）+ 1（F-3 ⑭ 读回 SDK 当前路径）+ 1（N-2 把语音开关交给高德）+ 6（2026-10-10：AmapNavigationEngine 的摘监听/预加载 .so + 新一屏 DriverGuideScreen 的 factory/update/onDispose 两步）+ 2（2026-10-15 #49 同一屏新增的标记贴放 :448 与收回 :463，两行都写进 RUNCATCHING_AUDIT.md 的标记块内，不新增豁免）；在册面再变就得逐点归因，判据与账一起改"; fail=1; }
+[ "$ROWS" = 45 ] || { echo "× RC-e 分类表不是 45 行（实测 $ROWS）：34（F-2 ⑨）+ 1（F-3 ⑭ 读回 SDK 当前路径）+ 1（N-2 把语音开关交给高德）+ 6（2026-10-10：AmapNavigationEngine 的摘监听/预加载 .so + 新一屏 DriverGuideScreen 的 factory/update/onDispose 两步）+ 2（2026-10-15 #49 同一屏新增的标记贴放 :448 与收回 :463，两行都写进 RUNCATCHING_AUDIT.md 的标记块内，不新增豁免）+ 1（#79 的 Api.kt:322 clearCache，同轮 40 行整表重判后补的那一行）；在册面再变就得逐点归因，判据与账一起改"; fail=1; }
 [ "$DOC_MIG" = 4 ] || { echo "× RC-e 表里标'已迁 attempt'的不是 4 行（实测 $DOC_MIG）：修改点与本轮结论不一致"; fail=1; }
 
 echo "SUMMARY|rows=6|RC-a=$RA_ACTIVE RC-a2=$RA_PROOF RC-b=$D_VIOL RC-b2=$D_SITES/$D_CAND RC-c=$CC1$CC2$CC3$CC4 RC-d=$D_RB/$D_SCC RC-e=$ROWS/$DOC_MIG"

@@ -27,6 +27,17 @@
 它是第 23 个文件 ⇒ 生效行 **30**、生效文件 **16**、violations **0** 三个实质数一个没动。
 RC-a 的四个目标已同步抬到 30/16/**47**/**23**，本节上方那张表按 ⑨ 当时口径保留，不改写。
 
+⚠ **#79（2026-10-16）之后的在册面**：出现次数 61→**62**、生效行 40→**41**，唯一增量是新增的
+`Api.clearCache()` 里那一处 `runCatching { cache.evictAll() }`（`core/net/Api.kt:322`；包围点是 `object Api` 的
+**非 suspend** 成员函数，块内是 OkHttp 同步 IO，无挂起调用 ⇒ RC-b violations 仍 **0**）；
+生效文件 18、含注释文件 26 两个都没动（`Api.kt` 本来就在册）。
+同轮引入了 `suspendCancellableCoroutine` **2 处**（1 处 import + 1 处 `private suspend fun OkHttpClient.callCancellable` 本体）
+⇒ 按上面那条规矩 RC-d 当场变红，下面 40 行的"否"**逐行重判过**：唯一落在 `Api.kt` 的那一行是
+`JSONObjectOrNull`（`private fun`，块内 `JSONObject(text)`），新的挂起点在它之外；
+`callCancellable` 自己的块体内 `runCatching` **0**（判据现在直接数这一格，不再只靠"结构上不可能"）。
+⇒ 结论：没有一行从"否"翻成"是"，但这条免疫前提从"结构上不可能挂起"降级成"按作用域逐点核"，
+RC-d 的目标随之改成 **0 / 2**（`runBlocking` 仍是 0）。
+
 ## 二、本轮修改的 4 点（文件 / 行号 / 原始行为 / 新行为 / 为什么属于协程取消敏感点）
 
 | # | 文件:行号（补丁前 → 后） | 类 | 原始行为 | 新行为 | 为什么是取消敏感点 |
@@ -111,10 +122,13 @@ core/navigation 同级，都是 core 层引 `core.net.attempt`，没有新的跨
 | ui/driver/DriverGuideScreen.kt:342 | E（视图回调） | 否 | 否 | 保持 | 同 341 的 `v.onDestroy()`：销毁两步各自包，一步抛不许顶掉另一步 |
 | ui/driver/DriverGuideScreen.kt:448 | A/D | 否 | 否 | 保持 | 任务点标记整批贴放：块内是 `AMapNaviView.getMap()` + `AMap.addMarker`（SDK 同步句柄，无挂起调用）；`onFailure` 不静默，落 `Log.w("BUS_MAP", …)` |
 | ui/driver/DriverGuideScreen.kt:463 | A/D | 否 | 否 | 保持 | `onDispose` 里收回本页贴的标记：`placed.forEach { it.remove() }`，纯 SDK 同步调用 |
+| core/net/Api.kt:322 | A | 否 | 否 | 保持 | `fun clearCache()`（#79 新增）：块内 `cache.evictAll()` 是 OkHttp 同步 IO，包围点是 `object Api` 的非 suspend 成员函数；失败不静默，`.onFailure` 落 `Log.w` |
 <!-- RC-ROWS-END -->
 
 RC-e 的计数口径：`<!-- RC-ROWS-BEGIN -->` 与 `END` 之间的物理行（32 行，不含表头与分隔行）；
 "已迁 attempt" 4 行写在标记块**上方**，两条相加 = 35 = 本轮审计的在册基数。
+（⑨ 当时口径，按上一节的规矩不改写。当前实测：标记块内 41 行"保持" + 块外 4 行"已迁 attempt" = **45**，
+与 RC-e 现钉的目标 45/4 对齐；#79 那一条 `Api.kt:322` 是 40→41 的唯一增量。）
 
 ## 四、分类口径（A–G，指令 ⑨ 的七类怎么落在这套代码上）
 
