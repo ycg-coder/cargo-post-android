@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusButton
@@ -132,6 +133,9 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
     val nav = LocalNavController.current
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    // 页头那一格读**后端计数**（与底部 tab 的角标同一个数）：本页只握着已加载的几页，
+    // 拿 `vm.shown` 自己算会在翻页时跳数，同屏出现两个"未读数"（缺陷 #47）。
+    val unread by AppState.driverUnread.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { if (vm.items.isEmpty()) vm.load() }
 
@@ -148,7 +152,7 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
                     Box(Modifier.size(3.dp, 15.dp).clip(RoundedCornerShape(2.dp)).background(t.clay))
                     Spacer(Modifier.width(8.dp))
                     Text("调度消息", color = t.ink, fontSize = (18 * scale).sp, fontWeight = FontWeight.Bold)
-                    if (vm.shown.count { !it.read } > 0) {
+                    if (unread > 0) {
                         Spacer(Modifier.width(8.dp))
                         Box(
                             Modifier
@@ -157,7 +161,7 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                         ) {
                             Text(
-                                "${vm.shown.count { !it.read }} 条未读",
+                                "$unread 条未读",
                                 color = t.danger,
                                 fontSize = (11 * scale).sp,
                                 fontWeight = FontWeight.Medium,

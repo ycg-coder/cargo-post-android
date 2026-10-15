@@ -8013,3 +8013,40 @@ EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / 
 靠前缀展开才配上 2**，负控 6 把全咬、恢复后绿。⇒ 新判据簿必须连负控一起交，否则"0 命中"这句话本身没人验过。
 
 全量：**tests=747 failures=0 errors=0**（72 份 XML，同一轮产出）。
+
+### D-121（10-16 00:4x–01:2x）· #47 四条"界面替后端宣布"的口径；#48 线路详情那一格终于有底图
+
+**#47 四条都不是"功能没做"，是界面在说后端没说过的话**（逐条先核契约）：
+
+① 商城排序/分类/搜索只拿着**已加载的那几页**排（`PAGE_SIZE=10`），界面却念成"价格↑第一名"。
+后端 `AppProductController.java:40-46` 的 `/product/page` 只收 `PageParam`（**没有 sort/orderBy 参数**），
+但同一个 controller 的 `:33-38` 有 `/product/list` 全量在架清单 ⇒ 正确解法不是给后端加参数，而是
+**筛选一开启就走全量**：`goodsNeedsCatalog()` 判定 + `ensureCatalog()` 只取一次 + 列表源改成
+`catalog ?: allProducts`；全量还没回来时 `countText` 照实说"只在已加载的 N 件里排"，不装作全店比过。
+② 空态那句「这类山货暂时没货」是替 `stock` 字段宣布结论（`AppProductRespVO.java:30` 库存是**每件商品**的，
+而分类是本机按商品名分的 `CATEGORY_KEYWORDS`，后端没有分类）。抽成纯函数 `goodsEmptyCopy()` 三分说法：
+正在取全店清单 / 在架清单里没有这一类 / 没搜到「词」。
+③ 未读数同屏两个来源：司机消息页头自己数 `vm.shown.count { !it.read }`，而 tab 角标读后端
+`/unread-count` —— **这条规矩本来就写在那页第 98 行的注释里**（"角标取后端计数…用它算未读会在翻页时跳数"），
+只是页面自己没照办。页头改成读 `AppState.driverUnread`；用户侧分段器那两个本机数加"本页"限定词。
+④ 公交页搜索框写"搜索线路名称"，实际只覆盖 `/bus/lines?radius` 半径内那几条；词一打错整块列表静默消失。
+改成"在附近线路里搜名称" + 未命中那一格明说范围与条数。
+
+用例新簿 `GoodsScopeContractTest.kt`（5 条，含"『没货』二字不许出现在生效文案里"这类否定断言）；
+判据新簿 `tools/check_caliber_probes.sh`（KL-a…KL-f，第 40 本）+ `tools/caliber_negative_controls.sh`
+**9 把全咬**（含一条"把注释里的『没货』一起抹掉"来反证 KL-b 那个 0 不是空跑）；SU-b 源集 74→75 同轮重钉。
+
+**#48 线路详情那一格**：同一页的实时公交主图早就走 `BusMap`（真底图 + marker/polyline，起不来才退回
+自绘示意图），而详情页 `BusDetailScreen` 一直只画那张"高德风格"的 canvas —— 不能缩放、不能拖动、
+底下没有地名。本轮接同一套：`detailMapFailed` 四件（声明/换线复位/分支/回调）+ `BusMap(markers, paths)`，
+高德失败才 `RouteMap`；底图没有 subtitle 的位置，所以折线四态那句单独成一行。
+判据新簿 `tools/check_detail_map_probes.sh`（LM-a…LM-f，第 41 本）+ 负控 6 把全咬。
+⚠ **LM-d 那条反证第一版是假失效**：破口打在"删掉兜底旁边那行注释"上，`grep -A 2` 的窗口照样数得到
+`RouteMap(` ⇒ 判据照旧绿、负控念 ✘。反证的破口必须打在**被判的那个形状**上（改名叫 `RouteMapX(` 才咬住），
+不是打在它旁边的注释上 —— 这与 DV 那本"下限型反证当不了 tripwire"是同一条。
+
+**环境红一次**：`subst Y:/Z:` 掉了（重启后不保留），从中文路径直接跑 gradle 测试会得到
+`initializationError / ClassNotFoundException` 那一族假失败；`cmd //c subst` 重挂后读数正常。
+
+**读数**：全量 **tests=752 failures=0 errors=0**（73 份 XML，最新 mtime 01:23:58）；
+判据簿 **41 本 rc≠0 = 0**；`compileDebugKotlin` rc=0。

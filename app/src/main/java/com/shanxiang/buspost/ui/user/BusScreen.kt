@@ -490,7 +490,7 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             BusTextField(
                 value = vm.lineQuery,
                 onValueChange = { vm.lineQuery = it },
-                placeholder = "搜索线路名称",
+                placeholder = "在附近线路里搜名称",
                 icon = BusIcons.search,
                 trailing = {
                     if (vm.lineQuery.isNotEmpty()) {
@@ -694,6 +694,20 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 "loading", "off", "empty", "error" -> Unit // 已在地图区域显示
 
                 else -> {
+                    // 缺陷 #47：这一屏的线路来自 `/bus/lines?latitude&longitude&radius`，**只有半径内那几条**。
+                    // 所以搜不到必须说"附近线路里没搜到"，不能让人以为全网点名查过；
+                    // 旧写法这里连一格提示都没有 —— 词一打错，整块列表静默消失，界面等于什么都没发生。
+                    if (vm.filteredLines.isEmpty() && vm.lines.isNotEmpty() && vm.lineQuery.isNotBlank()) {
+                        EmptyState(
+                            title = "附近线路里没搜到「${vm.lineQuery}」",
+                            subtitle = "这一屏只在你位置的半径内挑了 ${vm.lines.size} 条线路，不在附近的那条不会出现在这里",
+                            icon = BusIcons.search,
+                            actionText = "清空搜索",
+                            onAction = { vm.lineQuery = "" },
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+
                     // 线路选择 chip（横滑）
                     if (vm.filteredLines.size > 1) {
                         Row(
@@ -1197,6 +1211,10 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
     var isFav by remember(routeId) { mutableStateOf(Prefs.isFavoriteLine(routeId)) }
     /** 唤起步行导航失败的原话：只在真失败时出现，不写"已为你打开导航" */
     var walkProblem by remember { mutableStateOf<String?>(null) }
+    /** 高德底图起不来（key 不匹配/无网）才退回自绘示意图；换线路时重置，给 SDK 再一次机会 */
+    var detailMapFailed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(routeId) { detailMapFailed = false }
 
     LaunchedEffect(routeId) { vm.openDetail(context, routeId) }
 
@@ -1244,17 +1262,56 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
                     "全程 " + (line.distanceKm?.let { "%.1f 公里".format(it) } ?: "里程暂未知"),
                     subtitle = "${line.from} → ${line.to} · ${line.stations.size} 站",
                 )
-                RouteMap(
-                    polyline = vm.polyline,
-                    stations = line.stations,
-                    vehicles = vm.vehiclesOf(line),
-                    me = vm.me,
-                    height = 250.dp,
-                    reason = vm.polylineReason(
-                        "暂无该线路的真实道路折线，经停站顺序请看下方时刻表。",
-                    ),
-                    onReplan = { vm.replan() },
+                // 折线状态那句单独一行：底图那一格没有 subtitle 的位置，而"还没问 / 正在问 /
+                // 这次没问到 / 后端回了空"四种情况必须在主路径上分得开（F-3 ⑤ 同一条纪律）。
+                Text(
+                    vm.polylineSubtitle(),
+                    color = t.textTertiary,
+                    fontSize = (11.5f * scale).sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
                 )
+                // 缺陷 #48：这一格此前只有自绘 canvas（"高德风格"的网格 + 折线，但从来没有底图），
+                // 而同一页的实时公交主图早就走 `BusMap` + 失败兜底。现在两处同一套：
+                // 高德在 → 真实底图 + 站点/车辆 marker；高德起不来 → 退回自绘，且不装作有底图。
+                if (detailMapFailed) {
+                    RouteMap(
+                        polyline = vm.polyline,
+                        stations = line.stations,
+                        vehicles = vm.vehiclesOf(line),
+                        me = vm.me,
+                        height = 250.dp,
+                        reason = vm.polylineReason("地图服务不可用，下面这张是按站点坐标画的示意图"),
+                        onReplan = { vm.replan() },
+                    )
+                } else {
+                    val detailMarkers = buildList {
+                        vm.me?.let { add(MapMarker(it, "我的位置", MapMarker.KIND_ME)) }
+                        line.stations.forEach { s -> add(MapMarker(s.geo, s.name, MapMarker.KIND_STOP, "站点")) }
+                        vm.vehiclesOf(line).forEach { v ->
+                            v.geo?.let { geo ->
+                                add(
+                                    MapMarker(
+                                        geo,
+                                        v.lineName.ifEmpty { "班车" },
+                                        if (v.isReal) MapMarker.KIND_BUS_REAL else MapMarker.KIND_BUS_SIM,
+                                        v.plate.ifEmpty { "待派车" },
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    val detailPaths = if (vm.polyline.size >= 2) {
+                        listOf(MapPath(vm.polyline, MapPath.ROLE_MAIN, source = "amap"))
+                    } else emptyList()
+                    BusMap(
+                        markers = detailMarkers,
+                        paths = detailPaths,
+                        modifier = Modifier.fillMaxWidth().height(250.dp),
+                        fitAll = true,
+                        showMyLocation = vm.locationGranted,
+                        onUnavailable = { detailMapFailed = true },
+                    )
+                }
                 if (vm.me != null && line.stations.isNotEmpty()) {
                     // 挑站与唤起步行导航都走 ui/common/WalkToStation.kt 那一份口径：
                     // 这颗按钮此前只存在于实时公交页的内嵌详情里，从首页线路签点进来的人看不到它

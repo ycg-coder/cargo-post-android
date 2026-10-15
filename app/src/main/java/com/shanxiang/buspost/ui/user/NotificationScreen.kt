@@ -180,7 +180,9 @@ fun NotificationScreen(vm: NotificationViewModel = viewModel()) {
             }
 
             BusSegmented(
-                options = listOf("全部 ${vm.items.size}", "未读 ${vm.items.count { !it.read }}"),
+                // 这两个数**按本页已加载的消息算**，所以必须写"本页"：顶栏那句 `N 条未读` 读的是
+                // 后端 `/unread-count`，两者同源不同量，不加限定词就是同屏两个"未读数"（缺陷 #47）。
+                options = listOf("本页全部 ${vm.items.size}", "本页未读 ${vm.items.count { !it.read }}"),
                 selected = if (vm.onlyUnread) 1 else 0,
                 onSelect = { vm.onlyUnread = it == 1 },
             )

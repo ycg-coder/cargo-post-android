@@ -80,6 +80,38 @@ private fun matchCategory(p: Product): Int {
     return 0
 }
 
+/** 这一屏要不要"全店口径"（纯函数：VM 的 `needsCatalog` 只是把三个状态喂进来） */
+internal fun goodsNeedsCatalog(sortIndex: Int, categoryIndex: Int, query: String): Boolean =
+    sortIndex != 0 || categoryIndex != 0 || query.isNotBlank()
+
+/** 空态/计数那一格的说法：把"全店没这种东西"和"这一类卖完了"和"清单还没取回来"分成三句（缺陷 #47） */
+internal data class GoodsEmptyCopy(val title: String, val subtitle: String)
+
+/**
+ * 缺陷 #47：「这类山货暂时没货」这句话替后端宣布了一件它没说过的事。
+ * 分类是**本机按商品名分的**（`CATEGORY_KEYWORDS`，后端没有分类字段），所以"这一类没结果"有两种完全不同的成因：
+ * 全店清单还没取回来（只在已加载的几页里筛）、后端确实没上架这一类、以及这一类**有货但卖完了**（那是每件商品
+ * 自己的 `stock` 字段，与这一格无关）。三种成因必须是三句话，否则用户看到"暂时没货"就不会再刷新。
+ */
+internal fun goodsEmptyCopy(categoryIndex: Int, query: String, catalog: List<Product>?): GoodsEmptyCopy = when {
+    catalog == null && (categoryIndex != 0 || query.isNotBlank()) -> GoodsEmptyCopy(
+        "正在取全店在架清单",
+        "清单还没回来，这个筛选现在只在已加载的几页里筛，稍等再核对",
+    )
+
+    categoryIndex != 0 -> GoodsEmptyCopy(
+        "在架清单里没有这一类",
+        "分类是按商品名分的，不是这一类卖完了 —— 库存看的是每件商品自己的那一格",
+    )
+
+    query.isNotBlank() -> GoodsEmptyCopy(
+        "在架清单里没搜到「$query」",
+        "换个词试试，或切到「全部」看看别的山货",
+    )
+
+    else -> GoodsEmptyCopy("山货还没上新", "农户正在备货，过会儿再来看看")
+}
+
 class GoodsViewModel : ScreenViewModel() {
     var allProducts by mutableStateOf<List<Product>>(emptyList())
     var categoryIndex by mutableStateOf(0)
@@ -93,10 +125,39 @@ class GoodsViewModel : ScreenViewModel() {
 
     val categories: List<String> = listOf("全部", "水果", "蔬菜", "禽蛋", "茶叶", "干货")
     val sortOptions: List<String> = listOf("综合", "价格↑", "价格↓", "销量")
-    val hasMore: Boolean get() = allProducts.size < total
+    val hasMore: Boolean get() = !needsCatalog && allProducts.size < total
+
+    /**
+     * 全店在架清单（`/product/list`）。缺陷 #47：排序/分类/搜索一旦启用，就必须在**全店**上排；
+     * 旧写法只拿着已加载的那几页（首屏 10 件）排，界面念出来的"价格↑第一件"其实是
+     * "这 10 件里最便宜的"，而后端明明有 `/product/list` 能把全量取回来。
+     * null = 还没取过（不是"取到了空"），空列表才是后端说没有。
+     */
+    var catalog by mutableStateOf<List<Product>?>(null)
+        private set
+    var catalogLoading by mutableStateOf(false)
+    var catalogError by mutableStateOf<String?>(null)
+
+    /** 这一屏是否要"全店口径"：综合排序 + 全部 + 空词 时按分页看就够 */
+    val needsCatalog: Boolean get() = goodsNeedsCatalog(sortIndex, categoryIndex, query)
+
+    /** 列表顶上的那句计数：三种来源三种说法，不许都写成"共 N 件" */
+    val countText: String
+        get() {
+            val n = shown.size
+            return when {
+                !needsCatalog -> "已加载 $n 件（后端在架共 ${if (total > 0) total else n} 件）"
+                catalogLoading && catalog == null -> "正在取全店清单…"
+                catalogError != null && catalog == null -> "全店清单没取到，下面只在已加载的 $n 件里排"
+                else -> "全店 ${catalog?.size ?: 0} 件里 $n 件"
+            }
+        }
 
     val shown: List<Product> get() {
-        val filtered = allProducts.filter { p ->
+        // 全量还没回来时先用已加载的几页兜着，但 `countText` 会照实说"只在已加载的 N 件里排"，
+        // 不许在这一格里把"部分结果"念成"全店结果"。
+        val pool = if (needsCatalog) catalog ?: allProducts else allProducts
+        val filtered = pool.filter { p ->
             (categoryIndex == 0 || matchCategory(p) == categoryIndex) &&
                 (query.isBlank() || p.name.contains(query) || p.subtitle.contains(query) || p.village.contains(query))
         }
@@ -108,11 +169,29 @@ class GoodsViewModel : ScreenViewModel() {
         }
     }
 
+    /** 只在第一次需要全店口径时取一次；下拉刷新会作废它（见 [reload]） */
+    fun ensureCatalog() {
+        if (catalog != null || catalogLoading) return
+        catalogLoading = true
+        work(reset = false) {
+            try {
+                val f = Repo.products()
+                catalogError = f.error
+                if (f.error == null) catalog = f.items
+                demo = demo || f.demo
+            } finally {
+                catalogLoading = false
+            }
+        }
+    }
+
     fun reload() {
         pageNo = 1
         allProducts = emptyList()
         total = 0
         loadError = false
+        catalog = null
+        catalogError = null
         load(reset = true)
     }
 
@@ -170,6 +249,8 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { if (vm.allProducts.isEmpty()) vm.load() }
     LaunchedEffect(search) { vm.query = search }
+    // 排序/分类/搜索一开启就取一次全店清单（`ensureCatalog()` 自己保证只取一次）
+    LaunchedEffect(vm.needsCatalog) { if (vm.needsCatalog) vm.ensureCatalog() }
 
     Column {
         Signpost(
@@ -232,7 +313,7 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                         }
                         Spacer(Modifier.weight(1f))
                         Text(
-                            "共 ${vm.shown.size} 件",
+                            vm.countText,
                             color = t.textTertiary,
                             fontSize = (11 * scale).sp,
                         )
@@ -247,9 +328,10 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                     item { ErrorState("没能加载山货", onRetry = { vm.reload() }) }
                 } else if (vm.shown.isEmpty()) {
                     item {
+                        val copy = goodsEmptyCopy(vm.categoryIndex, vm.query, vm.catalog)
                         EmptyState(
-                            title = if (vm.categoryIndex == 0) "山货还没上新" else "这类山货暂时没货",
-                            subtitle = if (vm.categoryIndex == 0) "农户正在备货，过会儿再来看看" else "切到「全部」看看其他山货",
+                            title = copy.title,
+                            subtitle = copy.subtitle,
                             icon = BusIcons.parcel,
                             actionText = "清空筛选",
                             onAction = {
