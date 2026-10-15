@@ -13,9 +13,10 @@ cd "$ROOT" || exit 2
 M=app/src/main/java/com/shanxiang/buspost
 WB=$M/ui/driver/WorkbenchScreen.kt
 DN=$M/ui/driver/DriverNotices.kt
+HS=$M/ui/user/HomeScreen.kt
 CT=app/src/test/java/com/shanxiang/buspost/ui/driver/DriverNoticesContractTest.kt
 PROBE=tools/check_driver_notice_probes.sh
-FILES=("$WB" "$DN" "$CT")
+FILES=("$WB" "$DN" "$HS" "$CT")
 BAKS=()
 for f in "${FILES[@]}"; do
   [ -f "$f" ] || { echo "✘ 缺 $f，本书作废"; exit 2; }
@@ -106,6 +107,32 @@ check DN-12 "× DN-i 作业动作后那一轮不再取公告的表态没了" "$W
 # 13 取数被写成无条件（withNotices 闸门形同虚设）→ DN-i
 check DN-13 "× DN-i 取数没被 withNotices 圈住" "$WB"   '        if (withNotices) platformNotices = Repo.notices().toState()'   '        platformNotices = Repo.notices().toState()'
 
+# ---- DN-14…DN-18：用户侧公告正文这一格（缺陷 #44，判据 DN-j）----
+# 14 点轮播条又把人丢进读另一张表的消息中心 → DN-j 接线
+check DN-14 "× DN-j 首页轮播不再把整条公告交给阅读框" "$HS" \
+  'NoticeCarouselStrip(vm.notices) { readingNotice = it }' \
+  'NoticeCarouselStrip(vm.notices) { nav.navigate(Routes.MESSAGES) }'
+# 15 阅读框只念标题，接口给的 content 不进屏幕 → DN-j 正文
+check DN-15 "× DN-j 阅读框不再渲染公告正文" "$HS" \
+  'n.content.ifBlank { "（这条公告没有正文）" },' \
+  'n.title,'
+# 16 正文不能滚：长公告的超出部分被 AlertDialog 剪掉 → DN-j 可滚
+check DN-16 "× DN-j 阅读框的正文不能滚" "$HS" \
+  '                        .padding(top = 4.dp)
+                        .verticalScroll(rememberScrollState()),' \
+  '                        .padding(top = 4.dp),'
+# 17 上一代零调用点的渲染件回来（同一屏两套公告条，屏幕读的与被判据数的是两件东西）→ DN-j 死码
+check DN-17 "× DN-j 上一代零调用点的轮播渲染件回来了" "$HS" \
+  'private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit) {' \
+  'private fun NoticeCarousel(notices: List<Notice>, onClick: () -> Unit) {
+}
+
+private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit) {'
+# 18 反证自身：活着的那件渲染件被改名（DN-j 的"死码 0"就不再可信）→ DN-j 反证
+check DN-18 "× DN-j 反证掉了" "$HS" \
+  'private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit) {' \
+  'private fun NoticeCarouselStripV2(notices: List<Notice>, onClick: (Notice) -> Unit) {'
+
 restore
 bash "$PROBE" >/dev/null 2>&1 && echo "[恢复] 判据簿重新通过" || { echo "✘ [恢复] 判据簿仍红"; bad=$((bad + 1)); }
 same=1
@@ -114,7 +141,8 @@ for i in "${!FILES[@]}"; do
 done
 [ "$same" = 1 ] && echo "[恢复] 全部文件与原样一致" || bad=$((bad + 1))
 
-# 13 条 = DN-1…DN-7（七条真破口）+ DN-8/DN-9（两条"反证自身"）+ DN-10/DN-11（出处与用例数）。
+# 18 条 = DN-1…DN-7（七条真破口）+ DN-8/DN-9（两条"反证自身"）+ DN-10/DN-11（出处与用例数）
+#        + DN-12/DN-13（取数时机）+ DN-14…DN-18（用户侧正文那一格：接线/正文/可滚/死码 + 一条反证自身）。
 # 期望值按上面一条条数出来，不抄上一本的数字（上一本就是因为没跟着数，红了一轮才被发现）。
 echo "司机端公告栏结构负控：通过 $ok / 失败 $bad"
-[ "$bad" = 0 ] && [ "$ok" = 13 ]
+[ "$bad" = 0 ] && [ "$ok" = 18 ]

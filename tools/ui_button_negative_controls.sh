@@ -118,7 +118,8 @@ import androidx.compose.ui.unit.dp
 @Composable fun NegctlG() { Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(8.dp)).background(Color.White).clickable { }) }' \
   && ctl UB-g "按钮状可点块把高度写死成 46dp ⇒ BusTouch 的 48/56dp 下限整条失效"
 
-# ⑧ 轮播视口里长出第三条可点块（在册 2 条是被登记的，不是被豁免的）
+# ⑧ 轮播视口里长出第二条可点块（在册那一条是被登记的，不是被豁免的；
+#    2026-10-15 D-120 把第二条从在册里摘出去了——它从来是零调用点的死渲染件，没上过屏）
 injected ui/NegctlProbeH.kt 'package com.shanxiang.buspost.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -131,7 +132,7 @@ import androidx.compose.ui.unit.dp
         state = null,
         modifier = Modifier.fillMaxWidth().height(40.dp),
 ) { p -> Row(Modifier.fillMaxWidth().clickable { }) {} } }' \
-  && ctl UB-h "轮播视口数从在册 2 变 3 ⇒ 又有一条热区被视口钉住"
+  && ctl UB-h "轮播视口数从在册 1 变 2 ⇒ 又有一条热区被视口钉住"
 
 # 正控制：改一颗按钮的文案与 onClick 内容 —— 规格没动，不该红
 injected ui/NegctlProbePos.kt 'package com.shanxiang.buspost.ui

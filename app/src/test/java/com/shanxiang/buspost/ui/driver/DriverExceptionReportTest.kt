@@ -1,5 +1,7 @@
 package com.shanxiang.buspost.ui.driver
 
+import com.shanxiang.buspost.data.model.TransportLeg
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -80,5 +82,49 @@ class DriverExceptionReportTest {
         assertEquals(200 - "车辆故障".length - 1, exceptionDetailBudget(DriverExceptionReason.VEHICLE_FAULT))
         assertEquals(200 - "收件人不在".length - 1, exceptionDetailBudget(DriverExceptionReason.RECEIVER_ABSENT))
         assertEquals(200 - "其他".length - 1, exceptionDetailBudget(DriverExceptionReason.OTHER))
+    }
+
+    // ---- 缺陷 #43：段序是"每张单内"的序号，跨单会重号 ----
+
+    private fun obj(vararg pairs: Pair<String, Any?>): JSONObject {
+        val o = JSONObject()
+        pairs.forEach { (k, v) -> o.put(k, v ?: JSONObject.NULL) }
+        return o
+    }
+
+    /** 两张单的 `legSequence` 都从 1 起（后端按单算），所以两行都念"第 1 段"时司机认不出报的是哪一段 */
+    @Test
+    fun `跨单重号的段在选段行里必须互不相同`() {
+        val a = TransportLeg.parse(obj("id" to "9001", "legSequence" to 1, "orderNo" to "TO20261015000000123", "status" to 7))
+        val b = TransportLeg.parse(obj("id" to "9002", "legSequence" to 1, "orderNo" to "TO20261015000000456", "status" to 7))
+        assertEquals("第 1 段", "第 ${a.seq} 段", "第 ${b.seq} 段")
+
+        val titleA = legOptionTitle(a, actionable = true)
+        val titleB = legOptionTitle(b, actionable = true)
+        assertTrue("两行文案相同就是缺陷本身：$titleA", titleA != titleB)
+        assertEquals("单号尾 000123 · 第 1 段 · 运输中", titleA)
+        assertEquals("单号尾 000456 · 第 1 段 · 运输中", titleB)
+    }
+
+    /** 后端没给单号（或演示包）时不许悄悄退回"第 1 段"，那正是缺陷的写法 */
+    @Test
+    fun `缺单号就明说缺而不是省略标识`() {
+        val noOrder = TransportLeg.parse(obj("id" to "9003", "legSequence" to 2, "status" to 7))
+        assertEquals("", noOrder.orderNo)
+        assertEquals("单号未给 · 第 2 段 · 运输中", legOptionTitle(noOrder, actionable = true))
+        assertEquals("单号未给 · 第 2 段「运输中」", legReceiptText(noOrder))
+
+        // 空白单号按缺处理，不能拼出"单号尾  · "这种半句话
+        val blank = TransportLeg.parse(obj("id" to "9004", "legSequence" to 1, "orderNo" to "  ", "status" to 7))
+        assertEquals("单号未给 · 第 1 段 · 运输中", legOptionTitle(blank, actionable = true))
+    }
+
+    /** 终态段的"不可再报"后缀是点击闸的说明文字，掉了就等于界面允许对已完成段再报一次 */
+    @Test
+    fun `不可再报的段在文案里留痕`() {
+        val done = TransportLeg.parse(obj("id" to "9005", "legSequence" to 3, "orderNo" to "TO7", "status" to 11))
+        assertEquals("单号尾 TO7 · 第 3 段 · 已完成", legOptionTitle(done, actionable = true))
+        assertEquals("单号尾 TO7 · 第 3 段 · 已完成（不可再报）", legOptionTitle(done, actionable = false))
+        assertEquals("单号尾 TO7 · 第 3 段「已完成」", legReceiptText(done))
     }
 }

@@ -378,7 +378,7 @@ printf 'DV-z5 话术出口/未取到字面量           : %s/%s  （预期 2/1�
 printf 'DV-z6 ParcelCountContractTest 用例    : %s  （预期 ≥4：失败≠0 只剩 grep 就没人钉）\n' "$dvz6"
 printf 'DV-u  C 类形态拆分(独立实现/census)  : arr %s/%s numbool %s/%s 非可空 %s/%s str %s/%s  （预期四对全等，非可空 ≤19）\n' \
     "$hand_arr" "$cens_arr" "$hand_nb" "$cens_nb" "$hand_nn" "$cens_nn" "$hand_str" "$cens_str"
-printf 'DV-v  三面 0 生产者键/站点           : keys %s sites %s 其中 C 行 %s 非可空数值布尔 %s  （预期 ≤127/≤152/≤32/≤38，只降不升：2026-10-13 把天花板收到现读——原来 132/165/33/42 高出实测 5/13/1/4，负控注入一个孤立键也不红）\n' \
+printf 'DV-v  三面 0 生产者键/站点           : keys %s sites %s 其中 C 行 %s 非可空数值布尔 %s  （预期 ≤128/≤157/≤33/≤38，只降不升：2026-10-13 收到 127/152/32/38；2026-10-15 D-120 撤掉演示面 /bus/realtime 那条**没人请求**的分支后，`plate` 失去它唯一的演示写点 ⇒ 键 +1、站点 +4，这是假生产者摘掉后的真读数，不是新欠账）\n' \
     "$tfz_keys" "$tfz_sites" "$tfz_c" "$tfz_nb"
 printf 'DV-w  DV-k 口径桥                    : grep %s = census 行 %s + delta %s（逐名列 %s）｜DV-k 实测 %s  （预期 bridge_grep==DV-k 且 delta ≤2）\n' \
     "$bridge_grep" "$bridge_rows" "$bridge_delta" "$bridge_only" "$dvk"
@@ -408,7 +408,7 @@ echo "· 里程口径族仍读 distance/meters/distanceMeters（AppSendReachabil
 grep -rnE 'multi(Num|Str)\("[a-zA-Z]*([Dd]istance|distanceMeters)"' $A --include=*.kt | grep -vE ':[0-9]+: *(\*|//)' | wc -l | tr -d ' '
 echo "· steps/车道族仍按演示报文读（Repo.kt:1102/1104/1116/1133/1168；AppDriverRouteRespVO:17-86 里没有任何 steps/lanes 键）⇒ 待 F-3 ⑬⑭ 一批处置，本轮只把 recommendedLane/etaSeconds 改成可空"
 echo "· 档案字符串族 lineName/company/shiftCode 不在 VO 那 7 个键里（DemoData:687-690 自注）⇒ 收法要与解析层读点同定，已按 OPEN_DEFECT 登记"
-echo "· 车牌别名族：BusVehicle:765 与 TransportLeg:1125 仍读 plate/vehiclePlate/plateNumber，演示面 /bus/realtime:647 还在发 plate ⇒ 同属字符串族一批（本轮只收 DriverProfile 一处，真键 plateNo）"
+echo "· 车牌别名族：Models.kt:458/:803/:1067/:1220/:2096 与 Repo.kt:858 仍读 plate/vehiclePlate/plateNumber；演示面那个唯一写点（旧 /bus/realtime 分支）已随 D-120 撤掉 ⇒ plate 现在是三面 0 生产者，收法要与解析层读点同定（真键 plateNo）"
 
 ok=1
 [ "$dva" = 0 ] || { echo "× DV-a 收益解析体又出现缺键读成 0 的非可空读法"; ok=0; }
@@ -490,8 +490,8 @@ ok=1
 #   三方服务的键天然不在"后端 VO / 小程序 / 演示面"这三面里 ⇒ 三面普查必然记它 0 生产者。
 #   同形的那一处 `Repo.kt:350`（高德 regeo 的 `formatted_address`）本来就在 152 里，
 #   所以这不是新出现的一类病，是同一类病的第二个点。天花板随之 +1，仍"只降不升"。
-[ "$tfz_keys" -le 127 ] || { echo "× DV-v 三面 0 生产者的键数回涨（2026-10-13 现读 127）"; ok=0; }
-[ "$tfz_sites" -le 153 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（2026-10-13 合并后现读 153：多的一处是外部高德键 formatted_address 的第二个读点，见上方注释）"; ok=0; }
+[ "$tfz_keys" -le 128 ] || { echo "× DV-v 三面 0 生产者的键数回涨（2026-10-15 D-120 现读 128：撤掉演示面 /bus/realtime 后 plate 成为三面 0）"; ok=0; }
+[ "$tfz_sites" -le 157 ] || { echo "× DV-v 三面 0 生产者的站点数回涨（2026-10-15 D-120 现读 157：同一处假生产者摘掉，plate 的 6 个读点里 4 个进 C 类口径）"; ok=0; }
 [ "$tfz_c" -le 33 ] || { echo "× DV-v C 行里的三面 0 生产者站点回涨（2026-10-13 合并后现读 33，同一处）"; ok=0; }
 [ "$tfz_nb" -le 38 ] || { echo "× DV-v 三面 0 生产者里的非可空数值布尔回涨（2026-10-13 现读 38）"; ok=0; }
 # DV-w：两个口径必须接得上

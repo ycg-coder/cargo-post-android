@@ -1,0 +1,5 @@
+# 演示面有应答、请求侧没人发的路径 —— 在册豁免表（配 tools/check_demo_path_reachability_probes.sh 的 DP-c）
+# 规矩与 doc_anchor 的在册表一致：要么修好（删掉那条演示分支），要么在这里点名并写出为什么不删。
+# 已经不孤儿却还留在表里的条目会红（欠账不许悄悄转正）。
+#
+/get-subscribe-template-list  安卓侧走系统通知，App 不发这条；它是小程序调用面（docs/android/CONTRACT_EVIDENCE.md:348 已实测登记为"非客户端调用面"）。演示分支留着只为小程序同套报文兜底，删了会连带演示包那条通路一起塌。

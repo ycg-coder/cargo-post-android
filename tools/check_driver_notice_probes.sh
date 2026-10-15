@@ -63,6 +63,17 @@ DNI_GATE=$(grep -c 'if (withNotices) platformNotices = Repo.notices().toState()'
 # DN-h 契约用例在场
 DNH=$(grep -cE '^[[:space:]]*@Test' "$CT")
 
+# DN-j 用户侧的公告正文真的读得到（缺陷 #44）。司机端一直能看正文，用户端这一格此前只有标题：
+#   轮播条把整条 Notice 交给阅读框（不是把人丢进读 /notification/page 的消息中心——那是另一张表），
+#   阅读框渲染 content 而不是只渲染标题，且正文必须能滚（AlertDialog 的 text 槽不滚=超出部分被剪掉，
+#   "能点开"从来不等于"能读完"）。
+#   DN-j 的"死码 0"反证是同文件里活着的那件渲染件恰好 1 处：没有反证，0 也可能只是文件名写错了。
+DNJ_WIRE=$(grep -c 'NoticeCarouselStrip(vm.notices) { readingNotice = it }' "$HS")
+DNJ_BODY=$(grep -c 'n\.content\.ifBlank' "$HS")
+DNJ_SCROLL=$(grep -A 20 'readingNotice?\.let { n ->' "$HS" | grep -c '\.verticalScroll(rememberScrollState())')
+DNJ_DEAD=$(grep -c 'private fun NoticeCarousel(notices: List<Notice>, onClick: () -> Unit)' "$HS")
+DNJ_LIVE=$(grep -c 'private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit)' "$HS")
+
 echo "DN-a 工作台 / 首页 / 闪屏 各一次取数 = $DNA_WB/$DNA_HS/$DNA_BR （目标 1/1/1）"
 echo "DN-b 占格 / 判定 / 正文列表         = $DNB_ITEM/$DNB_BANNER/$DNB_DETAIL （目标 1/1/1）"
 echo "DN-c 司机端「暂无公告」/ 反证       = $DNC_NO+$DNC_NO2/$DNC_PROOF （目标 0/2：失败与真没有必须两句）"
@@ -72,6 +83,7 @@ echo "DN-f 公告混进整页 error / 反证      = $DNF/$DNF_PROOF （目标 0/
 echo "DN-g 初值 loading / 初值写成失败     = $DNG/$DNG_BAD （目标 1/0）"
 echo "DN-i 入口取 / 动作不取 / 闸门        = $DNI_ON/$DNI_OFF/$DNI_GATE （目标 1/1/1）"
 echo "DN-h 契约用例数                     = $DNH （目标 ≥9）"
+echo "DN-j 用户侧接线/正文/可滚/死码/活件  = $DNJ_WIRE/$DNJ_BODY/$DNJ_SCROLL/$DNJ_DEAD/$DNJ_LIVE （目标 1/1/1/0/1）"
 
 fail=0
 [ "$DNA_WB" = 1 ] || { echo "× DN-a 工作台的 Repo.notices() 不是恰好一次（现 $DNA_WB）：接了两次就是重复 REST，一次都没接就是这一格又是死的"; fail=1; }
@@ -93,6 +105,11 @@ fail=0
 [ "$DNI_OFF" = 1 ] || { echo "× DN-i 作业动作后那一轮不再取公告的表态没了（现 $DNI_OFF）：公告会跟着每次作业发 REST"; fail=1; }
 [ "$DNI_GATE" = 1 ] || { echo "× DN-i 取数没被 withNotices 圈住（现 $DNI_GATE）：闸门写成了无条件，等于每轮回读都多发一条"; fail=1; }
 [ "$DNH" -ge 9 ] || { echo "× DN-h 契约用例少于 9 条（现 $DNH）：三种说法的分工没人钉"; fail=1; }
+[ "$DNJ_WIRE" = 1 ] || { echo "× DN-j 首页轮播不再把整条公告交给阅读框（现 $DNJ_WIRE）：点标题又会把人丢进读另一张表的消息中心"; fail=1; }
+[ "$DNJ_BODY" = 1 ] || { echo "× DN-j 阅读框不再渲染公告正文（现 $DNJ_WIRE 接线/$DNJ_BODY 正文）：接口给了 content 而界面只念标题"; fail=1; }
+[ "$DNJ_SCROLL" = 1 ] || { echo "× DN-j 阅读框的正文不能滚（现 $DNJ_SCROLL）：长公告的超出部分被剪掉，「能点开」又冒充了「能读完」（缺陷 #44）"; fail=1; }
+[ "$DNJ_DEAD" = 0 ] || { echo "× DN-j 上一代零调用点的轮播渲染件回来了（现 $DNJ_DEAD 处定义）：同一屏两套公告条，读的却是没人渲染的那套"; fail=1; }
+[ "$DNJ_LIVE" = 1 ] || { echo "× DN-j 反证掉了（活着的轮播渲染件=$DNJ_LIVE，目标恰好 1）：上面那个 0 数的是不存在的东西"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "司机端公告栏判据通过"; else echo "司机端公告栏判据失败"; fi
 exit "$fail"

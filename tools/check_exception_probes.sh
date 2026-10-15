@@ -81,7 +81,17 @@ EI2=$(grep -n 'val canSend = leg != null && DriverLegStateMapper.of(leg).canRepo
 EI3=$(grep -n 'if (flow.canReportException) {' "$RS" | grep -vE "$NC" | wc -l | tr -d ' ')
 EI4=$(grep -n 'clickable(enabled = flow.canReportException' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 
-echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥7/≥6）"
+# EX-j 跨单段序重号的消歧（缺陷 #43）：`legSequence` 是**每张单内**的序号，两张单的段在列表里
+#   会同名"第 1 段"，而异常上报是对一段的状态写入 —— 报错对象撤不回来。
+#   钉三件事：选段行与回执各走那两个带订单标识的函数（=1/1）；页面里不许再留手写的
+#   `第 ${…} 段` 直出串（=0，那正是缺陷写法）；缺单号那句兜底不许被删（=1，
+#   删了就会悄悄退回"只念第 N 段"——缺陷换一副面孔回来）。
+EJ=$(grep -n 'legOptionTitle(leg' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
+EJ2=$(grep -n 'legReceiptText(back)' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
+EJ3=$(grep -n '第 ${.*} 段' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
+EJ4=$(grep -cF '?: "单号未给 · "' "$RP")
+
+echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥10/≥6）"
 echo "EX-b legAction 出口/页面自发热请求   = $EB/$EB2 （目标 1/0）"
 echo "EX-c 自造 type 键/三键集合契约        = $EC/$EC2 （目标 0/1）"
 echo "EX-d 分类条目数/缺失标签数            = $ED/$ED_MISS （目标 7/0）"
@@ -91,9 +101,10 @@ echo "EX-g 未发给后端/回读不一致/谎报成功   = $EG/$EG2/$EG3 （目
 echo "EX-g 幂等闸拦下那一格：分支在/句里宣布已提交 = $EG4/$EG5 （目标 1/0）"
 echo "EX-h 本机自改状态的 copy()            = $EH （目标 0）"
 echo "EX-i 终态守卫字面量（出网前/按钮/入口/选段） = $EI/$EI2/$EI3/$EI4 （目标 1/1/1/1）"
+echo "EX-j 消歧调用（选段行/回执）·页面残留直出串·缺单号兜底 = $EJ/$EJ2/$EJ3/$EJ4 （目标 1/1/0/1）"
 
 fail=0
-[ "$EA" -ge 7 ]  || { echo "× EX-a 纯函数用例少于 7 条"; fail=1; }
+[ "$EA" -ge 10 ] || { echo "× EX-a 纯函数用例少于 10 条（含 #43 的三条消歧用例）"; fail=1; }
 [ "$EA2" -ge 6 ] || { echo "× EX-a 契约用例少于 6 条（报文与回执没人钉）"; fail=1; }
 [ "$EB" = 1 ]    || { echo "× EX-b 异常上报不再走 Repo.legAction 单一出口（幂等闸与 401 收口都会被绕过）"; fail=1; }
 [ "$EB2" = 0 ]   || { echo "× EX-b 司机页面开始自己 Api.post：绕过闸门、绕过会话失效处理"; fail=1; }
@@ -117,6 +128,10 @@ fail=0
 [ "$EI2" = 1 ] || { echo "× EX-i 提交按钮不再判 canReportException：守卫只剩一条路径，按钮照样点得动"; fail=1; }
 [ "$EI3" = 1 ] || { echo "× EX-i 线路台入口不再判 canReportException：终态段也长出「上报异常」按钮"; fail=1; }
 [ "$EI4" = 1 ] || { echo "× EX-i 选段列表不再按 canReportException 禁用：司机能选中一段不可报的"; fail=1; }
+[ "$EJ" = 1 ]  || { echo "× EX-j 选段行不再走 legOptionTitle：跨单重号的段又会都念「第 1 段」"; fail=1; }
+[ "$EJ2" = 1 ] || { echo "× EX-j 提交回执不再带订单标识：回读那句仍然认不出是哪张单"; fail=1; }
+[ "$EJ3" = 0 ] || { echo "× EX-j 页面里回来了手写的「第 N 段」直出串（$EJ3 处）：段序是单内序号，跨单必歧义"; fail=1; }
+[ "$EJ4" = 1 ] || { echo "× EX-j 缺单号的兜底句被删：没单号时会退回只念段序，正是缺陷 #43 的写法"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "§54 异常上报判据通过"; else echo "§54 异常上报判据失败"; fi
 exit "$fail"

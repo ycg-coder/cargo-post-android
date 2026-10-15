@@ -151,4 +151,14 @@ ctl EX-i "线路台入口不再判终态段：每一段都长出「上报异常�
 swap "$DS" 'clickable(enabled = flow.canReportException, onClick = onSelect)' 'clickable(onClick = onSelect)'
 ctl EX-i "选段列表不再禁用终态段：能选中一段不可报的"
 
+# ---- EX-j（缺陷 #43：段序是单内序号，跨单重号）----
+swap "$DS" 'legOptionTitle(leg, flow.canReportException)' '"第 ${leg.seq} 段 · ${leg.statusLabel}"'
+ctl EX-j "选段行退回手写的「第 N 段」：两张单的两行又都念「第 1 段」"
+
+swap "$DS" '${legReceiptText(back)}' '第 ${back.seq} 段「${back.statusLabel}」'
+ctl EX-j "提交回执不再带订单标识：回读那句认不出是哪张单的段"
+
+swap "$RP" '?: "单号未给 · "' '?: ""'
+ctl EX-j "缺单号的兜底句被删：没单号时悄悄退回只念段序（缺陷换面孔回来）"
+
 echo "[恢复后] $(BUSPOST_ANDROID="$SC" bash "$PR" | tail -1)"

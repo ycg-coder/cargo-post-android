@@ -73,7 +73,7 @@ DOC_MIG=$(grep -c '^| .* | 已迁 attempt |' "$DOC")
 ROWS=$((KEEP + DOC_MIG))
 MIG_PROOF=$(grep -c '已迁 attempt\| RC-ROWS-BEGIN' "$DOC")
 
-echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标恰好 40/18/62/26）"
+echo "RC-a 生效行/生效文件/出现次数/含注释文件 = $RA_ACTIVE/$RA_FILES/$RA_RAW/$RA_ALLFILES （目标恰好 40/18/61/26）"
 echo "RC-a2 反证：同一 NC 管道的 attempt 行数   = $RA_PROOF （必须 >0，否则 RC-a 的数不可信）"
 echo "RC-b 块内含挂起调用（unsafe/violation）  = $D_VIOL （目标 0）"
 echo "RC-b2 检测器 sites/候选待复核/挂起名面     = $D_SITES/$D_CAND/$D_NAMES"
@@ -98,7 +98,7 @@ fail=0
 #   `ui/common/UpdateSection.kt` 的**注释**里点名 runCatching 两次（"为什么这里必须用 attempt 而不是 runCatching"），
 #   生效行与生效文件都没变（39/18）⇒ 这本账要区分"代码里真用"与"注释里解释为什么不用"。
 #   含注释文件数 24 → 25 → 26 的第二次增量就是这一本 UpdateSection.kt。
-[ "$RA_RAW" = 62 ]     || { echo "× RC-a 出现次数不是恰好 62（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56；2026-10-15 #49 两处生效 + 紧邻那两行的新注释各 1 ⇒ 62（出现次数口径含注释，与生效行不可互引）"; fail=1; }
+[ "$RA_RAW" = 61 ]     || { echo "× RC-a 出现次数不是恰好 61（实测 $RA_RAW）：口径含注释与同行两次出现，与生效行不可互引（⑩ NotifyOutcome.kt 的 KDoc +1 ⇒ 47；⑭ 新增行 +1 ⇒ 48；N-2 的 setUseInnerVoice +1 ⇒ 49；2026-10-10 的 6 处生效 + DriverGuideScreen 类注释里点名 runCatching 那 1 行 ⇒ 56；2026-10-15 #49 两处生效 + 紧邻那两行的新注释各 1 ⇒ 62；同日 D-120 删掉首页那个**零调用点**的旧轮播渲染件 ⇒ 61，掉的那一处是它注释里"旧写法一个 runCatching 把三者混成没事发生"那句，生效行 40 一字未动）"; fail=1; }
 # 基数 24 → 25：唯一增量仍是 `ui/user/BusScreen.kt`（现在既有那处非挂起解析，也有注释点名它）。
 [ "$RA_ALLFILES" = 26 ] || { echo "× RC-a 含注释文件数不是恰好 26（实测 $RA_ALLFILES）：23→24 的唯一增量是 ui/driver/DriverGuideScreen.kt；生效文件仍须是 17"; fail=1; }
 [ "$RA_PROOF" -gt 0 ]  || { echo "× RC-a2 反证失败：同一套管道连 attempt 都数不出来，那 RC-a 的 38 不可信"; fail=1; }

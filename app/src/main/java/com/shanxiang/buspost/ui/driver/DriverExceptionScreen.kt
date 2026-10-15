@@ -167,7 +167,7 @@ class DriverExceptionViewModel : ScreenViewModel() {
                     back == null -> "异常已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     LegStatus.of(back.status) != LegStatus.EXCEPTION ->
                         "异常已提交，但后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
-                    else -> "后端回读：第 ${back.seq} 段「${back.statusLabel}」，重排由调度处理"
+                    else -> "后端回读：${legReceiptText(back)}，重排由调度处理"
                 }
             } finally {
                 busy = false
@@ -291,8 +291,7 @@ private fun LegOption(leg: TransportLeg, selected: Boolean, onSelect: () -> Unit
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (flow.canReportException) "第 ${leg.seq} 段 · ${leg.statusLabel}"
-                    else "第 ${leg.seq} 段 · ${leg.statusLabel}（不可再报）",
+                    legOptionTitle(leg, flow.canReportException),
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 2.dp),

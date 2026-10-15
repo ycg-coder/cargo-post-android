@@ -1,5 +1,7 @@
 package com.shanxiang.buspost.ui.driver
 
+import com.shanxiang.buspost.data.model.TransportLeg
+
 /**
  * 指令 §54 的七个异常分类。
  *
@@ -54,3 +56,26 @@ internal fun buildExceptionRemark(reason: DriverExceptionReason?, detail: String
     return if (joined.length <= EXCEPTION_REMARK_MAX) joined
     else joined.substring(0, EXCEPTION_REMARK_MAX - 1) + "…"
 }
+
+/**
+ * 段的订单标识。**段序是"每张单内"的序号**：`AppDriverLegRespVO.legSequence` 由后端按单算
+ * （`MultiLegServiceImpl` 的 `legSequence` 从 1 起），司机一趟同时挂两三张单时，列表里会出现
+ * 两行都念"第 1 段"（缺陷 #43）—— 报错了对象，而异常上报是不可撤销的一段状态写入。
+ *
+ * 单号取**尾 6 位**：19 位全号在 11.5sp 的行里会挤掉状态名，而这段文字的唯一用途就是在
+ * 同屏两三行里认出自己的那一张。尾号缺失（后端没给 / 演示包）必须明说"单号未给"，
+ * 不许悄悄退回来只念"第 N 段"—— 那正是缺陷本身。
+ */
+internal fun legOrderTag(orderNo: String): String =
+    orderNo.trim().takeIf { it.isNotEmpty() }
+        ?.let { "单号尾 ${it.takeLast(6)} · " }
+        ?: "单号未给 · "
+
+/** 选段行的第二行：订单标识 + 段序 + 状态，末尾按"还能不能报"补一句 */
+internal fun legOptionTitle(leg: TransportLeg, actionable: Boolean): String =
+    "${legOrderTag(leg.orderNo)}第 ${leg.seq} 段 · ${leg.statusLabel}" +
+        (if (actionable) "" else "（不可再报）")
+
+/** 提交后回执里那一格：同样要带订单标识，否则"后端回读：第 1 段"念的还是那笔歧义账 */
+internal fun legReceiptText(leg: TransportLeg): String =
+    "${legOrderTag(leg.orderNo)}第 ${leg.seq} 段「${leg.statusLabel}」"

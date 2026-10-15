@@ -785,8 +785,18 @@ fun HomeScreen(
             },
             title = { Text(n.title, color = t.ink, fontSize = (16 * scale).sp) },
             text = {
-                Column(Modifier.padding(top = 4.dp)) {
-                    Text(n.content, color = t.ink, fontSize = (13.5f * scale).sp)
+                // 正文可滚：公告按后端列宽可以写到几百字，AlertDialog 的 text 槽不滚就是把超出部分
+                // 直接剪掉 —— "能点开"不等于"能读完"，这一格的缺陷原文就是"正文无处可读"。
+                Column(
+                    Modifier
+                        .padding(top = 4.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        n.content.ifBlank { "（这条公告没有正文）" },
+                        color = t.ink,
+                        fontSize = (13.5f * scale).sp,
+                    )
                     if (n.time.isNotEmpty()) {
                         Text(
                             n.time,
@@ -853,72 +863,6 @@ fun HomeScreen(
                 nav.navigate(Routes.ADDRESS_SEARCH)
             },
         )
-    }
-}
-
-/**
- * 公告轮播 —— 对应小程序 .notice-swiper（autoplay interval=3000 circular）。
- * 每条只显示「公告」标签 + 标题，点击进消息中心看全文（与小程序 showNotice 弹窗语义对齐为跳详情）。
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun NoticeCarousel(notices: List<Notice>, onClick: () -> Unit) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    if (notices.isEmpty()) return
-    val pager = androidx.compose.foundation.pager.rememberPagerState(pageCount = { notices.size })
-    // 自动播：3s 一次，人工拖动后继续（小程序 interval=3000、circular）
-    LaunchedEffect(notices.size) {
-        if (notices.size <= 1) return@LaunchedEffect
-        while (true) {
-            kotlinx.coroutines.delay(3000)
-            val next = (pager.currentPage + 1) % notices.size
-            // 三档分开：这一轮协程被取消（换页/notices 变了）必须穿出；只是滚动被用户抢走则继续自动播
-            // （对齐小程序 circular）；其余异常留日志不崩画面。旧写法一个 runCatching 把三者混成"没事发生"。
-            try {
-                pager.animateScrollToPage(next)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // 只有"这一轮协程本身被取消"才穿出；用户抢走一次滚动时本协程的 Job 仍是活的
-                if (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isCancelled == true) throw e
-            } catch (e: Exception) {
-                android.util.Log.w("BUS_HOME_CAROUSEL", e)
-            }
-        }
-    }
-    androidx.compose.foundation.pager.HorizontalPager(
-        state = pager,
-        modifier = Modifier.fillMaxWidth().height(42.dp),
-    ) { page ->
-        val n = notices[page]
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(BusRadius.m))
-                .background(t.goldLight)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 11.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(BusRadius.s))
-                    .background(Brush.linearGradient(listOf(t.gold, t.goldDeep)))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(BusIcons.bell, null, tint = t.onPrimary, modifier = Modifier.size(11.dp))
-                Text(" 公告", color = t.onPrimary, fontSize = (11 * scale).sp, fontWeight = FontWeight.Bold)
-            }
-            Text(
-                n.title,
-                color = t.ink,
-                fontSize = (13.5f * scale).sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 9.dp),
-            )
-        }
     }
 }
 

@@ -669,12 +669,6 @@ object DemoData {
                 )
             }
 
-            path.endsWith("/bus/realtime") -> a(
-                j("routeId" to "K1", "routeName" to "K1 县城 ⇄ 云山村", "plate" to "渝A·8K231",
-                    "latitude" to movingGeo(k1, now).lat, "longitude" to movingGeo(k1, now).lng,
-                    "nextStation" to shiqiao.name, "etaMinutes" to 12, "dataSource" to "REAL"),
-            )
-
             path.endsWith("/notification/page") || path.endsWith("/driver/messages") -> j(
                 "list" to notificationsJson(), "total" to 6,
             )

@@ -7962,3 +7962,54 @@ ISO 串（`"2026-09-29T09:40:00"` / `"2026-09-29 10:20:00"`），而后端全局
 同一格出现的簿名 `check_eta_probes` 被 `assign_tokens` 判给了它，而源文件里永远不可能出现那个串 ——
 与 `ui/driver/`、`notify/` 两个目录前缀同族，进 #159。⚠ 这一句本身就是示范：把那两个坐标写成
 `file:数字` 的形状，就会当场给自己造一条不可核验的锚点。）
+
+### D-119（10-15 22:1x–22:4x）· #43 异常上报两行都念"第 1 段"：段序是**单内**序号，不是全局序号
+
+**先核契约再动手**：`AppDriverLegRespVO.java:20` 发 `orderNo`、`:23` 发 `legSequence`，而 `legSequence` 是
+后端**按单**从 1 起算的（`MultiLegServiceImpl` 给每张单各自编号）⇒ 司机一趟同时挂两三张单时，异常上报页的
+选段列表里会出现两行都念"第 1 段 · 运输中"（`DriverExceptionScreen.kt:294` 那一格），提交后的回执同一笔账
+（`DriverExceptionScreen.kt:170`）。异常上报是**对某一段的状态写入且撤不回来**（后端把段与订单一起置异常并
+告警后台），所以这不是文案口味问题：报错对象了，司机与调度各拿一套事实。
+
+补两个纯函数（`DriverExceptionReport.kt:69`/`:75`/`:80`）：`legOrderTag` 取单号尾 6 位，
+**缺单号必须明说"单号未给"**，不许悄悄退回只念段序（那正是缺陷本身，也是这条规矩最容易被人"顺手简化"回来的地方）；
+`legOptionTitle`（选段行）与 `legReceiptText`（回执）各一个出处，两个调用点都改成走函数。
+用例 +3：两单同为第 1 段必须互不相同、缺单号与全空白单号两种都没法顶掉标识、终态段的"不可再报"在文案里留痕。
+
+判据 EX-j 四条（选段行走函数=1、回执走函数=1、页面手写的"第 N 段"直出串=0、缺单号那句兜底=1），
+EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / △0，恢复后绿。
+（M6 那类教训在前，三条破口都逐条读了 `× EX-j` 的原因句而不是只看 ✔ —— 第一条 knife 若落在等价写法上，
+它也会打 ✔。）
+
+### D-120（10-15 22:4x–23:0x）· #44 "能点开"不等于"能读完"；#46 `/bus/realtime` 证伪，死演示分支立成第 39 本闸
+
+**#44（半修状态补完）**：用户侧点公告读正文这一格，阅读框早就在（`HomeScreen.kt:776`），但两处没扫干净：
+① 同文件里还留着上一代**零调用点**的轮播渲染件（点标题把人丢进消息中心那一版，而消息中心读
+`/notification/page`、公告读 `/notice/list`，两张表）；② 正文那一栏不滚 —— AlertDialog 的 text 槽不滚就是把
+超出部分直接剪掉，"能点开"被界面当成了"能读完"。本轮删死渲染件（−65 行）、正文加
+`verticalScroll`（`HomeScreen.kt:793`）、`content` 缺失时明说"（这条公告没有正文）"而不是念一格空白
+（`HomeScreen.kt:796`）。判据 DN-j 五条（接线 1 / 渲染正文 1 / 可滚 1 / 死码 0 / 活着那件渲染件 1 作反证），
+负控 +5 把（DN-14…DN-18）：18✔ / 失败 0，全部文件与原样一致。
+
+**#46 证伪（不接）**：那条实时公交端点不是缺口。服务实现 `AppBusServiceImpl.java:83-84` 那两条返回的都是
+`AppBusRespVO` 列表，而 `:156` 那一行就是 `/nearby` 里对同一份地图数据的复用（行尾注释自己写着"不重复加载"），
+`AppBusRespVO`（17 字段）因此是 `AppBusNearbyRespVO.NearbyBus`（24 字段）的**子集**：只多 `progress` / `speedKmh` / `etaToNextStationMinutes` 三个，
+且**没有 radius 过滤**（全量车队）。接它 = 每次刷新多一条更大的 REST 换三个字段。其中
+`etaToNextStationMinutes` 这一格 `docs/android/CONTRACT_EVIDENCE.md:180` 早已实测登记为 PRODUCER_NOT_FOUND，
+并有正面用例钉住"nearby 没这键 ⇒ null ⇒ 界面退到 `etaMinutes` 或说'到站时间没给'"。
+本轮只收这一格真的病：`DemoData` 里 `/bus/realtime` 那条演示分支**全工程没有任何请求点**
+（台账 `AI_ITERATION_STATE.md` 记了它，但这条规矩只活在注释里 —— 判据空转根因清单里那一条）。
+
+删分支，并把规矩落成 `tools/check_demo_path_reachability_probes.sh`（DP-a…DP-d，判据簿第 39 本）：
+演示面每条 `path.endsWith` 都要在请求侧配得上，`$M`/`$T` 前缀按 `Repo.kt` 顶部那两条 const 的真实值展开后
+**按完整后缀**比；孤儿必须 0，或进 `tools/fixtures/demo_path_exempt.txt` 点名（现 1 条：
+`/get-subscribe-template-list` —— 安卓侧走系统通知，那是小程序调用面）。
+
+⚠ **这本判据自己先空转过一轮**，两次都是：第一版 `reached()` 把演示路径削掉首段再比，于是
+`/member/user/get` 变成拿 `user/get` 去配 ⇒ 把 const M 改歪照样"配上"；而
+`val path = if (editing) "$M/address/update" else …` 这种 if/else 写法整条没认到。
+后果是 DP-d 那条反证数出来的 4 是假的，负控 DP-4 与 DP-6 双双不咬（打 ✘ 而不是 ✔）。
+改成"整串字面量按 `$M`/`$T` 认 + 完整后缀 endswith 比"后实测：**分支 47 / 请求字面量 69 / 无解释孤儿 0 /
+靠前缀展开才配上 2**，负控 6 把全咬、恢复后绿。⇒ 新判据簿必须连负控一起交，否则"0 命中"这句话本身没人验过。
+
+全量：**tests=747 failures=0 errors=0**（72 份 XML，同一轮产出）。
