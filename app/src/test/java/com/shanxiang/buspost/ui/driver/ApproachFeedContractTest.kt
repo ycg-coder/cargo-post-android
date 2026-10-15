@@ -176,4 +176,34 @@ class ApproachFeedContractTest {
             assertNotEquals(DistanceSource.NONE, source)
         }
     }
+
+    /**
+     * #61：全屏导航那一面（`DriverGuideScreen`）只有引擎口径 —— 那一屏手上没有 `RouteGuide`，
+     * 后端的 `nextStopRoad*` 根本不在场。所以"说不清在导哪一站"、"这一站不在这趟表里"、
+     * "高德还没给剩余里程"三种情况都必须闭嘴，不许拿最近的一站或直线距离凑一句话。
+     */
+    @Test
+    fun `引擎口径只在说得清是哪一站时才说话`() {
+        val a = MissionStop(stationId = 11, name = "德感", visitSequence = 1, status = 0)
+        val b = MissionStop(stationId = 12, name = "珞璜", visitSequence = 2, status = 0)
+        val stops = listOf(a, b)
+
+        assertTrue(
+            "没确定导航目标就静默",
+            ApproachFeed.fromStops(stops, null, 800) is ApproachFrame.Silent,
+        )
+        assertTrue(
+            "目标不在这趟站表里 ⇒ 不敢报站（串站是到近播报最坏的错法）",
+            ApproachFeed.fromStops(stops, MissionStop(stationId = 99, name = "别趟的站"), 800) is ApproachFrame.Silent,
+        )
+        assertTrue(
+            "剩余里程没到或为 0 ⇒ 不拿 0 米播",
+            ApproachFeed.fromStops(stops, b, 0) is ApproachFrame.Silent,
+        )
+
+        val ready = ApproachFeed.fromStops(stops, b, 800) as ApproachFrame.Ready
+        assertEquals(12L, ready.stop.stationId)
+        assertEquals(800.0, ready.meters, 0.001)
+        assertEquals(DistanceSource.ENGINE_ROAD, ready.source)
+    }
 }

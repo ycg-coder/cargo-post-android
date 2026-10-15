@@ -7,7 +7,7 @@
 > 被改动文件的行号会漂移 —— 例如 `WorkbenchScreen.kt` 的发车 `:190→:181`、到站 `:236→:234`、收班 `:263→:261`，
 > `Repo.kt` 的 `depart :941→:945`、`reportLocation :966→:970`。矩阵行已按实测改到新行号。
 > 另有一处**写作当时就不准**的引用（§F 的"下一站距离"原写 `Models.kt:863`，该行其实是轨迹状态注释，
-> `nextStopRoadDistanceMeters` 在 `Models.kt:1904`），本轮一并改正 —— 记下来是为了说明：
+> `nextStopRoadDistanceMeters` 在 `Models.kt:1924`），本轮一并改正 —— 记下来是为了说明：
 > 行号会错，**判据不能只有行号**，读本文档时用函数名/grep 定位，不要按行号硬找。
 > 各条目"当前行为"里引用的旧行号保留不动（它们是定案当时的事实）。
 >
@@ -1262,7 +1262,7 @@ grep -rniE "euclidean|haversine|straight|mock|fake|demo stepping" . \
 # 结论写进 §56：**行号白名单会漂，内容白名单不会**；新写的判据一律按内容/函数名，不按行号。
 # 被过滤掉的 4 类命中各有正当理由，不要为了"绿"而扩大白名单：
 #   · RouteSource.kt：EUCLIDEAN/STRAIGHT/MOCK 是**拒用枚举 + 别名映射表**，出现是为了拒绝，不是使用；
-#   · NavIcon.STRAIGHT（Models.kt:1857/140 等 6 处）：**转向图标"直行"**，与几何直线无关，禁止因关键字顺手改名或删除；
+#   · NavIcon.STRAIGHT（Models.kt:1877/140 等 6 处）：**转向图标"直行"**，与几何直线无关，禁止因关键字顺手改名或删除；
 #   · 天气 mock 链（Models.kt:209-245、Repo.kt:255/261/266（⑥ 后行号，原 :240-251）、WeatherCard.kt:37/144/151）：mock=true 且界面显示"网络异常，展示本地天气"，属允许显式标注的兜底；
 #   · Api.kt:105 注释提到 MockWebServer（测试注入点）；MapCanvas.kt:136 的 isFakeBoldText 是字体加粗。
 # 反过来说：**不要把 `demo` 单独加进 pattern**。`Payload.demo` / `Api.demoAllowed` / `DEMO_ALLOWED` 是贯穿全工程的

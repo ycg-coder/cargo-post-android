@@ -52,6 +52,7 @@ import com.shanxiang.buspost.core.ui.BusTextField
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
+import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.SectionTitle
@@ -89,7 +90,12 @@ class HandoverViewModel : ScreenViewModel() {
     var refreshing by mutableStateOf(false)
         private set
 
-    val pending: List<HandoverTask> get() = items.filter { !isDone(it) }
+    /**
+     * 待办 = 还没进终态的那些。#58：以前写的是 `!status.contains("已交接")`，
+     * 超时(5)/取消(6)/异常(7) 匹配不上就被留在待办里，司机再点一次 → 后端 `HANDOVER_STATUS_ILLEGAL`。
+     * 现在按后端原码判（`HandoverTask.terminal`），文案只负责显示。
+     */
+    val pending: List<HandoverTask> get() = items.filter { !it.terminal }
 
     fun reload() {
         refreshing = true
@@ -206,7 +212,6 @@ class HandoverViewModel : ScreenViewModel() {
         }
     }
 
-    private fun isDone(task: HandoverTask) = task.status.contains("已交接") || task.status.contains("完成")
 }
 
 @Composable
@@ -258,7 +263,11 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
         )
 
         SectionTitle("交接单", subtitle = "${list.size} 笔")
-        if (list.isEmpty() && !vm.loading) {
+        // #56：取单失败此前既念红条又念一句"暂无交接单"（空态只判了 `!loading`），
+        // 两件事被说成一件；而首屏连骨架都没有，白屏看着像"没有单"。
+        if (vm.loading && list.isEmpty()) {
+            SkeletonList(3)
+        } else if (list.isEmpty() && vm.error == null) {
             EmptyState(title = "暂无交接单", subtitle = "到达换乘站后由系统派发", actionText = "刷新", onAction = { vm.load() })
         }
         list.forEach { task -> HandoverCard(task = task, busy = vm.busy, onConfirm = { target = task; picked = null; remark = ""; signPng = null }) }
@@ -342,7 +351,9 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
 private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Unit) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
-    val done = task.status.contains("已交接") || task.status.contains("完成")
+    // 终态一律按后端原码判（#58）；超时/取消/异常不是"完成"，但同样不能再提交
+    val done = task.handoverState?.isDone == true
+    val closed = task.terminal
     BusCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(verticalAlignment = Alignment.Top) {
@@ -369,7 +380,12 @@ private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Uni
                         modifier = Modifier.padding(top = 3.dp),
                     )
                 }
-                BusTag(task.status.ifEmpty { "待接货" }, tone = if (done) BusTone.OK else BusTone.CLAY)
+                // 状态标签跟着后端原码走：文案没给时只能说"未给/暂不可用"，
+                // 旧写法在这里兜一句「待接货」，等于替后端认了一个它没说过的状态。
+                BusTag(
+                    task.status.ifEmpty { task.handoverState?.label ?: "状态未给" },
+                    tone = task.handoverState?.tone ?: BusTone.CLAY,
+                )
             }
             BusDivider(Modifier.padding(vertical = 9.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -388,12 +404,19 @@ private fun HandoverCard(task: HandoverTask, busy: Boolean, onConfirm: () -> Uni
             }
             Row(Modifier.padding(top = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                 SourceTag(task.orderNo.ifEmpty { null }, modifier = Modifier.weight(1f))
-                if (!done) {
+                if (!closed) {
                     BusButton(
                         text = task.actionLabel.ifEmpty { "确认交接" },
                         small = true,
                         enabled = !busy,
                         onClick = onConfirm,
+                    )
+                } else if (!done) {
+                    // 超时/取消/异常：不能再提交，但也不能念成"已交接"（#58）
+                    Text(
+                        "已${task.handoverState?.label ?: "终态"}，不能再提交交接",
+                        color = t.textTertiary,
+                        fontSize = (11.5 * scale).sp,
                     )
                 }
             }

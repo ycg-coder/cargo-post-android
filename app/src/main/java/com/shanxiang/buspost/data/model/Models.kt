@@ -1824,7 +1824,24 @@ data class HandoverTask(
      * 回执要能分开"两个都在 / 只有照片 / 只有签名 / 都没有"这四种，合成一列就全塌成一句。
      */
     val signUrl: String = "",
+    /**
+     * 后端 `AppDriverHandoverRespVO.java:53 status` 的**原码**（`TransportHandoverStatusEnum` 0..7）。
+     * #58：交接"完成与否"此前是拿中文文案 `contains("已交接")` 判的 ⇒ 超时(5)/取消(6)/异常(7)
+     * 三个终态匹配不上，它们留在待办里可以再提交一次（后端回 `HANDOVER_STATUS_ILLEGAL`）。
+     * 判状态一律用这一格，`status` 那串文案只显示不判断。-1 = 后端没给码或码在表外。
+     */
+    val statusCode: Int = -1,
 ) {
+    /** 表内码才有结论；没给码 / 表外码 = null，由页面说"状态暂不可用" */
+    val handoverState: HandoverStatus? get() = HandoverStatus.of(statusCode.takeIf { it >= 0 })
+
+    /** 已经不能再操作的四种终态：完成、超时、取消、异常 */
+    val terminal: Boolean
+        get() = when (handoverState) {
+            HandoverStatus.COMPLETED, HandoverStatus.TIMEOUT, HandoverStatus.CANCELLED, HandoverStatus.EXCEPTION -> true
+            else -> false
+        }
+
     companion object {
         fun parse(o: JSONObject) = HandoverTask(
             id = o.multiNum("id", "handoverId").toLong(),
@@ -1849,6 +1866,9 @@ data class HandoverTask(
             handoverTime = o.timeOf("handoverTime", "confirmTime"),
             photoUrl = o.multiStr("photoUrl", "handoverPhotoUrl"),
             signUrl = o.multiStr("signUrl"),
+            // 数字才算码：`status` 是 Integer（VO:53），文案在 statusName；读不到数字就是"没给码"，
+            // 不拿文案反推（#58 那条中文匹配就是这么来的）。
+            statusCode = (o.opt("status") as? Number)?.toInt() ?: -1,
         )
     }
 }

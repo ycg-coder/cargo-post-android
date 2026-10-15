@@ -1183,7 +1183,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                         onClick = { scanSheet = false; scanMode = "VERIFY"; scanner.scan("扫描取件码核销") },
                     )
                     Text(
-                        "货运散件与商城单装车会强制拍照留证；邮快件凭面单可免拍。相机不可用时点订单卡上的「核验码」手输。",
+                        "货运散件装车强制拍照留证；商城单本机不强制（后端两种都收，差的只是凭证完整度）；邮快件凭面单可免拍。相机不可用时点订单卡上的「核验码」手输。",
                         color = t.textTertiary,
                         fontSize = (11.5f * scale).sp,
                     )

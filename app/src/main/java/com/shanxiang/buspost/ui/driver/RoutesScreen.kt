@@ -41,6 +41,7 @@ import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.ErrorState
+import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.core.ui.InfoRow
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
@@ -193,7 +194,11 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
             }
 
             SectionTitle("分段任务", subtitle = "查看各段运输状态")
-            if (vm.legs.isEmpty() && !vm.loading) {
+            // #56：失败时不再叠一句"今天没有被分配运输分段"（旧写法只判 `!loading`，
+            // 红条与空态同屏 = 把"没取到"说成"确实没有"）；首屏给骨架，不白屏。
+            if (vm.loading && vm.legs.isEmpty()) {
+                SkeletonList(3)
+            } else if (vm.legs.isEmpty() && vm.error == null) {
                 Text("今天没有被分配运输分段", color = t.textTertiary, fontSize = (13 * scale).sp)
             }
             vm.legs.forEach { leg ->
@@ -246,7 +251,10 @@ private fun VehicleCard(v: BusVehicle) {
             InfoRow("线路", v.lineName.ifEmpty { "—" })
             if (!v.isReal) {
                 Text(
-                    "位置为模拟推算：开启工作台的位置上报后才会是真实 GPS。",
+                    // 来源跟着模型那一格说（`sourceText`）：后端把"班次推算"标成 SIMULATED，
+                    // 而 NONE / 根本没给 是另外两件事。旧写法三种一律念"位置为模拟推算"，
+                    // 等于替后端认了一笔它没说过的计算（缺陷 #55 第三条）。
+                    "${v.sourceText}：开启工作台的位置上报后才会是真实 GPS。",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 6.dp),

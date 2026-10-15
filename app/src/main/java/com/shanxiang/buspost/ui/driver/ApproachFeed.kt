@@ -73,4 +73,26 @@ object ApproachFeed {
         }
         return fromBackend(guide)
     }
+
+    /**
+     * 全屏导航那一面的口径（#61）：那一屏没有 `RouteGuide`（目的地由 `AppState.GuideTarget` 传进来，
+     * 不在那儿重取一次 `/driver/route`），所以**只有引擎口径**——
+     * 后端的 `nextStopRoadDistanceMeters` 不在手上，就绝不拿它来配这一站（宁可静默）。
+     *
+     * @param navigatingStop 由调用方按"高德正在导到的那一站"给出（本趟计划 + 高德报过的到达下标），
+     *        传 null 表示这一刻说不清在导哪一站 ⇒ 静默。这里不猜、不测距、不设阈值。
+     */
+    fun fromStops(
+        stops: List<MissionStop>,
+        navigatingStop: MissionStop?,
+        engineRemainMeters: Int?,
+    ): ApproachFrame {
+        val stop = navigatingStop ?: return ApproachFrame.Silent("还没确定高德正在导到哪一个任务点")
+        if (stops.firstOrNull { it.stationId == stop.stationId } == null) {
+            return ApproachFrame.Silent("导航目标不在本趟站表里，不敢报站")
+        }
+        val meters = engineRemainMeters?.takeIf { it > 0 }
+            ?: return ApproachFrame.Silent("高德还没给到这一站的剩余里程")
+        return ApproachFrame.Ready(stop, meters.toDouble(), DistanceSource.ENGINE_ROAD)
+    }
 }

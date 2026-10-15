@@ -145,6 +145,27 @@ fun DriverGuideScreen() {
         ArrivedStop(index = k, stop = stop, known = stop != null)
     }
 
+    /**
+     * 到近播报（缺陷 #61）：这一屏以前没有本机播报器 —— 司机在全屏导航那一段路上反而听不到
+     * "快到 X 站"，而工作台那一面一直有（`DriverSdkNavCard` 里那个）。配对口径只认引擎：
+     * 高德那帧剩余里程属于"我正在导到的那一站"，而这一站由本趟计划 + 高德报过的到达下标算出来，
+     * 与上面 [arrivedStop] 同一个来源 —— 两处各算一遍就会串站，那是到近播报最坏的错法。
+     */
+    val announcer = remember { ApproachAnnouncer(context) }
+    DisposableEffect(announcer) {
+        announcer.ensureTts()
+        onDispose { announcer.shutdown() }
+    }
+    val engineTargetStop = plan?.let { p ->
+        val k = (arrivedWayIndex ?: -1) + 1
+        p.wayPoints.getOrNull(k) ?: p.destination.takeIf { k >= p.wayPoints.size }
+    }
+    LaunchedEffect(plan, arrivedWayIndex, frame) {
+        val stops = plan?.stops ?: return@LaunchedEffect
+        val meters = frame?.takeIf { it.hasRemainDistance }?.remainMeters
+        announcer.onFrame(ApproachFeed.fromStops(stops, engineTargetStop, meters))
+    }
+
     var phase by remember { mutableStateOf<GuidePhase>(GuidePhase.Waiting) }
     var session by remember { mutableStateOf<NavigationSession?>(null) }
     // 视角固定车头朝上：它必须落到底层 `setNaviMode` 上（不是只改本地标签）。

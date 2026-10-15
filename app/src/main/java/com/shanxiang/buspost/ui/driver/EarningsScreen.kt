@@ -34,6 +34,7 @@ import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusTag
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.ErrorState
+import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.core.ui.InfoRow
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
@@ -94,7 +95,11 @@ fun EarningsScreen(vm: EarningsViewModel = viewModel()) {
                 Text("暂无明细", color = t.textTertiary, fontSize = (13 * scale).sp)
             }
             e.items.forEach { ItemRow(it) }
-        } else if (!vm.loading) {
+        } else if (vm.loading) {
+            // #56：首屏给骨架；失败时只留红条那一句 —— 旧写法 `else if (!vm.loading)`
+            // 让"没取到"与"确实没有收益明细"共用一句话，取单失败被说成了空结果。
+            SkeletonList(2)
+        } else if (vm.error == null) {
             Text("没有取到统计数据", color = t.textTertiary, fontSize = (13 * scale).sp)
         }
 
