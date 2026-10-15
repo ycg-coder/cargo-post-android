@@ -525,6 +525,17 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             }
         }
 
+        // 站牌（本轮补的那一根轴）：以前只能"选一条线路、看它停哪些站"，
+        // 而用户在站台上要问的是反过来的那句 —— 我站的这一站，有哪几路会停、大概几点到。
+        // 数据一直都在（`BusLine.stations` 由 points 解出、站上带 plannedMinutes），只是没人按站聚合过。
+        vm.nearby?.stations?.firstOrNull()?.let { stop ->
+            StationBoardCard(
+                station = stop,
+                arrivals = stationBoard(vm.lines, stop.name),
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+        }
+
         // 非运营时段提示卡（对标高德：明确告知用户何时可乘车）
         if (vm.state() == "off" && vm.nearby != null) {
             BusCard(
