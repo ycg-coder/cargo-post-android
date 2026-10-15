@@ -67,28 +67,83 @@ object AppUpdater {
         // `block` 同上一条理由：让 TH-e 看得见这里在等一个挂起的下载
         block: suspend (url: String, dest: File) -> Long,
     ): File {
-        val dir = File(context.cacheDir, APK_DIR).apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val dest = File(dir, "app-release.apk")
+        val dest = apkFile(context)
+        // 已经完整躺在缓存里（后台预下载下的）就直接交出去，别再让用户等一遍 79 MB。
+        // 判据是"字节数等于发布页声明的 size"，不是"文件存在"——半份文件必须重下。
+        if (isCachedComplete(context, release)) return dest
+        dest.parentFile?.mkdirs()
+        dest.delete()
+        // 下到 .part 再改名：这样"下载中途被杀/断网"留下的残片永远不会被当成完整包交出去。
+        val part = File(dest.parentFile, dest.name + ".part")
+        part.delete()
         val written = try {
-            block(release.apkUrl, dest)
+            block(release.apkUrl, part)
         } catch (e: CancellationException) {
-            dest.delete()
+            part.delete()
             throw e
         } catch (e: Exception) {
-            dest.delete()
+            part.delete()
             throw e
         }
         val declared = release.apkSize
         if (declared != null && written != declared) {
-            dest.delete()
+            part.delete()
             throw IOException("安装包不完整：写了 $written 字节，发布页说 $declared 字节")
         }
         if (written <= 0L) {
-            dest.delete()
+            part.delete()
             throw IOException("安装包是空的")
         }
+        if (!part.renameTo(dest)) {
+            part.delete()
+            throw IOException("安装包落盘失败：下载完了但改不了名（缓存目录不可写？）")
+        }
         return dest
+    }
+
+    /** 缓存里那个正式包文件（FileProvider 只开放 `cache/apk` 这一个目录） */
+    fun apkFile(context: Context): File = File(File(context.cacheDir, APK_DIR), "app-release.apk")
+
+    /**
+     * 后台预下载是否已经把这一版拿全了。
+     * `apkSize == null`（发布页没声明 size）时**一律算没下好**：没有尺子就不能声称量满了，
+     * 否则一个断在半路的文件会被当成完整包送去安装，用户拿到的就是"安装包损坏"。
+     */
+    fun isCachedComplete(context: Context, release: Release): Boolean {
+        val declared = release.apkSize ?: return false
+        val f = apkFile(context)
+        return f.exists() && f.length() == declared
+    }
+
+    /**
+     * 后台预下载：把"等 79 MB"从用户手指底下挪走。装这一步仍然必须用户点 ——
+     * 自动只许发生在"取文件"这一段，不发生在"改设备上的应用"那一段。
+     */
+    /**
+     * 是不是**不计费**网络（Wi-Fi / 以太网）。预下载只在它上面跑：79 MB 走蜂窝流量，
+     * 是拿用户的钱去等一个他没要求的下载 —— 这种事默认不该发生。
+     * 拿不到网络信息时按"计费"处理（不预下载）：宁可少下一次，不可多花用户的流量。
+     */
+    fun unmeteredNetwork(context: Context): Boolean = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val cap = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        cap?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
+    } catch (e: Exception) {
+        false
+    }
+
+    suspend fun prefetch(
+        context: Context,
+        release: Release,
+        onProgress: (Float) -> Unit = {},
+    ): Result<File> = try {
+        Result.success(
+            download(context, release) { url, dest -> httpDownload(url, dest, onProgress) }
+        )
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     /**

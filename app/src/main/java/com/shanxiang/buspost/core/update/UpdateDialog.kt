@@ -47,6 +47,8 @@ import kotlinx.coroutines.launch
 fun UpdateDialog(
     release: Release,
     onDismiss: () -> Unit,
+    /** 后台预下载已经把包拿全了 → 按钮改口「立即安装」，点下去直接交给安装器 */
+    ready: Boolean = AppUpdater.isCachedComplete(LocalContext.current, release),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -137,7 +139,9 @@ fun UpdateDialog(
                             )
                             Spacer(Modifier.width(8.dp))
                             BusDialogAction(
-                                text = "立即更新",
+                                // 后台已经下好就改口「立即安装」—— 用户该知道这一下不用再等 79 MB 了；
+                                // 没下好才叫「立即更新」（点下去才开始下载）。
+                                text = if (ready) "立即安装" else "立即更新",
                                 primary = true,
                                 onClick = {
                                     downloading = true

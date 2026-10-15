@@ -25,6 +25,11 @@ object Channels {
     const val ARRIVAL = "arrival"
     const val SERVICE = "service"
     const val WEATHER = "weather"
+    /**
+     * 更新下载专用通道。IMPORTANCE_LOW 是刻意的：这是一条**进度**，
+     * 响铃/震动会让用户以为出了事，而它唯一该说的是"下到 62% 了"。
+     */
+    const val UPDATE = "update"
 
     fun ensure(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -47,6 +52,7 @@ object Channels {
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 300, 200, 300)
             },
+            channel(UPDATE, "更新下载", "后台预下载新版本安装包的进度，不响铃", NotificationManager.IMPORTANCE_LOW),
         ).forEach { mgr.createNotificationChannel(it) }
     }
 
@@ -85,6 +91,44 @@ object Notifier {
 
     // 没授权时那次 `notify()` 抛 SecurityException，下面那段捕获已经把它收成一条
     // `BUS_NOTIFY: 通知被系统拒绝` 的日志并且不打断业务 —— 这就是运行时处理，压的只是 lint 的视野。
+    /**
+     * 一条带进度的通知（后台预下载用）。`ongoing=true` 期间用户滑不掉，
+     * 下完必须用 `ongoing=false` + `autoCancel` 再发一次收尾 —— 否则它会永久赖在栏里。
+     */
+    @SuppressLint("MissingPermission")
+    fun progress(
+        context: Context,
+        notificationId: Int,
+        title: String,
+        body: String,
+        percent: Int,
+        ongoing: Boolean,
+        route: String? = null,
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            if (route != null) data = Uri.parse(Routes.deepLink(route))
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pending = PendingIntent.getActivity(
+            context, notificationId, intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val note = NotificationCompat.Builder(context, Channels.UPDATE)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setProgress(100, percent.coerceIn(0, 100), percent <= 0)
+            .setOngoing(ongoing)
+            .setAutoCancel(!ongoing)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(pending)
+            .setColor(ContextCompat.getColor(context, R.color.bus_primary))
+            .build()
+        runCatching { context.getSystemService(NotificationManager::class.java).notify(notificationId, note) }
+            .onFailure { e -> android.util.Log.w("BUS_NOTIFY", "更新进度通知没发出去：$e") }
+    }
+
     @SuppressLint("MissingPermission")
     fun push(
         context: Context,

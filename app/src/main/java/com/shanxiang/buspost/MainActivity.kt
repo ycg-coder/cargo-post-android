@@ -23,6 +23,7 @@ import com.shanxiang.buspost.core.update.UpdateOutcome
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.notify.NotifyWorker
+import kotlinx.coroutines.launch
 import com.shanxiang.buspost.ui.BusPostRoot
 import com.shanxiang.buspost.core.ui.BusAppTheme
 
@@ -59,14 +60,45 @@ class MainActivity : ComponentActivity() {
             //    跟任何正式版都比"旧"，所以它一定会提示 —— 装不上是签名的事，由弹窗里那句原话承担，
             //    不在这里替用户决定"你不需要知道有新版本"。
             var updateRelease by remember { mutableStateOf<Release?>(null) }
+            var prefetchJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+            val appContext = androidx.compose.ui.platform.LocalContext.current
+            val uiScope = androidx.compose.runtime.rememberCoroutineScope()
             LaunchedEffect(Unit) {
                 val latest = (AppUpdater.check() as? UpdateOutcome.Available)?.release ?: return@LaunchedEffect
-                if (latest.tagName != Prefs.updateSkipTag) updateRelease = latest
+                if (latest.tagName == Prefs.updateSkipTag) return@LaunchedEffect
+                updateRelease = latest
+                if (AppUpdater.isCachedComplete(appContext, latest)) return@LaunchedEffect
+                if (!AppUpdater.unmeteredNetwork(appContext)) return@LaunchedEffect
+                // 后台预下载：把 79 MB 的等待从用户手指底下挪走。三条边界写死在这里 ——
+                // ① 只在非计费网络跑；② 一次冷启动只自动发起一次；③ 用户点「稍后再说」就取消任务。
+                // 装这一步永远要人点：自动只发生在"取文件"这一段，不发生在"改设备上的应用"那一段。
+                val noteId = "update_prefetch".hashCode() and 0x7fffffff
+                val sizeMb = ((latest.apkSize ?: 0L) / 1048576L)
+                prefetchJob = uiScope.launch {
+                    AppUpdater.prefetch(appContext, latest) { p ->
+                        com.shanxiang.buspost.notify.Notifier.progress(
+                            appContext, noteId, "正在后台下载 ${latest.tagName}",
+                            "已下载 ${(p * 100).toInt()}%（共约 $sizeMb MB）· 下好后点一下就能装",
+                            (p * 100).toInt(), ongoing = true,
+                        )
+                    }.onSuccess {
+                        com.shanxiang.buspost.notify.Notifier.progress(
+                            appContext, noteId, "新版本已下载好",
+                            "点按安装 ${latest.tagName}", 100, ongoing = false,
+                        )
+                    }.onFailure { e ->
+                        com.shanxiang.buspost.notify.Notifier.progress(
+                            appContext, noteId, "更新包没下完",
+                            e.message ?: "未知原因，可在弹窗里再点一次「立即更新」", 0, ongoing = false,
+                        )
+                    }
+                }
             }
             updateRelease?.let { release ->
                 UpdateDialog(
                     release = release,
                     onDismiss = {
+                        prefetchJob?.cancel()   // 用户说不装了，就别继续吃他的流量
                         Prefs.updateSkipTag = release.tagName
                         updateRelease = null
                     },
