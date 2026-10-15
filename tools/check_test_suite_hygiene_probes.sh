@@ -107,7 +107,7 @@ for t in "${TARGETS[@]}"; do
 done
 
 echo "SU-a *Test.kt 文件数 / 其中 0 条 @Test 的空壳 = $SUA_FILES/$SUA_EMPTY （目标 ≥47/0：凑数空类归零）$SUA_EMPTY_LIST"
-echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 71/2：同一机制数得出 0 条，SU-a 的 0 不是空跑；71 = D-085~D-088 四本 + 签名纯层 + 本轮站牌纯层 ui/user/StationBoardTest.kt）"
+echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 72/2：同一机制数得出 0 条，SU-a 的 0 不是空跑；71 = D-085~D-088 四本 + 签名纯层 + 本轮站牌纯层 ui/user/StationBoardTest.kt）"
 echo "SU-c @Ignore 生效行 / @Test 注解行（反证）      = $SUC_IGNORE/$SUC_TESTLINES （目标 0/≥476：不许有用例被挂起来永远绿）"
 echo "SU-d 点名却未新建的类仍不存在 / 同名存在         = $SUD_ABSENT/$SUD_PRESENT （目标 7/3：建第 8 本空壳即红，撤掉那 3 本也红）"
 echo "SU-e 归位表落点类存在                            = $SUE_PRESENT （目标 10：缺哪本会在行尾列出）$SUE_MISSING"
@@ -115,7 +115,7 @@ echo "SU-e 归位表落点类存在                            = $SUE_PRESENT �
 fail=0
 [ "$SUA_FILES" -ge 47 ] || { echo "× SU-a *Test.kt 少于 47 本：有落点类被删了（归位表随之念空）"; fail=1; }
 [ "$SUA_EMPTY" = 0 ] || { echo "× SU-a 出现 0 条 @Test 的 *Test.kt（=$SUA_EMPTY 本：$SUA_EMPTY_LIST）——为凑数新建的空壳"; fail=1; }
-[ "$SUSB_ALL" = 71 ] || { echo "× SU-b 反证的源集文件数变了（现 $SUSB_ALL，预期恰好 71）：先核对改动面再重测这条，别顺手改闸（D-085 65→66 票面簿；D-086 66→67 钱包簿 ui/user/WalletRowsContractTest.kt；67→68 取件时间窗簿；68→69 收藏入口簿；69→70 签名纯层簿；本轮 70→71 = 站牌纯层簿 ui/user/StationBoardTest.kt（5 条 @Test，SU-a 同轮复量 0 空壳仍为 0）"; fail=1; }
+[ "$SUSB_ALL" = 72 ] || { echo "× SU-b 反证的源集文件数变了（现 $SUSB_ALL，预期恰好 71）：先核对改动面再重测这条，别顺手改闸（D-085 65→66 票面簿；D-086 66→67 钱包簿 ui/user/WalletRowsContractTest.kt；67→68 取件时间窗簿；68→69 收藏入口簿；69→70 签名纯层簿；70→71 站牌纯层簿 ui/user/StationBoardTest.kt；本轮 71→72 = 任务段站序同源簿 core/navigation/NavigationStopsTest.kt（5 条 @Test，SU-a 同轮复量 0 空壳仍为 0）"; fail=1; }
 [ "$SUSB_NOTEST" = 2 ] || { echo "× SU-b 反证掉了（无 @Test 的文件数=$SUSB_NOTEST≠2）：SU-a 那个 0 无法证明是归零还是没命中"; fail=1; }
 [ "$SUC_IGNORE" = 0 ] || { echo "× SU-c 出现 @Ignore（$SUC_IGNORE 行）：被挂起的用例是永远绿的那种假绿"; fail=1; }
 [ "$SUC_TESTLINES" -ge 476 ] || { echo "× SU-c 反证掉了（@Test 注解行数=$SUC_TESTLINES）：SU-c 的 0 无法证明机制命中过注解行"; fail=1; }
