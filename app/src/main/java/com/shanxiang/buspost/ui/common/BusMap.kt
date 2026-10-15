@@ -155,7 +155,21 @@ fun BusMap(
         modifier = modifier.fillMaxSize(),
         factory = { ctx ->
             val view = MapView(ctx)
-            runCatching { view.onCreate(null) }.onFailure { unavailable = true }
+            try {
+                view.onCreate(null)
+                // ⚠ 必须在这里显式 onResume：factory 是在 composition 里才把 MapView 造出来的，
+                //   那一刻宿主的 lifecycle **早就 RESUMED 了**，上面那个 observer 只能收到"之后"的事件，
+                //   ON_RESUME 永远不会再补发一次 ⇒ onResume() 一次都没被调过 ⇒ 高德**一直黑屏**
+                //   （官方要求 onCreate 之后必须 onResume 才开始出图）。
+                //   真机症状就是：这一格看起来"地图没显示、只有站点和路线"——其实那正是
+                //   黑屏之后被降级去画的自绘兜底图。
+                view.onResume()
+            } catch (e: Exception) {
+                // 以前是 runCatching{}.onFailure { unavailable = true } —— 异常整个丢掉，
+                // 于是"为什么不可用"永远查不到，只能反复猜。日志留原文，界面那句仍走兜底文案。
+                android.util.Log.e("BUS_MAP", "MapView 初始化失败（onCreate/onResume）", e)
+                unavailable = true
+            }
             mapView = view
             view
         },
