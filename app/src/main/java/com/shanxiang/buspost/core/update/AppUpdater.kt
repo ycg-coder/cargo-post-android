@@ -134,8 +134,15 @@ object AppUpdater {
      */
     fun installIntent(context: Context, apk: File): Intent {
         val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.fileprovider", apk)
-        return Intent(Intent.ACTION_VIEW).apply {
+        // 用 ACTION_INSTALL_PACKAGE 而不是 ACTION_VIEW：
+        // ACTION_VIEW 只是"给一个能处理这个 MIME 的组件看看"，MIUI 的安装器收到它常常
+        // 跳去「应用详情页」而不是真的起安装 —— 用户侧的表现就是"点了更新、什么都没发生、
+        // 回头还是旧版本"，而且不报任何错（真机 2026-10-15 就是这个形状）。
+        // ACTION_INSTALL_PACKAGE 是系统为"装这个包"专门留的动作，并且支持 EXTRA_RETURN_RESULT
+        // 把装没装成回传 —— 调用方（UpdateSection / UpdateDialog）正是靠它把结果说给人听。
+        return Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }
