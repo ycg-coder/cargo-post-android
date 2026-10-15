@@ -483,7 +483,19 @@ fun readinessOf(
  * 客户端把它跳掉就等于替调度改路线；失败点继续作为目的地，处理它走异常上报（V-3）。
  */
 internal fun nextNavigableStop(guide: RouteGuide): MissionStop? =
-    guide.stops.filter { !it.isDone && it.hasGeo }.minByOrNull { it.visitSequence }
+    navigableStops(guide).minByOrNull { it.visitSequence }
+
+/**
+ * 本任务段**还没去的**全部站点，按后端 `visitSequence` 原序返回。
+ *
+ * 它是 [nextNavigableStop] 的同源上位：两者共用同一个过滤条件（未完成 + 有坐标），
+ * 所以"下一站"永远等于这个列表的第一个 —— 用例 `NavigationStopsTest` 就钉这条等式。
+ * 全任务段导航要把中间站当途经点喂给高德（`calculateDriveRoute` 的第三个参数），
+ * 而途经点顺序必须与"下一站"的口径**出自同一处**：一旦导航页自己再 filter/sort 一遍，
+ * 就会出现"高德按 A 序导、界面按 B 序显示第 i/n 站"，那是客户端替调度改了路线（硬规则 3）。
+ */
+internal fun navigableStops(guide: RouteGuide): List<MissionStop> =
+    guide.stops.filter { !it.isDone && it.hasGeo }.sortedBy { it.visitSequence }
 
 /**
  * 「自动进导航」的唯一判定（用户口径 A：在途司机打开 App 就直接给他导航）。
