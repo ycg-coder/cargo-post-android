@@ -1197,7 +1197,11 @@ data class TransportLeg(
         }
     companion object {
         fun parse(o: JSONObject): TransportLeg {
-            val road = o.multiArr("navigationPolyline", "polyline", "track").map {
+            // 段的真实道路折线只有一个键：`AppSendLegRespVO.navigationPolyline`
+            //（`AppDriverLegRespVO` 根本没有折线键）。旧写法并列了 `polyline` 与 `track` ——
+            // 那两个分别是 `/driver/route` 的**全任务段脊柱**与 `/send/track` 的**整单轨迹**，
+            // 段报文里出现它们只可能是串了端点：一段卡画出整趟的线，看着像"这一段的几何"（缺陷 #62）。
+            val road = o.multiArr("navigationPolyline").map {
                 Geo(it.multiNum("latitude", "lat"), it.multiNum("longitude", "lng"))
             }.filter { it.lat != 0.0 && it.lng != 0.0 }
             // 后端 `AppSendLegRespVO:23-33` 给的就是这四个键（站点档案无坐标时为 null），

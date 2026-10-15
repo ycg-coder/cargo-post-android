@@ -1530,7 +1530,7 @@ main 源码里 `catch (e: Throwable)` 生效 **6** 处、`catch (e: Exception | 
    `Locator` 的取点、`HandoverScreen` 的照片上传 → 换 `attempt { … }`（TH-f 的 12 个调用点就是这批）；
    `Orders`/`Goods`/`Send`/`Widget`/`LoginViewModel`/`DriverLocationService`/`ScreenViewModel.work()` → 在既有
    `catch (e: Exception)` **前面**补一条先 `throw e` 的取消出口（TH-d 38/38 那批的 UI 侧对应物）；
-   `WorkbenchScreen.kt:575-581` 的照片上传是第三种：**整圈 `runCatching` 仪式直接摘掉**，改成裸调用
+   `WorkbenchScreen.kt:549-555` 的照片上传是第三种：**整圈 `runCatching` 仪式直接摘掉**，改成裸调用
    —— 那一圈原本只是"接住再原样抛出"，它唯一的实际作用就是在半空中接一次 `CancellationException`；
    给它补取消出口反而是给不存在的通路开药。**三种收法形状不同、结论同一条：没有任何一处把取消接在半空中。**
    `HomeScreen` 轮播**故意不是裸 `throw e`**：用户手指抢走滚动时的取消必须被咽下去（不然轮播会把自己停掉），
@@ -1578,7 +1578,7 @@ TH-j 1/1/0 · TH-k 1/1 · TH-l 2/2/0）；负控十三本**全批复跑** rc 全
    （清单见 `THIRD_PARTY_NOTICES.md` §6 F-1 段、状态板 DONE「F-1」的"改动面清点"、审计 §80 七）。
 
 尾巴（在册，不当已通过）：`apiCall` 生产调用点仍 **0**（只登记不谎称已用）；`runCatching` 在 main 仍剩 **34** 处
-（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1083` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
+（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1067` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
 记为"未收"而不是"已判无害"）；§二十 的 Worker 重试语义（真失败回 `retry` 而不是 `success`）**没做**；
 §三十三 的四类失败分型仍只是台账口径，**没落进代码**；设备侧一律 `NOT VERIFIED ON DEVICE`
 （真实取消来自手指划走页面 / Worker 被系统停止 / 进程被杀，JVM 只能造 `cancelAndJoin` 与 `withTimeoutOrNull` 两种）；
@@ -4806,7 +4806,7 @@ DA-d 在册 **262**、新增 **5**、消失 **0**／DA-e ID-MISS **293**（闸�
 - `AppSendLegRespVO.java:24-33` 的 `fromLongitude`（:24 就是这个字段）—— 同一锚点在审计簿出现 5 处，:792 / :800 / :2234 三处红，
   判给它们的是 `statusName`/`statusLabel`/`fromGeo`/`navigationPolyline`，而 :21-36 那个窗口里这四个名字一个都没有。
 - `AppDriverLegRespVO.java:11-74` 的 `navigationSource`（:65）—— 红在 :792：判到 `toGeo`/`navigationPolyline`，而那句话的本意正是"该 VO 没有任何几何字段"。
-- `fromLatitude` 的读点（现 `Models.kt:1205-1208`）与 `etaMinutes` 的读点（现 `Models.kt:1220`）—— ㊶ 当时这两条锚点写的是 1118-1121 与 1133，两条被分到的名字**正好串了位**（别名句尾挨着后一条、`etaMinutes` 挨着前一条）；㊻ 按现读把它们改成各自的真读点。
+- `fromLatitude` 的读点（现 `Models.kt:1205-1208`）与 `etaMinutes` 的读点（现 `Models.kt:1224`）—— ㊶ 当时这两条锚点写的是 1118-1121 与 1133，两条被分到的名字**正好串了位**（别名句尾挨着后一条、`etaMinutes` 挨着前一条）；㊻ 按现读把它们改成各自的真读点。
 - `ui/BusPostRoot.kt:134` 的 `Routes.SETTINGS`（:134 那一行就是它）—— 该行唯一的锚点被旁边那句 `GIT=ENVIRONMENT_BLOCKED` 借走了词。
 
 ⚠ 修法只有"给锚点补一个**它自己窗口里真有的标识符**当见证 ＋ 不指锚点的旁白另起一行（无锚点的行不进取词面）"这一种：
@@ -5608,7 +5608,7 @@ canonical 仍是 D-070 §3 那一发。
 
 ### D-076 续二（同日 13:5x）· #40 地图"我的位置"：图层从未开启 + 用户端从没申请过权限，两件事叠成一个现象
 
-实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：清单声明了 `ACCESS_FINE_LOCATION`（`AndroidManifest.xml:15-17`），但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `Locator.once`（`core/loc/Locator.kt:201`）也拿不到点，所以页面连"按位置排序"都是空的。
+实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：`AndroidManifest.xml:15-17` 声明了 `ACCESS_FINE_LOCATION`，但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `core/loc/Locator.kt:201` 也拿不到点，所以页面连"按位置排序"都是空的。
 
 改法三处：① `BusMap` 新增 `showMyLocation` 参数并真的开图层（**由调用方按授权状态传值** —— SDK 不会替我们弹框，未授权开图层等于承诺一个永远不来的位置）；② 实时公交页进页读一次授权、未授权申请一次，被拒不追弹；授权回来若还没有点就重跑 `load`；③ 定位提示收成**纯函数 `locationHintFor(granted, fix)`** 三态各说各话，顺手收掉 §51 在册那条"定位三态被折叠成 `me==null`"——旧文案在用户已经允许之后还教他去"系统设置里允许定位"。
 
@@ -6028,7 +6028,7 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
 ### D-081（10-12 19:1x）· #54 用户端「我的乘车安排」：`/send/arrangements` 这条**通路一直是活的，缺的只有读它的那一页**
 
 **起点**（`ANDROID_PARITY_AUDIT_V2.md:155` 记的是 `REAL_COMPLETE`，但全仓零消费者）：
-`Repo.myArrangements()`（`Repo.kt:763`）与 `Arrangement`（`Models.kt:2064`）都在，`grep` 只命中它们自己 ⇒
+`Repo.myArrangements()`（`Repo.kt:763`）与 `Arrangement`（`Models.kt:2068`）都在，`grep` 只命中它们自己 ⇒
 通路侧是死代码、界面侧是缺那一格。这一格也不是新功能：`DriverLocationService.kt:53` 那条常驻通知写的就是
 "正在为**乘车安排**与到车提醒上传车辆位置"，而用户端从来没有"乘车安排"可看。
 
@@ -6895,7 +6895,7 @@ D-087 与本轮两批负控里 `doc_anchor_negative_controls.sh` 都以 rc=2 收
 **2 条是真错配**：`ANDROID_PARITY_AUDIT_V2.md:789` 那一句同时写着"fromLatitude 的读点"与"etaMinutes 的读点"两个锚点，
 我的片段规则把 `fromLatitude` 这个证据分给了**后一个**锚点（`Models.kt:1156` 被搬到 1168 = fromLatitude 那行），
 又把前一个搬成 `1169-1172`（差一行）—— **正是那句话自己点名过的"两条被分到的名字正好串了位"这个老病，我在修它的同一轮复现了它**。
-按实际行号改正为 `Models.kt:1205-1208`（fromLatitude）与 `Models.kt:1220`（etaMinutes），复测后 DA-d 重新对齐。
+按实际行号改正为 `Models.kt:1205-1208`（fromLatitude）与 `Models.kt:1224`（etaMinutes），复测后 DA-d 重新对齐。
 ⇒ 教训并入 (54) 同族：**同句多锚点时，"贴着锚点取片段"必须先按锚点切段，否则邻近规则会跨锚点拿证据**。
 
 **仍红的那一格，照实写**：DA-e 现读 **321 > 闸门 286**。**下限一个字没动。**

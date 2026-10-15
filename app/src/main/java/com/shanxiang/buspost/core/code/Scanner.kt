@@ -1,6 +1,5 @@
 package com.shanxiang.buspost.core.code
 
-import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -10,8 +9,12 @@ import com.journeyapps.barcodescanner.ScanOptions
 /**
  * 扫码（装车 / 妥投 / 取件核销）—— 对应小程序 `wx.scanCode({ scanType: ['qrCode','barCode'] })`。
  *
- * 与小程序同口径：扫码失败或用户取消都不抛异常，返回 null 由页面走「手输单号兜底」，
- * 保证"相机不可用 / 码磨损"时作业流程不被堵死。
+ * 三种结局要分开说（缺陷 #55/#54 那一族：把两件事说成一件）：
+ * ① 扫到了 → `onResult(内容)`；
+ * ② 用户自己按了返回/取消 → `onResult(null)`，页面提示可以怎么继续；
+ * ③ **这台机器打不开扫码器**（无相机、扫码 activity 不存在）→ `onUnavailable()`。
+ * 旧写法把 ③ 也塞进 `onResult(null)`，于是"点了没反应"被念成"你取消了"，
+ * 司机再点一次还是没反应 —— 而 ③ 的正确出口是换一条提交路径，不是再点一次。
  */
 class BusScanner(private val onResult: (String?) -> Unit) {
 
@@ -24,7 +27,7 @@ class BusScanner(private val onResult: (String?) -> Unit) {
 }
 
 @Composable
-fun rememberBusScanner(onResult: (String?) -> Unit): BusScanner {
+fun rememberBusScanner(onResult: (String?) -> Unit, onUnavailable: () -> Unit = {}): BusScanner {
     val scanner = remember { BusScanner(onResult) }
     val launcher = rememberLauncherForActivityResult(ScanContract()) { result ->
         onResult(result.contents?.takeIf { it.isNotBlank() })
@@ -35,11 +38,7 @@ fun rememberBusScanner(onResult: (String?) -> Unit): BusScanner {
             .setPrompt(prompt)
             .setBeepEnabled(true)
             .setOrientationLocked(false)
-        runCatching { launcher.launch(options) }.onFailure { onResult(null) }
+        runCatching { launcher.launch(options) }.onFailure { onUnavailable() }
     }
     return scanner
 }
-
-/** 相机权限被拒时的兜底提示文案（与小程序手输兜底同语义） */
-fun scanFallbackHint(context: Context): String =
-    "相机不可用时，可直接输入单号完成核验"

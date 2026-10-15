@@ -133,6 +133,14 @@ def main():
             keep = [h for h in hits if ok(h)]
             if len(keep) == 1:
                 hits = keep
+            elif len(keep) > 1:
+                # 第 2b 趟：内容完全相同的行在文件里出现多次（`etaMinutes = o.multiNumOrNull(…)`
+                # 这种一行在四个 parse 块里长得一模一样），标识符窗口分不开它们。
+                # 这时只有"离旧位置最近、且第二名差得够远"才算同一次位移；否则退回人工，
+                # 让人去读那一段到底是哪个类的 parse —— 猜错就是把 A 类的读点说成 B 类。
+                near = sorted(keep, key=lambda x: abs(x - a))
+                if len(near) < 2 or abs(near[1] - a) - abs(near[0] - a) >= 15:
+                    hits = [near[0]]
         # 第 3 趟：一块被改掉（0 命中）时，退到"旧位置附近找唯一含全部标识符的窗口"。
         # 只认唯一落点：附近有第二处就把这条退回人工，绝不猜。
         if not hits and r["tokens"]:

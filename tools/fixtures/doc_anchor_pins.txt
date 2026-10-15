@@ -117,6 +117,7 @@
 7a351063	ID-MISS	SendScreen.kt:559	ANDROID_PARITY_AUDIT_V2.md:2214	distanceCaliberText
 7cb38dfb	ID-MISS	Models.kt:1503-1536	ANDROID_PARITY_AUDIT_V2.md:1932	notify/AlertEngine/Arrangement/etaMinutes
 7ce18999	ID-MISS	DriverShell.kt:37	ANDROID_V2.1_CHECKLIST.md:121	AppState/setRole/driver
+7dacd480	ID-MISS	WorkbenchScreen.kt:653	DECISION_LOG.md:5611	ACCESS_FINE_LOCATION/RequestPermission
 7dbbf73c	ID-MISS	Repo.kt:983	AI_ITERATION_STATE.md:4526	AppDriverArriveReqVO/shiftId/stationId/arrive
 7dd46c37	ID-MISS	ApiTest.kt:167	AI_ITERATION_STATE.md:3064	suspend
 7e189af9	ID-MISS	AlertEngine.kt:45	DECISION_LOG.md:2732	AI_ITERATION_STATE/AlertEngine
@@ -168,7 +169,7 @@ b5d7418d	ID-MISS	AppPoliciesContractTest.kt:60	DECISION_LOG.md:5938	tests/comple
 b64d70f0	ID-MISS	Repo.kt:227	ANDROID_PARITY_AUDIT_V2.md:815	Android/district/Locator/HomeScreen
 b6c79056	ID-MISS	WorkbenchScreen.kt:445	ANDROID_PARITY_AUDIT_V2.md:1769	driver
 b79733c5	ID-MISS	Repo.kt:873	DECISION_LOG.md:5575	return/loading/error/error
-b7b032ca	ID-MISS	BusMap.kt:157-166	DECISION_LOG.md:5611	isMyLocationEnabled/MyLocationStyle/isMyLocationButtonEnabled/ACCESS_FINE_LOCATION
+b7b032ca	ID-MISS	BusMap.kt:157-166	DECISION_LOG.md:5611	isMyLocationEnabled/MyLocationStyle/isMyLocationButtonEnabled/AndroidManifest
 b869236f	ID-MISS	Models.kt:563	CONTEXT_LOCK.md:2080	sourceOf
 b97cb17b	ID-MISS	Repo.kt:822	CONTRACT_EVIDENCE.md:276	positionSource
 b9aa8d71	ID-MISS	BusPostRoot.kt:87	DECISION_LOG.md:3125	ShellDecision/internal/deepLinkTarget/route
@@ -194,7 +195,6 @@ c9d109e3	ID-MISS	Repo.kt:716	AI_ITERATION_STATE.md:3427	optBoolean/inService/loc
 ca7b61a5	ID-MISS	DriverNavScreen.kt:480	DECISION_LOG.md:2533	multiNumOrNull
 cc8e37cd	ID-MISS	HandoverScreen.kt:260	DECISION_LOG.md:2532	originPrice/sales/needPhoto
 cd233f97	ID-MISS	BusScreen.kt:297	CONTRACT_EVIDENCE.md:135	BusLine/distanceMeters/Station
-ce244ac4	ID-MISS	Models.kt:1721-1730	CONTRACT_EVIDENCE.md:205	totalPrice/unitFee/mileageFee/count
 cecb8b38	ID-MISS	GoodsDetailScreen.kt:115	AI_ITERATION_STATE.md:3254	update/update/gatedUserCreate
 d0621a23	ID-MISS	Models.kt:13	ANDROID_PARITY_AUDIT_V2.md:1256	distanceMeters/haversine
 d08fb8a1	ID-MISS	DriverMissionMap.kt:71	ANDROID_PARITY_AUDIT_V2.md:2220	token/AMAP_KEY
@@ -219,6 +219,7 @@ e58c18dc	ID-MISS	Repo.kt:873	AI_ITERATION_STATE.md:429	nearby/return/loading/err
 e59558fc	ID-MISS	Models.kt:287	CONTEXT_LOCK.md:2085	tools/default_value_census/c_no_producer
 e640d1fb	ID-MISS	OssLicensesScreen.kt:29	THIRD_PARTY_NOTICES.md:456	OpenStreetMap/contributors/resources
 e6766197	ID-MISS	BusScreen.kt:247	DECISION_LOG.md:3028	ANDROID_PARITY_AUDIT_V2
+e68cad5e	ID-MISS	Models.kt:497	AI_ITERATION_STATE.md:2833	Minutes/check_eta_probes
 e7cd007d	ID-MISS	TimestampLocalDateTimeDeserializer.java:24-27	AI_ITERATION_STATE.md:325	readyTime
 ea6debe8	ID-MISS	BusScreen.kt:98	AI_ITERATION_STATE.md:1699	Property/public/exposes/internal
 eac36ab1	ID-MISS	Repo.kt:202	DECISION_LOG.md:2640	setRole
@@ -247,4 +248,3 @@ fdc58260	ID-MISS	WorkbenchScreen.kt:576-579	DECISION_LOG.md:2567	DEVICE_VERIFIED
 fe059f6f	ID-MISS	ActionGate.kt:63	AI_ITERATION_STATE.md:685	rethrow
 ff25748f	ID-MISS	Models.kt:1494	AI_ITERATION_STATE.md:3005	DriverStateTest
 fff23f68	ID-MISS	LoginViewModelTest.kt:84	AI_ITERATION_STATE.md:1991	failures/flake
-e68cad5e	ID-MISS	Models.kt:497	AI_ITERATION_STATE.md:2833	check_eta_probes

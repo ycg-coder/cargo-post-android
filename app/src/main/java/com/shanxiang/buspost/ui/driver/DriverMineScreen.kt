@@ -130,6 +130,11 @@ fun DriverMineScreen() {
                 MineRow(BusIcons.settings, "设置", "主题 / 适老 / 提醒", {
                     nav.navigate(Routes.SETTINGS)
                 })
+                BusDivider()
+                // 驾驶模式（字号 ×1.2 / 大按钮 / 夜间）此前只有 `DrivingModeRow` 这一个实现、
+                // 而它零调用点 —— 开关做完了却没有一格能按（缺陷 #62）。挂在"通用"这一格最靠上：
+                // 司机在开车前调它，与"个人资料/设置"同一个场景动线。
+                DrivingModeRow(Modifier.padding(top = 10.dp))
             }
         }
 

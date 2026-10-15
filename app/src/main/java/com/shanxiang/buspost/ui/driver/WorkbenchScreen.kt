@@ -428,32 +428,6 @@ class WorkbenchViewModel : ScreenViewModel() {
         }
     }
 
-    /**
-     * 收班 = **到末站到站**（审计 §39）：`POST /driver/arrive` 到达线路最大 sequence 站时，
-     * 后端把执行记录置已完成（`DriverAppServiceImpl:914-920`），这才是收班的真出口。
-     *
-     * 旧写法把 `"shift-$id"` 当 `legId` 发给 `@NotNull Long legId` 的 `/driver/leg/complete`：
-     * ① 字符串转 Long 必 400；② 把"客运班次"和"货运运输段"两个业务域混进同一个调用（硬规则 1）。
-     *
-     * 后端有**防跳站**：`targetSeq` 必须在 `currentSeq + 1` 之内，否则 `DRIVER_STATION_ORDER_ILLEGAL`
-     * （`DriverAppServiceImpl:900-911`）。所以没走到末站前一格时点收班会被**服务端拒**，
-     * 这里不预先猜"能不能收"：错误如实进 `error`，下一次 `load()` 按后端班次状态把 `Running.shiftId` 复位（`:169-176`）。
-     */
-    fun finish() {
-        val s = shift ?: return
-        val terminalId = s.stations.lastOrNull()?.id ?: 0L
-        if (terminalId == 0L) {
-            receipt = "后端没给末站编号，收班提交不了——请到末站后用「到站」收口本班"
-            return
-        }
-        act("收班（末站到站）") {
-            val ack = Repo.arrive(s.shiftId, terminalId)
-            docked = false
-            Running.shiftId = 0L
-            ack
-        }
-    }
-
     /** 扫码结果 → 待办任务：单号或取件码任一匹配（小程序 scanOrder 同口径） */
     fun matchScan(scanned: String): PickupTask? {
         val s = scanned.trim()
@@ -662,20 +636,30 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
 
     // 扫码模式：LOAD 装车 / DELIVER 妥投 / VERIFY 取件核销（对齐小程序 scanToLoad 等三个入口）
     var scanMode by remember { mutableStateOf("") }
-    val scanner = rememberBusScanner { scanned ->
-        val mode = scanMode
-        scanMode = ""
-        if (scanned.isNullOrBlank()) {
-            // 取消扫码不报错，提示可手输兜底（相机不可用时作业流程不能被堵死）
-            if (mode.isNotEmpty()) vm.showReceipt("已取消扫码，可用下方「手输单号」兜底")
-            return@rememberBusScanner
-        }
-        when (mode) {
-            "LOAD" -> vm.beginScanLoad(scanned)
-            "DELIVER" -> vm.beginScanDeliver(scanned)
-            "VERIFY" -> vm.scanVerify(scanned)
-        }
-    }
+    val scanner = rememberBusScanner(
+        onResult = { scanned ->
+            val mode = scanMode
+            scanMode = ""
+            if (scanned.isNullOrBlank()) {
+                // 取消不报错，但要按模式说清下一步走哪条路：只有取件核销那一格真有手输入口
+                // （任务卡上的「核验码」）；装车/妥投的扫码只是快捷方式，兜底是回卡直接选单。
+                // 旧文案对三种模式统一许诺了一个不存在的「手输单号」按钮（缺陷 #54）。
+                if (mode == "VERIFY") vm.showReceipt("已取消扫码，可用任务卡上的「核验码」手输这一单")
+                else if (mode.isNotEmpty()) vm.showReceipt("已取消扫码，可在任务卡上直接选这一单提交")
+                return@rememberBusScanner
+            }
+            when (mode) {
+                "LOAD" -> vm.beginScanLoad(scanned)
+                "DELIVER" -> vm.beginScanDeliver(scanned)
+                "VERIFY" -> vm.scanVerify(scanned)
+            }
+        },
+        onUnavailable = {
+            // 打不开扫码器 ≠ 用户取消：把它念成"你取消了"，司机就会再点一次、再没反应一次
+            scanMode = ""
+            vm.showReceipt("这台设备打不开扫码器（相机不可用），请在任务卡上直接选单提交")
+        },
+    )
 
     // 需要拍照的作业（货运装车 / 商城单装车与妥投）→ 自动拉起选图
     LaunchedEffect(vm.pendingLoad, vm.pendingProof) {
