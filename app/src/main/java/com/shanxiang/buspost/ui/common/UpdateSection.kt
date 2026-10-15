@@ -1,5 +1,8 @@
 package com.shanxiang.buspost.ui.common
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +63,19 @@ fun UpdateCheckRow() {
     var progress by remember { mutableFloatStateOf(0f) }
     /** 安装那一步的原话（含"还差授权"那一格）：只在真出事时出现，不预置、不美化、不写"已更新" */
     var problem by remember { mutableStateOf<String?>(null) }
+    // 安装器的结果**必须收回来告诉用户**。以前这里 `context.startActivity(安装意图)` 之后什么都不管，
+    // 于是"你在安装器里点了取消""被系统挡下了""装成功了"这三种情况在界面上是同一个无声 ——
+    // 真机实测就是这个坑：一直提示检测到 v95、下载走完，回头一看还是 86，界面一句实话都没有。
+    val installLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        when (res.resultCode) {
+            android.app.Activity.RESULT_OK -> Unit
+            android.app.Activity.RESULT_CANCELED ->
+                problem = "安装没完成：你在安装器里退出了，现在装的还是当前版本"
+            else -> problem = "安装器返回了结果码 ${res.resultCode}，没装成"
+        }
+    }
 
     InfoRow(
         label = "检查更新",
@@ -109,6 +125,8 @@ fun UpdateCheckRow() {
                             val r = attempt { installOrAskPermission(context, o.release) { p -> progress = p } }
                             downloading = false
                             r.exceptionOrNull()?.let { problem = it.message ?: "更新没成功" }
+                            // 意图交给 launcher 发，才拿得到返回码
+                            r.getOrNull()?.let { installLauncher.launch(it) }
                         }
                     }
                 )
@@ -155,11 +173,11 @@ private suspend fun installOrAskPermission(
     context: Context,
     release: Release,
     onProgress: (Float) -> Unit = {},
-) {
+): Intent {
     if (!AppUpdater.canInstall(context)) {
         context.startActivity(AppUpdater.unknownSourcesIntent())
         throw IllegalStateException("还没允许本应用安装未知应用：已打开系统设置页，授权后再回来点一次「立即更新」")
     }
     val apk = AppUpdater.download(context, release) { url, dest -> AppUpdater.httpDownload(url, dest, onProgress) }
-    context.startActivity(AppUpdater.installIntent(context, apk))
+    return AppUpdater.installIntent(context, apk)
 }
