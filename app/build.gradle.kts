@@ -124,6 +124,20 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            /**
+             * 只发 64 位 ARM。量出来的账（真机 2026-10-15 拉回 v77 逐条目统计）：
+             * 包内 native 库共 73.6 MB，其中 `lib/armeabi-v7a` 占 29.6 MB —— 装到 arm64 手机上
+             * 这一半**永远不会被加载**，却每次都跟着下载。用户侧的直接症状就是"下载得很慢"：
+             * 整包 110 MB，其中约四分之一是死重。
+             * debug 不加这一条，保持全 ABI，免得换台机器/模拟器就装不上测试包。
+             *
+             * ⚠ 这是**设备支持面**的收窄：只有 32 位 ARM 的老机器将装不了正式版
+             *   （minSdk 26 起这种机型已极少，且高德导航 SDK 本身连 x86 都没出，模拟器从来就装不上）。
+             *   要回退：删掉下面这三行即可，产物名与 CI、App 内更新通路都不用动。
+             */
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
             // 硬编码 false，不受任何属性/环境变量影响：正式版禁止演示数据。
             buildConfigField("boolean", "DEMO_ALLOWED", "false")
             buildConfigField("String", "DEMO_MOBILE", "\"\"")

@@ -174,6 +174,19 @@ jobs:
                   sys.exit('release 包里残留本机/内网地址：' + bad.decode())
           if blob.count(want) == 0:
               sys.exit('包里找不到给定的 baseUrl —— 配置没进包，别把它当成可发布的包')
+          # 包体面判据（打在**产物**上，不是打在源码形状上）：
+          # 真机拉回 v77 逐条目量得 native 库 73.6 MB，其中 armeabi-v7a 占 29.6 MB ——
+          # 那一半在 arm64 手机上永远不会被加载，却每次跟着 110 MB 一起下载（用户报的症状就是"下载得很慢"）。
+          # 加了 abiFilters 后实测 78,849,588 字节。这里断言 ABI 集合与包体上限：
+          # 谁把 build.gradle.kts 里那三行删掉，这一步就会红 —— 规矩不许只活在注释里。
+          abis = sorted({n.split('/')[1] for n in z.namelist() if n.startswith('lib/') and len(n.split('/')) > 2})
+          print('包内 ABI =', abis)
+          if abis != ['arm64-v8a']:
+              sys.exit('release 包带了 arm64-v8a 以外的 native ABI：' + ','.join(abis) + ' —— 32 位那一半是死重，别把它发出去')
+          size = os.path.getsize(apk)
+          print('APK 字节 =', size)
+          if size > 95_000_000:
+              sys.exit('release 包体退回 95 MB 以上（本轮砍完 32 位后实测 78.8 MB）—— 先查是哪一块又长回去了')
           PY
       - uses: actions/upload-artifact@v4
         with:
