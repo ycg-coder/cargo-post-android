@@ -54,6 +54,7 @@ import com.shanxiang.buspost.core.navigation.NavigationSession
 import com.shanxiang.buspost.core.navigation.engineRecalcTextOf
 import com.shanxiang.buspost.core.navigation.guidanceSwitchOffText
 import com.shanxiang.buspost.core.navigation.laneDisplayTextOf
+import com.shanxiang.buspost.core.navigation.navPlanOfStops
 import com.shanxiang.buspost.core.navigation.turnIconSpeechOf
 import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
@@ -68,7 +69,9 @@ import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.driver.Running
 import com.shanxiang.buspost.ui.common.LocalNavController
+import com.shanxiang.buspost.ui.common.MapMarker
 import com.shanxiang.buspost.ui.common.RouteUnavailableState
+import com.shanxiang.buspost.ui.common.markerOptionsOf
 
 /**
  * 车道级导航页（本轮新增，正式可达）。
@@ -102,6 +105,20 @@ fun DriverGuideScreen() {
     val target = remember { AppState.consumeGuideTarget() }
     val me by Running.geo.collectAsStateWithLifecycle()
 
+    /**
+     * 全任务段计划（[navPlanOfStops]）：终点与途经点**出自同一次取数**，顺序只认后端 `visitSequence`。
+     * 工作台传来的站表为空时（老调用点只给一个目的地）这一格是 null，整屏行为退回逐站，
+     * 与本轮之前一字不差 —— 新读点不许把旧路径顶坏。
+     */
+    val plan = remember(target) {
+        target?.let { it.legStops.ifEmpty { null }?.let { stops -> navPlanOfStops(stops) } }
+    }
+    // 顶部条与算路的终点同一个来源：全段模式认 plan.destination（后端顺序最后一站），
+    // 逐站模式认进页时那一个目的地。两者只可能有一个非空，界面不会出现"两个目的地"。
+    val destGeo = plan?.destination?.geo ?: target?.let { Geo(it.lat, it.lng) }
+    val destName = plan?.destination?.name?.ifEmpty { null }
+        ?: target?.name.orEmpty().ifEmpty { if (destGeo == null) "" else "任务点" }
+
     val engine = remember { NavigationEngines.create(context) }
     DisposableEffect(engine) {
         onDispose { engine.release() }
@@ -110,15 +127,33 @@ fun DriverGuideScreen() {
     val frame by engine.guidance.collectAsStateWithLifecycle()
     val laneFrame by engine.lane.collectAsStateWithLifecycle()
     val recalc by engine.recalc.collectAsStateWithLifecycle()
+    val arrivedWayIndex by engine.arrivedWayPointIndex.collectAsStateWithLifecycle()
+
+    /**
+     * 把"高德说到了第 k 个途经点"翻成站表里的那一站。
+     *
+     * 下标语义来自 `AMapNaviListener.onArrivedWayPoint(int wayID)` 的官方 javadoc：
+     * wayID 是**到达的途经点编号，从 0 开始** —— 所以它配 `plan.wayPoints[k]`，而终点那一站
+     * 由高德的 `onArriveDestination` 说（这一格永远配不到它）。界面念的是"第 k+1 个"（1 基），
+     * 与存下来的那个下标故意不同写法：混为一谈就整体错开一站。
+     *
+     * 对不上就**不猜是哪一站**：`known=false`，卡片只念"高德说了到达、下标不在本趟站表里"，
+     * 并保留回工作台核对的出口。到站之后要做的事（揽收/扫码/交接）仍然只在工作台那一面。
+     */
+    val arrivedStop = arrivedWayIndex?.let { k ->
+        val stop = plan?.wayPoints?.getOrNull(k)
+        ArrivedStop(index = k, stop = stop, known = stop != null)
+    }
 
     var phase by remember { mutableStateOf<GuidePhase>(GuidePhase.Waiting) }
     var session by remember { mutableStateOf<NavigationSession?>(null) }
-    // 车头朝上 / 正北朝上：这是**高德视图的视角**，必须落到底层 setNaviMode 上，不能只改本地标签
-    var carUp by remember { mutableStateOf(true) }
+    // 视角固定车头朝上：它必须落到底层 `setNaviMode` 上（不是只改本地标签）。
+    // 页面上那个"车头朝上 / 正北朝上"的切换按钮本轮摘掉了，理由写在 `GuideBottomBar` 的注释里。
+    val carUp = true
 
     // 算路：目的地 + 本机定位 + 引擎就绪 三者齐了才发请求。缺一个就照实说缺哪个。
     LaunchedEffect(target, me, readiness) {
-        val dest = target
+        val dest = destGeo
         if (dest == null) {
             phase = GuidePhase.NoTarget
             return@LaunchedEffect
@@ -133,7 +168,11 @@ fun DriverGuideScreen() {
         }
         if (phase is GuidePhase.Calculating || phase is GuidePhase.Ready) return@LaunchedEffect
         phase = GuidePhase.Calculating
-        val result = attempt { engine.calculateRoute(me, Geo(dest.lat, dest.lng)) }
+        // 途经点只在"这一帧是全段模式"时喂：plan 自己会因超出高德上限而退回逐站（legByLeg + note 说要话），
+        // 那时 wayPoints 是空列表，算路就只导到最近一站 —— 摘掉中间站等于跳站，这一支永远不许那样。
+        val result = attempt {
+            engine.calculateRoute(me, Geo(dest.lat, dest.lng), plan?.wayPoints?.map { it.geo } ?: emptyList())
+        }
             .getOrElse { RouteCheck.Rejected(reason = "导航引擎调用异常", detail = it.toString()) }
         phase = when (result) {
             is RouteCheck.Accepted -> GuidePhase.Ready(result.route.roadDistanceMeters, result.route.roadEtaSeconds)
@@ -163,6 +202,11 @@ fun DriverGuideScreen() {
     }
 
     val ready = phase is GuidePhase.Ready
+    // 任务点标记：与工作台地图同一个出口（`MissionMarkers.stopMarkers`），焦点交给这一趟的终点。
+    // 站表为空（逐站模式的旧调用点）时这里就是 0 个标记，画面与本轮之前一致。
+    val navMarkers = remember(plan) {
+        MissionMarkers.stopMarkers(plan?.stops ?: emptyList(), focusStopId = plan?.destination?.stationId ?: 0L)
+    }
     // 两条自绘条是**盖在全屏地图上**的，而 AMapNaviView 把自己的路口放大图 / 转向提示画在它表面的
     // 左上角 —— 于是那些控件画在我们的标题**底下**，既看不见也点不着（2026-10-10 真机实测：
     // `layout_audit` 报"进入 × 乡邮智联 · 车道级导航 重叠 50%"，且该节点被屏幕左边裁掉一半）。
@@ -174,6 +218,30 @@ fun DriverGuideScreen() {
     var bottomPx by remember { mutableIntStateOf(0) }
     val topReserve = if (topPx == 0) 170.dp else with(density) { topPx.toDp() }
     val bottomReserve = if (bottomPx == 0) 96.dp else with(density) { bottomPx.toDp() } + 8.dp
+
+    /**
+     * 导航中把系统两条 bar 收掉（用户口径："开启自带车道级导航后尽量占全屏，去掉无用的按钮和遮挡"）。
+     *
+     * 为什么现在能收：上一轮的遮挡根因不是自绘条太厚，而是**高德把路口放大图画在视图左上角**，
+     * 而我们的顶条盖在它上面（真机实测重叠 50%）。顶条已经改成"量高度再把地图夹在中间"，
+     * 这一格再收掉状态栏，顶条让出来的那一条就真还给地图了。
+     *
+     * 只在 ready 时收，离场必须还原：不还原的话司机退出导航后，整个 App 都少了一条状态栏，
+     * 那是把一屏的选择变成全局的。`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE` 而不是完全禁掉 ——
+     * 司机要从上边下拉通知，手势仍然给。
+     */
+    val controller = (context as? android.app.Activity)?.window?.insetsController
+    DisposableEffect(ready) {
+        if (ready) {
+            controller?.systemBarsBehavior =
+                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(android.view.WindowInsets.Type.systemBars())
+        } else {
+            controller?.show(android.view.WindowInsets.Type.systemBars())
+        }
+        onDispose { controller?.show(android.view.WindowInsets.Type.systemBars()) }
+    }
+
     Box(Modifier.fillMaxSize().background(if (ready) Color.Black else t.paper)) {
         if (ready) {
             AmapNaviSurface(
@@ -181,32 +249,50 @@ fun DriverGuideScreen() {
                 night = nightUi || driving,
                 laneOn = Prefs.laneGuidance,
                 carUp = carUp,
+                markers = navMarkers,
             )
             // ---- 自绘信息条（顶部）：品牌 + 下一动作 + 剩余里程/时间 + 车道 ----
             GuideTopStrip(
                 modifier = Modifier.align(Alignment.TopCenter).onSizeChanged { topPx = it.height },
-                destination = target?.name.orEmpty(),
+                destination = destName,
+                // 全段模式说"本段 k 站（终点是最后一站）"；逐站模式不编这句话。
+                // 剩余里程那一个大数字在高德那里是**整条导航路径**的剩余，全段模式下它就是到终点的剩余，
+                // 所以这一行是把那个数的口径写明白，不让司机把它读成"到最近一站还有这么多"。
+                stopLine = when {
+                    plan == null -> ""
+                    plan.legByLeg -> plan.note
+                    plan.stops.size > 1 -> "本段共 ${plan.stops.size} 站 · 途经点 ${plan.wayPoints.size} 个（按调度顺序）"
+                    else -> "本段只剩这一站"
+                },
                 frame = frame,
                 laneText = if (!Prefs.laneGuidance) guidanceSwitchOffText("车道级指引", "已关闭")
                 else laneDisplayTextOf(laneFrame),
                 recalcText = engineRecalcTextOf(recalc),
                 onExit = exit,
             )
-            // ---- 底部：语音 / 视角 / 结束 ----
-            GuideBottomBar(
-                modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomPx = it.height },
-                voiceOn = Prefs.voiceGuidance,
-                onToggleVoice = { on ->
-                    Prefs.voiceGuidance = on
-                    // 高德内置播报是进程单例上的开关，改完必须重起一次导航才生效；
-                    // 这里如实重起，而不是只改本地开关让司机以为已经静音了。
-                    engine.stopNavi()
-                    session = engine.startGpsNavi(on)
-                },
-                carUp = carUp,
-                onToggleCarUp = { carUp = it },
-                onStop = exit,
-            )
+            // ---- 底部：到站那一格（高德说的）+ 语音 / 结束 ----
+            // 两块合在一个容器里量高度：分开量就要各留一段 padding，而这一屏的地图尺寸是"夹在两条之间"算出来的。
+            Column(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomPx = it.height },
+            ) {
+                arrivedStop?.let { arrived ->
+                    GuideArrivedCard(
+                        arrived = arrived,
+                        onGoWorkbench = exit,
+                    )
+                }
+                GuideBottomBar(
+                    voiceOn = Prefs.voiceGuidance,
+                    onToggleVoice = { on ->
+                        Prefs.voiceGuidance = on
+                        // 高德内置播报是进程单例上的开关，改完必须重起一次导航才生效；
+                        // 这里如实重起，而不是只改本地开关让司机以为已经静音了。
+                        engine.stopNavi()
+                        session = engine.startGpsNavi(on)
+                    },
+                    onStop = exit,
+                )
+            }
             (session as? NavigationSession.Refused)?.let { refused ->
                 // 算路过了但 startNavi 被拒：这一条同样要露出来，不能静默停在"看着像在导"
                 Text(
@@ -236,7 +322,7 @@ fun DriverGuideScreen() {
                     fontWeight = FontWeight.Black,
                 )
                 Text(
-                    guidePhaseDetail(phase, target?.name.orEmpty()),
+                    guidePhaseDetail(phase, destName),
                     color = t.textSecondary,
                     fontSize = (13 * scale).sp,
                 )
@@ -245,7 +331,7 @@ fun DriverGuideScreen() {
                 }
                 RouteUnavailableState(
                     height = 150.dp,
-                    reason = guidePhaseDetail(phase, target?.name.orEmpty()),
+                    reason = guidePhaseDetail(phase, destName),
                     // "重算"这里等于"退出去重进"：算路由上面那条四态驱动的 LaunchedEffect 负责，
                     // 就地再写一条重算路径就会出现两个算路口径（一个是真相，一个会漂移）。
                     onReplan = exit,
@@ -302,12 +388,16 @@ private fun AmapNaviSurface(
     night: Boolean,
     laneOn: Boolean,
     carUp: Boolean,
+    markers: List<MapMarker>,
 ) {
     var failed by remember { mutableStateOf<String?>(null) }
     if (BuildConfig.AMAP_KEY.isBlank()) {
         failed = "地图服务未配置，导航视图无法启动"
     }
     var viewRef by remember { mutableStateOf<AMapNaviView?>(null) }
+    // 这一屏自己贴的标记，自己收回：`AMapNaviView.getMap()` 拿到的 `AMap` 与高德导航层共用，
+    // 页面离场不摘就会留在进程里（下一次进来看不到旧标记，但旧标记还在占 SDK 的图层）。
+    var placed by remember { mutableStateOf<List<com.amap.api.maps.model.Marker>>(emptyList()) }
 
     if (failed == null) {
         AndroidView(
@@ -348,8 +438,30 @@ private fun AmapNaviSurface(
                 }
             },
         )
+        // 任务点标记：贴在高德导航视图自己的底图上（用户要的那一格："导航是全任务段整体的，
+        // 但具体业务点在导航里看得见"）。来源仍是 [MissionMarkers.stopMarkers] —— 顺序、配色、
+        // 标题与工作台地图同一出口，这里只多一件事：把同一批 `MapMarker` 交给 `AMap`。
+        // 整批一次贴：中途某条抛了就当作"这一批都没贴上"并留一行 logcat ——
+        // 比"贴上 5 个、第 6 个静默丢了、屏幕上一切正常"诚实（贴一半最难查）。
+        LaunchedEffect(viewRef, markers) {
+            val view = viewRef ?: return@LaunchedEffect
+            runCatching {
+                placed.forEach { it.remove() }
+                val aMap = view.map
+                placed = if (aMap == null) emptyList() else markers.mapNotNull { m ->
+                    markerOptionsOf(m)?.let { aMap.addMarker(it) }
+                }
+            }.onFailure {
+                placed = emptyList()
+                android.util.Log.w("BUS_MAP", "任务点标记没贴上导航面（底图句柄为 null 或 SDK 抛了）", it)
+            }
+        }
         DisposableEffect(Unit) {
             onDispose {
+                // 这一屏自己贴的标记自己收回：`getMap()` 的 `AMap` 与高德导航层共用，
+                // 不摘就会留在进程里（下一次进来看不到旧标记，但旧标记还占着 SDK 图层）。
+                runCatching { placed.forEach { it.remove() } }
+                placed = emptyList()
                 viewRef?.let { v ->
                     runCatching { v.onPause() }
                     runCatching { v.onDestroy() }
@@ -438,6 +550,7 @@ private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, c
 private fun GuideTopStrip(
     modifier: Modifier = Modifier,
     destination: String,
+    stopLine: String,
     frame: NavigationGuidance?,
     laneText: String,
     recalcText: String,
@@ -471,6 +584,17 @@ private fun GuideTopStrip(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (stopLine.isNotEmpty()) {
+                    // 这一行写的是"这一趟导航覆盖几站"，不是后端状态：站点是否已完成只由后端说（`arrive` 之后回读）。
+                    // 逐站模式（老调用点没有站表）时这一格是空串，一行都不占。
+                    Text(
+                        stopLine,
+                        color = Color(0xFFBFD3EA),
+                        fontSize = (11.5 * scale).sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             // 退出按钮：**实心白底 + 深色字**（对比度稳、驾驶中一眼能认），并吃满触控下限
             Text(
@@ -558,13 +682,92 @@ private fun GuideTopStrip(
     }
 }
 
+/**
+ * 高德宣布"到达第 [index] 个途经点"（0 基，来自 SDK 回调原值）这一帧。
+ *
+ * [stop] 为 null 是有意保留的一格：下标越界时不许随便指一站顶上 ——
+ * 那是把"高德说了到达"和"到了哪一站"两件事里较贵的那一件编出来。
+ */
+private data class ArrivedStop(
+    val index: Int,
+    val stop: com.shanxiang.buspost.data.model.MissionStop?,
+    val known: Boolean,
+)
+
+/**
+ * 到站那一格（用户口径："到任务点要揽收扫码，然后接着下一任务继续导航"）。
+ *
+ * 这一屏只做三件事：说清**高德说到了哪一站**（动作 / 件数都取后端 `stops`，本机不编）、
+ * 给一个**回工作台作业**的出口、明说**到站状态不由这里写**。
+ * 为什么不放"确认到站"按钮：`/driver/arrive` 要 `shiftId` 且后端按顺序校验防跳站
+ * （`DriverAppServiceImpl:905`），而导航页手里只有进页时的站表快照，没有班次态 ——
+ * 在这一屏写就是拿一份可能过期的快照去赌后端放行，而工作台那一面本来就有完整的确认链路。
+ */
+@Composable
+private fun GuideArrivedCard(arrived: ArrivedStop, onGoWorkbench: () -> Unit) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(t.goldLight)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                // 念的是 1 基"第几个"，存的是 0 基下标：这句只给司机看，日志里那一行给的是原值。
+                if (arrived.known) {
+                    "高德说已到第 ${arrived.index + 1} 个途经点 · ${arrived.stop!!.name.ifEmpty { "任务点#${arrived.stop.stationId}" }}"
+                } else {
+                    "高德说已到第 ${arrived.index + 1} 个途经点，但本趟站表里没有这一格"
+                },
+                color = t.goldDeep,
+                fontSize = (13 * scale).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (arrived.known) {
+                    with(MissionMarkers) {
+                        listOfNotNull(
+                            arrived.stop!!.actionLabel.ifEmpty { null },
+                            arrived.stop!!.quantityText(),
+                            arrived.stop!!.statusLabel.ifEmpty { null },
+                        ).joinToString(" · ")
+                    }.ifEmpty { "这一站后端没给动作与件数" } + " · 到站状态回工作台确认后才写"
+                } else "下标对不上时不猜是哪一站：回工作台核对任务列表",
+                color = t.goldDeep,
+                fontSize = (11.5 * scale).sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        BusButton(
+            text = "回工作台作业",
+            variant = BusButtonVariant.PRIMARY,
+            small = true,
+            onClick = onGoWorkbench,
+        )
+    }
+}
+
+/**
+ * 底部条：**只留两格**（播报 / 结束导航）。
+ *
+ * 原来第三格是"车头朝上 / 正北朝上"的视角切换。摘掉它的理由不是嫌挤：
+ * 用户口径是"导航尽量占全屏、去掉无用的按钮和遮挡"，而这一格在驾驶中是**唯一会改地图视角**的控件 ——
+ * 行车途中误触一下，整屏方向翻转，比少一个选项贵得多。视角仍然固定车头朝上（`carUp` 恒为 true，
+ * 走 `applyNaviOptions` 落到底层 `setNaviMode`），也就是说这一格从来不是一个"功能"，
+ * 只是一个会把功能调坏开关。
+ */
 @Composable
 private fun GuideBottomBar(
     modifier: Modifier = Modifier,
     voiceOn: Boolean,
     onToggleVoice: (Boolean) -> Unit,
-    carUp: Boolean,
-    onToggleCarUp: (Boolean) -> Unit,
     onStop: () -> Unit,
 ) {
     val t = LocalBusTokens.current
@@ -583,13 +786,6 @@ private fun GuideBottomBar(
             variant = if (voiceOn) BusButtonVariant.CLAY else BusButtonVariant.OUTLINE,
             modifier = Modifier.weight(1f),
             onClick = { onToggleVoice(!voiceOn) },
-        )
-        BusButton(
-            text = if (carUp) "车头朝上" else "正北朝上",
-            icon = BusIcons.compass,
-            variant = BusButtonVariant.OUTLINE,
-            modifier = Modifier.weight(1f),
-            onClick = { onToggleCarUp(!carUp) },
         )
         BusButton(
             text = "结束导航",

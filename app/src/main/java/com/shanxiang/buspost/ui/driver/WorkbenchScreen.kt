@@ -180,6 +180,21 @@ class WorkbenchViewModel : ScreenViewModel() {
     private var navOffset = 0
     private var navShiftId = 0L
 
+    /**
+     * 那一次「到站」**已经被后端接受**（上过网络且非演示回落）—— 一次性旗标，由下一次「停靠完成」消费。
+     *
+     * 为什么必须有这一格：`runAction` 每次写后都回读（`syncFromServer`），后端把 `currentStationId`
+     * 推到刚确认的那一站，于是 [targetIndex] 的基准**自己就前进了一格**；
+     * 「停靠完成」在这之上再 `navOffset += 1` 就会越过中间那站（实测：4 站班次上目标从 603 跳到 604），
+     * 下一次到站提交 604 被后端按跳站拒（`DriverAppServiceImpl:905-906` `DRIVER_STATION_ORDER_ILLEGAL`），
+     * 而 603 的接客/送客明细永远拿不到到达上报 —— 撞硬规则「每站必停」。
+     * 所以后端已经收口的那一站，「停靠完成」只该离开停靠视图，不该再往后指。
+     *
+     * 幂等闸拦下的那次（`notSent`）与演示回落都不置位：那两种情况下后端状态没动，
+     * 视图要往前走仍然只能靠 navOffset。
+     */
+    private var pendingDockAdvance = false
+
     /** 扫码后等待补照片的作业（货运/商城单强制拍照，邮快件凭面单免拍） */
     var pendingLoad by mutableStateOf<PickupTask?>(null)
         private set
@@ -373,6 +388,14 @@ class WorkbenchViewModel : ScreenViewModel() {
             // 幂等闸拦下的那次（notSent）一个字节都没上网络，后端状态没有变化，
             // 所以本机视图也不许先行推进到"停靠作业"——那会和回执里"显示的是后端当前状态"自相矛盾。
             if (!ack.notSent) docked = !isTerminal
+            // 演示回落同样不算：后端没动，视图往前走仍然只能靠 navOffset（不置位就是不剥夺它唯一的推进手段）。
+            // navShiftId 一并认领：`continueToNextStation` 开头那一支是"换了班次就归零"，
+            // 而司机第一次到站时 navShiftId 可能还是 0 —— 不认领的话这一旗标会在下一次点「停靠完成」时
+            // 被那条早退当成"换班次"清掉，越站照旧发生。
+            if (!ack.notSent && !ack.demo) {
+                pendingDockAdvance = true
+                navShiftId = id
+            }
             ack
         }
     }
@@ -380,12 +403,22 @@ class WorkbenchViewModel : ScreenViewModel() {
     /**
      * 停靠完成 / 跳过本站 → 继续行驶。**纯本机导航视图推进**（小程序 continueToNextStation 同语义），
      * 只把目标站往后挪一格，不重发 depart、也不改写后端班次状态。
+     *
+     * ⚠ 唯一不许挪的情况：这一格是"到站刚被后端接受"之后的那一次「停靠完成」。
+     * 那时回读已经把 `currentStationId` 推到司机刚确认的站，[targetIndex] 的基准自己前移了一格，
+     * 再 `navOffset += 1` 就是越过下一站（见 [pendingDockAdvance] 的完整推导与被钉住的那条用例）。
      */
     fun continueToNextStation() {
         val s = shift ?: return
         if (s.state != ShiftState.RUNNING) return
         docked = false
-        if (navShiftId != s.shiftId) { navShiftId = s.shiftId; navOffset = 0 }
+        if (navShiftId != s.shiftId) { navShiftId = s.shiftId; navOffset = 0; pendingDockAdvance = false }
+        if (pendingDockAdvance) {
+            // 后端已经替这一站收了口：这一次只离开停靠视图，导航目标保持在后端给的下一站上
+            pendingDockAdvance = false
+            receipt = "本站到达已提交，导航目标仍指向 ${targetStationName()}（顺序以后端回读为准）"
+            return
+        }
         navOffset += 1
         if (navOffset > (s.stations.size - 1).coerceAtLeast(0)) {
             navOffset = (s.stations.size - 1).coerceAtLeast(0)

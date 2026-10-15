@@ -32,6 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
+import com.shanxiang.buspost.core.ui.BusBackArrow
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
@@ -136,11 +137,12 @@ fun DriverMessagesScreen(vm: DriverMessagesViewModel = viewModel()) {
 
     BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload() }) {
     BusPage(spacedBy = 12.dp) {
-        // 紧凑页头：标题 + 未读数 + 状态标签一行排开
+        // 紧凑页头：返回 + 标题 + 未读数一行排开（这屏是整屏路由，看得见退出口是硬要求 #80）
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            BusBackArrow(onBack = { nav.popBackStack() }, tint = t.ink)
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(3.dp, 15.dp).clip(RoundedCornerShape(2.dp)).background(t.clay))

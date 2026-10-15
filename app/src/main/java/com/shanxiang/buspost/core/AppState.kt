@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.core
 
+import com.shanxiang.buspost.data.model.MissionStop
 import com.shanxiang.buspost.data.model.Role
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.core.ui.BusTheme
@@ -120,8 +121,19 @@ object AppState {
      *
      * 只装"要去哪儿"这三个字段，**不装折线**：折线必须由导航页自己让高德算一次真实道路
      * （硬规则"宁可暂时不能导航，不允许假导航"），从别处搬一条过来就绕过了 `RealRoadRouteValidator`。
+     *
+     * [legStops] 是**同一批"要去哪儿"**的全任务段形态（进页那一刻工作台已经读到的未去站快照，
+     * 后端 `visitSequence` 原序），导航页据此把中间站当途经点交给高德 —— 它带的是**站点坐标**（业务点），
+     * 不是几何（怎么走）：上面那句"不许搬折线"约束的是后者，途经点顺序恰恰只许来自调度（硬规则 3）。
+     * 默认空 = 调用方只给了一个目的地，导航页退回逐站模式，行为与本轮之前一字不差。
      */
-    data class GuideTarget(val lat: Double, val lng: Double, val name: String, val stationId: Long)
+    data class GuideTarget(
+        val lat: Double,
+        val lng: Double,
+        val name: String,
+        val stationId: Long,
+        val legStops: List<MissionStop> = emptyList(),
+    )
 
     /**
      * 自动进导航在**一个进程里只许发生一次**（用户口径 A：在途司机开 App 就给他导航）。

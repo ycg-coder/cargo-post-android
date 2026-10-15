@@ -194,6 +194,15 @@ internal fun missionFootnote(guide: RouteGuide, gpsNote: String = ""): String = 
         if (guide.roadDistanceMeters > 0) " · 道路里程 " + formatRoadMeters(guide.roadDistanceMeters)
         else " · 道路里程暂无，开始导航后给实时剩余",
     )
+    // 折线完不完整只由后端说（`routeComplete`，`AppDriverRouteRespVO:50`「false=中段取不到道路，
+    // 折线在缺口处截断，绝不连直线补上」）。这一句必须跟着那条线：缺了它，"画到半路的线"和"整条线"
+    // 在屏幕上长得一模一样，司机会按前者判断后面还有路。
+    // 三格里只有两格说话：`null`（后端没发这个键）留白 —— 没说 ≠ 完整，也 ≠ 不完整。
+    when (guide.routeComplete) {
+        false -> append(" · 后端说中段取不到道路：这条线到缺口为止，没有连直线补上")
+        true -> append(" · 折线覆盖全部任务段")
+        else -> Unit
+    }
     if (gpsNote.isNotEmpty()) append(" · ").append(gpsNote)
 }
 

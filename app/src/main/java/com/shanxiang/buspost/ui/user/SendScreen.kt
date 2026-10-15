@@ -600,6 +600,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     badge = "第 1 步 · 共 3 步",
                     title = "填写货物信息",
                     subtitle = "写清货物与收发站点，费用提前算给你看",
+                    onBack = { nav.popBackStack() },
                 )
                 DemoNote(vm.demo || vm.stationsDemo || vm.reachDemo)
                 vm.error?.let { ErrorState(it, onRetry = { vm.load(context) }) }
@@ -796,6 +797,8 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     badge = "第 2 步 · 共 3 步",
                     title = "拍照确认货物",
                     subtitle = "拍张货物照片，司机取货更好认",
+                    // 这条路由是整屏推上来的，此前屏内没有看得见的退出口（#80：每个路由屏都要有）。
+                    onBack = { nav.popBackStack() },
                 )
                 DemoNote(vm.demo || vm.stationsDemo)
 
@@ -931,6 +934,7 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     badge = "寄货单已受理",
                     title = "寄货已提交！",
                     subtitle = "保存好单号，可在「我的寄货」查看进度",
+                    onBack = { nav.popBackStack() },
                 )
 
                 vm.created?.let { ack ->

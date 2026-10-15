@@ -36,6 +36,22 @@ enum class LegDriverAction(
     EXCEPTION("exception", "上报异常", LegStatus.EXCEPTION);
 }
 
+/**
+ * 段动作按钮点下去该走哪条路（#53）。
+ *
+ * 为什么单独成一个导出函数：这条分流原先只写在 Composable 的 `onClick` 里，工程无 Robolectric ⇒ 它红不了，
+ * 而它管的是"凭证会不会永久丢失"那一格。提出来之后用例能钉住"需要凭证的动作绝不在路线页就地发"。
+ *
+ * 后果有原文依据：`HandoverServiceImpl.java:210-211` 对**已完成**的交接是幂等 return，
+ * 所以先落一次没有 photoUrl 的提交，照片那一格再也补不进去；而交接页同一动作本来就拦
+ *（`HandoverScreen.kt:486-494`「绝不在这发一次没有 photoUrl 的 handover-confirm」）——
+ * 两个入口必须给同一个答案。
+ */
+enum class LegClick { SEND, GO_HANDOVER }
+
+fun legClickOf(action: LegDriverAction?): LegClick =
+    if (action != null && action.needsPhoto) LegClick.GO_HANDOVER else LegClick.SEND
+
 /** 一段当前能做什么：动作、时间线走到第几步、以及"没有动作"时的原因。 */
 data class LegFlowState(
     val steps: List<LegDriverAction>,

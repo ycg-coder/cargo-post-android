@@ -22,8 +22,61 @@ NC=':[0-9]+: *(\*|//)'   # 注释行：以 * 或 // 开头的源码行不算代�
 # 司机一次性动作的函数名清单（判据范围）。新增写接口必须同时进这张表，否则 I-a 与 I-b 对不上就会报红。
 WRITE_FUNCS='depart|arrive|pickupConfirm|deliver|pickupVerify|productLoad|productDeliver|legAction|confirmHandover|readDriverMessage'
 
-# I-a 十个写函数各自的第一步就是交给闸门（按"签名后的前两行"判，不看行号）
-IA=$(grep -A2 -E "^    suspend fun ($WRITE_FUNCS)\(" "$REPO" | grep -c 'gatedAction(')
+# I-a 十个写函数各自的第一步就是交给闸门。
+#     ⚠ 旧口径是"签名行往下两行内出现 gatedAction("，#49 之后它读不动了：`legAction` 为 P0-2
+#     加了 `actionKey` 形参 ⇒ 签名跨六行，两行窗口里根本没有闸门那一句（实测 9≠10）。
+#     "判据跑不动"比"判据偏松"更坏——它把"闸门明明还在"报成"有人绕开闸门"，红的原因还是假的。
+#     现在按**参数列表闭合之后的第一条语句**判：单行签名（`... : Ack = gatedAction(`）与多行签名
+#     （`): Ack =` 换行再 `gatedAction(`）同判；先算点别的再走闸、或整圈摘掉，都不计入 ⇒ 照样红。
+IA=$(python - "$REPO" "$WRITE_FUNCS" <<'PY'
+import re, sys
+
+path, names = sys.argv[1], sys.argv[2].split('|')
+src = open(path, encoding='utf-8', errors='replace').read().splitlines()
+
+def blank(j):
+    t = src[j].strip()
+    return not t or t.startswith(('*', '//'))
+
+def first_stmt(i):
+    depth, close = 0, None
+    for j in range(i, len(src)):
+        for k, ch in enumerate(src[j]):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    close = (j, k + 1)
+                    break
+        if close:
+            break
+    if not close:
+        return ''
+    j, k = close
+    while True:
+        rest = src[j][k:].strip().lstrip('{').strip()
+        rest = re.sub(r'^:[^=]*=\s*', '', rest).strip()
+        if rest:
+            return rest
+        j += 1
+        while j < len(src) and blank(j):
+            j += 1
+        if j >= len(src):
+            return ''
+        k = 0
+
+n = 0
+for name in names:
+    pat = re.compile(r'^    suspend fun %s\(' % re.escape(name))
+    for i, line in enumerate(src):
+        if pat.match(line):
+            if first_stmt(i).startswith('gatedAction('):
+                n += 1
+            break
+print(n)
+PY
+)
 # I-b 闸门调用点总数（= 定义之外真正走闸的出口数）
 IB=$(grep -o 'gatedAction("' "$REPO" | wc -l | tr -d ' ')
 # I-c 有意豁免：周期位置上报**不得**被幂等闸吞掉（吞点=偷点，新鲜度与丢点可见由 ⑦ 的合并闸负责）
@@ -34,7 +87,10 @@ ID2=$(grep -o '\.withLock(' "$GATE" | wc -l | tr -d ' ')
 # I-e 页面必须能区分"被本地闸拦下"与"已提交后端"：五个回执点一支不漏
 # （§54 起多一个异常上报页，同一轮把下限从 4 抬到 5 —— 下限跟着生效代码走，不是随手放宽；
 #   F-3 ⑦⑨ 工作台多出一个**非文案**的 notSent 消费者（`if (!ack.notSent) docked = ...`，视图推进也算回执），
-#   同一轮把 5 抬到 6 —— 不抬的话这一族判据会把"认得出 notSent"读成"只有文案认得出"。）
+#   同一轮把 5 抬到 6 —— 不抬的话这一族判据会把"认得出 notSent"读成"只有文案认得出"。
+#   #49 P0-1 又多一处（`WorkbenchScreen.kt:395` 的 `if (!ack.notSent && !ack.demo) { pendingDockAdvance = …`）：
+#   被本地闸拦下的那一次点击**不许顺手把停靠状态往后推**，所以"要不要交给下一跳"也必须先认 notSent。
+#   同一轮把 6 抬到 7 —— 还是同一条规矩：下限跟着生效代码走，不是随手放宽。）
 IE=$(grep -rn 'ack\.notSent' "$UI" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
 # I-f 被拦下的那一支绝不能写"已提交后端"（宁可说"没发出去"，不许假装成功）
 IF=$(grep -rn 'ack\.notSent' "$UI" --include=*.kt | grep -vE "$NC" | grep -c '已提交后端')
@@ -44,7 +100,7 @@ IG=$(grep -rn -A1 'work(reset = false) {' "$UI" --include=*.kt | grep -cE '(busy
 IH=$(grep -rn 'clientRequestId\|requestId\|bizNo\|idempotencyKey\|X-Request-Id' app/src/main --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
 # I-i Ack 上必须有 notSent 这个可判别的字段（页面靠它分支，不是靠文案猜）
 II=$(grep -c 'val notSent: Boolean = false' "$REPO")
-# I-j 用例锚点：闸门 5 条 + 仓库/网络 6 条
+# I-j 用例锚点：闸门 5 条 + 仓库/网络 7 条
 IJ=$(cat "$T_GATE" "$T_REPO" | grep -cE '^[[:space:]]*@Test')
 
 # ---------- F-2 第 6 步：用户端 create 幂等（I-* 那十条是司机域的，一条都不动） ----------
@@ -124,13 +180,18 @@ HE2=$(vm_body verify | grep -c 'receipt = "取件码还没填')
 HF=$(grep -o '"stationId" to stationId\|"pickupCode" to pickupCode' "$REPO" | wc -l | tr -d ' ')
 # H-g 诚实化用例条数（下限随用例走，删一条就响）
 #     4→5：#147 收尾补的那条「继续行驶只推进导航目标」（H-m 那一族的**行为**半边，见 H-m5）
+#     5→6：#49 P0-1 补的那条「到站被后端接受后停靠完成不得再往后推一格」——它钉的是**双重推进**那一侧：
+#          到站 POST 被后端收下之后再点"停靠完成"，本机不许自己把 stationIndex 往前挪一格
+#          （挪了就会越过下一站、且那一站的到达上报被后端以 DRIVER_STATION_ORDER_ILLEGAL 拒掉）。
 HG=$(grep -cE '^[[:space:]]*@Test' "$HT")
-# H-h 反向对照：三条用例各自钉住"真的发出去了"那一侧（早退不许退化成"这个动作永远不发"）
-# H-h 反向对照：三条用例各自钉住"真的发出去了"那一侧（早退不许退化成"这个动作永远不发"）
+# H-h 反向对照：用例各自钉住"真的发出去了"那一侧（早退不许退化成"这个动作永远不发"）
 #   锚点数字 11→12（2026-10-12 D-080）：司机工作台进入/刷新那一轮多了 1 条公告请求（6 读 + 1 写 + 5 读）。
 #   ⚠ 这一格是"逐字锚点"，改测试里的数字必须同轮改这里 —— 它同时也是在提醒：动作后的回读仍只有 5 条。
+#   3→4（#49 P0-1）：新那条「到站被后端接受后停靠完成不得再往后推一格」也钉在同一侧——
+#   它先要证明那一次 arrive **真的出网并被后端接受**，才有资格说"之后不许本机自己往前推"。
 HH=$(grep -c '12, server.requestCount' "$HT")
-# H-i 夹具自检：定义 1 + 五条用例各调一次。坏夹具会静默变成"没有站点"，把早退读成通过
+# H-i 夹具自检：定义 1 + 六条用例各调一次（#49 P0-1 那条也要先验夹具，否则"没推进"读成"通过"）。
+#      坏夹具会静默变成"没有站点"，把早退读成通过
 HI=$(grep -c 'awaitLoaded' "$HT")
 
 # H-j 夹具的键形状必须就是后端**实际下发**的那一套（F-3 ⑦⑨ 本轮补丁 #184）：
@@ -185,12 +246,12 @@ echo "I-a 写函数首步走闸        = $IA （目标 10）"
 echo "I-b 闸门调用点            = $IB （目标 10）"
 echo "I-c 位置上报被误接进闸门    = $IC （目标 0：有意豁免，接进去就是偷点）"
 echo "I-d tryLock/.withLock(     = $ID/$ID2 （目标 1/0：丢弃而非排队）"
-echo "I-e 页面 notSent 分支       = $IE （目标 6：工作台文案+视图推进/线路/交接两处/异常上报）"
+echo "I-e 页面 notSent 分支       = $IE （目标 7：工作台文案+视图推进+停靠推进/线路/交接两处/异常上报）"
 echo "I-f notSent 分支谎称已提交  = $IF （目标 0）"
 echo "I-g 旗标在 work 内才置位    = $IG （目标 0）"
 echo "I-h 自造幂等键进报文        = $IH （目标 0）"
 echo "I-i Ack.notSent 字段声明    = $II （目标 1）"
-echo "I-j 幂等用例条数            = $IJ （目标 11）"
+echo "I-j 幂等用例条数            = $IJ （目标 12）"
 echo "U-a create 首步走用户闸     = $UA （目标 2：商城下单 + 寄货下单）"
 echo "U-b 用户闸调用点            = $UB （目标 2）"
 echo "U-c Repo 上的闸门实例       = $UC （目标 2：一域一把）"
@@ -209,10 +270,10 @@ echo "H-c 到站内裸翻 docked        = $HC （目标 0）"
 echo "H-d 核销空白取件码早退      = $HD （目标 1）"
 echo "H-e 两处早退的回执            = $HE1/$HE2 （目标 1/1）"
 echo "H-f 早退未改动报文字段名      = $HF （目标 2）"
-echo "H-g 诚实化用例条数            = $HG （目标 5）"
-echo "H-h 反向对照（真发出去那一侧）= $HH （目标 3）"
-echo "H-i 夹具自检定义+调用         = $HI （目标 6）"
-echo "H-j 夹具键形状 stops/别名/plateNo = $HJ_STOPS/$HJ_ALIAS/$HJ_PLATE （目标 3/0/1：只准后端实际下发的键）"
+echo "H-g 诚实化用例条数            = $HG （目标 6）"
+echo "H-h 反向对照（真发出去那一侧）= $HH （目标 4）"
+echo "H-i 夹具自检定义+调用         = $HI （目标 7）"
+echo "H-j 夹具键形状 stops/别名/plateNo = $HJ_STOPS/$HJ_ALIAS/$HJ_PLATE （目标 4/0/1：只准后端实际下发的键）"
 echo "H-k isProduct 单条件/枚举码回流 = $HK_PROD/$HK_LEAK （目标 1/0）"
 echo "H-l 跨域回归断言锚点          = $HL_GUARD （目标 5：邮快件不进商城域 + 真商城单照旧）"
 echo "H-m1 导航目标认后端当前站     = $HM_TGT （目标 1：targetIndex 的基序号来自 currentStationId）"
@@ -227,12 +288,12 @@ fail=0
 [ "$IC" = 0 ] || { echo "× I-c 周期位置上报被接进了幂等闸，重复点位会被当重复动作丢掉"; fail=1; }
 [ "$ID" = 1 ] || { echo "× I-d 闸门不再用 tryLock，重复提交会被排队而不是丢弃"; fail=1; }
 [ "$ID2" = 0 ] || { echo "× I-d 出现了 Mutex.withLock：排队等于第一次完成后照发给后端"; fail=1; }
-[ "$IE" = 6 ] || { echo "× I-e 回执里认不出 notSent 的分支变少了，被拦下会被说成已提交"; fail=1; }
+[ "$IE" = 7 ] || { echo "× I-e 回执里认不出 notSent 的分支变少了，被拦下会被说成已提交"; fail=1; }
 [ "$IF" = 0 ] || { echo "× I-f 被拦下的请求在界面上谎称已提交后端"; fail=1; }
 [ "$IG" = 0 ] || { echo "× I-g 按钮旗标又回到 work{} 内置位，防连点依赖调度器"; fail=1; }
 [ "$IH" = 0 ] || { echo "× I-h 往报文里塞了后端不收的唯一键字段（后端的键由服务端解析器自算，任何版本都不收客户端传的键）"; fail=1; }
 [ "$II" = 1 ] || { echo "× I-i Ack 不再带 notSent，页面无法区分'没发出去'和'后端拒绝'"; fail=1; }
-[ "$IJ" = 11 ] || { echo "× I-j 幂等用例不是 11 条（删用例必须让判据变红）"; fail=1; }
+[ "$IJ" = 12 ] || { echo "× I-j 幂等用例不是 12 条（删用例必须让判据变红）"; fail=1; }
 [ "$UA" = 2 ] || { echo "× U-a 有用户端 create 没经闸门（少了=绕闸直发，多了=凭空多设出口）"; fail=1; }
 [ "$UB" = 2 ] || { echo "× U-b 用户闸调用点不是 2"; fail=1; }
 [ "$UC" = 2 ] || { echo "× U-c 闸门实例数不是 2：并成一把就跨域互相挡，拆成三把就是有人另开了一条写路径"; fail=1; }
@@ -257,10 +318,10 @@ fail=0
 [ "$HE1" = 1 ] || { echo "× H-e 到站早退变成静默 return（司机点了没任何反应）"; fail=1; }
 [ "$HE2" = 1 ] || { echo "× H-e 核销早退变成静默 return，同上"; fail=1; }
 [ "$HF" = 2 ] || { echo "× H-f 报文字段名被改动（$HF）：早退闸门只该决定发不发，不该顺手改 wire（后端 ReqVO 的键是 stationId/pickupCode）"; fail=1; }
-[ "$HG" = 5 ] || { echo "× H-g 诚实化用例不是 5 条（删用例必须让判据变红）"; fail=1; }
-[ "$HH" = 3 ] || { echo "× H-h '真的发出去了'那一侧的对照掉了：早退判据会退化成'这个动作永远不发'也测不出来"; fail=1; }
-[ "$HI" = 6 ] || { echo "× H-i 夹具自检没被五条用例都调上（$HI）：坏夹具会静默变成'没有站点'，把早退读成通过"; fail=1; }
-[ "$HJ_STOPS" = 3 ] || { echo "× H-j 夹具里 stops 的形状数变了（$HJ_STOPS）：三站/空数组/单站三处班次夹具少一处，多半是有人把它退回别名 stations"; fail=1; }
+[ "$HG" = 6 ] || { echo "× H-g 诚实化用例不是 6 条（删用例必须让判据变红）"; fail=1; }
+[ "$HH" = 4 ] || { echo "× H-h '真的发出去了'那一侧的对照掉了：早退判据会退化成'这个动作永远不发'也测不出来"; fail=1; }
+[ "$HI" = 7 ] || { echo "× H-i 夹具自检没被六条用例都调上（$HI）：坏夹具会静默变成'没有站点'，把早退读成通过"; fail=1; }
+[ "$HJ_STOPS" = 4 ] || { echo "× H-j 夹具里 stops 的形状数变了（$HJ_STOPS）：三站/空数组/单站/四站四处班次夹具少一处，多半是有人把它退回别名 stations"; fail=1; }
 [ "$HJ_ALIAS" = 0 ] || { echo "× H-j 夹具里又出现无生产者别名（$HJ_ALIAS 处 stations/id/plate/senderName）：别名形状绿着也只证明'别名可用'，不证明真机路径"; fail=1; }
 [ "$HJ_PLATE" = 1 ] || { echo "× H-j profile 夹具的车牌键不再是 plateNo（$HJ_PLATE）：AppDriverProfileRespVO:19 与 Models.kt:1374 都只有这一个键"; fail=1; }
 [ "$HK_PROD" = 1 ] || { echo "× H-k isProduct 不再是'只认 bizType'那一行（$HK_PROD）：后端商城单的唯一判据是 bizType=PRODUCT（DriverAppServiceImpl:352）"; fail=1; }

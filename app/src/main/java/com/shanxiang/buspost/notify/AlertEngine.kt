@@ -55,6 +55,12 @@ object AlertEngine {
             primed = true
         }
 
+        // 天气预警**跑在角色分域之前**：司机比乘客更需要"前方大雾/暴雨"这一条，而旧写法把它放在
+        // 司机域那条 `return` 之后 ⇒ 常驻司机端的人一次都收不到，而「我的→设置」里
+        // `SettingRow("天气预警", "雨雪、大雾、高温等恶劣天气推送提醒")` 照样摆给司机看 —— 那就是个装饰。
+        // ⚠ 到车提醒**不跟着搬**：它的正文是"请提前到站点等候"，服务对象是在站点等的人，不是开车的人。
+        val weatherAlerted = pushWeatherAlert(context)
+
         if (AppState.activeDomain.value == AppDomain.DRIVER) {
             val dm = Repo.driverMessages(pageNo = 1, pageSize = 20)
             dm.cause?.let { causes += it }
@@ -80,7 +86,10 @@ object AlertEngine {
                 )
             }
             dm.items.maxOfOrNull { it.id }?.let { Prefs.lastSeenDriverMsgId = it }
-            return AlertScan(outcomeOf(causes, fresh.size), announced = fresh.size)
+            // 司机域这一格的 announced 必须带上天气那一条：否则"推了天气、读数说推了 0 条"，
+            // 而 notify_result 判据钉的正是 announced 与真实推送次数一致。
+            val driverAnnounced = fresh.size + weatherAlerted
+            return AlertScan(outcomeOf(causes, driverAnnounced), announced = driverAnnounced)
         }
 
         val fresh = msgs.items
@@ -130,9 +139,19 @@ object AlertEngine {
                 }
         }
 
-        // ---------- 天气预警 ----------
-        // 与到车提醒同模式：同一类天气 4 小时内不重复推送；天气状况变了（晴→雨）立即推，
-        // 持续同一种恶劣天气（雨→雨）不重复打扰。没有位置就不推（无法确定"当地"天气）。
+        val announced = fresh.size + arrival + weatherAlerted
+        return AlertScan(outcomeOf(causes, announced), announced = announced)
+    }
+
+    /**
+     * 天气预警（#52：2026-10-15 从 scan 的用户域那一段里提出来，改成两个域都跑）。
+     *
+     * 为什么是提出来而不是复制一份：这一格原先写在 scan 里司机域那条 return **之后**，
+     * 于是常驻司机端的司机一次都收不到恶劣天气推送，而「我的→设置」里那条开关照样摆着。
+     * 提出来同时保住两件单一：开关只有一个读点，4 小时去重与"天况变了立即推"的时钟也只有一份
+     *（复制成两份就会变成同一个问题两个答案）。
+     */
+    private suspend fun pushWeatherAlert(context: Context): Int {
         var weatherAlerted = 0
         if (Prefs.weatherAlertEnabled) {
             val geo = com.shanxiang.buspost.core.loc.Locator.once(context)
@@ -173,9 +192,7 @@ object AlertEngine {
                 }
             }
         }
-
-        val announced = fresh.size + arrival + weatherAlerted
-        return AlertScan(outcomeOf(causes, announced), announced = announced)
+        return weatherAlerted
     }
 
     /**

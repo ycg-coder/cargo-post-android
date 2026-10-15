@@ -1009,7 +1009,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
     与原方案相比少了一个能力（续报），多了一个保证（不制造虚假实时性）。这个取舍记在 D-019，不写成"队列已完成"。
   - **顺带修掉本条第 ② 点**：上报的坐标现在已是 GCJ-02（§17），队列里"存了两套系的点"这个风险不复存在 ——
     因为不存队列，每个 `TrackFix` 出厂即 GCJ-02（`Locator.trackFixes` → `fixOf` → `gcjOf`）。
-  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1373-1374` 注释已写明"，
+  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1411-1412` 注释已写明"，
     那条**注释是陈旧的**：后端已把 `shiftId` 改为可选（`AppDriverLocationReqVO` 无 `@NotNull`，
     服务层 `currentLegShiftId()` 按当前活跃段兜底）。Android 侧原来 `Running.shiftId <= 0` 就一句不发，
     实际后果是**运输段模式（无班次）的司机永远不上报**，监控上看是车凭空消失。
@@ -1325,7 +1325,7 @@ bash tools/check_domain_probes.sh
 #        写裸词不写 `driverIdParam()`（实测会少算 KDoc 里那次引用），数字对不上时无法区分"少了一个调用点"还是"注释被删了"；
 #   P-c：角色切换入口 2（`MineScreen` 先 `bindDriver` / `DriverShell` 退出用户版回写 `Role.USER`）；
 #   P-d：深链分域闸 2（`Routes.DRIVER_ONLY` 声明 + `BusPostRoot.deepLinkAllowed` 判据）；
-#   P-e：司机通知落司机页 1（`AlertEngine.kt:78` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
+#   P-e：司机通知落司机页 1（`AlertEngine.kt:84` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
 #        人眼复核 `trace/*` 只能出现在司机分支 `return`(`:57`) 之后的用户分支里；
 #   P-f：`DRIVER_UNBOUND` 引用 5 = Repo 的映射 + 异常类 + 常量，MineScreen 的 import + 使用。
 # 与 §55 C 同一课：**这些判据全部按内容/函数名，不按行号**；行号白名单会随一次插入整段失效。
@@ -2007,7 +2007,7 @@ bash tools/check_eta_probes.sh
    以及深链那一行把**两个壳都排除在深链之外**（注意读法：`route != USER_SHELL && route != DRIVER_SHELL` 是**不放行**，不是放行）。
    但"读代码成立"不等于指令 §95/§97 要的**用例**——重构一次就能静默回潮，这正是 §29 那一类问题的成因。
 3. **异常上报（指令 §54）是"有旗标、没有页面、没有端点"**：
-   `DriverLegStateMapper.kt:45/:88` 算出 `canReportException`（并且 `:174-176` 三条形为用例钉住了它），
+   `DriverLegStateMapper.kt:61/:104` 算出 `canReportException`（并且 `DriverLegStateMapperTest.kt:174-176` 三条形为用例钉住了它），
    但 `.actionable` 在 `ui/driver/` 里**零消费者**，`Repo.kt` 里也**没有任何 exception 上报调用**。
    ⇒ 状态机知道"这一段可以报异常"，界面上却没有任何入口。**下一步不是先写页面**：
    §54 明确要求"后端若现有 enum 不完整：先读取真实 enum，不要自己发一套后端无法接受的 type"。
@@ -3028,7 +3028,7 @@ D-003 原文要求"在页面上显著标注"。落三处，判据 N-o 钉 ≥2/1
   "所以读 `eta` 也合理"的依据 —— 过期注释是这类缺陷的孵化器。
 - **顺手核清的一条口径（与 §77 二那条单位未验是同一条线的不同事实）**：`roadEtaSeconds` / `roadDistanceMeters`
   是**客户端字段名，不是 JSON 键**；真实键是 `routeDurationSeconds`（`AppDriverRouteRespVO:48`）与
-  `routeDistanceMeters`（`:45`），`Repo.kt:1270-1271` 的读法**已经**以真实键打头（本轮实测该行仍是这两个键在第一候选位）
+  `routeDistanceMeters`（`:45`），`Repo.kt:1277-1278` 的读法**已经**以真实键打头（本轮实测该行仍是这两个键在第一候选位）
   ⇒ 正式包的全程分钟只可能来自通过校验的真实道路耗时，与 #51 的"release 导航面"结论接得上。
 
 ### 五、"打印不判红"的残留升格成三条判据，同轮抬两条计数下限
@@ -3152,7 +3152,7 @@ D-003 原文要求"在页面上显著标注"。落三处，判据 N-o 钉 ≥2/1
 1. `app/src/main` 里生效的 `catch (e: Throwable)` 共 **6** 处（F-1-a 分类读数），`catch (e: Exception | Throwable)` **69** 处。
 2. 分级之后真正会吞取消的是"try 首段里有挂起点"的那一批：`catch (e: Exception)` 全 main **49** 处
    （`grep -rn "catch (e: Exception) {"` 裸数与排除注释行数**相同** ⇒ 这一族没有被注释顶替的风险），
-   其中挂起形状 **48** 处、非挂起 **1** 处（`DriverSdkNavCard.kt:464` 唤起外部地图，`startActivity` 不可被取消）。
+   其中挂起形状 **48** 处、非挂起 **1** 处（`DriverSdkNavCard.kt:471` 唤起外部地图，`startActivity` 不可被取消）。
 3. §七 点名要建的那个"unified helper"形状，**工程里已经有了**：`apiCall`（`Api.kt:60`，`suspend inline`、
    先 `throw e` 穿透取消、五类 typed 分支，`ApiTest.kt:165` 有"只做分类不吞异常"一条用例）——
    但**生产调用点实测 0**。这条读数决定了本轮的命名与范围（见 D-034 第 2 点），也决定了它**不能**被写成"本轮建了 safeApiCall"。
@@ -3272,7 +3272,7 @@ UI/服务侧按"取消从哪来"分三种收法（`attempt {}` 替换挂起形�
 ① **`apiCall` 仍是"已存在但没人用"**：生产调用点实测 **0**（判据里 Z1=1 是它自己的定义行）。
    §七 点名要的 unified helper 我立的是 `attempt{}`，因为它的用场超出网络层；`apiCall` **没删**（删它要动 `ApiTest` 那条用例，是减量不是收口）。
 ② **`runCatching` 在 main 里仍剩 34 处**（Z2 只打数不判红）：本轮只收了"try 里有挂起点"的那一批（TH-g 七个点名形状 → 0），
-   其余（如 `WorkbenchScreen.kt:1738` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
+   其余（如 `WorkbenchScreen.kt:1771` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
    照实记为"未收"而不是"已判无害"。
 ③ **§二十 的 Worker 重试语义没做**：真失败该回 `Result.retry` 而不是 `success` —— 本轮只收了"取消不许谎报这一轮跑过了"（TH-j）。
 ④ **失败四类分型（§三十三 SOURCE/DEPENDENCY/ENVIRONMENT/DEVICE_UNAVAILABLE）没落进代码**：

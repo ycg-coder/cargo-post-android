@@ -1712,7 +1712,7 @@ CURRENT_ANDROID_STATUS:  F-3 ④⑫ 收工（2026-10-02 02:1x–05:4x，源码/�
                   `readinessOf()`（:238）三个 Blocked 分支分别给 `NOT_INSTALLED`（:244）/ `SDK_UNAVAILABLE`（:250）/ `ERROR`（:258）。
                   **gate 不持状态、不落盘、没有 flow** ⇒ 它是同一份真相的**读法**、不是第二份真相（这句必须写着，否则下一轮看到多出来的类型会以为是叠层）。
                   **断点的形状**：判据层对 `Initializing` 说"不可点"，页面旧写法 `enabled = !blocked && …` 对它说"可点"（`blocked` 为假）——两边各自都"对"，
-                  司机会点一个引擎还没答应的按钮。现在引擎侧两道闸改读同一个 `state.canNavigate`（`AmapNavigationEngine.kt:404` 算路 / `:195` 起步），
+                  司机会点一个引擎还没答应的按钮。现在引擎侧两道闸改读同一个 `state.canNavigate`（`AmapNavigationEngine.kt:427` 算路 / `:195` 起步），
                   SDK 层不再自己判 `is EngineReadiness.Blocked`（`N-s 2/0`）⇒ **回执里那句 reason 与按钮上那句原因是同一句话**（用例 `替身引擎拒绝算路的原因与入口闸门一致`）。
                   UI 一处入口：`ui/driver/DriverSdkNavCard.kt:157-161` 取 gate，**五条出口**全部派生 —— 底色 `warm`（:86）、tag `gate.userText`（:95-102）、
                   不可点时副标题 `gate.detail`（:104-106）、`enabled = gate.canNavigate && !calculating`（:129）、不可点原因块（:157）；
@@ -1832,7 +1832,7 @@ CURRENT_ANDROID_STATUS:  F-3 ③ 收工（2026-10-01 19:0x–22:15，三态分�
                   ② **echo-only 的数不可归因**：`P-b2` / `P-c` / `P-d` / `P-f` 的"上一轮是多少"这条链断了（② 那两份批次日志只存逐本 rc、不存逐本读数），
                      本轮能核的只有**现状构成**（脚本输出里逐处点名）⇒ 登记为归属未定，并把"每轮把这几个数连构成一起落同一份日志"排进 ⑱⑳；
                   ③ `V21-31` 的 `haversine` **口径不可复现**：旧记 11 命中 / 6 文件但命令原文没留档，本轮 `-i` = 15/7、区分大小写 = 1/1 ⇒ 三组数互不可比；
-                     逐条读下来 15 处**全是口径声明或"假来源显式降级"映射**（`RouteSource.kt:46 "haversine" to EUCLIDEAN`、`Models.kt:2164 …"（直线估算，不是道路里程）"`），
+                     逐条读下来 15 处**全是口径声明或"假来源显式降级"映射**（`RouteSource.kt:46 "haversine" to EUCLIDEAN`、`Models.kt:2205 …"（直线估算，不是道路里程）"`），
                      **没有一处把 Haversine 当道路里程用** ⇒ 事实清楚但**数字不可比**，那一格**保留 ⚠ 不升 ✅**；
                   ④ `AccountRole` 这个类型名没有落地（用 `Prefs.role` 兼任，见上面那条 ⚠）—— 若下一轮要求字面同名，先解决"谁是唯一写入口"再改名。
                   ⑤ ⚠ **`--strict-id` 的 ID-MISS 数不能当跨轮闸门**（登记 `D-③-5`，它同时**作废**本轮 §4 终检 ⑤ 里"每轮连抄 ID-MISS 更便宜"那条建议）：
@@ -1957,7 +1957,7 @@ CURRENT_ANDROID_STATUS:  F-3 ⑩⑪⑮ 收工（2026-10-01 13:5x–14:55，三�
                   **命令原文已写进 D-045 第 2 节**——上一轮那串 `6e263735675020c1…`（146 文件）的算法没记在案，**跨轮不可比对，别再拿这两个数互相引用**。
                   判据面：`tools/check_*.sh` 20 本全 `rc=0 / ✘=0`；`DV-k=132`（只许降，本轮未升）；
                   census `rows=474 / B=400 / C=74`（D-044 是 472/398/74 ⇒ **+2 行全落 B、C 集合一条没动**，
-                  新增读点 `Repo.kt:1290/727/740/746` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
+                  新增读点 `Repo.kt:1325/728/741/747` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
                   负控 20 本 18 本 `rc=0`，`notify_result`/`oss_credits` 两本先 `rc=2`（自家预检：TEST XML 不在就不许交差）、
                   接力全量跑完单独复跑 `RESULT=PASS`；⚠ `eta` 本 `rc=0` 但 `✘=2` ⇒ **D-⑰⑱-1 本轮复现，未修**。
                 **release / device / git（各自单算，不许顶替上面那两态）**：
@@ -2359,7 +2359,7 @@ RRt-10 `setAccountRole` 不再把视图带出司机域 → 只红在 `撤档降�
    `^    LaunchedEffect(vm.demoted) {$` 之后，这条与 RR-d 另两条才真的红过；
 ② **跨文件的"恰好 N"要写清是哪几个文件**：RR-d 的 `RD4` 期望 2，第一版只扫 `WorkbenchScreen.kt` 得 **1**
    （另一处"回用户壳"在 `DriverShell.kt`）⇒ 判据改成**两文件合数**，**不是把期望从 2 降到 1**（降期望就是把判据改松凑绿）；
-③ **`grep` 会把"读"也算成"写"**：RR-e 的 `Prefs\.role =` 实测 **4** 而不是 2，多出来的是 `AlertEngine.kt:136/:44` 的
+③ **`grep` 会把"读"也算成"写"**：RR-e 的 `Prefs\.role =` 实测 **4** 而不是 2，多出来的是 `AlertEngine.kt:155/:44` 的
    `Prefs.role ==`（比较不是赋值）⇒ 收紧成 `Prefs\.role = [a-z]`，并把这条坑写进脚本注释。
 **§八 探针 V-3 复跑（2026-09-29 23:0x–23:13，四本台账写完之后再跑一遍才算收口）**：
 **十套全部 exit 0**：`check_authenticity_counts / domain / envelope / eta / exception / idempotency / location /
@@ -2655,7 +2655,7 @@ AMap Navigation 的**运行时那一半**仍要等一台真机，本机不许编
 正好证"数子句"与"逐点配对"不是同一条判据；TH-l 的兜底 0 由"`NetworkException` 出口换成 `RuntimeException`"打出；
 ③ **注释不许顶替生效代码，负控脚本自己也要防**：`swap` 现在强制 `assert old not in new` —— 把 `if (!demoAllowed) throw e`
 换成"同样字符串的注释"，TH-b 会数到注释里那一句，破口看着还在 ⇒ 假绿。同一条坑 V-3 / ⑳ 都犯过，本轮写成脚本里的机器闸；
-④ **台账自述可能判据抓不到**：本轮最实的一条。`WorkbenchScreen.kt:542-548` 的收法是**整圈 `runCatching` 仪式摘掉**，
+④ **台账自述可能判据抓不到**：本轮最实的一条。`WorkbenchScreen.kt:575-581` 的收法是**整圈 `runCatching` 仪式摘掉**，
 既不留 `catch (e: CancellationException)` 子句、也不留 `attempt {` ⇒ 在 TH-d 的"数子句"与 TH-e 的"逐点配对"里**全都隐形**；
 而 DONE 草稿把它写成"先穿透取消"，属于自述不实（"本来就没有 catch"这种改法只能靠**读代码**发现，不能靠数）。
 同批还有两处计数是**推算**出来的（负控 `✔=18` 实测 **19 行** = 18 破口 + 1 自检行；`idempotency_test` 的 `✔=0` 会被读成"没跑负控"，
@@ -3379,7 +3379,7 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
   **台账把 `WorkbenchScreen` 写成"先穿透取消"而实测是"整圈仪式摘掉"**（⚠ 这类"本来就没有 catch"的收法在任何判据里都是隐形的，
   只能靠读到自己写的假话 —— 这是本轮唯一一条**判据抓不到、只有读代码抓到**的缺陷）。
 - **没做（在册尾巴，逐条都是"没做"不是"不需要做"）**：`apiCall` 生产调用点仍 **0**；`runCatching` 在 main 仍剩 **34** 处
-  （本轮只收"try 首段有挂起点"那批，`WorkbenchScreen.kt:1050` 的 `callDriver` 这类纯同步形状记为**未收**而不是"已判无害"）；
+  （本轮只收"try 首段有挂起点"那批，`WorkbenchScreen.kt:1083` 的 `callDriver` 这类纯同步形状记为**未收**而不是"已判无害"）；
   **§二十 的 Worker 重试语义没做**（真失败应回 `Result.retry` 而不是 `success`）；**§三十三 的四类失败分型没落进代码**
   （本轮落的是"缺陷 vs 失败"两类 + 取消不是失败，四分类仍只是台账口径）；`QuoteResult` 缺键塌 `0.0`、
   `Repo.optBoolean(…, true)` 两处仍在；**设备侧一字未验**（`NOT VERIFIED ON DEVICE`，五条新增未验项见 DEVICE_STATUS）；
@@ -4436,7 +4436,7 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
   档案返回"非演示 + 有条目 + 无 driverId"→ 视为撤销并清绑定，返回 `data:null`/失败/演示回落 → 视为**未知**并保留
   （第一版写成"driverId<=0 就清"，自查发现一次网络抖动会把真司机锁死，改成三态并补用例）。
 - **§64 三处串域已修**：`DriverShell.kt:38` 点"用户版"先 `AppState.setRole(Role.USER)`（否则 `AlertEngine`
-  继续按司机域轮询 `/driver/messages`）；`AlertEngine.kt:78` 司机通知落 `Routes.DRIVER_MESSAGES`、单号进正文，
+  继续按司机域轮询 `/driver/messages`）；`AlertEngine.kt:64-92` 司机通知落 `Routes.DRIVER_MESSAGES`、单号进正文，
   不再深链村民端 `trace/$orderNo`；`Routes.kt:37 DRIVER_ONLY` + `BusPostRoot.kt:183-184 deepLinkAllowed()`
   给 Intent 深链加角色闸（不允许就留在当前页，不猜不跳不崩）。
 - **判据固化**：`tools/check_domain_probes.sh`（§55 H 组）+ §56 两行新的不许回潮不变量 + `CONTEXT_LOCK.md` §八 ⑦。

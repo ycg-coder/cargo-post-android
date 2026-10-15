@@ -1887,9 +1887,50 @@ data class RouteGuide(
     val nextStopName: String = "",
     /** 后端给的动作话术（`nextActionName`，同一生产者 `:668-679`）；空 = 后端没说 */
     val nextActionName: String = "",
+    /**
+     * 全路线折线是否覆盖**全部**任务段（`AppDriverRouteRespVO.routeComplete`，
+     * 生产者 `DriverAppServiceImpl` 的 spine.covered < items-1 时置 false）。
+     *
+     * 三格不许并成两格：`null` = 后端没发这个键，`false` = 后端明说"中段取不到道路，折线在缺口处截断"。
+     * 后者是有信息量的实话 —— 画出来的那条线**只到缺口为止**，司机若按整条线判断"后面还有路"会走错。
+     * 后端在 VO:50 一并写了"绝不连直线补上"，所以本机这里同样不许补齐。
+     */
+    val routeComplete: Boolean? = null,
+    /**
+     * 当前偏航：距**后端规划 polyline** 的最小距离（米）（`AppDriverRouteRespVO.deviationMeters`，
+     * 生产者 `fillDeviation` 一侧）。三格：`null` = 后端没发这个键；**负数** = 后端发了、但它自己说"无法判定"
+     * （VO:53 的 -1）；非负 = 真实读数。
+     *
+     * 为什么留原始值而不是当场塌成 null：`deviated`（布尔）与这一格是两回事 ——
+     * 后端可能在"无法判定"时把 `deviated` 发成 false，那一格读起来就像"没偏航"，
+     * 而这里读出来的是"根本没测"。两者塌成一个结论就是本机替后端补话。
+     */
+    val deviationMeters: Double? = null,
+    /**
+     * 当前任务段（车辆实时位置 → 后端点名的那个下一站）的真实道路折线
+     * （`AppDriverRouteRespVO.currentSegmentPolyline`，VO:86 原话"导航用"，
+     * 生产者 `fillNextActionAndNav:710-718`，与 [nextStopRoadDistanceMeters] 出自**同一次** `seg` 抓取）。
+     *
+     * 它与 [polyline] 不是同一几何：后者是全任务段的脊柱（可能截断），前者是"现在这一段该怎么走"。
+     * 空 = 后端这一段没取到道路（`to == null` / `points < 2` 时后端直接不写这个键），
+     * 此时导航只能退回全段线或明说"这一段没有真实道路"，**不许拿站点连线补**。
+     */
+    val currentSegmentPolyline: List<Geo> = emptyList(),
 ) {
     /** 有通过校验的道路折线才谈得上导航 */
     val hasRealRoad: Boolean get() = routeUnavailableReason == null && polyline.size >= 2
+
+    /** 后端明说"这一段的偏航测不出来"（发了键但是负数）；与"没发键"不是一格 */
+    val deviationUndeterminable: Boolean get() = (deviationMeters ?: 0.0) < 0.0
+
+    /** 偏航读数可用：后端发了键且不是它自己标的那个"无法判定" */
+    val deviationKnown: Boolean get() = deviationMeters != null && !deviationUndeterminable
+
+    /** 全段折线被截断：后端明说了 false 才算，没发这个键不算（那是"不知道"不是"不完整"） */
+    val routeTruncated: Boolean get() = routeComplete == false
+
+    /** 当前段几何可用：至少两点，且必须与后端点名的下一站里程同源那一次抓取才配得上 */
+    val hasCurrentSegment: Boolean get() = currentSegmentPolyline.size >= 2
 
     companion object {
         val EMPTY = RouteGuide(emptyList(), emptyList(), emptyList(), 0.0, 0, 0, "", 0, false, null, 0.0, "")

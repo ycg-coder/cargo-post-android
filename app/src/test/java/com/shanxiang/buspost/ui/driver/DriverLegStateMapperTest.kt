@@ -175,4 +175,25 @@ class DriverLegStateMapperTest {
         assertTrue(!DriverLegStateMapper.of(leg(11)).canReportException)
         assertTrue(!DriverLegStateMapper.of(leg(-1)).canReportException)
     }
+
+    /**
+     * #53 段动作按钮的分流：需要凭证照片的动作**不许在路线页就地发**。
+     *
+     * 这一格此前只写在 Composable 的 onClick 里（工程无 Robolectric ⇒ 红不了），而它管的是不可逆的代价：
+     * 后端 `HandoverServiceImpl:210-211` 对已完成的交接幂等 return，先落一次没有 photoUrl 的提交，
+     * 凭证就永久为空；交接页同一动作是拦着的（`HandoverScreen.kt:486-494`），两个入口不能两套答案。
+     */
+    @Test
+    fun `需要凭证的段动作只能改道交接页_其余照常提交`() {
+        assertEquals(LegClick.GO_HANDOVER, legClickOf(LegDriverAction.HANDOVER_CONFIRM))
+        assertTrue("这条分流的全部依据就是枚举上那个 needsPhoto", LegDriverAction.HANDOVER_CONFIRM.needsPhoto)
+        // 免照片的几步必须仍然能提交：修这一格不许顺手把整排按钮掐死
+        listOf(
+            LegDriverAction.ACCEPT, LegDriverAction.NAVIGATE, LegDriverAction.ARRIVE_ORIGIN,
+            LegDriverAction.LOAD, LegDriverAction.START, LegDriverAction.ARRIVE_DEST,
+            LegDriverAction.ENTER_DELIVERY, LegDriverAction.HANDOVER_START,
+            LegDriverAction.COMPLETE, LegDriverAction.EXCEPTION,
+        ).forEach { assertEquals(LegClick.SEND, legClickOf(it)) }
+        assertEquals("没有下一步动作时不许凭空跳页", LegClick.SEND, legClickOf(null))
+    }
 }

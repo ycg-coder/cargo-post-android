@@ -555,12 +555,15 @@ class NavigationContractTest {
     }
 
     /**
-     * `routeFingerprint` 就是四个实测数的定长拼接，不是摘要、不是高德给的图版本号。
+     * `routeFingerprint` 就是几个实测数的定长拼接，不是摘要、不是高德给的图版本号。
      * 钉住字面形状：一旦有人换成哈希，这台机器上就没有任何来源能解释那串字符是什么（V21-13 的 graphVersion 三面 0 生产者就是前车之鉴）。
+     *
+     * 尾部 `|wp=` 是 2026-10-15 全任务段导航（任务 #49）加进去的第五项：确认到站后站表变短、途经点数就变，
+     * 而"这已经不是为这一单算的路了"必须在几何与终点都可能相同时也说得出。
      */
     @Test
     fun `指纹就是实测数的拼接`() {
-        assertEquals("to=29.650000,106.650000|pts=4|m=9200", acceptedSession.routeFingerprint)
+        assertEquals("to=29.650000,106.650000|pts=4|m=9200|wp=0", acceptedSession.routeFingerprint)
         assertFalse(acceptedSession.routeFingerprint.contains("sha"))
         assertFalse(acceptedSession.routeFingerprint.contains("md5"))
     }

@@ -216,17 +216,24 @@ sealed class NavigationSession {
  * 也会被另一张卡片（另一个引擎实例）的算路顶掉 —— 没有这份记录，"启动的就是刚验过的那条"只是愿望，
  * 这正是 V21-09 那两行 ❌ 钉的东西。
  *
- * 只装实测读得到的四个量：终点是调用方交给高德的业务坐标（GCJ-02），
- * 点数与道路米数取自 javap 核对过的 `AMapNaviPath.getCoordList()` / `getAllLength()`。
+ * 只装实测读得到的五个量：终点是调用方交给高德的业务坐标（GCJ-02），
+ * 点数与道路米数取自 javap 核对过的 `AMapNaviPath.getCoordList()` / `getAllLength()`，
+ * 途经点个数是**本机交给高德的那一批**（`calculateDriveRoute` 的第三个参数，所以它是实测值而不是推测）。
  */
 data class AcceptedRouteSession(
     val destinationLat: Double,
     val destinationLng: Double,
     val coordCount: Int,
     val roadDistanceMeters: Int,
+    /**
+     * 这次算路交给高德的途经点个数（全任务段导航 > 0，逐站 = 0）。
+     * 它进指纹的理由与终点一样：确认到站之后剩余站表变短、途经点数就变，
+     * §九 那条"任务发生变化 → 旧 session 作废"要**即使两次几何恰好相同也成立**。
+     */
+    val wayPointCount: Int = 0,
 ) {
     /**
-     * §九 点名的 `routeFingerprint`：**上面四个实测数的定长拼接**，不是哈希、不是高德给的图版本号
+     * §九 点名的 `routeFingerprint`：**上面几个实测数的定长拼接**，不是哈希、不是高德给的图版本号
      * （`graphVersion` 在后端 VO / 小程序 / DemoData 三面 0 生产者，拿它当指纹就是凭空造一个看起来可信的东西）。
      *
      * 终点参与拼接不是为了比对（见 [routeBindingOf] 为什么只能比另两项），是为了让
@@ -234,7 +241,9 @@ data class AcceptedRouteSession(
      * 换了任务点就一定换指纹，即使两次算出的几何一模一样。
      */
     val routeFingerprint: String
-        get() = "to=%.6f,%.6f|pts=%d|m=%d".format(destinationLat, destinationLng, coordCount, roadDistanceMeters)
+        get() = "to=%.6f,%.6f|pts=%d|m=%d|wp=%d".format(
+            destinationLat, destinationLng, coordCount, roadDistanceMeters, wayPointCount,
+        )
 }
 
 /**
@@ -494,8 +503,87 @@ internal fun nextNavigableStop(guide: RouteGuide): MissionStop? =
  * 而途经点顺序必须与"下一站"的口径**出自同一处**：一旦导航页自己再 filter/sort 一遍，
  * 就会出现"高德按 A 序导、界面按 B 序显示第 i/n 站"，那是客户端替调度改了路线（硬规则 3）。
  */
-internal fun navigableStops(guide: RouteGuide): List<MissionStop> =
-    guide.stops.filter { !it.isDone && it.hasGeo }.sortedBy { it.visitSequence }
+internal fun navigableStops(guide: RouteGuide): List<MissionStop> = navigableStopsOf(guide.stops)
+
+/**
+ * [navigableStops] 的站表形态：过滤条件与排序只有这一份，两个入参形态共用。
+ *
+ * 单独开这一支不是为了省代码，是因为导航页拿到的是**进页那一刻的站表快照**（目的地经
+ * `AppState.GuideTarget` 传进来，不在那儿重新拉一次 `/driver/route`），
+ * 快照没有 RouteGuide 外壳，但绝不能因此在本机另写一遍 filter/sort —— 那正是"高德按 A 序导、
+ * 界面按 B 序念第 i/n 站"的来路。
+ */
+internal fun navigableStopsOf(stops: List<MissionStop>): List<MissionStop> =
+    stops.filter { !it.isDone && it.hasGeo }.sortedBy { it.visitSequence }
+
+/**
+ * 高德驾车算路的途经点上限。
+ *
+ * 外部依据（本轮查证，不是本机自定）：高德官方 Android 导航 SDK《驾车路线规划》原文
+ * "从导航 SDK V5.0.0 版本起最多支持设置 16 个途经点，注意：导航组件最多支持设置 3 个途径点"。
+ * 本工程走的是**导航 SDK** 的 `AMapNavi.calculateDriveRoute`（依赖 `com.amap.api:navi-3dmap:10.0.600_3dmap10.0.600`，
+ * `app/build.gradle.kts:287`），版本 10.x ≥ 5.0.0 ⇒ 适用 16 这一档，不是组件那档的 3。
+ */
+internal const val MAX_AMAP_WAY_POINTS = 16
+
+/**
+ * 一帧"这一趟该让高德导成什么样"的决定 —— 全任务段导航的唯一出口。
+ *
+ * 为什么要单独成一个类型而不是让导航页自己拼参数：
+ * 途经点列表与目的地必须**出自同一次取数**。导航页若自己 `guide.stops.filter{}.sortedBy{}` 一遍，
+ * 就会和 [nextNavigableStop] 分成两套口径 —— 高德按 A 序导、界面按 B 序念"第 i/n 站"，
+ * 那是客户端替调度改了路线（硬规则 3，VO `AppDriverRouteRespVO:88` 原话"导航层不得重排"）。
+ *
+ * @param stops 本段还没去的站，后端 `visitSequence` 原序（与 [navigableStops] 同一个列表）
+ * @param destination 交给高德的终点
+ * @param wayPoints 交给高德的中间途经点，顺序 = `visitSequence`，恒为 `stops` 去掉终点的那一段
+ * @param legByLeg true = 这一帧不是全段而是只导最近一站；[note] 给出为什么
+ * @param note 退回逐站的原因；空串 = 正常全段模式
+ */
+internal data class NavPlan(
+    val stops: List<MissionStop>,
+    val destination: MissionStop,
+    val wayPoints: List<MissionStop>,
+    val legByLeg: Boolean,
+    val note: String,
+)
+
+/**
+ * 全任务段计划：终点 = 后端顺序的**最后一个**未去站，中间站按原序当途经点。
+ *
+ * 没有任务点（调度还没下发 / 全部完成）时返回 null，调用方必须明说"调度还没给点"，
+ * 不许拿班次终点站或县城中心凑一个目的地（同 [nextNavigableStop] 那条）。
+ *
+ * ⚠ 超上限时**退回逐站**而不是"摘掉几个中途站继续全段"：被摘掉的那几站高德根本不会绕，
+ * 等于本机替司机跳站 —— 而公交车按线路每站必停拉客是业务底线（后端 `arrive` 那侧也有防跳站校验，
+ * `DriverAppServiceImpl:905` 直接报 `DRIVER_STATION_ORDER_ILLEGAL`）。
+ * 退回逐站只是"这一帧先导到最近那站"，确认到站后列表变短，下一帧自然又回到全段模式。
+ */
+internal fun navPlanOf(guide: RouteGuide): NavPlan? = navPlanOfStops(guide.stops)
+
+/** [navPlanOf] 的站表形态，理由同 [navigableStopsOf]：导航页只有进页时那份快照 */
+internal fun navPlanOfStops(stops: List<MissionStop>): NavPlan? {
+    val rest = navigableStopsOf(stops)
+    if (rest.isEmpty()) return null
+    val mid = rest.dropLast(1)
+    if (mid.size > MAX_AMAP_WAY_POINTS) {
+        return NavPlan(
+            stops = rest,
+            destination = rest.first(),
+            wayPoints = emptyList(),
+            legByLeg = true,
+            note = "本段还有 ${rest.size} 站，中间 ${mid.size} 个超出高德途经点上限 $MAX_AMAP_WAY_POINTS，" +
+                "先只导到最近一站（到站确认后自动接着导后面的）",
+        )
+    }
+    return NavPlan(
+        stops = rest,
+        destination = rest.last(),
+        wayPoints = mid,
+        legByLeg = false,
+        note = "",
+    )
+}
 
 /**
  * 「自动进导航」的唯一判定（用户口径 A：在途司机打开 App 就直接给他导航）。
@@ -547,10 +635,32 @@ interface NavigationEngine {
     val recalc: StateFlow<EngineRecalcDisplay?>
 
     /**
+     * 高德最近一次宣布"车已到达第 N 个途经点"的 **0 基下标**（`AMapNaviListener.onArrivedWayPoint(int wayID)`）。
+     *
+     * 参数语义取自官方 javadoc 原文：`void onArrivedWayPoint(int wayID)` —— "Callback function when driving
+     * route navigation reaches a waypoint"，wayID 是"到达的途经点编号，从 0 开始递增"，
+     * 所以它是**下标**而不是"还剩几个""第几站（1 基）"；把它当 1 基来显示就整体错开一站。
+     *
+     * 三格不许并：
+     * · `null` = 高德这一世还没回调过（逐站导航本来就没有途经点，这一格永远该是 null）；
+     * · 非 null = 高德说了到了下标 k 这一件事，**仅此而已** —— 它不写后端状态。
+     *   到站/揽收/妥投的推进只能由司机在工作台确认后走 `/driver/arrive`
+     *   （后端 `DriverAppServiceImpl:928` 原话"状态以后端为最终来源，前端不做布尔替代"，
+     *   且 `:905` 那侧有防跳站校验，本机替司机点一下可能直接报 `DRIVER_STATION_ORDER_ILLEGAL`）。
+     * 每次重新算路都清零：上一趟的到站记录不属于这一趟。
+     */
+    val arrivedWayPointIndex: StateFlow<Int?>
+
+    /**
      * 算一条真实道路路线。[from] 为 null 时由定位补；参数一律是业务坐标（GCJ-02）。
      * 返回 [RouteCheck]：不通过时带原因，调用方显示"路线不可用 + 原因 + 重试"，不做连线示意。
+     *
+     * [wayPoints] 是**全任务段导航**的中间站（顺序来自后端 `visitSequence`，见 [navPlanOf]），
+     * 高德会按这个顺序经过它们再到 [to]。默认空 = 只导到终点（逐站模式）。
+     * ⚠ 这一格只能由 [navPlanOf] 那种"和目的地同一次取数"的出口喂：调用方各自 filter/sort 出来的列表
+     * 会和本机的"下一站"口径分家，等于客户端替调度重排了路线（硬规则 3）。
      */
-    suspend fun calculateRoute(from: Geo?, to: Geo): RouteCheck
+    suspend fun calculateRoute(from: Geo?, to: Geo, wayPoints: List<Geo> = emptyList()): RouteCheck
 
     /**
      * 开始 GPS 导航；结果直接来自 SDK 返回值，不本机推断。
@@ -584,11 +694,15 @@ class BlockedNavigationEngine(private val blockedReadiness: EngineReadiness) : N
     private val emptyRecalc = MutableStateFlow<EngineRecalcDisplay?>(null)
     override val recalc: StateFlow<EngineRecalcDisplay?> = emptyRecalc.asStateFlow()
 
+    // 到途经点同理：替身一次算路都没发出去，高德永远不会说"到了第 k 个"，这一格恒为 null（不是"到了 0 个"）
+    private val emptyWayPoint = MutableStateFlow<Int?>(null)
+    override val arrivedWayPointIndex: StateFlow<Int?> = emptyWayPoint.asStateFlow()
+
     // 替身的状态是构造时就定死的，不会再变 —— 用它自己的 flow 暴露，页面仍然只订阅、不轮询
     private val blockedState = MutableStateFlow(blockedReadiness)
     override val readiness: StateFlow<EngineReadiness> = blockedState.asStateFlow()
 
-    override suspend fun calculateRoute(from: Geo?, to: Geo): RouteCheck =
+    override suspend fun calculateRoute(from: Geo?, to: Geo, wayPoints: List<Geo>): RouteCheck =
         RouteCheck.Rejected(reason = blockedReadiness.userText, detail = blockedReadiness.toString())
 
     override fun startGpsNavi(voiceOn: Boolean): NavigationSession =

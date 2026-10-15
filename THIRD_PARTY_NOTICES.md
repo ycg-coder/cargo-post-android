@@ -203,7 +203,7 @@ grep -n "版本\|| .*$" THIRD_PARTY_NOTICES.md | head
 （`core/net/Api` / `core/net/Attempt`（新）/ `data/repo/Repo` / `ui/login/LoginViewModel`）+ `if (!demoAllowed) throw e` 命中 1 个（`core/net/Api`）
 ⇒ 并集去重 16 个（含 `Attempt.kt`），再加上编辑窗口 08:13–08:28 内的 `driver/DriverLocationService` / `ui/common/ScreenViewModel` /
 `ui/user/Orders|Goods|Send|Home` / `widget/NextBusWidgetProvider` ⇒ 既有生产文件 **17** 个。
-⚠ **必须点名的一条方法读数**：`ui/driver/WorkbenchScreen.kt:542-548` 的收法是**整圈 `runCatching` 仪式摘掉**，
+⚠ **必须点名的一条方法读数**：`ui/driver/WorkbenchScreen.kt:575-581` 的收法是**整圈 `runCatching` 仪式摘掉**，
 所以它**同时不在** mtime 窗口清单里（16:55 是被就地簿 `cp` 恢复的时间戳）、**也不在**任何一条内容 glob 里
 （既无 `attempt {`、无 CE 子句、无 demoAllowed 出口）—— 它是 `comm -23` 拿"注释里引用 §三十一 的文件"与上面并集作差才被找出来的。
 ⇒ **"改了哪些文件"这件事，靠 glob 数出来的清单会漏掉'删除型'改动**，本轮的 17 是并集 + 作差两条都跑过之后的数，不是估的。

@@ -63,8 +63,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
+ * 一枚图标返回键（无文字，命中 ≥ [LocalBusTouch] 下限），[Signpost] 的箭头与自带页头的屏共用这一份。
+ * 单独开出来是为了 #80 那条规矩：每个整屏路由都要有**看得见**的退出口 —— 各屏自己画会画歪，
+ * 歪掉的那一格恰好是用户唯一能按的出口。
+ */
+@Composable
+fun BusBackArrow(onBack: () -> Unit, tint: Color = Color.White, modifier: Modifier = Modifier) {
+    val touch = LocalBusTouch.current
+    Box(
+        modifier
+            .defaultMinSize(touch.min, touch.min)
+            .clip(CircleShape)
+            .clickable(onClickLabel = "返回", onClick = onBack),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Image(
+            imageVector = BusIcons.back,
+            contentDescription = "返回",
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+/**
  * 站牌头：主题深板渐变 + 顶部落款横档 + 角落光晕，等价 app.wxss 的 .signpost。
  * 页面顶部通栏与卡片内均复用本原语。
+ *
+ * [onBack] 非空时在标题前挂一枚返回箭头（与 [BusTopBar] 同一形状、同一 `BusIcons.back`）。
+ * 为什么箭头长在这里而不是叫屏再叠一条 `BackTopBar`：全屏路由（货物交接 / 寄货）的第一格
+ * 就是这块站牌头，再加一条顶栏等于两行标题压在一起，白吃掉一屏里最贵的那 56dp。
+ * 壳内宿主（首页 / 商城 / 工作台）本来就有底部标签栏可退，不传这个参数就不会长出箭头。
  */
 @Composable
 fun Signpost(
@@ -73,6 +102,7 @@ fun Signpost(
     subtitle: String? = null,
     badge: String? = null,
     compact: Boolean = false,
+    onBack: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     val t = LocalBusTokens.current
@@ -116,13 +146,14 @@ fun Signpost(
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) BusBackArrow(onBack = onBack)
                 Text(
                     title,
                     color = Color.White,
                     fontSize = if (compact) 17.sp else 20.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.padding(start = if (onBack != null) 4.dp else 0.dp).weight(1f, fill = false),
                 )
                 if (badge != null) {
                     Box(

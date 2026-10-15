@@ -257,4 +257,74 @@ class MissionRouteStateContractTest : ServerTest() {
         assertNull("演示数据顶上时没有『没问到』这件事可说", vm.routeFailure)
         assertTrue(vm.demo)
     }
+
+    /**
+     * #49 补的那半边：页脚那句"折线完不完整"必须由后端 `routeComplete` 说，而且**三格不许并成两格**。
+     *
+     * `false` 不说出来的代价很具体：地图上那条线画到缺口就停了，而在司机眼里它和一条完整的线一模一样，
+     * 他会以为缺口后面还有路 —— 后端在 VO:50 特意写了"绝不连直线补上"，本机若连"断了"都不说，
+     * 就等于把这份克制藏起来。反过来 `null`（后端没发这个键）必须留白：没说不等于完整，也不等于不完整。
+     */
+    @Test
+    fun `页脚的折线完整性三格各说各的`() {
+        val truncated = missionFootnote(guideForNote(routeComplete = false))
+        assertTrue("后端说断了必须念出来：$truncated", truncated.contains("到缺口为止"))
+        assertTrue("不许把它写成一句含糊的『暂无』：$truncated", truncated.contains("没有连直线补上"))
+
+        val complete = missionFootnote(guideForNote(routeComplete = true))
+        assertTrue(complete.contains("折线覆盖全部任务段"))
+        assertFalse(complete.contains("到缺口为止"))
+
+        val silent = missionFootnote(guideForNote(routeComplete = null))
+        assertFalse("后端没发这个键，页面一个字都不许替它说：$silent", silent.contains("缺口"))
+        assertFalse(silent.contains("覆盖全部任务段"))
+    }
+
+    /**
+     * 偏航那一行只报**后端量出来的数**，永远不报"未偏航"：
+     * 模型里 `deviated` 缺键塌成 false，"未偏航"与"后端没答"在界面上就成了同一句话 ——
+     * 而司机看到"未偏航"会停止检查自己的位置。反过来 `deviated=true` 是后端正面给的，可以照说。
+     */
+    @Test
+    fun `偏航行三格读数 但一句未偏航都不说`() {
+        with(MissionMarkers) {
+            val measured = deviationText(guideForNote(deviationMeters = 42.5, deviated = false))
+            assertTrue(measured.contains("距规划线 42 米（后端量）"))
+            assertFalse("没发 deviated=true 就不许写成未偏航：$measured", measured.contains("未偏航"))
+
+            val flagged = deviationText(guideForNote(deviationMeters = 300.0, deviated = true))
+            assertTrue(flagged.contains("后端标记偏航"))
+
+            val undeterminable = deviationText(guideForNote(deviationMeters = -1.0))
+            assertTrue(undeterminable.contains("判定不了"))
+            assertFalse(undeterminable.contains("距规划线"))
+
+            val absent = deviationText(guideForNote(deviationMeters = null))
+            assertTrue("没发键要说『没给』，不能借 -1 那一格的话：$absent", absent.contains("后端没给"))
+            assertFalse(absent.contains("判定不了"))
+        }
+    }
+
+    private fun guideForNote(
+        routeComplete: Boolean? = null,
+        deviationMeters: Double? = null,
+        deviated: Boolean = false,
+    ) = com.shanxiang.buspost.data.model.RouteGuide(
+        stops = emptyList(),
+        steps = emptyList(),
+        polyline = emptyList(),
+        stations = emptyList(),
+        totalMeters = 0.0,
+        etaMinutes = null,
+        currentStep = 0,
+        nextStation = "",
+        nextStationDistanceMeters = 0,
+        deviated = deviated,
+        vehicleGeo = null,
+        headingDegrees = 0.0,
+        dataSource = "TEST",
+        roadDistanceMeters = 5000,
+        routeComplete = routeComplete,
+        deviationMeters = deviationMeters,
+    )
 }

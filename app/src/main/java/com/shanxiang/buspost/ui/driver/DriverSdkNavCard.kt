@@ -138,6 +138,7 @@ fun DriverSdkNavCard(
                 lng = stop.geo.lng,
                 name = stop.name.ifEmpty { "任务点#${stop.stationId}" },
                 stationId = stop.stationId,
+                legStops = guide.stops,
             ),
         )
         onOpenLaneGuide()
@@ -203,6 +204,9 @@ fun DriverSdkNavCard(
                             lng = stop.geo.lng,
                             name = stop.name.ifEmpty { "任务点#${stop.stationId}" },
                             stationId = stop.stationId,
+                            // 站表原样交给导航页，由它调 navPlanOfStops 决定"全段还是逐站"：
+                            // 过滤与排序只许有一份，卡片这里不先 filter 一遍，否则两边各数一次就会错开。
+                            legStops = guide.stops,
                         ),
                     )
                     onOpenLaneGuide()
@@ -387,6 +391,9 @@ fun DriverSdkNavCard(
                     // 高德那两条广播没有结局，随后的算路回执又不带原因，所以这里也不写"重算完成/已回到线路"（配对推断禁止）。
                     // 这一行没有对应的司机开关（Prefs 里只有上面那一条车道与下面的语音两条），所以它不接 guidanceSwitchOffText。
                     InfoRow("重算", engineRecalcTextOf(sdkRecalc))
+                    // 偏航那一格走后端的量（`deviationMeters`，VO:53）：本机既没测距也不卡阈值，
+                    // 而这一行存在的意义正是让"高德在重算"与"后端说偏离规划线"分成两件事看。
+                    InfoRow("偏航", MissionMarkers.deviationText(guide))
                     // 播报文本是高德 onGetNavigationText 原句；本机没有 TTS，关着时也不冒充"高德没给"。
                     // 播报类型名进的是**值**那一侧：label 这一屏全是静态词，动态词拼进 label 会让 13 行的标签宽窄不齐。
                     InfoRow(

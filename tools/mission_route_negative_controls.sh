@@ -459,9 +459,9 @@ s = s.replace(n, n + 'import com.shanxiang.buspost.data.model.MissionStop\n', 1)
 ctl MR-r "视觉层 import 业务模型：画法的一层开始读业务数据"
 
 red "$BM" "
-n = '                    val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)'
+n = '    val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)'
 assert s.count(n) == 1, 'ANCHOR-MISS'
-s = s.replace(n, n + '\n                Running.waiting.value = \"NEG-CONTROL 画一笔顺手写服务状态\"', 1)
+s = s.replace(n, n + '\n        Running.waiting.value = \"NEG-CONTROL 画一笔顺手写服务状态\"', 1)
 "
 ctl MR-r "视觉层写共享状态（画的副作用回灌服务侧）"
 

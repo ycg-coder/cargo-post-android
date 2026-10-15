@@ -109,6 +109,8 @@ core/navigation 同级，都是 core 层引 `core.net.attempt`，没有新的跨
 | ui/driver/DriverGuideScreen.kt:333 | E（视图回调） | 否 | 否 | 保持 | `update = { v -> }` 重设夜间/车道/视角，形参类型 `(T) -> Unit`，非 suspend |
 | ui/driver/DriverGuideScreen.kt:341 | E（视图回调） | 否 | 否 | 保持 | `DisposableEffect(Unit) { onDispose { } }` 里的 `v.onPause()` |
 | ui/driver/DriverGuideScreen.kt:342 | E（视图回调） | 否 | 否 | 保持 | 同 341 的 `v.onDestroy()`：销毁两步各自包，一步抛不许顶掉另一步 |
+| ui/driver/DriverGuideScreen.kt:448 | A/D | 否 | 否 | 保持 | 任务点标记整批贴放：块内是 `AMapNaviView.getMap()` + `AMap.addMarker`（SDK 同步句柄，无挂起调用）；`onFailure` 不静默，落 `Log.w("BUS_MAP", …)` |
+| ui/driver/DriverGuideScreen.kt:463 | A/D | 否 | 否 | 保持 | `onDispose` 里收回本页贴的标记：`placed.forEach { it.remove() }`，纯 SDK 同步调用 |
 <!-- RC-ROWS-END -->
 
 RC-e 的计数口径：`<!-- RC-ROWS-BEGIN -->` 与 `END` 之间的物理行（32 行，不含表头与分隔行）；

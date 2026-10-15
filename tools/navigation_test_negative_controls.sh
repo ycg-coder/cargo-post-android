@@ -167,9 +167,12 @@ s = s.replace(old, new, 1)
 case_run M5 "算路结果不过真实道路闸门，直接当 Accepted"
 
 # M6 目的地改用数组顺序：客户端开始替调度排路线
+# ⚠ #49 把过滤+排序收进了 navigableStopsOf，这条刀先跟着挪到"摘掉 sortedBy"，实测**全绿**：
+#   下一站那一句自己还写着 `minByOrNull { visitSequence }`，上游排不排序它都挑得对 —— 那是一把空刀。
+#   真正的破口在"下一站"那一行：让它直接吃数组顺序、两个出口都不走。
 red "$NE" "
-old = 'guide.stops.filter { !it.isDone && it.hasGeo }.minByOrNull { it.visitSequence }'
-new = 'guide.stops.filter { !it.isDone && it.hasGeo }.firstOrNull()'
+old = '    navigableStops(guide).minByOrNull { it.visitSequence }'
+new = '    guide.stops.filter { !it.isDone && it.hasGeo }.firstOrNull()'
 assert old in s, 'ANCHOR-MISS M6'
 s = s.replace(old, new, 1)
 "
@@ -177,8 +180,8 @@ case_run M6 "目的地按数组顺序而非后端 visitSequence"
 
 # M7 把后端标为失败的任务点也跳掉：等于客户端替调度改了路线
 red "$NE" "
-old = 'guide.stops.filter { !it.isDone && it.hasGeo }.minByOrNull { it.visitSequence }'
-new = 'guide.stops.filter { !it.isDone && !it.isFailed && it.hasGeo }.minByOrNull { it.visitSequence }'
+old = 'stops.filter { !it.isDone && it.hasGeo }.sortedBy { it.visitSequence }'
+new = 'stops.filter { !it.isDone && !it.isFailed && it.hasGeo }.sortedBy { it.visitSequence }'
 assert old in s, 'ANCHOR-MISS M7'
 s = s.replace(old, new, 1)
 "
@@ -264,9 +267,13 @@ s = s.replace(old, new, 1)
 case_run M14 "「高德没有路径」与「本机没算成过」共用一句"
 
 # M15 指纹换成不含终点的哈希：终点变了指纹可能不变（§九 那条作废依据失效），而且这台机器上没人能解释那串字符
+# ⚠ #49 给指纹加了 `wp=`（途经点数）⇒ 这一格从一行变成三行，锚点跟着换成三行原文。
 red "$NE" "
-old = '        get() = \"to=%.6f,%.6f|pts=%d|m=%d\".format(destinationLat, destinationLng, coordCount, roadDistanceMeters)'
-new = '        get() = java.security.MessageDigest.getInstance(\"SHA-1\").digest((coordCount.toString() + roadDistanceMeters).toByteArray()).toString()'
+old = '''        get() = \"to=%.6f,%.6f|pts=%d|m=%d|wp=%d\".format(
+            destinationLat, destinationLng, coordCount, roadDistanceMeters, wayPointCount,
+        )'''
+new = '''        get() = java.security.MessageDigest.getInstance(\"SHA-1\")
+            .digest((coordCount.toString() + roadDistanceMeters + wayPointCount).toByteArray()).toString()'''
 assert old in s, 'ANCHOR-MISS M15'
 s = s.replace(old, new, 1)
 "

@@ -189,6 +189,26 @@ object MissionMarkers {
         }
     }
 
+    /**
+     * 偏航那一行的说法（#49：后端 `deviationMeters` 一直在发，本机以前只有 `deviated` 一个位）。
+     *
+     * 只报**后端量出来的数**，不报结论：`deviated` 缺键时模型塌成 false，所以"未偏航"这一句
+     * 本机永远说不出（它分不清"后端说不偏"与"后端没答"）；反过来 `deviated=true` 是后端正面给的，
+     * 可以照说。这一条不对称是有意的，不是偷懒。
+     *
+     * 三格读数各有各的话：没发键 / 发了但后端自己标"无法判定"（VO:53 的 -1）/ 有真实米数。
+     * 本机一律不补数 —— 垂距那条已经明确"不参与偏航判定"（`DriverNavViewModel.crossTrackMeters` 的注释）。
+     */
+    fun deviationText(guide: RouteGuide): String = when {
+        guide.deviationKnown -> {
+            val meters = guide.deviationMeters!!.toInt()
+            "距规划线 ${meters} 米（后端量）" + if (guide.deviated) " · 后端标记偏航" else ""
+        }
+        guide.deviationUndeterminable -> "偏航距离：后端说这一趟判定不了" +
+            if (guide.deviated) " · 但后端标记了偏航" else ""
+        else -> "偏航读数：后端没给" + if (guide.deviated) " · 不过后端标记了偏航" else ""
+    }
+
     fun MissionStop.markerTitle(): String {
         val seq = if (visitSequence > 0) "$visitSequence · " else ""
         return "$seq${name.ifEmpty { "任务点" }}"

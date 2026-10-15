@@ -5,6 +5,7 @@
 01d64ab7	ID-MISS	MultiLegPlanner.java:187	DECISION_LOG.md:6294	totalDistanceKm
 020c3f3d	ID-MISS	Api.kt:105	ANDROID_PARITY_AUDIT_V2.md:1267	MockWebServer
 02475f9f	ID-MISS	BusScreen.kt:98	DECISION_LOG.md:2965	gradle/Property/public/exposes
+0276e11a	ID-MISS	Repo.kt:1168	AI_ITERATION_STATE.md:1870	cargoCapacityKg/multiNumOrNull/cargoCapacity/multiNumOrNull
 02875ea7	ID-MISS	AmapNavigationEngine.kt:152	DECISION_LOG.md:2232	daily
 02b247df	ID-MISS	Models.kt:1447	DECISION_LOG.md:758	Models
 02df974a	ID-MISS	Models.kt:997	ANDROID_PARITY_AUDIT_V2.md:3356	goodsName/cargoName/itemCount/count
@@ -71,6 +72,7 @@
 4c891250	ID-MISS	Models.kt:763	ANDROID_PARITY_AUDIT_V2.md:407	RoutesScreen/statusLabel/RoutesScreen/nextActionOf
 4d005346	ID-MISS	MapCanvas.kt:55	DECISION_LOG.md:268	TraceView/BusScreen/DriverNavScreen
 4d877866	ID-MISS	NotifyWorker.kt:24	ANDROID_V2.1_CHECKLIST.md:111	Worker
+4f5e2741	ID-MISS	Repo.kt:1271	CONTRACT_EVIDENCE.md:197	routeDistanceMeters/nextStopRoadDistanceMeters
 4f7f1181	ID-MISS	HandoverScreen.kt:165-173	CONTRACT_EVIDENCE.md:252	DEVICE_VERIFIED
 53490f2f	ID-MISS	NextBusWidgetProvider.kt:80	DECISION_LOG.md:3126	widget
 5512fb08	ID-MISS	BusScreen.kt:267	CONTEXT_LOCK.md:2054	safeApiCall/safeApiCall/attempt/runCatching
@@ -172,7 +174,6 @@ b869236f	ID-MISS	Models.kt:563	CONTEXT_LOCK.md:2080	sourceOf
 b97cb17b	ID-MISS	Repo.kt:822	CONTRACT_EVIDENCE.md:276	positionSource
 b9aa8d71	ID-MISS	BusPostRoot.kt:87	DECISION_LOG.md:3125	ShellDecision/internal/deepLinkTarget/route
 ba5977de	ID-MISS	UserIdempotentKeyResolver.java:21-25	AI_ITERATION_STATE.md:2834	create
-baf08b3e	ID-MISS	Repo.kt:1316	DECISION_LOG.md:2563	steps
 bb1e02ab	ID-MISS	Models.kt:469	AI_ITERATION_STATE.md:153	doc_anchor_negative_controls
 bd37dbb5	ID-MISS	DriverAppServiceImpl.java:1498	AI_ITERATION_STATE.md:2751	MISSING
 bd4d70c0	ID-MISS	MultiLegServiceImpl.java:391	DECISION_LOG.md:5836	backend
@@ -200,6 +201,7 @@ d0621a23	ID-MISS	Models.kt:13	ANDROID_PARITY_AUDIT_V2.md:1256	distanceMeters/hav
 d08fb8a1	ID-MISS	DriverMissionMap.kt:71	ANDROID_PARITY_AUDIT_V2.md:2220	token/AMAP_KEY
 d171b596	ID-MISS	MultiLegPlanner.java:187	CONTRACT_EVIDENCE.md:442	totalDistanceKm
 d36cfaa4	ID-MISS	RouteServiceImplStationsTest.java:68	DECISION_LOG.md:6862	Mockito/Never/wanted
+d3980b40	ID-MISS	AppState.kt:124	DECISION_LOG.md:5821	GuideTarget
 d481498f	ID-MISS	AppDriverController.java:258-263	DECISION_LOG.md:990	RoutesScreen/nextStation
 d6692e0b	ID-MISS	Repo.kt:1341	DECISION_LOG.md:7035	default/pickupConfirm/productLoad/productDeliver
 d7af7227	ID-MISS	Notifier.kt:92	DECISION_LOG.md:3126	routeFromDeepLink/notify

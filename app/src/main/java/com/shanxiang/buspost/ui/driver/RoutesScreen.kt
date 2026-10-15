@@ -105,12 +105,14 @@ class RoutesViewModel : ScreenViewModel() {
      * 旧实现在 ack 之后本机 `copy(status = nextStatus(...))`，而 `nextStatus` 造的是 2/3/4 这套
      * 不存在的推进（真实表 4 = 前往起点），后端拒了也照显示（§28）。现在客户端不再算下一状态。
      */
-    fun action(leg: TransportLeg, action: String) {
+    fun action(leg: TransportLeg, action: LegDriverAction) {
         if (busy) return
         busy = true
         work(reset = false) {
             try {
-                val ack = Repo.legAction(action, leg.legId)
+                // 闸键走枚举名而不是 URL：ARRIVE_DEST 与 ENTER_DELIVERY 打同一个 URL 却是两次不同的意图
+                //（后端按段的当前状态分两支），只按 URL 拼键会把第二次拦在本机，段永远进不了派送。
+                val ack = Repo.legAction(action.api, leg.legId, actionKey = action.name)
                 val feed = Repo.driverLegs()
                 legs = feed.items
                 val back = feed.items.firstOrNull { it.legId == leg.legId }
@@ -118,7 +120,7 @@ class RoutesViewModel : ScreenViewModel() {
                 receipt = when {
                     // 被本地幂等闸拦下：一个字节都没发出去，所以不能说"已提交"也不能说"失败"
                     ack.notSent -> "同一个动作还在处理中，本次点击未发给后端，以下为后端当前状态"
-                    ack.demo -> "$action 已记录，系统同步中"
+                    ack.demo -> "${action.api} 已记录，系统同步中"
                     back == null -> "动作已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     back.status == leg.status ->
                         "动作已提交，后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
@@ -200,6 +202,8 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
                     isCurrent = leg.legId == vm.current?.legId,
                     busy = vm.busy,
                     onAction = { vm.action(leg, it) },
+                    // 需要凭证的段动作改跳交接页：那一面有选图、有"绝不发没有 photoUrl 的确认"那道闸
+                    onNeedsPhoto = { nav.navigate(Routes.HANDOVER) },
                     // 旧导航页是调试入口（D-003）：路由只在 DEBUG 注册，这里同轮加闸
                     onNav = { if (BuildConfig.DEBUG) nav.navigate(Routes.DRIVER_NAV) },
                     // 段号靠进入意图传，不写进路由：带参数的司机域路由会绕过分域闸（§54，见 Routes.DRIVER_EXCEPTION）
@@ -308,7 +312,8 @@ private fun LegRow(
     leg: TransportLeg,
     isCurrent: Boolean,
     busy: Boolean,
-    onAction: (String) -> Unit,
+    onAction: (LegDriverAction) -> Unit,
+    onNeedsPhoto: () -> Unit,
     onNav: () -> Unit,
     onException: () -> Unit,
 ) {
@@ -397,7 +402,14 @@ private fun LegRow(
                         small = true,
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
-                        onClick = { onAction(next.api) },
+                        onClick = {
+                            // 分流只由 legClickOf 一处说（#53）：需要凭证照片的动作**不在这里发**，
+                            // 因为后端对已完成的交接是幂等 return，先落一次没有 photoUrl 的提交就补不回来了。
+                            when (legClickOf(next)) {
+                                LegClick.GO_HANDOVER -> onNeedsPhoto()
+                                LegClick.SEND -> next?.let(onAction)
+                            }
+                        },
                     )
                 }
                 // 旧导航页只在调试包可达（D-003）。这一页的段契约只有站名没有坐标，

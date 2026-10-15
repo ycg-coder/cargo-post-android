@@ -64,6 +64,7 @@ import com.shanxiang.buspost.data.model.HandoverTask
 import com.shanxiang.buspost.data.model.TransportLeg
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.ui.common.DemoNote
+import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.ScreenViewModel
 import com.shanxiang.buspost.ui.user.formatPrice
 
@@ -213,6 +214,7 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
     val context = LocalContext.current
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val nav = LocalNavController.current
     var tab by remember { mutableStateOf(0) }
     var target by remember { mutableStateOf<HandoverTask?>(null) }
     var picked by remember { mutableStateOf<Uri?>(null) }
@@ -233,6 +235,7 @@ fun HandoverScreen(vm: HandoverViewModel = viewModel()) {
             title = "货物交接",
             subtitle = "换乘站把货交给下一班车，拍照留证后可追溯责任段",
             badge = if (vm.pending.isEmpty()) "无待办" else "${vm.pending.size} 笔待办",
+            onBack = { nav.popBackStack() },
         )
         DemoNote(vm.demo, text = "当前为演示交接任务。")
         vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }

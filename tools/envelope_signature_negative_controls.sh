@@ -81,7 +81,7 @@ check_miss() {
 }
 
 check EI-1 "× E-i 模型不再解析后端 signUrl" sub "$MD" \
-  'signUrl = o.multiStr("signUrl", "handoverSignUrl"),' \
+  'signUrl = o.multiStr("signUrl"),' \
   'signUrl = o.multiStr("signatureUrl", "sign_url"),'
 check EI-2 "× E-i 页面不再渲染后端回读的 signUrl" delline "$HD" '                    url = task.signUrl,'
 check EI-3 "× E-i 签名上传失败不再拦停提交" sub "$HD" \

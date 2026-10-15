@@ -323,7 +323,7 @@ key 为空时 `BusMap` 只会给出空白底图 + 水印，比自绘更误导；
 `CONTEXT_LOCK.md` §八 ① 是**宽口径**（含 `stepping|two.?point|连线|直线`），实测 **19 行** = 4 处假步进违规 + 15 行禁止性说明/带标注值，
 §55 C 是**窄口径**，实测 **0 行**；两者是不同的探针，以后引用时必须说明是哪一条。
 新增的 1 行是 `DriverMissionMap.kt:166` 的注释（"接口没给里程就写'接口未给'，不拿直线距离凑"），属说明文字，不是违规调用点；
-`GeoMath` 命中数保持 **19 行未增长**，唯一违规仍是 `WorkbenchScreen.kt:343`（§32）。
+`GeoMath` 命中数保持 **19 行未增长**，唯一违规仍是 `WorkbenchScreen.kt:358`（§32）。
 
 **验证**：`24 tests completed` / `BUILD SUCCESSFUL`（MissionMapTest + RouteGuideContractTest）、
 `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug` 全绿、`lint-results-debug.txt` **0 条 `: Error:`** 且新文件零 finding。
@@ -343,7 +343,7 @@ key 为空时 `BusMap` 只会给出空白底图 + 水印，比自绘更误导；
 **决策 1：门槛整体删除，不降级成"提醒"**。
 `canArrive()`、`ARRIVE_RADIUS_METERS` 常量、以及 VM 里那个从未被写入也从未被读的 `canArrive` 状态位一并删。
 依据是后端事实而非偏好：`AppDriverArriveReqVO` 只收 `shiftId + stationId`，**不吃坐标、不做距离校验**；
-`Repo.arrive`(`Repo.kt:1377`) 发的 body 也只有 `driverId/shiftId/stationId`。
+`Repo.arrive`(`Repo.kt:1415`) 发的 body 也只有 `driverId/shiftId/stationId`。
 既然服务端按司机声明受理，客户端自设 50 米门槛就是"既严又不管用"的随机行为（无定位时形同虚设）。
 工程里不存在"GPS 自动到站提醒"，所以没有走 §32 方案的第 ③ 分支（常量改作提醒）；将来若加提醒，**只能提示，不得改按钮可用性**。
 
@@ -1499,7 +1499,7 @@ rc=0（**43 actionable tasks: 43 executed**，本轮是**全量重跑**不是增
 main 源码里 `catch (e: Throwable)` 生效 **6** 处、`catch (e: Exception | Throwable)` 共 **69** 处（F-1-a 的分类读数量）。
 按"里面到底挂不挂起"分完之后的**当前**读数：`catch (e: Throwable)` 生效 **2**（都在白名单，见第 3 点）、
 `catch (e: Exception)` **49** 处，其中 try 首段含挂起点 **48** 处（已全部先穿透取消）、不含挂起点 **1** 处
-（`DriverSdkNavCard.kt:464` 唤起外部地图，`startActivity` 不可能被取消）。
+（`DriverSdkNavCard.kt:471` 唤起外部地图，`startActivity` 不可能被取消）。
 
 **决策与执行**：
 
@@ -1530,7 +1530,7 @@ main 源码里 `catch (e: Throwable)` 生效 **6** 处、`catch (e: Exception | 
    `Locator` 的取点、`HandoverScreen` 的照片上传 → 换 `attempt { … }`（TH-f 的 12 个调用点就是这批）；
    `Orders`/`Goods`/`Send`/`Widget`/`LoginViewModel`/`DriverLocationService`/`ScreenViewModel.work()` → 在既有
    `catch (e: Exception)` **前面**补一条先 `throw e` 的取消出口（TH-d 38/38 那批的 UI 侧对应物）；
-   `WorkbenchScreen.kt:542-548` 的照片上传是第三种：**整圈 `runCatching` 仪式直接摘掉**，改成裸调用
+   `WorkbenchScreen.kt:575-581` 的照片上传是第三种：**整圈 `runCatching` 仪式直接摘掉**，改成裸调用
    —— 那一圈原本只是"接住再原样抛出"，它唯一的实际作用就是在半空中接一次 `CancellationException`；
    给它补取消出口反而是给不存在的通路开药。**三种收法形状不同、结论同一条：没有任何一处把取消接在半空中。**
    `HomeScreen` 轮播**故意不是裸 `throw e`**：用户手指抢走滚动时的取消必须被咽下去（不然轮播会把自己停掉），
@@ -1578,7 +1578,7 @@ TH-j 1/1/0 · TH-k 1/1 · TH-l 2/2/0）；负控十三本**全批复跑** rc 全
    （清单见 `THIRD_PARTY_NOTICES.md` §6 F-1 段、状态板 DONE「F-1」的"改动面清点"、审计 §80 七）。
 
 尾巴（在册，不当已通过）：`apiCall` 生产调用点仍 **0**（只登记不谎称已用）；`runCatching` 在 main 仍剩 **34** 处
-（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1050` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
+（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1083` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
 记为"未收"而不是"已判无害"）；§二十 的 Worker 重试语义（真失败回 `retry` 而不是 `success`）**没做**；
 §三十三 的四类失败分型仍只是台账口径，**没落进代码**；设备侧一律 `NOT VERIFIED ON DEVICE`
 （真实取消来自手指划走页面 / Worker 被系统停止 / 进程被杀，JVM 只能造 `cancelAndJoin` 与 `withTimeoutOrNull` 两种）；
@@ -2414,7 +2414,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 ### 3 三方核对的关键结论（逐字段表在 `CONTRACT_EVIDENCE.md` §八，这里只记判定）
 - 三格（车辆位置 / 上报时间 / 当前任务）在寄货与商城两侧的 VO 里**都有真实生产者**，缺的是客户端读取；
-  `geoOf`（`Repo.kt:1339`）要求 `lat!=0 && lng!=0` 才建点 ⇒ `0.0` 不会被画成一个"真点"。
+  `geoOf`（`Repo.kt:1377`）要求 `lat!=0 && lng!=0` 才建点 ⇒ `0.0` 不会被画成一个"真点"。
 - `lastReportTime` 只有商城侧有（`AppProductOrderTraceRespVO.java:72` ← `ProductOrderServiceImpl.java:379`）；
   寄货 `/send/track` 侧 `PRODUCER_NOT_FOUND` ⇒ 恒"上报时间未给"。旧写法拿订单创建时间当车辆上报时刻，本轮用 `reportTimeOf`（不回落 `createTime`）收口。
 - `carrierLocationSource` 值域只有 `REAL_FRESH`/`REAL_STALE`（`AppSendController.java:473-474`，阈值 `CARRIER_FRESH_MINUTES = 5` @ `:114`）⇒ `STALE` 不升格成"实时"。
@@ -2560,7 +2560,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 ### 5 三态（分开写，不混）
 - `SOURCE_COMPLETE`：六族的读取侧真键化、模型可空化、消费侧"未给"分支、`D-②-1…4` 登记、判据与负控同轮扩建。
-  ⚠ **② 要求的"清零"这一半没有完成**：在册基数被本轮实测推翻为 **65**，其中"真待收口 **23** 处"（字符串族 11、里程/steps/段状态族 5、arr 车道、`Repo.kt:1316` `crs`、
+  ⚠ **② 要求的"清零"这一半没有完成**：在册基数被本轮实测推翻为 **65**，其中"真待收口 **23** 处"（字符串族 11、里程/steps/段状态族 5、arr 车道、`Repo.kt:1255-1271` `crs`、
   `SendScreen` 草稿 `?: 0L` 等）按 §四之二 各自排进 ③⑥⑦⑬⑭⑯⑰，本轮一处都没有"顺手"收（顺手收就违反 ⑲ 的不扩大战线约束）。
 - `BUILD_VERIFIED`（debug 面）：第 2 节的 gradle / 用例 / lint / APK 四条读数（42 类 410 例 0 红、lint Error 0、APK 已产出、DV-k 116）。
   release 面 **BLOCKED**（产物从未产出）、`lintRelease` 未跑 ⇒ 不许把 debug 读数当全变体。
@@ -3123,7 +3123,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
   `routeFromDeepLink()`（**:59-61**，不匹配前缀 → `null`）、`trace()`（**:67**）与 `busDetail()`（**:68**）两个 builder 都过 `encodeSegment`（**:82**，纯 Kotlin；`RESERVED_OTHER` **:99** / `HEX` **:101**）；
   `DRIVER_ONLY`（**:43**）四条路由全部**无参数**——这不是巧合：闸门是精确集合成员判断，带参数的路由串永远进不了那个集合。
 - `nav/ShellDecision.kt`：`internal fun deepLinkTarget(route, role)`（**:35**）的两支 `-> null`（**:36** 壳路由丢弃、**:37** 非司机角色命中 `DRIVER_ONLY`）；唯一消费点 `ui/BusPostRoot.kt:87`。
-- 出网口四处统一走 `Routes`：`MainActivity.kt:100`（Intent 的 `dataString` → `routeFromDeepLink`）、`notify/Notifier.kt:92` 与 **:100**、`widget/NextBusWidgetProvider.kt:80`、`notify/AlertEngine.kt:96`（`Routes::trace`）与 **:127**。
+- 出网口四处统一走 `Routes`：`MainActivity.kt:100`（Intent 的 `dataString` → `routeFromDeepLink`）、`notify/Notifier.kt:92` 与 **:100**、`widget/NextBusWidgetProvider.kt:80`、`AlertEngine.kt:106`（`Routes::trace`）与 **:137**。
 - **新** `ui/user/BusDetailSlot.kt`（51 行 / 2,206 B / CRLF 0）：`enum class DetailSlot`（**:17**）四格 **:19/:22/:25/:28**，
   `internal fun detailSlotOf(target, lines, selectedId, loading, error)`（**:39**）优先级 **:46-50**（`Ready` > `Loading` > `Failed` > `NotInList` > 兜底 `Failed`）；
   本文件**零** `androidx.compose` 依赖（`SR-m2` 钉），所以四态是纯派生、JVM 可直接喂满组合。
@@ -3538,7 +3538,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 1. **"三面 0 生产者"从不可复现变成逐字可复现**（D-②-4 闭环）。以前那个"32 处 C 站点"是一次性 grep 的产物，谁都复现不了；现在 `default_value_census.py` 每行自带 `shape` / `numbool_nonnull` / `demo_keys`，聚合里有 `shape_tally` / `c_shape` / `c_no_producer`，而 `DV-u` 用**另一份独立实现**去交叉核对（同一份代码自证不算判据），`DV-w` 更把"grep 116 vs census 114"这个差解释到个位 —— **+2 是逐名列函数自己的两条声明，不是读法差异**。代价也记下来：`DV-k` 那格的 116 数值没变但**含义变了**，历史引用要带这个解释（§7）。
 2. **ID-MISS 第一次能当闸门而不是候选清单**（D-③-5 闭环）。锚点标识符改成按锚点分配、且 `aid` **不含行号**，于是"整篇台账行号位移"不再新增/消灭在册条目（`doc_anchor_negative_controls.sh` 里那条 POS 控制实测：顶部插一行让所有行号位移，判据仍绿）；同时"新增即红 / 消失即红 / 扫不到即红"三向都有破口（DA-a/b/c/d/e/f 六条注入全命中）。**但同一轮也暴露出新的无闸门面**：`docs/android/RUNCATCHING_AUDIT.md` 的逐点账锚点不在任何在册表里 —— 它漂了不会有东西响（§5 登记为 D-⑬⑭⑯⑰-1）。
-3. **导航会话与"当前这条真实路线"之间第一次有一个可判定的结论**。`routeBindingOf` 把"没有凭证 / SDK 没给出点集 / 起终点已经不是同一条"三支成因**分开说**，SDK 层在 `startGpsNavi` 之前重读一次 `navi.naviPath`（`currentPath AmapNavigationEngine.kt:471`），于是"上一轮的会话还在、路线早换了"这种状态不再被当成可导航；绑定失败走 `Refused`，**没有**新增任何补几何或降级路径。红线形状守住了，且这条形状由 N-u…N-x + M12…M15 双向钉住。
+3. **导航会话与"当前这条真实路线"之间第一次有一个可判定的结论**。`routeBindingOf` 把"没有凭证 / SDK 没给出点集 / 起终点已经不是同一条"三支成因**分开说**，SDK 层在 `startGpsNavi` 之前重读一次 `navi.naviPath`（`currentPath AmapNavigationEngine.kt:513`），于是"上一轮的会话还在、路线早换了"这种状态不再被当成可导航；绑定失败走 `Refused`，**没有**新增任何补几何或降级路径。红线形状守住了，且这条形状由 N-u…N-x + M12…M15 双向钉住。
 
 ### 4 新增文件 / 改动面 / 换行符 / 许可证义务
 
@@ -5608,7 +5608,7 @@ canonical 仍是 D-070 §3 那一发。
 
 ### D-076 续二（同日 13:5x）· #40 地图"我的位置"：图层从未开启 + 用户端从没申请过权限，两件事叠成一个现象
 
-实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：清单声明了 `ACCESS_FINE_LOCATION`（`AndroidManifest.xml:15-17`），但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:620/887`。未授权时 `Locator.once` 也拿不到点，所以页面连"按位置排序"都是空的。
+实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：清单声明了 `ACCESS_FINE_LOCATION`（`AndroidManifest.xml:15-17`），但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `Locator.once`（`core/loc/Locator.kt:201`）也拿不到点，所以页面连"按位置排序"都是空的。
 
 改法三处：① `BusMap` 新增 `showMyLocation` 参数并真的开图层（**由调用方按授权状态传值** —— SDK 不会替我们弹框，未授权开图层等于承诺一个永远不来的位置）；② 实时公交页进页读一次授权、未授权申请一次，被拒不追弹；授权回来若还没有点就重跑 `load`；③ 定位提示收成**纯函数 `locationHintFor(granted, fix)`** 三态各说各话，顺手收掉 §51 在册那条"定位三态被折叠成 `me==null`"——旧文案在用户已经允许之后还教他去"系统设置里允许定位"。
 
@@ -6028,7 +6028,7 @@ CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 R
 ### D-081（10-12 19:1x）· #54 用户端「我的乘车安排」：`/send/arrangements` 这条**通路一直是活的，缺的只有读它的那一页**
 
 **起点**（`ANDROID_PARITY_AUDIT_V2.md:155` 记的是 `REAL_COMPLETE`，但全仓零消费者）：
-`Repo.myArrangements()`（`Repo.kt:763`）与 `Arrangement`（`Models.kt:1966`）都在，`grep` 只命中它们自己 ⇒
+`Repo.myArrangements()`（`Repo.kt:763`）与 `Arrangement`（`Models.kt:2007`）都在，`grep` 只命中它们自己 ⇒
 通路侧是死代码、界面侧是缺那一格。这一格也不是新功能：`DriverLocationService.kt:53` 那条常驻通知写的就是
 "正在为**乘车安排**与到车提醒上传车辆位置"，而用户端从来没有"乘车安排"可看。
 
@@ -6216,7 +6216,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 5. `mission_route_negative_controls.sh` + `check_mission_route_probes.sh`：MR-c 五条整族重锚（那五句全被 8387929 改短）；
    新增 `MR_C6`＝`这次没问到：$failure`（目标 1）——括号里那半句免责有 `MR_C3` 钉，而**括号前**那半句被换成
    "后端没有可用路线"时 `MR_C3`/`MR_CT` 都不动；MR-e 两处按新缩进重锚；MR-i 重试入口改成**按窗口定位**——
-   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:813` 有路线支 / `:828` 失败支），
+   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:846` 有路线支 / `:861` 失败支），
    按"第一处"删会删错支，而 `MRI_RETRY` 只数失败支那 12 行 ⇒ 那是一条**注入了但打错地方**的破口（`red` 的字节比对挡不住）。
 6. `mission_route_test_negative_controls.sh` MT-2、`navigation_test_negative_controls.sh` 的 M14/M24/M25/M27/M28/M29/M30/M31
    重锚（全是话术字面被顶掉）。⚠ 这两本都是"第一条落空就 exit 2"，所以**报错那条之后的破口连跑都没跑过**
@@ -7823,9 +7823,108 @@ V032 的两行也在 ⇒ "6920 这一行没落库"成立，**为什么没落库�
 
 **发版被自家守卫拦下一次（v71 第一次 dispatch 失败，读数：`release/扫包取证 exit 1`）**：
 为了让云端明文商品图能加载，我在 `Models.kt` 加了 `isPrivateHost()`，里面写了环回主机名的字面量 ——
-而 `build-and-release.yml:170` 的"扫包取证"是**逐个字节串扫 APK**、包内残留本机/内网地址即红。
+而 `build-and-release.yml:175` 的"扫包取证"是**逐个字节串扫 APK**、包内残留本机/内网地址即红。
 也就是说：一个字符串常量就能把发版打断，而这一步在 `verify` 之后，本地判据簿与 706 例全绿照样拦得住。
 改成按四段数字判环回/私网（顺带比 `startsWith("10.")` 更准：主机名恰好叫 `10x.example` 的不再误判成内网），
 `grep` 确认主源码里那四个被禁字面量命中数为 0 后重投。
 **这一格的教训**：改"地址判定"这类代码之前要先读发版守卫的扫描面 —— 判据簿管的是源码形状，CI 那一格管的是**产物字节**，
 两者不重叠，后者才是 release 的真闸门。
+
+### D-116（10-15 16:2x–19:5x）· 批次放锁后的收口：三本负控的注入锚点重指、I-a 判据跑不动、台账 22 条重锚
+
+**开局读数**：44 本负控 16:28:46 起跑、18:44:42 结束，`rc≠0` 共 **8 本**（doc_anchor / envelope_signature /
+idempotency / idempotency_test / mission_route / navigation_test / notify_result / oss_credits），另有
+`default_value` rc=0 而 ✘=2。逐本归因后分四类，**没有一类是"重跑一次就绿"**。
+
+**① 三本"锚点没命中，破口根本没注入"**（都是 #49 改了源码文本，注入器还指着旧形状）：
+
+- EI-1：`signUrl = o.multiStr("signUrl", "handoverSignUrl"),` 这串在 Repo.kt 里早就不存在（别名那轮撤的），
+  真读点搬到了 **`Models.kt:1814`** 且只剩 `signUrl = o.multiStr("signUrl"),` ⇒ 锚点与落点文件一起改。复跑 **rc=0 ✔=8 ✘=0**（18s）。
+- mission_route 那刀：`val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)` 原本缩进 20 格，#49 把
+  `markerOptionsOf` 提成顶层函数后是 **`BusMap.kt:266`** 的 4 格 ⇒ 子串替换会命中更早的长缩进行（空刀），锚点连缩进一起换。复跑 **rc=0 ✔=52 ✘=0**（621s）。
+- navigation_test M6/M7：`guide.stops.filter{…}.minByOrNull{ it.visitSequence }` 被 #49 收进了
+  `navigableStopsOf`。**M6 的第一版修法是空刀**：只把破口挪到"摘掉 `.sortedBy`"，而"下一站"那一行自己还写着
+  `minByOrNull` ⇒ 上游排不排序它都挑得对，62 例照旧全绿 —— 是这本负控自己把它报成 ✘ 的，不是我看出来的。
+  真破口在 **`NavigationEngine.kt:495`** 那一行（改成直接吃数组顺序、两个出口都不走）。
+  同本 M15 的指纹锚点也因 `wp=` 段从一行变三行 ⇒ 换三行原文。复跑 **rc=0 ✔=39 ✘=0**（1096s，比早退那轮多跑 18 把刀）。
+
+**② 幂等判据：一条是判据跑不动，六条是钉值落后于实测**（`check_idempotency_probes.sh` 改后 **rc=0**）：
+
+- I-a 实测 **9≠10**，红因写着"有司机写路径没经单一出口"——**这是假的**：`grep -A2 "^    suspend fun (…)\("`
+  只看签名后两行，而 `legAction` 为 P0-2 加 `actionKey` 形参把签名撑成六行，闸门那句落在窗口外。
+  改成按**参数列表括号配平之后的第一条语句**判（单行 `: Ack = gatedAction(` 与多行 `): Ack =`↵`gatedAction(` 同判，
+  先干别的再走闸仍不计 ⇒ 只收紧不放松）。改后 I-a=10，`depart` 那把摘闸门的刀照红。
+- 抬钉值（每条把涨因写在判据旁边）：I-e 6→**7**（P0-1 在 `WorkbenchScreen.kt:395` 多一处 notSent 消费者：
+  被本地闸拦下的点击不许顺手推停靠状态）、I-j 11→**12**、H-g 5→**6**、H-h 3→**4**、H-i 6→**7**、H-j stops 3→**4**
+  （后五条同源：新那条「到站被后端接受后停靠完成不得再往后推一格」+ 它的四站夹具）。
+- 配对负控复跑：**idempotency rc=0 ✔=44 ✘=0**（263s）、**idempotency_test rc=0 ✔=3 ✘=0**。
+
+**③ 台账 22 条漂移锚点，全部按内容重锚，一条没进在册表**：改前 DA-d 新增 **22** / DA-e ID-MISS **295**（上限 273）；
+改后 **新增 0 / 消失 0 / miss 273 / FILE-NOT-FOUND 15**，锚点总数 1461→**1463**。手法：拿 HEAD 工作树逐字切出被指片段，
+在工作树里找同一切片 ⇒ 纯平移 16 条（每文件位移一致：WorkbenchScreen +33、Repo +35/+38/+53、AlertEngine +6/+19、DriverLegStateMapper +16）；
+3 条改指**语义块**：`AlertEngine.kt:64-92`（司机域通知整块）、`Repo.kt:1255-1271`（crs/steps 读块）、
+`Repo.kt:1490-1501`（confirmHandover 现体）；3 条动台账原文 —— 目录前缀 `ui/driver/`、`notify/` 会被 `assign_tokens`
+判给紧随其后的锚点，而源码窗口里永远不可能出现那个串 ⇒ 这类锚点**天生不可核验**，只能去前缀或扩到真含该串的块。
+⚠ 第一版想用"HEAD 切片"自动平移**裸续号**（`Repo.kt:1310/727/740/746` 里的 727/740/746），实测会把 `**65**`、
+`字符串族 11` 这类**计数**当行号改掉，而 `}` 这种短行一次命中 12–21 处 ⇒ 自动重写废掉，裸号只做"原地内容等值核验"。
+核验结果：10 个裸号里 9 个已漂移，其中两处是**在册判据结构上看不见的谎**：
+那三条 `canReportException` 断言其实在 `DriverLegStateMapperTest.kt:174-176`（被指的那个源文件只有 137 行，容不下这个号）；
+另一处自称 `vehicleGeo = geo` 的裸号早已指着一个 `}`，真位在 `Repo.kt:865`。
+两条都升格成带文件名的真锚（白送两条新闸）。
+配对负控复跑：**doc_anchor rc=0 ✔=8 ✘=0**。
+
+**④ doc_anchor 复跑第一次是 7✔/1✘，红的那条又是"注入器打到错的文件"**：DA-d"在册锚点被抹掉而不是被修好"
+用 `sed -i 's/Models\.kt:497/…/g' "$CK"` 改 V2.1 核对表，而 aid `c7c057d7` 的在册条目在 **`CONTEXT_LOCK.md:2043`**
+（aid = 文档 + 锚点原文，核对表里那一处是另一个 aid、本来不在册）⇒ sed 空转，**"消失"这一检测从来没响过**。
+换成书里自带的 `subst()`：锚点不在就 `OLD-MISS` 当场报错，不给空刀混进 ✔。
+
+**⑤ Actions 存储（用户贴来的那封"已用 90%"邮件）**：账号只有一个 public 仓，artifact **107 个 / 7.13 GB**，
+默认保留 90 天，每次构建 +124 MB。只调远端 API 删掉 105 个（留最新 2 次运行），**7.13 → 0.138 GB**，失败 0，
+清单留 `prep-49/artifacts_all.tsv`。CI 两处 `upload-artifact` 各加 `retention-days: 1`（现 :106 / :201），
+台账 `build-and-release.yml:170` 跟着平移到 **:175**。理由记牢：发版真正用的是 Release 上的 `app-release.apk`
+（App 自装那一格认它），artifact 只是副本；而 upload 排在 `gh release create` **之前**，存储一满就是**发版被拦停**。
+
+**收尾读数**：`run-unit-tests.sh` 打印 `tests=738 failures=0 errors=0`（19:42:18）—— 但那一跑是
+`:app:testDebugUnitTest FROM-CACHE`，且随后三本按 `--tests` 过滤的负控把产物目录刷成了 4 份 XML（29 条）。
+⇒ 产物与结论对不上时以**最后一次真跑**为准：本轮收尾要再跑一次全量并且**不再在其后跑过滤用例**（已排进 #49 关账）。
+`notify_result rc=0 ✔=17 ✘=0`、`oss_credits rc=0 ✔=20 ✘=0` 两本环境红随产物恢复而收。
+
+**新登记两格（不在本轮收，先钉住）**：
+① `default_value` 的 DV-t3 / DV-t5 两条"负控制失效"，以及**这本自己 ✘>0 却 exit 0**（聚合段没把 ✘ 并进退出码）；
+② `check_doc_anchors.py` 的扩展名表不含 `.yml` ⇒ 台账里所有 CI 行号声明从来没被核过（本轮两处全靠手工平移），
+扩表属"扫得更严"、会一次性放出多条在册可疑 ⇒ 单开一轮。
+
+### D-117（10-15 19:5x–20:4x）· #80 返回出口：三屏补上看得见的退出口，并把这条规矩立成闸（38 本判据里第 38 本）
+
+**用户报的原话**："扫码等拍照界面无返回键，我希望所有功能界面都有返回键或者手势返回。"
+`BackTopBar` 这个原语早就有，但**没有任何一格数过"哪些屏用了它"** —— 这就是"规矩只活在注释里"（D-082 那一轮的同一课）。
+
+**普查（函数体级，不是文件级）**：`BusPostRoot.kt` 里 24 条整屏路由（壳层与登录页不算：没有可退的一格）。
+⚠ 一开始按文件数会读成"19 个文件都有出口"—— 而 `MinePages.kt` 一个文件住着 Address/Feedback/Profile/Settings 四屏，
+文件级"这个文件里有 6 处 BackTopBar"会让其中任何一屏缺出口都读成"有"。**按 `fun XScreen(` 到闭合括号切体**才数得准。
+结果：缺出口的只有三条，且三条都成立 —— `BUS`（底部标签页，本来就没有"上一屏"）、
+`DRIVER_GUIDE`（沉浸导航，出口是 `GuideTopStrip` 那一条）、`DRIVER_NAV`（`if (BuildConfig.DEBUG)`，正式包连路由都不注册）。
+⇒ 真缺陷是**三屏**：`DRIVER_MESSAGES`、`HANDOVER`、`SEND`（寄货三步一体，第三步"已提交"那屏也退不出去）。
+
+**修法**：箭头做成一份共享件 `BusBackArrow`（`core/ui/Primitives.kt`，与 `BusTopBar` 同一枚 `BusIcons.back`、
+同一命中下限 `LocalBusTouch.min`），`Signpost` 加一个可选 `onBack` —— 全屏路由的第一格就是站牌头，
+再叠一条 `BackTopBar` 等于两行标题压在一起，白吃掉一屏里最贵的那 56dp；
+`DriverMessagesScreen` 自带浅色紧凑页头，直接挂 `BusBackArrow(tint = t.ink)`。
+图标不带文字，同守用户那一条"按钮尽量少用文字"。
+
+**新判据 `tools/check_back_affordance_probes.sh`（六格）+ 配对负控（七把刀 + 一条正控制）**：
+BA-a 整屏路由数恰好 24（新增一屏必须同轮验出口）/ BA-b 有出口的屏恰好 21 / BA-c 无出口名单逐字等于那三条豁免 /
+BA-d **反证格**：解析器只扫到 <30 个屏函数体就不采信上面那个"缺口=0" / BA-e 箭头实现 1 份且 ui/ 里手搓 `ArrowBack` 0 处 /
+BA-f 出口挂点恰好 6（五处屏内 + `BackTopBar` 自己那一处）。
+负控实测 rc=0：8/8 各自红在该管的那一格（撤交接箭头→BA-b、改名豁免屏→BA-c、第二份 BusBackArrow→BA-e、撤寄货一步→BA-f、
+新增假路由→BA-a、解析器下岗→BA-d），正控制"只改副标题"不误伤。
+
+**这一轮自己造的两个坑（记下来，都是"✔ 长得像验过"）**：
+① 负控第一版 BA-d 报"判据不响"，真因是**我的簿把 `PR` 指向真身那份判据**，而 BA-d 这把刀改的就是判据自己的解析器
+⇒ 注入咬不到被跑的那一份。改成跑沙盒副本（`doc_anchor` 那本一直这么做）后立刻红。
+② 新判据第一版把预期名单写成 `DRIVER_GUIDE,BUS,DRIVER_NAV`，而 python 是按目的地**排序**输出的
+⇒ 基线当场红，红的是我自己的期望值。两条都不是把判据改松，是把期望值改成实测值。
+
+**收尾读数**：全量判据簿 38 本一遍过，rc≠0 = 0 本、`×` 行 = 0 行；`compileDebugKotlin` rc=0
+（有一条 `Incremental compilation failed: different roots: C:\… and Z:\…` 的告警 —— 同一棵树被两种路径写过后
+增量缓存失效，回退全量编译仍然成功；这是效率告警不是正确性告警，登记在此免得下轮当成新病）。

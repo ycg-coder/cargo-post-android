@@ -20,7 +20,7 @@
 # MR-l…MR-r 是队列 #216（指令 §八 ⑫⑬ 3D 任务 Marker / 3D 车辆）同轮加进来的**另一族**，判的是视觉层：
 # 立体感只有一个出口、旋转只给本机 GPS 真给出 bearing 的那一格、新鲜度只有一个阈值、视觉不写业务状态。
 # 行为那一半在 app/src/test/.../ui/common/Map3DVisualContractTest.kt（16 条），刻意不进 ⑧ 那本
-# ——两族的条数各自钉死（MR-a 恰好 12、MR-r 恰好 16），并进同一本就看不出删掉的是哪一族的用例。
+# ——两族的条数各自钉死（MR-a 恰好 14、MR-r 恰好 16），并进同一本就看不出删掉的是哪一族的用例。
 set -u
 ROOT="${BUSPOST_ANDROID:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT" || { echo "找不到 $ROOT"; exit 2; }
@@ -235,7 +235,7 @@ MT_TOP=$(grep -n 'onSizeChanged { topPx = it.height }' "$GD" | grep -vE "$NC" | 
 MT_BOT=$(grep -n 'onSizeChanged { bottomPx = it.height }' "$GD" | grep -vE "$NC" | wc -l | tr -d ' ')
 MU_FILL=$(grep -n '100f - it.toFloat()' "$CG" | grep -vE "$NC" | wc -l | tr -d ' ')
 
-echo "MR-a 行为用例条数                       = $MRA （目标 12：五格纯函数 + 五格请求条数/相位 + 其余）"
+echo "MR-a 行为用例条数                       = $MRA （目标 14：五格纯函数 + 五格请求条数/相位 + 其余 + 2026-10-15 #49 那两格）"
 echo "MR-b 唯一出口定义/页面读点              = $MRB_DEF/$MRB_USE （目标 1/2：只有一个出口，页面两处读它）"
 echo "MR-c 五格字面量（在问/没问过/没问到/后端给的/兜底） = $MR_C1/$MR_C2/$MR_C3/$MR_C4/$MR_C5 （目标全 1，整串唯一锚定）"
 echo "MR-c 出口里的'不画示意线'生效行        = $MR_CT （目标 5：每一格都自带'不画线'承诺）"
@@ -273,7 +273,7 @@ echo "MR-u 仓位填充取 100-空余                       = $MU_FILL （目标
 echo "MR-r 视觉层 import 业务模型/BusMap+出口对照反证  = $MRR_IMP/$MRR_IMP_PF （目标 0/10）"
 
 fail=0
-[ "$MRA" = 12 ] || { echo "× MR-a ⑧ 的行为用例不是 12 条（说法那一半或请求条数那一半被删了）"; fail=1; }
+[ "$MRA" = 14 ] || { echo "× MR-a ⑧ 的行为用例不是 14 条（说法那一半或请求条数那一半被删了）：12 → 14 的逐点归因 = 2026-10-15 #49 在 ui/driver/MissionRouteStateContractTest.kt 新加的两格 —— ①「页脚的折线完整性三格各说各的」（routeComplete 的 没发键/后端说断了/后端说完整）②「偏航行三格读数 但一句未偏航都不说」（deviationMeters 的 没发键/-1 无法判定/真实米数，并钉住 deviated 缺键塌 false 时界面不许念'未偏航'）；再变就得逐点重名，不许把"恰好"改成下限"; fail=1; }
 [ "$MRB_DEF" = 1 ] || { echo "× MR-b '这一班有没有路线'有了第二个出口定义：同一个问题两个答案"; fail=1; }
 [ "$MRB_USE" = 2 ] || { echo "× MR-b 页面读唯一出口的点不是 2 处（画地图支 + 失败支），有人开始自己拼句子"; fail=1; }
 [ "$MR_C1" = 1 ] || { echo "× MR-c '在问'那一格的字面量变了：在飞时会念成别的（或整格没了）"; fail=1; }

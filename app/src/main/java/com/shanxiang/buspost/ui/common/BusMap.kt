@@ -216,24 +216,7 @@ fun BusMap(
                     )
                 }
 
-                if (markersChanged) markers.forEach { m ->
-                    if (m.geo.lat == 0.0 && m.geo.lng == 0.0) return@forEach
-                    // 3D 形状只认 Map3DVisual 这一个出口，页面侧不许再各自 setFlat / setAltitude / setRotateAngle
-                    val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)
-                    var options = MarkerOptions()
-                        .position(LatLng(m.geo.lat, m.geo.lng))
-                        .title(m.title)
-                        .snippet(m.detail)
-                        .icon(BitmapDescriptorFactory.defaultMarker(markerHue(m.kind)))
-                        .anchor(0.5f, 0.5f)
-                        .setFlat(v3d.flat)
-                        .perspective(v3d.perspective)
-                        .zIndex(v3d.zIndex)
-                    // 朝向与浮空都是"有值才设"：null 与 0 米保持 SDK 默认（不旋转、贴地）
-                    v3d.rotateAngle?.let { angle -> options = options.rotateAngle(angle) }
-                    if (v3d.altitudeMeters > 0f) options = options.altitude(v3d.altitudeMeters)
-                    aMap.addMarker(options)
-                }
+                if (markersChanged) markers.forEach { m -> markerOptionsOf(m)?.let { aMap.addMarker(it) } }
 
                 // 视口自适应：点集包围盒 + 留白（小程序 include-points 等价能力）
                 val all = markers.map { it.geo } + paths.flatMap { it.validated().orEmpty() }
@@ -268,6 +251,34 @@ fun BusMap(
 }
 
 /** 高德默认 marker 的色相值（0=红 / 30≈橙 / 120=绿 …），按语义分配 */
+/**
+ * [MapMarker] → 高德 `MarkerOptions` 的**唯一**换算出口。
+ *
+ * 为什么必须是函数而不是留在 `BusMap` 的 update 块里：车道级导航页（`DriverGuideScreen` 的
+ * `AMapNaviView.getMap()`）要贴同一批任务点标记，而配色与 3D 形状规则一旦在两处各写一遍，
+ * 就会出现"工作台地图上失败是红的、导航面上失败是绿的"。3D 那三项仍然只认 [Map3DVisual]。
+ *
+ * 坐标 (0,0) 回 null = 这一个点不画：任务点没坐标时后端给的是 0/0，画上去就是几内亚湾外一个标记，
+ * 司机看到的是一个**存在但不存在**的站（与 `hasGeo` 那条同一口径）。
+ */
+internal fun markerOptionsOf(m: MapMarker): MarkerOptions? {
+    if (m.geo.lat == 0.0 && m.geo.lng == 0.0) return null
+    val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)
+    var options = MarkerOptions()
+        .position(LatLng(m.geo.lat, m.geo.lng))
+        .title(m.title)
+        .snippet(m.detail)
+        .icon(BitmapDescriptorFactory.defaultMarker(markerHue(m.kind)))
+        .anchor(0.5f, 0.5f)
+        .setFlat(v3d.flat)
+        .perspective(v3d.perspective)
+        .zIndex(v3d.zIndex)
+    // 朝向与浮空都是"有值才设"：null 与 0 米保持 SDK 默认（不旋转、贴地）
+    v3d.rotateAngle?.let { angle -> options = options.rotateAngle(angle) }
+    if (v3d.altitudeMeters > 0f) options = options.altitude(v3d.altitudeMeters)
+    return options
+}
+
 private fun markerHue(kind: Int): Float = when (kind) {
     MapMarker.KIND_START -> 210f
     MapMarker.KIND_END -> 30f

@@ -99,6 +99,11 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          # 只留一天：这一版真正要装出去的包已经挂在 GitHub Release 上（下面 `gh release create`），
+          # artifact 是给人从 run 页面随手下的副本。默认 90 天 ⇒ 每次构建 +124 MB 存三个月，
+          # 而 Actions 存储是有额度的（今天那封 90% 的邮件）；更要紧的是这一步排在
+          # `gh release create` **之前**——存储一满，upload 红掉就会把发版本身一起拦停。
+          retention-days: 1
 
   release:
     if: github.event_name == 'workflow_dispatch'
@@ -192,6 +197,8 @@ jobs:
         with:
           name: release-apk
           path: app/build/outputs/apk/release/*.apk
+          # 同 debug：Release 上那份 `app-release.apk` 才是 App 内自装读的那一格，副本只留一天。
+          retention-days: 1
       # ---- #48：把这一版发成 GitHub Release，App 里那一格才有东西可查 ----
       # tag 用 `v${GITHUB_RUN_NUMBER}`：它必须与 `app/build.gradle.kts` 里 versionCode 的取数**同一个来源**，
       # 因为 App 侧比较的就是这个数字（`AppUpdate.releaseCodeOf`）。两处来源不一致时，

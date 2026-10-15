@@ -233,4 +233,59 @@ class DriverActionHonestyContractTest : ServerTest() {
         assertEquals(501L, vm.shift?.currentStationId)
         assertEquals(6, server.requestCount)
     }
+
+    /**
+     * #50 到站 → 停靠完成 → 再到站：这条**金路**必须一站不落、且第二次到站不被后端按跳站拒掉。
+     *
+     * 缺陷形状（2026-10-15 读码定位，此前没有任何用例覆盖组合序列）：
+     * `runAction` 每次写后都 `syncFromServer`（`WorkbenchScreen.kt:578`），所以后端一旦把
+     * `currentStationId` 推到 502，`targetIndex()` 的基准**已经**变成 503；
+     * 而「停靠完成」在它之上又 `navOffset += 1`（`:389`）⇒ 目标跳到 504，
+     * 下一次 `arrive(vm.targetStationId())` 提交 504，被后端
+     * `DriverAppServiceImpl:905-906`（`targetSeq > currentSeq + 1` ⇒ `DRIVER_STATION_ORDER_ILLEGAL`）拒收，
+     * 而 503 那一站的接客/送客明细永远拿不到到达上报 —— 撞硬规则「每站必停」。
+     *
+     * 已有的那条 `继续行驶只推进导航目标…` 测的是**没到站、纯本机推进**（起点 current=501，
+     * 点一次 502→503，那是对的）；本条测的是**到站被后端接受之后**再点那一支，两者不同序列。
+     */
+    @Test
+    fun `到站被后端接受后停靠完成不得再往后推一格`() {
+        val four = """[{"shiftId":7103,"status":1,"currentStationId":%d,"stops":[
+            |{"stationId":601,"stationName":"起点站","sequenceNo":1},
+            |{"stationId":602,"stationName":"第二站","sequenceNo":2},
+            |{"stationId":603,"stationName":"第三站","sequenceNo":3},
+            |{"stationId":604,"stationName":"末站","sequenceNo":4}]}]""".trimMargin()
+
+        TestHost.strictBackend()
+        enqueueReads(four.replace("%d", "601"))
+        respondData("true")            // 第一次到站的 ack
+        enqueueReads(four.replace("%d", "602"))  // 到站后的那次回读：后端已把当前站推到 602
+        respondData("true")            // 第二次到站的 ack
+        enqueueReads(four.replace("%d", "603"))
+
+        val vm = WorkbenchViewModel()
+        vm.load()
+        awaitLoaded(vm, expectStations = 4)
+        assertEquals("当前在第 1 站 ⇒ 目标是第 2 站", 602L, vm.targetStationId())
+
+        vm.arrive(0L)
+        awaitUntil { !vm.busy }
+        assertEquals("6 读 + 1 写 + 5 读", 12, server.requestCount)
+        assertEquals("后端已说当前在 602 ⇒ 视图目标就该是 603", 603L, vm.targetStationId())
+
+        // 司机卸完货点「停靠完成」：后端已经把这一站收口了，这一步只该离开停靠视图，不该再往后指
+        vm.continueToNextStation()
+        assertEquals(
+            "到站已被后端接受，再往后推就越过 603（每站必停）",
+            603L, vm.targetStationId(),
+        )
+        assertEquals("后端当前站不许被本机改写", 602L, vm.shift?.currentStationId)
+        assertFalse("停靠视图该离开", vm.docked)
+
+        vm.arrive(0L)
+        awaitUntil { !vm.busy }
+        val bodies = requestsFor("/app-api/transport/driver/arrive").map { bodyOf(it) }
+        assertEquals(2, bodies.size)
+        assertTrue("第二次必须提交相邻的 603，而不是后端会拒的 604：${bodies[1]}", bodies[1].contains("\"stationId\":603"))
+    }
 }

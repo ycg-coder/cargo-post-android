@@ -78,6 +78,16 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
     override val recalc: StateFlow<EngineRecalcDisplay?> = recalcState.asStateFlow()
 
     /**
+     * 高德宣布"到了第 k 个途经点"的那一帧（`onArrivedWayPoint(wayID)`，wayID 是 0 基下标）。
+     * 唯一写入点是下面那个监听；null = 高德这次会话里没说到达过（逐站导航本来就不会有）。
+     *
+     * 这一格只**播报到了哪一站**，不写后端状态：到站/揽收的推进仍由司机确认后走 `/driver/arrive`
+     * （后端 `DriverAppServiceImpl:928`"状态以后端为最终来源，前端不做布尔替代"）。
+     */
+    private val wayPointState = MutableStateFlow<Int?>(null)
+    override val arrivedWayPointIndex: StateFlow<Int?> = wayPointState.asStateFlow()
+
+    /**
      * SDK 的初始化结论：null = 回调还没回来，**不等于失败**。
      *
      * 初值取 [NaviInitState] 而不是写死 null：`AMapNavi` 是**进程单例**，`onInitNaviSuccess`
@@ -368,6 +378,19 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
             override fun onArriveDestination() {
                 // 到达是高德说的，不是本机算的；这里只留状态，段/订单状态仍必须回读后端
             }
+
+            /**
+             * 全任务段导航的"到了一件事"：高德按 `wayID`（官方 javadoc：**到达的途经点编号，从 0 开始**）
+             * 说它把车带到了第 k 个途经点。这是本页唯一合法的"到站"来源 ——
+             * 本机不许自己拿"距这一点 < N 米"去宣布到达（阈值没经任何一方认可，与 §⑪ 那条同型）。
+             *
+             * 只记下下标，不做任何业务动作：确认到站是司机的操作，落到 `/driver/arrive` 上，
+             * 由后端校验顺序并推进状态（防跳站 `DriverAppServiceImpl:905`）。
+             */
+            override fun onArrivedWayPoint(wayID: Int) {
+                wayPointState.value = wayID
+                Log.i(NAVI_TAG, "高德宣布到达途经点 wayID=$wayID（0 基，来自 onArrivedWayPoint）")
+            }
         }
         if (runCatching { navi.addAMapNaviListener(l) }.isFailure) {
             Log.w(NAVI_TAG, "addAMapNaviListener 失败")
@@ -397,7 +420,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         warmupDone.complete(true)
     }
 
-    override suspend fun calculateRoute(from: Geo?, to: Geo): RouteCheck {
+    override suspend fun calculateRoute(from: Geo?, to: Geo, wayPoints: List<Geo>): RouteCheck {
         val state = readiness.value
         // 只认 Ready：`Initializing` 时高德还没说"我能用"，这时把算路请求发出去就是替 SDK 做决定
         // （F-3 ④⑫：入口层与引擎层必须给同一个答案，判据层的 canNavigate 早就说它不可点）
@@ -417,6 +440,21 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         }
         if (!RealRoadRouteValidator.isValidGeo(to)) {
             return RouteCheck.Rejected(reason = "终点坐标非法", detail = to.toString())
+        }
+        // 途经点里有一个坐标非法就**整条**拒绝，不许悄悄摘掉那一个：
+        // 摘掉等于替司机跳过一站，而公交车按线路每站必停拉客是业务底线
+        //（后端 `arrive` 那侧也按顺序校验，跳站直接报 DRIVER_STATION_ORDER_ILLEGAL）。
+        // 文案里的"第 N 个"是给人看的 1 基序，与 `onArrivedWayPoint` 的 0 基 wayID 故意不同源：
+        // 那一格是下标、这一句是第几个，混用就会整体错开一站。
+        // ⚠ 用 indexOfFirst 而不是 forEachIndexed：判据 N-z 是按 token 判的（`zip` / `forEachIndexed`
+        // 一出现就红，钉的是"两个车道数组按下标配对"那一族）。这里只是给错误文案找一个下标，
+        // 没有任何"两个数组按下标配对"的语义 —— 但也不值得为它去解释一条安全判据的例外。
+        val badIndex = wayPoints.indexOfFirst { !RealRoadRouteValidator.isValidGeo(it) }
+        if (badIndex >= 0) {
+            return RouteCheck.Rejected(
+                reason = "第 ${badIndex + 1} 个途经点坐标非法，这一趟不能开始导航",
+                detail = "wayPointIndex=$badIndex",
+            )
         }
         val navi = instance() ?: return RouteCheck.Rejected(
             reason = "导航引擎实例不可用",
@@ -445,10 +483,14 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         // attempt 而非 runCatching：这里在 `override suspend fun calculateRoute` 里，
         // runCatching 连 CancellationException 一起收成 false，会把"调用方已取消"报成"算路请求没被受理"。
         val accepted = attempt {
+            // 新的一趟：上一趟的"到达第 k 个途经点"不属于这一条线，先清零再发请求。
+            wayPointState.value = null
             navi.calculateDriveRoute(
                 NaviPoi(null, LatLng(origin.lat, origin.lng), null),
                 NaviPoi(null, LatLng(to.lat, to.lng), null),
-                null,
+                // 空列表必须回 null：给高德一个空 List 与给 null 在 SDK 里不是同一件事，
+                // 逐站模式是既有行为，本轮不让它顺带变成"带 0 个途经点的算路"。
+                wayPoints.map { NaviPoi(null, LatLng(it.lat, it.lng), null) }.ifEmpty { null },
                 STRATEGY,
             )
         }.getOrDefault(false)
@@ -489,6 +531,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
                 destinationLng = to.lng,
                 coordCount = points.size,
                 roadDistanceMeters = path.allLength,
+                wayPointCount = wayPoints.size,
             )
         }
         return check
@@ -539,6 +582,8 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         // 重算那一格同理：留住"高德说它要重算"会在下一次进这一屏时被读成"现在还在重算"，
         // 而那件事属于上一次会话；清掉之后页面念的是"高德没说过"，那才是这一屏当前的真相
         recalcState.value = null
+        // 到途经点那一格同理：留住"到了第 k 个"会在下一次进这一屏时把上一趟的最后一站显示成这一趟的到站点
+        wayPointState.value = null
         // 一次会话结束了，凭证就一起作废：下一次开始必须重新算一条真实道路（§九"不能继续沿用旧路线"）
         acceptedRoute = null
     }

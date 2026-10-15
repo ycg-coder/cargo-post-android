@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.data.repo
 
+import com.shanxiang.buspost.core.map.RealRoadRouteValidator
 import com.shanxiang.buspost.core.map.RouteCheck
 import com.shanxiang.buspost.core.map.RouteRepository
 import com.shanxiang.buspost.core.map.RouteSource
@@ -1263,13 +1264,18 @@ object Repo {
         //（DemoData 的 /driver/route 写 "DEMO"）。`provider` 是 route-preview 的键、`routeSource` 三方 0 命中 ⇒ 撤。
         val providerRaw = o.multiStr("routeProvider", "dataSource")
         val serverAvailable = !o.has("routeAvailable") || o.multiBool("routeAvailable")
+        // 报文级坐标系声明：全段折线与"当前段"折线共用**同一次读取**（本端点只有这一处读它）。
+        // ⚠ 不许在下面第二段几何那里再写一遍 `o.multiStr("coordinateSystem")` —— 这个键在
+        // 后端 /driver/route 的 VO、小程序、演示面三面都没有生产者，多一个读点就是 DV-v 记的那一类
+        // "三面 0 生产者的站点回涨"：同一个没来源的键被本机多信了一次。
+        val crsRaw = o.multiStr("coordinateSystem")
         val check = RouteRepository.resolve(
             key = "driverRoute:$driverId",
             sourceRaw = providerRaw,
             points = geoListOf(o.multiArr("polyline", "track", "points")),
             roadDistanceMeters = o.multiNum("routeDistanceMeters", "distanceMeters").toInt(),
             roadEtaSeconds = o.multiNum("routeDurationSeconds").toInt(),
-            crsRaw = o.multiStr("coordinateSystem"),
+            crsRaw = crsRaw,
             stationGeos = stations.map { it.geo }, serverAvailable = serverAvailable,
         )
         // 后端 routeAvailable 是权威判定：它说没有真实道路，客户端就不画，也不管数组里有没有点。
@@ -1281,6 +1287,35 @@ object Repo {
             } else null
 
         val nextIdx = (current + 1).coerceAtMost(steps.size - 1)
+        // 后端一直在发、本机一直只写在注释里点过名的三格，从今天起真的读：
+        // · routeComplete —— VO:50「false=中段取不到道路，折线在缺口处截断，绝不连直线补上」，
+        //   三格不许塌成两格：没发这个键 = 不知道；发 false = 后端明说这条线不完整。
+        // · deviationMeters —— VO:53「-1=无法判定」，所以原值留着（负数那一格由模型的 deviationUndeterminable 说），
+        //   不在这里塌成 null —— 塌了就分不出"后端没测"与"后端测了说测不出"。
+        // · currentSegmentPolyline —— VO:86 原话「导航用」，与 nextStopRoadDistanceMeters 出自
+        //   fillNextActionAndNav:710-718 同一次 seg 抓取；它是"车→后端点名的下一站"那一段，
+        //   与全任务段脊柱 polyline 不是同一几何，两者不许互相顶替。
+        // 键名只认后端原名（不加别名候选）：这三方（后端 VO / 小程序 / 演示面）都没有同义写法，
+        // 多写一个候选键就是给本机凭空造第二个真相源。
+        // 下一任务点的道路里程/耗时**只在这里读一次**：校验器要的与页面要的是同一个数，
+        // 分两处读就是 DV-k 记的那种"同一个键被本机多信一次"（而且两次读法一改就会不一致）。
+        val segRoadMeters = o.multiNum("nextStopRoadDistanceMeters").toInt()
+        val segRoadEta = o.multiNum("nextStopRoadEtaSeconds").toInt()
+        // 当前段折线也必须过同一道真实道路闸门 —— `RealRoadRouteValidator` 的原话是"正式链路里
+        // **任何一条**折线都必须过这里，过不了就没有路线可画"，它不因这一格是新读点而豁免。
+        // 换算只从 `RealRoadRoute.gcj02Points` 那**一个**出口取（判据 L-a 钉的就是"偏移只发生一次、
+        // 出口只有一个"，在这里自己写 convertAll 就是把出口做成两个，所以走校验器返回的那条 Accepted）。
+        // 不进 RouteRepository 缓存：那份缓存的读点口径已被赛道 ⑭/⑱ 钉成"一条线路一条几何"，
+        // 当前段是每次轮询都在变的另一份几何，塞进去会让"缓存里那条是不是刚验过的那条"重新变得不可证。
+        val segCheck = RealRoadRouteValidator.validate(
+            sourceRaw = providerRaw,
+            points = geoListOf(o.multiArr("currentSegmentPolyline")),
+            roadDistanceMeters = segRoadMeters,
+            roadEtaSeconds = segRoadEta,
+            crsRaw = crsRaw,
+            stationGeos = stations.map { it.geo },
+        )
+        val currentSegment = (segCheck as? RouteCheck.Accepted)?.route?.gcj02Points ?: emptyList()
         val nextRaw = raw.getOrNull(nextIdx)
         val nextStation = nextRaw?.multiStr("stationName", "nextStation").orEmpty().ifEmpty { stations.getOrNull(nextIdx)?.name ?: "" }
         // 旧字段照旧解析（后端给的是直线值），但不再用它兜底算距离：拿不到就是 0，界面显示"—"
@@ -1308,14 +1343,17 @@ object Repo {
             routeSourceName = accepted?.source?.name ?: RouteSource.parse(providerRaw).name,
             roadDistanceMeters = accepted?.roadDistanceMeters ?: 0,
             roadEtaSeconds = accepted?.roadEtaSeconds ?: 0,
-            nextStopRoadDistanceMeters = o.multiNum("nextStopRoadDistanceMeters").toInt(),
-            nextStopRoadEtaSeconds = o.multiNum("nextStopRoadEtaSeconds").toInt(),
+            nextStopRoadDistanceMeters = segRoadMeters,
+            nextStopRoadEtaSeconds = segRoadEta,
             routeUnavailableReason = unavailable,
             stops = stops,
             // 后端自己点名的"下一个点"与动作话术：与 nextStopRoad* 同一个 next 写出，所以到近播报只认这一对。
             // 客户端原先只按 stops 数组自己挑下一个点（nextNavigableStop），挑到的和这段里程是不是同一个点，本机无从证明。
             nextStopName = o.multiStr("nextStopName"),
             nextActionName = o.multiStr("nextActionName"),
+            routeComplete = o.multiBoolOrNull("routeComplete"),
+            deviationMeters = o.multiNumOrNull("deviationMeters"),
+            currentSegmentPolyline = currentSegment,
         )
     }
 
@@ -1424,8 +1462,23 @@ object Repo {
         )
 
     /** action ∈ accept/navigate/arrive-origin/load/start/arrive-dest/handover-start/handover-confirm/complete */
-    suspend fun legAction(action: String, legId: String, extra: Map<String, Any?> = emptyMap()): Ack =
-        gatedAction("leg/$action:$legId") {
+    /**
+     * 段动作。[action] 是后端 URL 那一段（`arrive-dest` 等），[actionKey] 是**幂等闸的标识**。
+     *
+     * 两者必须能分开：`LegDriverAction.ARRIVE_DEST` 与 `ENTER_DELIVERY` 打的是**同一个 URL**，
+     * 但后端 `legAction` 的 switch 按段的当前状态分两支（`DriverAppServiceImpl:1514-1529`），
+     * 所以那是两次语义不同的提交。闸键只按 URL+legId 拼时，第二次会被本机拦住（成功后持锁 10 秒，
+     * `ActionGate.kt:38-40`），段就永远停在"到达卸货站"进不了派送；而后端这些端点**没有** `@Idempotent`
+     * （全模块只有 `AppProductOrderController:38` / `AppSendController:119` 两处），
+     * ⇒ 这一拦完全是本机自己造的，必须由调用方给一个能区分意图的键。
+     */
+    suspend fun legAction(
+        action: String,
+        legId: String,
+        extra: Map<String, Any?> = emptyMap(),
+        actionKey: String = "",
+    ): Ack =
+        gatedAction("leg/${actionKey.ifEmpty { action }}:$legId") {
             Ack(Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra).demo)
         }
 

@@ -106,6 +106,32 @@ class DriverActionIdempotencyContractTest : ServerTest() {
         assertEquals("拦下后请求总数仍然不变", 2, server.requestCount)
     }
 
+    /**
+     * #51 同一个 URL 上的**两种意图**必须都能提交。
+     *
+     * `LegDriverAction.ARRIVE_DEST` 与 `ENTER_DELIVERY` 的 api 串都是 `arrive-dest`
+     *（枚举注释原话："段停在 8 又不需交接时，只有再发一次 arrive-dest 才会转入派送 —— 这是后端分支，不是重复动作"），
+     * 而后端 `legAction` 的 switch 按段的当前状态分两支；这些段动作端点**没有** `@Idempotent`
+     *（全模块只有 `AppProductOrderController:38` / `AppSendController:119` 两处有），
+     * 所以"第二次被拦"完全是本机闸自己造的：段会永远停在"到达卸货站"进不了派送。
+     * 上一那条用例钉的是"不同动作分键"，它看不见这一格——两个动作的 api 串**相同**时它照样绿。
+     */
+    @Test
+    fun `同一URL的两种意图各发各的_只有枚举名能分开它们`() = runBlocking {
+        TestHost.strictBackend()
+        respondData("true")
+        respondData("true")
+        val arrive = Repo.legAction("arrive-dest", "9509", actionKey = "ARRIVE_DEST")
+        val enter = Repo.legAction("arrive-dest", "9509", actionKey = "ENTER_DELIVERY")
+        assertFalse("第一次到达必须真的上网络", arrive.notSent)
+        assertFalse("转入派送那一次也必须真的上网络（同 URL、不同意图）", enter.notSent)
+        assertEquals(2, server.requestCount)
+        // 但同一意图连点仍然要拦：修这一格不是把闸门拆掉
+        val repeat = Repo.legAction("arrive-dest", "9509", actionKey = "ENTER_DELIVERY")
+        assertTrue("同一个意图在窗口内重发仍必须被拦", repeat.notSent)
+        assertEquals("拦下后请求数不变", 2, server.requestCount)
+    }
+
     @Test
     fun `标记已读也走同一道闸`() = runBlocking {
         TestHost.strictBackend()

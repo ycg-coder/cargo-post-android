@@ -7,6 +7,7 @@ import com.shanxiang.buspost.data.store.Prefs
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -295,5 +296,151 @@ class RouteGuideContractTest : ServerTest() {
         assertEquals(0, step.distanceMeters)
         assertNull(step.recommendedLane)
         assertNull(step.etaSeconds)
+    }
+
+    /**
+     * #49 第一步：后端一直在发、本机一直没读的三格从今天起真的进模型。
+     *
+     * 这三格各自都有一次"塌成两格就会说谎"的机会，所以逐格钉：
+     * · `routeComplete` 缺失 ≠ false —— 前者是"后端没说这条线完不完整"，后者是"后端明说中段断了"。
+     *   把缺失读成 true，页面就会在一条只画到缺口的折线旁边念"全段覆盖"。
+     * · `deviationMeters` 的 -1 是后端自己的"无法判定"（VO:53），必须与"没发这个键"分家；
+     *   把 -1 当 0 米用，就等于把"测不出"报成"正好在线上"。
+     * · `currentSegmentPolyline` 是"车→后端点名的下一站"那一段（VO:86 原话"导航用"），
+     *   它和全段脊柱 `polyline` 不是同一几何，谁也不许顶替谁。
+     */
+    @Test
+    fun `routeComplete 三格分得开：没发键 与 后端说断了 与 后端说完整`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200}"""
+        )
+        val absent = Repo.routeGuide().value!!
+        assertNull("后端没发这个键", absent.routeComplete)
+        assertFalse("没发键不许被读成'不完整'", absent.routeTruncated)
+
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "routeComplete":false}"""
+        )
+        val truncated = Repo.routeGuide().value!!
+        assertEquals(false, truncated.routeComplete)
+        assertTrue(truncated.routeTruncated)
+
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "routeComplete":true}"""
+        )
+        assertTrue(Repo.routeGuide().value!!.routeTruncated.not())
+    }
+
+    @Test
+    fun `deviationMeters 的负数是后端说的无法判定，不是零米也不是没发`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "deviationMeters":-1.0}"""
+        )
+        val undeterminable = Repo.routeGuide().value!!
+        assertNotNull("后端发了键，值就要留着", undeterminable.deviationMeters)
+        assertTrue(undeterminable.deviationUndeterminable)
+        assertFalse("无法判定不等于'没偏航'", undeterminable.deviationKnown)
+
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "deviationMeters":42.5,"deviated":false}"""
+        )
+        val measured = Repo.routeGuide().value!!
+        assertEquals(42.5, measured.deviationMeters!!, 1e-9)
+        assertTrue(measured.deviationKnown)
+        assertFalse(measured.deviationUndeterminable)
+
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200}"""
+        )
+        val missing = Repo.routeGuide().value!!
+        assertNull(missing.deviationMeters)
+        assertFalse("没发键既不是无法判定也不是有读数", missing.deviationUndeterminable)
+        assertFalse(missing.deviationKnown)
+    }
+
+    @Test
+    fun `当前段折线单独进模型，不顶替全段脊柱也不反过来`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","coordinateSystem":"GCJ-02","stops":$twoStops,"polyline":$realPolyline,
+               "routeDistanceMeters":9200,
+               "currentSegmentPolyline":[{"latitude":29.60,"longitude":106.60},{"latitude":29.61,"longitude":106.61}]}"""
+        )
+        val guide = Repo.routeGuide().value!!
+        assertEquals(2, guide.currentSegmentPolyline.size)
+        assertTrue(guide.hasCurrentSegment)
+        assertEquals(3, guide.polyline.size)
+        assertNotEquals(
+            "两段几何不是同一份：全段脊柱与当前段各自进模型，谁也没顶替谁",
+            guide.polyline.size, guide.currentSegmentPolyline.size,
+        )
+    }
+
+    /**
+     * 当前段折线**也要过真实道路闸门**，而且这里钉的是两件不同的事：
+     * · 单点不构成线 ⇒ 校验器当场拒收，模型里连那一个点都不留（旧写法会把"一个点"存成一条线让页面去画）；
+     * · 两点但形状正好等于两个站点的连线 ⇒ 同样拒收，这正是校验器那句"所谓路线只是两个站点的连线"。
+     * 两种都判"这一段没有可用几何"，页面退回全段线或明说没有，绝不自己补线。
+     */
+    @Test
+    fun `当前段几何过不了闸就不留点 单点与站点连线两种都不留`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "currentSegmentPolyline":[{"latitude":29.60,"longitude":106.60}]}"""
+        )
+        val onePoint = Repo.routeGuide().value!!
+        assertTrue("单点不构成线：校验器拒收后模型里不许留着那一个点", onePoint.currentSegmentPolyline.isEmpty())
+        assertFalse(onePoint.hasCurrentSegment)
+
+        // 当前段 == 两个站点的连线：后端说这是道路，本机不信（两个站连一条线包装成真实道路是同一族假话）
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "currentSegmentPolyline":[{"latitude":29.60,"longitude":106.60},{"latitude":29.65,"longitude":106.65}]}"""
+        )
+        val stationJoin = Repo.routeGuide().value!!
+        assertTrue("站点连线不算道路：这一格必须被校验器拦下", stationJoin.currentSegmentPolyline.isEmpty())
+    }
+
+    @Test
+    fun `当前段来源不可信时整段不留`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"euclidean","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "currentSegmentPolyline":[{"latitude":29.60,"longitude":106.60},{"latitude":29.61,"longitude":106.61}]}"""
+        )
+        val guide = Repo.routeGuide().value!!
+        assertTrue("来源被后端标成直线估算 ⇒ 当前段也不许进模型", guide.currentSegmentPolyline.isEmpty())
+        assertFalse(guide.hasCurrentSegment)
+    }
+
+    /**
+     * 三格都只认后端原名。`segmentPolyline` / `coversAllSegments` / `deviation` 这几个"看起来会有人这么写"
+     * 的名字在本端点 0 生产者（本轮逐字段读 `AppDriverRouteRespVO` 核对），
+     * 让它们任一个产生值，就是给本机凭空造第二个真相源。
+     */
+    @Test
+    fun `三格的自造别名一个都不认`() = runBlocking {
+        TestHost.strictBackend()
+        respondData(
+            """{"routeProvider":"amap","stops":$twoStops,"polyline":$realPolyline,"routeDistanceMeters":9200,
+               "segmentPolyline":[{"latitude":29.70,"longitude":106.70},{"latitude":29.71,"longitude":106.71}],
+               "coversAllSegments":false,"deviation":-1.0,"route_complete":false}"""
+        )
+        val guide = Repo.routeGuide().value!!
+        assertTrue("别名键不许画出当前段", guide.currentSegmentPolyline.isEmpty())
+        assertNull("别名键不许代替 routeComplete", guide.routeComplete)
+        assertNull("别名键不许代替 deviationMeters", guide.deviationMeters)
     }
 }
