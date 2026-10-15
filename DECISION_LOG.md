@@ -5858,7 +5858,7 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 `shortcuts.xml` 与 `widget_next_bus_info.xml`）；后端 `grep -riE "app_?version|checkUpdate|forceUpdate"` **0 命中**；
 CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 Release**，顶层 `permissions: contents: read`；
 `gh release list` 退出 0 且**输出为空** ⇒ 仓库里一条发布都没有。
-"我的"页只有一行只读的版本号（`MinePages.kt:1042 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
+"我的"页只有一行只读的版本号（`MinePages.kt:1051 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
 
 **按用户口径做的取舍**：数据源**只有 GitHub Releases**（用户选定），不新增后端版本表 —— 多一跳只会把"这一句来自哪一路"抹平，
 同 #41/#42 那条理由。代价如实登记在下面"仍欠"。
@@ -8050,3 +8050,34 @@ EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / 
 
 **读数**：全量 **tests=752 failures=0 errors=0**（73 份 XML，最新 mtime 01:23:58）；
 判据簿 **41 本 rc≠0 = 0**；`compileDebugKotlin` rc=0。
+
+### D-122（10-16 01:2x–01:5x）· #76 反馈那次"已提交"没读 Ack；导航页的"正在请求真实道路…"永远不会结束
+
+**反馈**（`MinePages.kt`）：`Repo.submitFeedback` 返回 `Ack`，页面直接丢在地上不读，成功卡只管念
+"反馈已提交，站点会在班次调整时统一回复。" —— 演示包里那一次**没发给任何站点**（后端 `/feedback/create`
+根本没被请求，报文来自 `DemoData`），这句话就是替后端许愿。改成 `val ack = …` + `sentDemo = ack.demo`，
+两句回执分开（与 §54 的"操作已记录，系统同步中"同一口径）。
+（异常路径本来是对的：`Api` 在 `code != 0` 时抛 `ApiException`（`Api.kt:393`），`work` 收成 error，
+`sent` 不会被置上 —— 所以这一格缺的不是失败分支，是**成功分支没区分"真提交"与"演示记录"**。）
+
+**导航页卡在"计算中"**（`DriverGuideScreen.kt`）：这一条是结构性死锁，不是慢。旧写法
+`LaunchedEffect(target, me, readiness)` 把**每帧都在变的定位坐标**当键 ⇒ 司机一动就重启 effect，
+老那一协程正挂在 `engine.calculateRoute()` 里等回执，被取消时 `attempt` 按 §七 让
+`CancellationException` 穿出（**不写 phase**），于是 `phase` 留在 `Calculating`；
+新那一协程进来看见上一行的守卫 `if (phase is Calculating || phase is Ready) return` 直接退出 ⇒
+屏幕上永远念"正在请求真实道路…"，而底下没有任何人在算路。
+两条一起改才成立：**键换成"有没有定位"**（`me == null`）+ **删掉那道守卫**（重启就重算一遍）。
+起点取启动这一轮的那一帧，中途不跟车移动重算 —— 重算本来由高德的偏航通道负责（`recalc` 那一族）。
+
+排查时顺手看了同族的另外两处 `LaunchedEffect`：`DriverGuideScreen.kt:163` 是每帧推给播报器的
+（没有状态机，重启无害），`DriverSdkNavCard.kt:149` 只是往 logcat 打一行诊断 —— 两处都不是同一形病，
+登记以免下轮误当成同款去"修"。
+
+判据：`check_safe_call_probes.sh` 加 **SA-g** 四条（新键=1 / 旧键=0 / 守卫=0 / 相位写入=1 作反证），
+配 `safe_call_negative_controls.sh` 三把破口全咬（**这条负控第一次跑不成立**：破口想插守卫时
+替换文本里带着锚点原文，被 swap 的 SELF-MATCH 守卫当场拒绝 —— 反证的注入也要按"替换不得含锚点"写）；
+`check_caliber_probes.sh` 加 **KL-g** 四条（Ack 被读 / sentDemo / 演示那句 / 真实那句作反证），
+负控 +2 把（11 把全咬，恢复后绿）。
+
+读数：`compileDebugKotlin` rc=0；`check_safe_call_probes.sh` SA-g=1/0/0/1 绿、
+`check_caliber_probes.sh` KL-g=1/1/1/1 绿、`safe_call_negative_controls.sh` 破口 29/29 + 自检 3 条全过。

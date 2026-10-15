@@ -173,7 +173,14 @@ fun DriverGuideScreen() {
     val carUp = true
 
     // 算路：目的地 + 本机定位 + 引擎就绪 三者齐了才发请求。缺一个就照实说缺哪个。
-    LaunchedEffect(target, me, readiness) {
+    //
+    // ⚠ 键里**不能放 `me` 这个坐标**（缺陷 #76 的真因）：司机在动，`me` 每来一帧就换一个值 ⇒
+    // 这个 effect 被反复重启，而老那一协程正挂在 `engine.calculateRoute()` 里等回执 ——
+    // `attempt` 按 §七 让 CancellationException 穿出，于是老的一路死在半道、没来得及写 phase，
+    // 新的那一进来看见 `phase is Calculating` 就 return ⇒ **屏幕上永远停在"正在请求真实道路…"**，
+    // 底下已经没有任何人在算路。所以这里按"有没有定位"（`me == null`）而不是"定位是多少"来触发；
+    // 起点用启动这一轮取到的那一帧，中途不跟车移动重算（重算由高德的偏航通道负责）。
+    LaunchedEffect(target, me == null, readiness.canNavigate) {
         val dest = destGeo
         if (dest == null) {
             phase = GuidePhase.NoTarget
@@ -187,7 +194,9 @@ fun DriverGuideScreen() {
             phase = GuidePhase.EngineBlocked(readiness.userText)
             return@LaunchedEffect
         }
-        if (phase is GuidePhase.Calculating || phase is GuidePhase.Ready) return@LaunchedEffect
+        // 这里**不许**再写 `if (phase is Calculating || phase is Ready) return`：
+        // 键一变，老协程已经被取消而 phase 还留在 Calculating —— 那道守卫只会让新协程也提前退出，
+        // 于是这一格永远"计算中"（就是上面那条注释说的病）。重启就等于重新算一遍，代价可接受。
         phase = GuidePhase.Calculating
         // 途经点只在"这一帧是全段模式"时喂：plan 自己会因超出高德上限而退回逐站（legByLeg + note 说要话），
         // 那时 wayPoints 是空列表，算路就只导到最近一站 —— 摘掉中间站等于跳站，这一支永远不许那样。

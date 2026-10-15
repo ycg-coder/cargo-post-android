@@ -18,10 +18,11 @@ GS=$A/ui/user/GoodsScreen.kt
 DM=$A/ui/driver/DriverMessagesScreen.kt
 NS=$A/ui/user/NotificationScreen.kt
 BS=$A/ui/user/BusScreen.kt
+MP=$A/ui/user/MinePages.kt
 T=app/src/test/java/com/shanxiang/buspost/ui/user/GoodsScopeContractTest.kt
 NC='(^|[0-9]+:)[[:space:]]*(\*|//)'
 
-for f in "$GS" "$DM" "$NS" "$BS" "$T"; do
+for f in "$GS" "$DM" "$NS" "$BS" "$MP" "$T"; do
     [ -f "$f" ] || { echo "× 判据文件缺失：$f（扫描面塌了，本轮所有数不采信）"; exit 2; }
 done
 
@@ -59,12 +60,20 @@ KLD_OLD=$(cnt "$BS" '"搜索线路名称"')
 # KL-e 用例条数（纯函数判据的底盘，删用例必须让这里变红）
 KLE=$(grep -cE '^[[:space:]]*@Test' "$T")
 
+# KL-g 反馈提交的回执：Ack 不许被丢在地上，演示那一次必须说"没发给站点"（缺陷 #76）
+#     反证是"真实提交"那句还在（=1）：只剩一句反而说明两分支塌回了一句谎话。
+KLG_ACK=$(cnt "$MP" 'val ack = Repo.submitFeedback')
+KLG_FLAG=$(cnt "$MP" 'sentDemo = ack.demo')
+KLG_DEMO=$(cnt "$MP" '这条只记在演示数据里，没有发给站点。')
+KLG_REAL=$(cnt "$MP" '反馈已提交，站点会在班次调整时统一回复。')
+
 echo "KL-a 全量源/取数点/闸门/触发 · 旧分页直排 = $KLA_POOL/$KLA_FETCH/$KLA_NEED/$KLA_TRIGGER · $KLA_OLD （目标 1/≥1/≥2/1 · 0）"
 echo "KL-b 三分说法调用/标题句 · 『没货』非注释/全部 = $KLB_BRANCH/$KLB_TITLE · $KLB_NOSTOCK/$KLB_NOSTOCK_ALL （目标 ≥2/1 · 0/≥1）"
 echo "KL-c 页头读后端数 · 本页自算的未读句 = $KLC_HEAD · $KLC_LOCAL （目标 1 · 0）"
 echo "KL-c2 用户侧『本页未读』限定 / 裸『未读 N』 = $KLC_PAGE_QUAL/$KLC_BARE （目标 1/0）"
 echo "KL-d 附近限定/未命中提示 · 旧『搜索线路名称』 = $KLD_HINT/$KLD_MISS · $KLD_OLD （目标 1/≥1 · 0）"
 echo "KL-e 口径用例条数                        = $KLE （目标 ≥5）"
+echo "KL-g 反馈 Ack/演示标志/两句回执           = $KLG_ACK/$KLG_FLAG/$KLG_DEMO/$KLG_REAL （目标 1/1/1/1）"
 
 fail=0
 [ "$KLA_POOL" = 1 ] || { echo "× KL-a 列表源不再是『全量 ?: 分页』（现 $KLA_POOL）：排序又会只在那几页里比高低"; fail=1; }
@@ -84,6 +93,10 @@ fail=0
 [ "$KLD_MISS" -ge 1 ] || { echo "× KL-d 搜不到时没有那句『附近线路里没搜到』（现 $KLD_MISS）：词一打错整块列表静默消失"; fail=1; }
 [ "$KLD_OLD" = 0 ] || { echo "× KL-d 旧『搜索线路名称』那句话回来了（现 $KLD_OLD 处）：它承诺的是全网搜索"; fail=1; }
 [ "$KLE" -ge 5 ] || { echo "× KL-e 口径用例少于 5 条（现 $KLE）：这三句话的分工没人钉"; fail=1; }
+[ "$KLG_ACK" = 1 ] || { echo "× KL-g 反馈提交又把 Ack 丢在地上（现 $KLG_ACK）：演示那次没发给任何站点，界面却说『站点会回复』"; fail=1; }
+[ "$KLG_FLAG" = 1 ] || { echo "× KL-g 没把 ack.demo 记进回执（现 $KLG_FLAG）：分支条件没了，两句回执会塌成一句"; fail=1; }
+[ "$KLG_DEMO" = 1 ] || { echo "× KL-g 演示那次那句真话没了（现 $KLG_DEMO）"; fail=1; }
+[ "$KLG_REAL" = 1 ] || { echo "× KL-g 反证掉了（真实提交那句=$KLG_REAL，目标 1）：上面那个 1 可能是整块回执被删了"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "四条口径判据通过"; else echo "四条口径判据失败"; fi
 exit "$fail"

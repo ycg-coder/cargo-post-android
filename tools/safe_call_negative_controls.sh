@@ -37,6 +37,7 @@ cp -r "$SC" "$CLEAN"
 API="$SC/app/src/main/java/$PKG/core/net/Api.kt"
 REPO="$SC/app/src/main/java/$PKG/data/repo/Repo.kt"
 BUS="$SC/app/src/main/java/$PKG/ui/user/BusScreen.kt"
+GD="$SC/app/src/main/java/$PKG/ui/driver/DriverGuideScreen.kt"
 LOC="$SC/app/src/main/java/$PKG/core/loc/Locator.kt"
 TST="$SC/app/src/test/java/$PKG/core/net/SafeApiCallContractTest.kt"
 PDEC="$SC/app/src/main/java/$PKG/core/map/PolylineDecision.kt"
@@ -237,6 +238,26 @@ ctl "契约用例被删掉一条（12→11）" SA-f
 # 16 「请求不出网」断言被删一条：3→2。取消/缺陷/未绑定三条都靠这类断言才不是空话。
 swap "$TST" '        assertEquals(0, server.requestCount)' '        assertEquals(1, server.requestCount)'
 ctl "「请求没出网」的断言少了一条（3→2）" SA-f
+
+# ── SA-g 算路的触发键与"卡在计算中"（缺陷 #76）───────────────────────────────
+# 22 键里放回每帧都在变的坐标：老协程被取消、phase 留在 Calculating，新协程又被守卫挡回去。
+swap "$GD" '    LaunchedEffect(target, me == null, readiness.canNavigate) {' \
+           '    LaunchedEffect(target, me, readiness) {'
+ctl "算路触发键改回每帧定位（每次移动都掐断上一次算路）" SA-g
+
+# 23 守卫回来：新键即便不变，重启那一次也会被"phase 已经是 Calculating"挡回去 ⇒ 永远停在计算中。
+#    ⚠ 锚点取"注释那句的尾巴 + 相位行"，替换文本里**不带**那句注释 —— 否则 swap 的 SELF-MATCH
+#    守卫会拒（替换文本含锚点原文时，判据数到的可能只是注释里那句话）。本轮第一次就撞在这条上。
+swap "$GD" '代价可接受。
+        phase = GuidePhase.Calculating' \
+           '代价丢了
+        if (phase is GuidePhase.Calculating || phase is GuidePhase.Ready) return@LaunchedEffect
+        phase = GuidePhase.Calculating'
+ctl "重启守卫回来（被取消那一路留下的 Calculating 会把新的一路也挡住）" SA-g
+
+# 24 反证自身：把相位写入那一行摘掉 —— 上面两个"目标 0"就必须靠这条来证明不是"整块被删"。
+swap "$GD" '        phase = GuidePhase.Calculating' '        phase = phase'
+ctl "相位机那一行被删（G_PHASE 的 1 不再可信）" SA-g
 
 # ── 打到判据簿自己头上 ──────────────────────────────────────────────────────
 # 17 把 $NC（注释排除式）写成匹配一切：于是所有"生效代码计数"都变 0，SA-d/SA-e 那一串"目标 0"全绿，

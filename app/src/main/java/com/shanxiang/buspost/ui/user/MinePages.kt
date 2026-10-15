@@ -791,6 +791,8 @@ class FeedbackViewModel : ScreenViewModel() {
     var name by mutableStateOf(Prefs.nickname)
     var mobile by mutableStateOf(Prefs.mobile)
     var sent by mutableStateOf(false)
+    /** 这一次"提交"是不是只落在演示包里（`Ack.demo`）：真实提交与演示记录必须是两句话 */
+    var sentDemo by mutableStateOf(false)
     var formError by mutableStateOf("")
     var page by mutableStateOf(1)
     var hasMore by mutableStateOf(true)
@@ -814,7 +816,8 @@ class FeedbackViewModel : ScreenViewModel() {
         formError = if (content.length < 5) "再多写几个字，站点才好调整" else ""
         if (formError.isNotEmpty()) return
         work(reset = false) {
-            Repo.submitFeedback(content, name, mobile)
+            val ack = Repo.submitFeedback(content, name, mobile)
+            sentDemo = ack.demo
             content = ""
             sent = true
             load(reset = true)
@@ -836,7 +839,13 @@ fun FeedbackScreen(vm: FeedbackViewModel = viewModel()) {
             vm.error?.let { ErrorState(it, onRetry = { vm.load() }) }
             if (vm.sent) {
                 BusCard(modifier = Modifier.fillMaxWidth(), warm = true) {
-                    Text("反馈已提交，站点会在班次调整时统一回复。", color = t.ink, fontSize = (13.5 * scale).sp)
+                    // 演示包那次没发给任何站点，说"站点会回复"就是替后端许愿（缺陷 #76 / 与 §54 回执同一口径）
+                    Text(
+                        if (vm.sentDemo) "这条只记在演示数据里，没有发给站点。"
+                        else "反馈已提交，站点会在班次调整时统一回复。",
+                        color = t.ink,
+                        fontSize = (13.5 * scale).sp,
+                    )
                 }
             }
 

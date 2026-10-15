@@ -18,12 +18,13 @@ S=app/src/main/java/com/shanxiang/buspost
 API="$S/core/net/Api.kt"
 REPO="$S/data/repo/Repo.kt"
 BUS="$S/ui/user/BusScreen.kt"
+GD="$S/ui/driver/DriverGuideScreen.kt"
 PDEC="$S/core/map/PolylineDecision.kt"
 TST="app/src/test/java/com/shanxiang/buspost/core/net/SafeApiCallContractTest.kt"
 PTEST="app/src/test/java/com/shanxiang/buspost/core/map/PolylineDecisionContractTest.kt"
 NC='(^|[0-9]+:)[[:space:]]*(\*|//)'
 
-for f in "$API" "$REPO" "$BUS" "$PDEC" "$TST" "$PTEST"; do
+for f in "$API" "$REPO" "$BUS" "$GD" "$PDEC" "$TST" "$PTEST"; do
     [ -f "$f" ] || { echo "× 判据文件缺失：$f（先确认工程根/副本建对，别把缺文件读成计数 0）"; exit 2; }
 done
 
@@ -173,6 +174,18 @@ F_CANC=$(grep -c 'is CancellationException' "$TST")
 F_TYPES=$(grep -cE 'is ApiResult\.(BusinessError|NetworkError|Unauthorized)' "$TST")
 F_NOREQ=$(grep -c '0, server.requestCount' "$TST")
 
+# ---------- SA-g 算路的触发键与"卡在计算中"（缺陷 #76，2026-10-16）----------
+# 司机在动 ⇒ `Running.geo` 每帧换值。旧键写的是坐标本身：每来一帧就重启 effect，
+# 老那一协程正挂在 `engine.calculateRoute()` 里等回执、被取消（`attempt` 按 §七 让取消穿出，
+# 所以它不会写 phase），而新那一进来看见 `phase is Calculating` 就 return ⇒
+# 屏幕上永远停着"正在请求真实道路…"，底下其实没有任何人在算路。
+# 这一族只有"键 + 守卫"两条一起钉才成立：光钉键（旧守卫还在）或光钉守卫（键还是坐标）都不红。
+G_KEY=$(grep -cF 'LaunchedEffect(target, me == null, readiness.canNavigate) {' "$GD")
+G_OLDKEY=$(grep -cF 'LaunchedEffect(target, me, readiness) {' "$GD")
+G_GUARD=$(grep -cF 'if (phase is GuidePhase.Calculating || phase is GuidePhase.Ready) return@LaunchedEffect' "$GD")
+# 反证：相位机本身还在（这一格不是整块被删掉才"没有旧键、没有守卫"的）
+G_PHASE=$(grep -cF 'phase = GuidePhase.Calculating' "$GD")
+
 echo "SA-a helper 定义 / 旧名 apiCall 残留 / 反证 = $DEF / $LEGACY / $LEGACY_PROOF （目标 1 / 0 / >0）"
 echo "SA-b 体内取消出口 / throw e / 四类 / 兜底 = $B_CANC/$B_THROW/$B_TYPED/$B_SWEEP （目标 1/1/4/0）"
 echo "SA-b 兜底模式在 Repo 的反证                = $B_SWEEP_PROOF （目标 >0，否则上面那个 0 不可信）"
@@ -192,6 +205,7 @@ echo "SA-e3 首屏问 / 序号声明 / 自增 / 双条件闸  = $E3_AUTOASK/$E3_
 echo "SA-e3 相位写入 Asking/Asked/NotAsked/取消  = $E3_ASKING/$E3_ASKED/$E3_NOTASKED/$E3_CANCEL/$E3_CATCH （目标 1/1/3/1/1）"
 echo "SA-e4 三态行为簿：条数 / 三格整句 / 唯一出口 = $E4_TESTS/$E4_CELLS/$E4_EXIT （目标 ≥15/≥3/1）"
 echo "SA-f 用例条数 / 取消 / 四类 / 不出网断言    = $F_TESTS/$F_CANC/$F_TYPES/$F_NOREQ （目标 12/≥2/≥3/≥3）"
+echo "SA-g 算路键（新/旧）/ 卡死守卫 / 相位反证  = $G_KEY/$G_OLDKEY/$G_GUARD/$G_PHASE （目标 1/0/0/1）"
 
 fail=0
 [ "$DEF" = 1 ] || { echo "× SA-a helper 定义不是那一条（$DEF）：签名被改或第二份 helper 长出来了"; fail=1; }
@@ -254,6 +268,10 @@ fail=0
 [ "$F_CANC" -ge 2 ] || { echo "× SA-f 取消穿透只被断言了 $F_CANC 次：块内抛出与真实协程取消是两条不同的路"; fail=1; }
 [ "$F_TYPES" -ge 3 ] || { echo "× SA-f 四类失败只点了 $F_TYPES 处：分类错一类这里看不出来"; fail=1; }
 [ "$F_NOREQ" -ge 3 ] || { echo "× SA-f 「请求不出网」的断言只剩 $F_NOREQ 处：取消/缺陷/未绑定三条都靠它才不是空话"; fail=1; }
+[ "$G_KEY" = 1 ] || { echo "× SA-g 算路的触发键不再是「目标 + 有没有定位 + 引擎可不可用」（现 $G_KEY）：坐标一进帧就重启算路，这一格会永远停在「正在请求真实道路…」"; fail=1; }
+[ "$G_OLDKEY" = 0 ] || { echo "× SA-g 旧键回来了（现 $G_OLDKEY）：LaunchedEffect(target, me, readiness) 把每帧定位当成了重算的触发器"; fail=1; }
+[ "$G_GUARD" = 0 ] || { echo "× SA-g 「phase is Calculating 就 return」那道守卫回来了（现 $G_GUARD）：被取消的那一路留下的 Calculating 会把新的一路也挡在门外，谁都不再算路"; fail=1; }
+[ "$G_PHASE" = 1 ] || { echo "× SA-g 反证掉了（相位写入处数=$G_PHASE，目标 1）：上面那两个 0 可能是因为整块算路被删了"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "safeApiCall 落点判据通过"; else echo "safeApiCall 落点判据失败"; fi
 exit "$fail"

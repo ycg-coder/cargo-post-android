@@ -102,4 +102,15 @@ ctl KL-d "未命中那句被换成不含范围的话：整块列表静默消失�
 kill_test "$T"
 ctl KL-e "口径用例少于 5 条：这三句话的分工没人钉"
 
+# 10 反馈的 Ack 又被丢在地上 → KL-g
+MPF="$A/ui/user/MinePages.kt"
+swap "$MPF" '            val ack = Repo.submitFeedback(content, name, mobile)' \
+             '            Repo.submitFeedback(content, name, mobile)'
+ctl KL-g "提交结果不再被读：演示那一次也会念成『站点会回复』"
+
+# 11 演示那句真话被撤（两分支塌回一句）→ KL-g
+swap "$MPF" 'if (vm.sentDemo) "这条只记在演示数据里，没有发给站点。"' \
+             'if (vm.sentDemo) "反馈已提交，站点会在班次调整时统一回复。"'
+ctl KL-g "演示与真实两种结果共用同一句成功语"
+
 echo "[恢复后] $(BUSPOST_ANDROID="$SC" bash "$PR" | tail -1)"
