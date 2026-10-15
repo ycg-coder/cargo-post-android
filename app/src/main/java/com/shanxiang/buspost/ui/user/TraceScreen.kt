@@ -331,7 +331,18 @@ fun TraceScreen(no: String, vm: TraceViewModel = viewModel()) {
                                         )
                                     }
                                     val legEta = leg.etaMinutes
-                                    if (legEta != null && legEta > 0 && leg.statusTone != com.shanxiang.buspost.core.ui.BusTone.OK) {
+                                    // #57：后端段契约发的是**绝对时刻**，有时刻就先念时刻（"预计 14:20 到"）；
+                                    // `etaMinutes` 那个键段契约里没有，只在演示面写了它时退回来用。
+                                    val schedule = leg.scheduleText
+                                    if (schedule != null && leg.statusTone != com.shanxiang.buspost.core.ui.BusTone.OK) {
+                                        Text(
+                                            schedule,
+                                            color = t.primary,
+                                            fontSize = (13 * scale).sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Spacer(Modifier.size(4.dp))
+                                    } else if (legEta != null && legEta > 0 && leg.statusTone != com.shanxiang.buspost.core.ui.BusTone.OK) {
                                         Text(
                                             "${legEta}分",
                                             color = if (legEta <= 5) t.danger else t.primary,

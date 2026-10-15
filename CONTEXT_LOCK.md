@@ -564,7 +564,7 @@ bash tools/eta_negative_controls.sh      # ⑬ 后 **50 条**逐条人为破口�
 #          并且会让它的负控制 sed 变成假绿 —— 见下面"同轮复现的两条老坑"③）
 #   T-p ≥1 / **T-p2 ≥3**（真实键 `busId` 与 `plateNo` 的读法**分开数**，F-3 ② 拆开的：`tp = grep -cE 'multiStr\("busId"'`、
 #          `tp2 = grep -cE 'multiStr\("plateNo"'`。**为什么要拆**：旧写法把两个键合成一条 `busId|plateNo` 数，基线 3；
-#          把 `Models.kt:1477` 换成 `plateNo` 真键读法后基线涨到 4，于是"删掉 busId 读法"的注入照样 ≥3 ⇒ **注入空跑、判据等于没判据**
+#          把 `Models.kt:802` 换成 `plateNo` 真键读法后基线涨到 4，于是"删掉 busId 读法"的注入照样 ≥3 ⇒ **注入空跑、判据等于没判据**
 #          （D-040 那族的第二种形状：**一条判据管两个键名，两条破口就会互相顶掉**）。同轮在 `eta_negative_controls.sh` 补了
 #          `plateNo→vehiclePlate` 破口，复跑 tp/tp2 均 ✔。⚠ 下限仍按"当前实测值"抬，**写死旧值就是留一条永不响的判据**）
 #   T-q ≥1（§68"到站提醒的数据源根本没有 etaMinutes"必须还在文档里，防止缺口被顺手修掉后无人知情）

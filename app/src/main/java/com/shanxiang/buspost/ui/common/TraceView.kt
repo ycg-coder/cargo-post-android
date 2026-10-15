@@ -222,8 +222,9 @@ private fun LegCard(leg: TransportLeg) {
             if (!done) {
                 val actionText = leg.action.ifEmpty { "暂未知" }
                 Text(
-                    if (leg.etaMinutes != null) "预计 ${leg.etaMinutes} 分钟 · $actionText"
-                    else "到站时间暂未知 · $actionText",
+                    // #57：先报后端的绝对时刻，退一步才用演示面的分钟数，两者都没有才说"到站时间暂未知"
+                    (leg.scheduleText?.let { "$it · " }
+                        ?: if (leg.etaMinutes != null) "预计 ${leg.etaMinutes} 分钟 · " else "到站时间暂未知 · ") + actionText,
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 6.dp),

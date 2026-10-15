@@ -364,8 +364,11 @@ private fun LegRow(
                     )
                     if (!done) {
                         Text(
-                            // 段契约（AppDriverLegRespVO / AppSendLegRespVO）根本没有 etaMinutes 键，真接口下走这条文案（审计 §71）
-                            leg.etaMinutes?.let { "$it 分" } ?: "暂未知",
+                            // #57：到/发时刻先走后端一直发的**绝对时刻**（estimatedArrival 等三个键）；
+                            // `etaMinutes` 段契约里没有，只在演示面写了它时补一句分钟数，两者都没有才念"暂未知"。
+                            leg.scheduleText
+                                ?: leg.etaMinutes?.let { "$it 分" }
+                                ?: "暂未知",
                             color = t.textTertiary,
                             fontSize = (11 * scale).sp,
                             modifier = Modifier.padding(top = 3.dp),

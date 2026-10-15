@@ -57,16 +57,23 @@ MD="$A/data/model/Models.kt"; RP="$A/data/repo/Repo.kt"; DM="$A/data/repo/DemoDa
 [ -f "$PSU" ] && [ -f "$PCTU" ] || { echo "✘ 沙盒缺 ParcelScreen.kt 或 ParcelCountContractTest.kt，DV-z…DV-z6/GUARD5a…b 的基线不成立"; exit 2; }
 CLEAN=/tmp/dv_neg_clean.$$; cp -r "$SC" "$CLEAN"
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
+# 这本原先**根本没有失败计数**：ctl 把 ✘ 打出来就完事，末尾 echo 的退出码恒 0 ⇒
+# 「批跑完了、这本 rc=0」与「这本有两条判据等于没判据」可以同时成立（D-116 第⑤条登记的 fail open）。
+# 现在 ✘/△ 都进 FAIL 并落进退出码，末行按 名点名变红 OK/TOTAL 打数，不再靠人眼扫日志。
+FAIL=0
+OK=0
+TOTAL=0
 
 ctl() { # $1=编号 $2=说明
   local out code
+  TOTAL=$((TOTAL + 1))
   out=$(BUSPOST_ANDROID="$SC" bash "$PR" 2>&1); code=$?
   if [ "$code" = 1 ] && echo "$out" | grep -q "^× $1"; then
-    echo "✔ $1  $2 → exit 1：$(echo "$out" | grep "^× $1" | head -1)"
+    OK=$((OK + 1)); echo "✔ $1  $2 → exit 1：$(echo "$out" | grep "^× $1" | head -1)"
   elif [ "$code" = 1 ]; then
-    echo "△ $1  $2 → exit 1，但抓到的是别的判据：$(echo "$out" | grep '^×' | head -1)"
+    echo "△ $1  $2 → exit 1，但抓到的是别的判据：$(echo "$out" | grep '^×' | head -1)"; FAIL=1
   else
-    echo "✘ $1  $2 → 负控制失效（exit $code），这条判据等于没判据"
+    echo "✘ $1  $2 → 负控制失效（exit $code），这条判据等于没判据"; FAIL=1
   fi
   rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 }
@@ -286,3 +293,5 @@ subst "$PCTU" 'vm.sends.size' 'vm.sendsCount.size'
                                                                                                               ctl GUARD5b "z1 模式在契约用例里也数不到 ⇒ 反证输入没了，DV-z1 的 0 不采信"
 
 echo "[恢复后] $(BUSPOST_ANDROID="$SC" bash "$PR" | tail -1)"
+echo "[聚合] 按名点名变红 $OK / $TOTAL 条，不成立 $((TOTAL - OK)) 条"
+[ "$FAIL" = 0 ] || exit 1

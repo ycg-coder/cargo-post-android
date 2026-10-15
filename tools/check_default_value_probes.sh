@@ -145,6 +145,9 @@ dvt=$(printf '%s\n%s\n' "$RB" "$NB" | grep -oE "$RKEYS" | wc -l | tr -d ' ')
 #   multi* 调用里**（第一候选名或并列候选名都算）仍然会响 ⇒ 由 DV-t2/DV-t2b 两条注入分别钉。
 dvt2=$(grep -rnE "$RKEYS" $A --include=*.kt | grep -vE ':[0-9]+: *(\*|//)' | grep -cE 'multi[A-Za-z]*\(' | tr -d ' ')
 # DV-t3/t4 真实键读法数量：撤别名时把真键一起删掉是最常见的坏法，归零判据必须配对数
+#   ⚠ 2026-10-15 实测：t3 是 20 却钉 ≥19、t5 是 21 却钉 ≥15 ⇒ 删掉一条照样绿，
+#     配对负控 DV-t3 / DV-t5 两条当场报「负控制失效」。这不是判据误报，是下限低于实测的空转闸门
+#     （D-082 那一轮的第 3 群）。两条一起改成恰好实测值，与本来就贴着实测的 t4(7) / t6(13) 同一口径。
 dvt3=$(printf '%s\n' "$RB" | grep -oE "multi(NumOrNull|Num|Str|Bool|BoolOrNull|Arr)\($RREAL" | wc -l | tr -d ' ')
 dvt4=$(printf '%s\n' "$NB" | grep -oE "multi(NumOrNull|Num|Str|Bool|BoolOrNull)\($RREAL" | wc -l | tr -d ' ')
 # DV-t5/t6 两份行为用例的用例数（别名不产生值这件事只有 JVM 用例能证明，grep 只能证明键名没出现）
@@ -355,9 +358,9 @@ printf 'DV-r  演示面被撤的无生产者键        : %s  （预期 0：demo 
 printf 'DV-s  NoProducerKeyFamily 用例数    : %s  （预期 ≥7）\n' "$dvs"
 printf 'DV-t  路线两块解析体内别名键        : %s  （预期 0：routeGuideOf+navStepOf，12 个已撤别名）\n' "$dvt"
 printf 'DV-t2 已撤别名键全 main 命中        : %s  （预期 0：闭包判据，挪进别的解析块也响）\n' "$dvt2"
-printf 'DV-t3 routeGuideOf 真实键读法       : %s  （预期 ≥19：撤别名时把真键一起删就靠这条数）\n' "$dvt3"
+printf 'DV-t3 routeGuideOf 真实键读法       : %s  （预期恰好 20：撤别名时把真键一起删就靠这条数；2026-10-15 由 ≥19 改成等值）\n' "$dvt3"
 printf 'DV-t4 navStepOf 真实键读法          : %s  （预期 ≥7：steps 只有演示面那套真键）\n' "$dvt4"
-printf 'DV-t5 RouteGuideContractTest 用例   : %s  （预期 ≥15：别名不产生值要有 JVM 断言）\n' "$dvt5"
+printf 'DV-t5 RouteGuideContractTest 用例   : %s  （预期恰好 21：别名不产生值要有 JVM 断言；2026-10-15 由 ≥15 改成等值）\n' "$dvt5"
 printf 'DV-t6 UserTrackingContractTest 用例 : %s  （预期 ≥13：节点完成态只认 done）\n' "$dvt6"
 printf 'DV-y  任务族两块解析体内幻影键      : %s  （预期 0：taskType/bizType/targetStation/cargoName/goodsName/itemCount/planTime/taskName/createTime/count）\n' "$dvy"
 printf 'DV-y2 任务族真实键读法              : %s + 窗口/ETA %s  （预期 11+3：撤别名把 19 键一起带走就靠这两条数）\n' "$dvy2" "$dvy2w"
@@ -436,9 +439,9 @@ ok=1
 [ "$dvs" -ge 7 ] || { echo "× DV-s NoProducerKeyFamilyContractTest 用例被删"; ok=0; }
 [ "$dvt" = 0 ] || { echo "× DV-t 路线解析块又采纳了已撤别名键（guidance/instructions/routeSource/crs/offRoute/meters/lane/seconds…三面 0 生产者）"; ok=0; }
 [ "$dvt2" = 0 ] || { echo "× DV-t2 已撤别名键在 main 别处复现（换个解析块就是第三个真相源；provider 不在此列，它是 route-preview 的真键，只按站点判）"; ok=0; }
-[ "$dvt3" -ge 19 ] || { echo "× DV-t3 routeGuideOf 的真实键读法被删（撤别名把 routeDistanceMeters/routeProvider 一起带走，字段恒为默认值还静默）"; ok=0; }
+[ "$dvt3" = 20 ] || { echo "× DV-t3 routeGuideOf 的真实键读法不是 20（撤别名把 routeDistanceMeters/routeProvider 一起带走，字段恒为默认值还静默）"; ok=0; }
 [ "$dvt4" -ge 7 ] || { echo "× DV-t4 navStepOf 的真实键读法被删（steps 只认演示面 guideOf() 那套键名）"; ok=0; }
-[ "$dvt5" -ge 15 ] || { echo "× DV-t5 RouteGuideContractTest 用例被删（别名不产生值只剩 grep，行为没人钉）"; ok=0; }
+[ "$dvt5" = 21 ] || { echo "× DV-t5 RouteGuideContractTest 用例不是 21 条（别名不产生值只剩 grep，行为没人钉；增删用例要同轮改这里）"; ok=0; }
 [ "$dvt6" -ge 13 ] || { echo "× DV-t6 UserTrackingContractTest 用例被删（finished/completed 顶替 done 这件事没人钉）"; ok=0; }
 # DV-y：任务族只按块判（块外那些名字在别的报文里是真键，全 main 归零会当场长红 —— 同 DV-t 的 provider 教训）
 [ -f "$DTR" ] || { echo "× DV-y 找不到 DriverTaskRespContractTest.kt（缺文件会被读成用例数 0，那是判据自己骗自己）"; ok=0; }

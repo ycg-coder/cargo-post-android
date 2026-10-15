@@ -124,6 +124,13 @@ private fun yuan(v: Double): String =
 fun JSONObject.timeOf(vararg keys: String): String = ts(multiStr(*keys, "createTime", "create_time"))
 
 /**
+ * 后端 `LocalDateTime` 一律走 `TimestampLocalDateTimeSerializer` ⇒ 线上是**毫秒数**（不是 ISO 串）。
+ * 不是数字（缺键 / null / 字符串 / 0）都返回 0，含义是"后端没给这一格"，由页面说"未给"——
+ * 不许塌成一个能格式化的时间戳（那会念出 1970-01-01 08:00）。
+ */
+fun JSONObject.timeMillis(key: String): Long = (opt(key) as? Number)?.toLong()?.takeIf { it > 0L } ?: 0L
+
+/**
  * 轨迹/时间线那一列的时刻：先按 [ts] 的口径归一（后端把 LocalDateTime 注册成 Epoch 毫秒，ISO 串也吃），
  * 再只取 `HH:mm`。
  * ⚠ 旧写法是直接对原始串 `substringAfter(' ').take(5)` —— 13 位毫秒串里没有空格，切出来是 "17590" 这种数字
@@ -1127,6 +1134,15 @@ data class TransportLeg(
     val distanceKm: Double? = null,
     /** 本段计划耗时(分钟)：`AppDriverLegRespVO.java:61-62` Integer 可空，语义是**计划**时长不是剩余 */
     val durationMinutes: Int? = null,
+    /**
+     * 段的**绝对时刻**（毫秒）：`AppDriverLegRespVO.java:43-50` 与 `AppSendLegRespVO.java:44-47`
+     * 一直在发 `estimatedDeparture` / `estimatedArrival` / `actualArrival`，而本机此前只读一个
+     * 契约里根本不存在的 `etaMinutes` ⇒ 段列表的到/发时刻恒念"暂未知"（缺陷 #57）。
+     * 0 = 后端没给这一格，页面说"未给"，不许格式化成 08:00 冒充凌晨。
+     */
+    val estimatedDepartureMillis: Long = 0,
+    val estimatedArrivalMillis: Long = 0,
+    val actualArrivalMillis: Long = 0,
     /** ESTIMATED 表示里程/时长是估算值，页面需提示 */
     val navigationSource: String = "",
     val fromGeo: Geo? = null,
@@ -1142,6 +1158,24 @@ data class TransportLeg(
 
     /** 后端给了名字就用，没给才按枚举兜底；未知码 = [STATUS_UNAVAILABLE_LABEL]，不猜"待承运" */
     val statusLabel: String get() = statusName.ifEmpty { LegStatus.labelOf(status) }
+
+    /**
+     * 段的到/发时刻（缺陷 #57）。后端发的是**绝对时刻**，所以这一格报"几点"而不是"几分钟"：
+     * 实际到达 → 预计到达 → 预计出发，三个键都没给才返回 null 由页面说"未给"。
+     * ⚠ 不让 `etaMinutes` 参与这一格：段契约没有那个键（见字段注释），它恒 null，
+     *   旧写法拿它当唯一来源，于是真值一直在报文里而界面一直念"暂未知"。
+     */
+    val scheduleText: String?
+        get() {
+            fun clock(millis: Long) = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA)
+                .format(java.util.Date(millis))
+            return when {
+                actualArrivalMillis > 0L -> "已到 ${clock(actualArrivalMillis)}"
+                estimatedArrivalMillis > 0L -> "预计 ${clock(estimatedArrivalMillis)} 到"
+                estimatedDepartureMillis > 0L -> "预计 ${clock(estimatedDepartureMillis)} 发"
+                else -> null
+            }
+        }
 
     /** 配色跟着码走：未知码 NEUTRAL */
     val statusTone: BusTone get() = LegStatus.toneOf(status)
@@ -1192,6 +1226,9 @@ data class TransportLeg(
                 orderNo = o.multiStr("orderNo", "bizOrderNo"),
                 distanceKm = o.multiNumOrNull("distanceKm"),
                 durationMinutes = o.multiNumOrNull("durationMinutes")?.toInt(),
+                estimatedDepartureMillis = o.timeMillis("estimatedDeparture"),
+                estimatedArrivalMillis = o.timeMillis("estimatedArrival"),
+                actualArrivalMillis = o.timeMillis("actualArrival"),
                 navigationSource = o.multiStr("navigationSource", "source"),
                 fromGeo = if (fromLat != null && fromLng != null) Geo(fromLat, fromLng) else null,
                 toGeo = if (toLat != null && toLng != null) Geo(toLat, toLng) else null,

@@ -7,7 +7,7 @@
 > 被改动文件的行号会漂移 —— 例如 `WorkbenchScreen.kt` 的发车 `:190→:181`、到站 `:236→:234`、收班 `:263→:261`，
 > `Repo.kt` 的 `depart :941→:945`、`reportLocation :966→:970`。矩阵行已按实测改到新行号。
 > 另有一处**写作当时就不准**的引用（§F 的"下一站距离"原写 `Models.kt:863`，该行其实是轨迹状态注释，
-> `nextStopRoadDistanceMeters` 在 `Models.kt:1867`），本轮一并改正 —— 记下来是为了说明：
+> `nextStopRoadDistanceMeters` 在 `Models.kt:1904`），本轮一并改正 —— 记下来是为了说明：
 > 行号会错，**判据不能只有行号**，读本文档时用函数名/grep 定位，不要按行号硬找。
 > 各条目"当前行为"里引用的旧行号保留不动（它们是定案当时的事实）。
 >
@@ -767,10 +767,10 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   ④ `statusOf` 两态兼容落地并锁进测试（`BusEtaContractTest` 的"lines 端点整数状态 1/2/0 三种码各有说法"）：
      字符串 RUNNING/IDLE/ARRIVED/NO_LOCATION + 整数 1/0/2，**整数 2 是停用不是"已到终点站"**，
      旧码表里那个 `3` 后端从不发、已删（判据 T-f1=0 / T-f2=1）。
-  ③ **未做**：`BusLine.parse` 仍是 `distanceMeters = o.multiNum("distance", "meters")`（`Models.kt:749`），
-     真实键是 `AppBusLineRespVO.java:28 distanceKm`（`AppBusServiceImpl:179 vo.setDistanceKm(route.getDistanceKm())`，
-     **可能为 null**）⇒ 对接真后端时 `BusScreen.kt:579` 的"全程"永远显示"—"（`multiNum` 把没读到塌成 0.0，
-     而页面按 `> 0` 判，所以**失败方向是诚实的**，但后端真实给的里程被丢掉了）。
+  ③ **已做（本轮实测更正，原记"未做"）**：`BusLine` 的 parse 现在读真实键 `distanceKm = o.multiNumOrNull("distanceKm")`（`Models.kt:888`），
+     旧字段 `distanceMeters` 改成可空、且不再读 `distance|meters` 那对无生产者别名（`Models.kt:866`，审计 §72 那一轮收的）。
+     原记的坏法（`multiNum` 把没读到塌成 0.0、页面按 `> 0` 判）已经不存在：后端没给就是 null，页面说"未给"。
+     后端真实键与出处不变：`AppBusLineRespVO.java:28 distanceKm` ← `AppBusServiceImpl:179 vo.setDistanceKm(route.getDistanceKm())`，**可能为 null**。
      顺带记一条同源事实：`AppBusServiceImpl:422` 的 `bus.setDistanceKm(located ? GeoDistanceUtil.haversineKm(...) : null)` ——
      `NearbyBus.distanceKm` 是**用户与车辆之间的直线公里数**且没定位时为 null，所以它只能用于排序与"离你 N km"，
      **不得**当道路里程展示，也不得参与任何可用性判定（⑪ 的 `DemoData` nearby 兜底按同形镜像，注释已写明）。
@@ -786,7 +786,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/data/model/Models.kt`
 - **类 / 函数**：`TransportLeg.parse`(`:761-788`)
-- **当前行为（㊶ / D-062 现读 `TransportLeg.parse` 后更正本行；原文写的是 #261 之前的形状）**：`seq` 读 `seq|legSeq|legSequence|sort`；起点读 `fromStation|fromStationName|startStation|pickupStation`；终点读 `toStation|toStationName|endStation|deliveryStation`；车牌读 `plateNo|vehiclePlate|plate`；折线读 `navigationPolyline|polyline|track`；段坐标只读后端那四个真键（`AppSendLegRespVO.java:24-33` 的 `fromLongitude`），走 `multiNumOrNull` ⇒ 缺键=null，见 `Models.kt:1171-1174` 的 `fromLatitude`；`etaMinutes` 只认一个名字，见 `Models.kt:1186`。
+- **当前行为（㊶ / D-062 现读 `TransportLeg.parse` 后更正本行；原文写的是 #261 之前的形状）**：`seq` 读 `seq|legSeq|legSequence|sort`；起点读 `fromStation|fromStationName|startStation|pickupStation`；终点读 `toStation|toStationName|endStation|deliveryStation`；车牌读 `plateNo|vehiclePlate|plate`；折线读 `navigationPolyline|polyline|track`；段坐标只读后端那四个真键（`AppSendLegRespVO.java:24-33` 的 `fromLongitude`），走 `multiNumOrNull` ⇒ 缺键=null，见 `Models.kt:1205-1208` 的 `fromLatitude`；`etaMinutes` 只认一个名字，见 `Models.kt:1209-1220`。
    旧行里的 `startLatitude`/`endLongitude` 那批自造别名现在在 `Models.kt` 里 **0 命中**（已撤读，G-1）。
 - **后端真实行为**：`AppDriverLegRespVO.java:11-74` 下发 `id / orderId / orderNo / legSequence / fromStationId / fromStationName / toStationId / toStationName / status(Integer) / statusName / estimatedDeparture / estimatedArrival / actualArrival / vehicleId / plateNo / distanceKm / durationMinutes / navigationSource / handoverRequired / handoverId / handoverStatusName`。**该 VO 没有任何坐标或折线字段**，段级几何只能来自 `/driver/route`（`AppDriverRouteRespVO.polyline/currentSegmentPolyline`）。`estimated = navigationSource=="ESTIMATED"` 这类值在 Android 侧的解析路径本身没错，但后端该字段现在只会给白名单来源（§54）。
 - **小程序行为**：`parcel.js:446` 直接拼 `activeLeg.legSequence / fromStationName / toStationName / statusName`；`routes.js`/`handover.js` 透传字段名，从不自造。
@@ -1262,7 +1262,7 @@ grep -rniE "euclidean|haversine|straight|mock|fake|demo stepping" . \
 # 结论写进 §56：**行号白名单会漂，内容白名单不会**；新写的判据一律按内容/函数名，不按行号。
 # 被过滤掉的 4 类命中各有正当理由，不要为了"绿"而扩大白名单：
 #   · RouteSource.kt：EUCLIDEAN/STRAIGHT/MOCK 是**拒用枚举 + 别名映射表**，出现是为了拒绝，不是使用；
-#   · NavIcon.STRAIGHT（Models.kt:1820/140 等 6 处）：**转向图标"直行"**，与几何直线无关，禁止因关键字顺手改名或删除；
+#   · NavIcon.STRAIGHT（Models.kt:1857/140 等 6 处）：**转向图标"直行"**，与几何直线无关，禁止因关键字顺手改名或删除；
 #   · 天气 mock 链（Models.kt:209-245、Repo.kt:255/261/266（⑥ 后行号，原 :240-251）、WeatherCard.kt:37/144/151）：mock=true 且界面显示"网络异常，展示本地天气"，属允许显式标注的兜底；
 #   · Api.kt:105 注释提到 MockWebServer（测试注入点）；MapCanvas.kt:136 的 isFakeBoldText 是字体加粗。
 # 反过来说：**不要把 `demo` 单独加进 pattern**。`Payload.demo` / `Api.demoAllowed` / `DEMO_ALLOWED` 是贯穿全工程的

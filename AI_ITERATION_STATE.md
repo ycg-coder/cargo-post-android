@@ -1832,7 +1832,7 @@ CURRENT_ANDROID_STATUS:  F-3 ③ 收工（2026-10-01 19:0x–22:15，三态分�
                   ② **echo-only 的数不可归因**：`P-b2` / `P-c` / `P-d` / `P-f` 的"上一轮是多少"这条链断了（② 那两份批次日志只存逐本 rc、不存逐本读数），
                      本轮能核的只有**现状构成**（脚本输出里逐处点名）⇒ 登记为归属未定，并把"每轮把这几个数连构成一起落同一份日志"排进 ⑱⑳；
                   ③ `V21-31` 的 `haversine` **口径不可复现**：旧记 11 命中 / 6 文件但命令原文没留档，本轮 `-i` = 15/7、区分大小写 = 1/1 ⇒ 三组数互不可比；
-                     逐条读下来 15 处**全是口径声明或"假来源显式降级"映射**（`RouteSource.kt:46 "haversine" to EUCLIDEAN`、`Models.kt:2205 …"（直线估算，不是道路里程）"`），
+                     逐条读下来 15 处**全是口径声明或"假来源显式降级"映射**（`RouteSource.kt:46 "haversine" to EUCLIDEAN`、`Models.kt:2242 …"（直线估算，不是道路里程）"`），
                      **没有一处把 Haversine 当道路里程用** ⇒ 事实清楚但**数字不可比**，那一格**保留 ⚠ 不升 ✅**；
                   ④ `AccountRole` 这个类型名没有落地（用 `Prefs.role` 兼任，见上面那条 ⚠）—— 若下一轮要求字面同名，先解决"谁是唯一写入口"再改名。
                   ⑤ ⚠ **`--strict-id` 的 ID-MISS 数不能当跨轮闸门**（登记 `D-③-5`，它同时**作废**本轮 §4 终检 ⑤ 里"每轮连抄 ID-MISS 更便宜"那条建议）：
@@ -1849,7 +1849,7 @@ CURRENT_ANDROID_STATUS:  F-3 ③ 收工（2026-10-01 19:0x–22:15，三态分�
                 **整体状态**：**③ 收口**（指令原话的四件齐）；F-3 全队列未收（④⑫ / ⑤ / ⑥ / ⑦⑨ / ⑧ / ⑬⑭⑯⑰ / ⑱⑳ 仍在，`D-②-1…4` 的"真待收口 23"也仍在后续项）
                   ⇒ 按指令 ⑳ 记 **`ANDROID_F3_PARTIAL`**，**不写百分比**。明细见 **D-047**。
                 **NEXT（F-3 队列，③ 已收口）**：**当前项 = ④⑫** 导航入口 readiness 闸门（把 `BuildConfig.DEBUG` 从业务开关改成能力判据）+ ⑤ 线路页折线三态与文案诚实化；
-                  ③ 不并进来的两条：字符串族剩余 11 处的难点是**端点归属**不是默认值（随 ⑥⑦）、`Models.kt:227 role` 恒走 `fallbackRole`（= `D-②-2` / `D-③-4`，要先定"档案即身份"的端点归属）。
+                  ③ 不并进来的两条：字符串族剩余 11 处的难点是**端点归属**不是默认值（随 ⑥⑦）、`Models.kt:234 role` 恒走 `fallbackRole`（= `D-②-2` / `D-③-4`，要先定"档案即身份"的端点归属）。
                 ⚠ **本轮造成的"历史行漂移"集中登记（一条都不回改 —— 那些是各自当轮的实测值，回改会把"谁推翻谁"这条链抹掉；下一轮不许当现状读）**。
                   行号是写下这一句那一刻的值，**按内容找、不要按行号找**：本文件本轮自己在 :632 插了 58 行、在 :1594 并掉了 5 行，
                   所以下面每个行号都可能随下一次编辑再漂一次（这正是"绝对行号是读数不是判据"那条纪律的又一次自证）。
@@ -1868,7 +1868,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                   本轮收口的是**六族**（商品 `Product` / 司机档案 `DriverProfile` / 揽件 `PickupOrder.checked` / 交接 `HandoverTask.needPhoto` /
                   候选方案 `Candidate` / `steps`·车道族），改法只有两种：**三方核到真键的改成只读那一个真键**
                   （`Models.kt:796 plate = o.multiStr("plateNo")`、`:1402 multiNumOrNull("cargoCapacityKg")`、`:1407 multiNumOrNull("cargoCapacity")`、`Repo.kt:1168 multiNumOrNull("recommendedLane")`），
-                  **三面 0 生产者的改成可空 + "未给"态**（`Models.kt:1582 needPhoto: Boolean? = null`、`:1479 checked`、`:1178 recommended`、`:1179 legs`、`:313 stock`、`:310 originPrice`、`:315 sales`、`:1349/:1351/:1353/:1355`）。
+                  **三面 0 生产者的改成可空 + "未给"态**（`Models.kt:1807 needPhoto: Boolean? = null`、`:1479 checked`、`:1178 recommended`、`:1179 legs`、`:313 stock`、`:310 originPrice`、`:315 sales`、`:1349/:1351/:1353/:1355`）。
                   ⚠ **没有把任何别名换成另一个猜的键名、没有删字段**；`usedKg`/`verified` 是**直接撤掉读法**而不是改名
                   （`AppDriverProfileRespVO.java:11-23` 全文 7 个键，"已装重量/认证状态"在重量口径上三方都没有生产者）。
                   生产源码动 **8 个 main 文件**：`Models.kt`、`Repo.kt`、`DemoData.kt` + 消费侧 `WorkbenchScreen.kt:566-579`、`GoodsDetailScreen.kt:79/138/219/229`、
@@ -1931,7 +1931,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                 **整体状态**：② 的**六族收口 = 收口**，② 的**全量清零 = 未完成**（基数已推翻为 65、真待收口 23）⇒ 按指令 ⑳ 记 **`ANDROID_F3_PARTIAL`**，不写百分比。明细见 **D-046**。
                 **NEXT（F-3 队列，② 的六族已收口）**：**当前项 = ③** `AccountRole`/`ActiveDomain` 分离 + 清空 `DriverShell.kt:38`
                   （② 剩下的"真待收口 23"不并进 ③：字符串族 11 处的难点是**端点归属**不是默认值 ⇒ 随 ⑥⑦ 收；
-                  `Models.kt:227 role` 恒走 `fallbackRole` = `D-②-2`，它的收口方式就是 ③，本轮刻意没动）→
+                  `Models.kt:234 role` 恒走 `fallbackRole` = `D-②-2`，它的收口方式就是 ③，本轮刻意没动）→
                   ④⑫ 导航入口 readiness 闸门 → ⑤ 线路页折线三态 → ⑥ USER 闭环 → ⑦⑨ DRIVER 闭环 + 任务点 mapper →
                   ⑧ 任务地图无路线态 → ⑬⑭⑯⑰ 引擎契约/路线绑定/缓存指纹（含 `D-②-4` census 补列、里程别名 5、`steps` 族 5、`Repo.kt:1154` crs）→
                   ⑱⑳ 10 本测试类 + 全量 + 四份台账。

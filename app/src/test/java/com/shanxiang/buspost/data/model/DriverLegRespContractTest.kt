@@ -28,9 +28,9 @@ class DriverLegRespContractTest {
           "toStationName": "江北机场站",
           "status": 8,
           "statusName": "已到达终点",
-          "estimatedDeparture": "2026-09-29T08:30:00",
-          "estimatedArrival": "2026-09-29T09:40:00",
-          "actualArrival": "2026-09-29T09:36:00",
+          "estimatedDeparture": 1790641800000,
+          "estimatedArrival": 1790646000000,
+          "actualArrival": 1790645760000,
           "vehicleId": 12,
           "plateNo": "渝A·88888",
           "distanceKm": 21.4,
@@ -127,7 +127,7 @@ class DriverLegRespContractTest {
         val leg = TransportLeg.parse(
             JSONObject(
                 """{"legSequence":1,"fromStationName":"石桥驿站","toStationName":"江北机场站",
-                   "status":2,"statusName":"运输中","estimatedArrival":"2026-09-29T09:40:00",
+                   "status":2,"statusName":"运输中","estimatedArrival":1790646000000,
                    "actualArrival":null,"driverName":"陈师傅","plateNo":"渝A·8K231"}"""
             ),
         )
@@ -137,5 +137,42 @@ class DriverLegRespContractTest {
         assertEquals(null, leg.distanceKm)
         assertEquals(null, leg.durationMinutes)
         assertEquals(null, leg.etaMinutes)
+        // 只有预计到达、没有实际到达 ⇒ 念"预计 … 到"；actualArrival 显式 null 不许塌成 0
+        assertEquals(1790646000000L, leg.estimatedArrivalMillis)
+        assertEquals(0L, leg.actualArrivalMillis)
+        assertTrue("预计时刻要念出来（#57 那一格）: ${leg.scheduleText}", leg.scheduleText?.startsWith("预计 ") == true)
+    }
+
+    /**
+     * #57：段列表的到/发时刻此前恒"暂未知"——parse 读的是契约里不存在的 `etaMinutes`，
+     * 而 `AppDriverLegRespVO.java:43-50` 一直在发三个**绝对时刻**。
+     * 线上形状也一并钉住：`YudaoJacksonAutoConfiguration` 给 LocalDateTime 挂的是
+     * `TimestampLocalDateTimeSerializer`（`application.yaml:32 write-dates-as-timestamps: true`），
+     * 所以是**毫秒数**；本文件旧 fixture 写的 ISO 串是后端从不发的形状，
+     * 它让"读不到时刻"这件事在测试里长得像正常（这条就是补那一格的）。
+     */
+    @Test
+    fun `三个绝对时刻逐个读到，实际到达优先，非数字值算没给`() {
+        val full = TransportLeg.parse(
+            JSONObject("""{"legSequence":1,"estimatedDeparture":1790641800000,"estimatedArrival":1790646000000,"actualArrival":1790645760000}"""),
+        )
+        assertEquals(1790641800000L, full.estimatedDepartureMillis)
+        assertEquals(1790646000000L, full.estimatedArrivalMillis)
+        assertEquals(1790645760000L, full.actualArrivalMillis)
+        // 实际到达优先于预计：念"已到"而不是"预计到"
+        assertTrue("实际到达要压过预计: ${full.scheduleText}", full.scheduleText?.startsWith("已到 ") == true)
+        assertTrue("文案里必须带 HH:mm: ${full.scheduleText}", Regex("""已到 \d{2}:\d{2}""").containsMatchIn(full.scheduleText ?: ""))
+
+        val onlyDeparture = TransportLeg.parse(
+            JSONObject("""{"legSequence":1,"estimatedDeparture":1790641800000}"""),
+        )
+        assertTrue("只有预计出发 ⇒ 念发: ${onlyDeparture.scheduleText}", onlyDeparture.scheduleText?.endsWith(" 发") == true)
+
+        // 三个键都没给：null，由页面说"未给"，不许格式化成 08:00
+        assertEquals(null, TransportLeg.parse(JSONObject("""{"legSequence":1}""")).scheduleText)
+        // 值是字符串（后端不发这个形状）⇒ 认"没给"，不猜
+        val iso = TransportLeg.parse(JSONObject("""{"legSequence":1,"estimatedArrival":"2026-09-29T09:40:00"}"""))
+        assertEquals(0L, iso.estimatedArrivalMillis)
+        assertEquals(null, iso.scheduleText)
     }
 }

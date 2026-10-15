@@ -140,8 +140,9 @@ class SendEtaContractTest : ServerTest() {
                 "toStationName" to "石桥驿站",
                 "status" to 7,
                 "statusName" to "运输中",
-                "estimatedDeparture" to "2026-09-29 09:40:00",
-                "estimatedArrival" to "2026-09-29 10:20:00",
+                // 线上形状：LocalDateTime 走 TimestampLocalDateTimeSerializer ⇒ 毫秒数，不是 ISO 串（#57）
+                "estimatedDeparture" to 1790646000000L,
+                "estimatedArrival" to 1790648400000L,
                 "vehicleId" to 5,
                 "plateNo" to "渝A·8K231",
                 "driverName" to "王有德",
@@ -169,6 +170,11 @@ class SendEtaContractTest : ServerTest() {
         assertEquals(66L, leg.handoverId)
         assertEquals("待交接", leg.handoverStatusName)
         assertEquals("YP20260929008", leg.orderNo)
+        // #57：段契约一直在发绝对时刻，本机此前一个都没读 ⇒ 段列表的到/发时刻恒念"暂未知"
+        assertEquals(1790646000000L, leg.estimatedDepartureMillis)
+        assertEquals(1790648400000L, leg.estimatedArrivalMillis)
+        assertEquals(0L, leg.actualArrivalMillis)
+        assertTrue("没给实际到达就要念预计: ${leg.scheduleText}", leg.scheduleText?.startsWith("预计 ") == true)
     }
 
     @Test
