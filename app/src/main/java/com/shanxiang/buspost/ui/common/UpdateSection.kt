@@ -1,5 +1,19 @@
 package com.shanxiang.buspost.ui.common
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.shanxiang.buspost.core.ui.BusRadius
+import com.shanxiang.buspost.core.ui.LocalBusTokens
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +52,12 @@ fun UpdateCheckRow() {
     var busy by remember { mutableStateOf(false) }
     var outcome by remember { mutableStateOf<UpdateOutcome?>(null) }
     var downloading by remember { mutableStateOf(false) }
+    // 下载进度。以前这一格**根本没有进度状态**：`httpDownload` 的 onProgress 走默认空函数，
+    // 回调被丢在地上，用户点完「立即更新」只看到一句静态的"正在下载新版本…"，
+    // 而包是 78 MB —— 没有任何东西告诉他是没开始、还是在动。（冷启动那个弹窗一直有进度条，
+    // 两条路共用同一个下载出口，只有一边画了，这就是"同一个动作两种反馈"。）
+    val t = LocalBusTokens.current
+    var progress by remember { mutableFloatStateOf(0f) }
     /** 安装那一步的原话（含"还差授权"那一格）：只在真出事时出现，不预置、不美化、不写"已更新" */
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -45,7 +65,7 @@ fun UpdateCheckRow() {
         label = "检查更新",
         value = when {
             busy -> "正在查…"
-            downloading -> "正在下载新版本…"
+            downloading -> "下载中 ${(progress * 100).toInt()}%"
             outcome == null -> "看有没有新版本"
             else -> updateText(outcome!!, current)
         },
@@ -85,7 +105,8 @@ fun UpdateCheckRow() {
                     onClick = {
                         downloading = true
                         scope.launch {
-                            val r = attempt { installOrAskPermission(context, o.release) }
+                            progress = 0f
+                            val r = attempt { installOrAskPermission(context, o.release) { p -> progress = p } }
                             downloading = false
                             r.exceptionOrNull()?.let { problem = it.message ?: "更新没成功" }
                         }
@@ -96,6 +117,24 @@ fun UpdateCheckRow() {
         )
 
         else -> Unit
+    }
+
+    if (downloading) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .height(8.dp)
+                .clip(RoundedCornerShape(BusRadius.s))
+                .background(t.goldLight),
+        ) {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                color = t.primary,
+                trackColor = Color.Transparent,
+            )
+        }
     }
 
     problem?.let { reason ->
@@ -112,11 +151,15 @@ fun UpdateCheckRow() {
  * 下载 → 唤起系统安装器。缺"安装未知应用"授权时**先跳系统那一页并原样报回来**，
  * 不静默失败，也不替用户假设"授权点了"。
  */
-private suspend fun installOrAskPermission(context: Context, release: Release) {
+private suspend fun installOrAskPermission(
+    context: Context,
+    release: Release,
+    onProgress: (Float) -> Unit = {},
+) {
     if (!AppUpdater.canInstall(context)) {
         context.startActivity(AppUpdater.unknownSourcesIntent())
         throw IllegalStateException("还没允许本应用安装未知应用：已打开系统设置页，授权后再回来点一次「立即更新」")
     }
-    val apk = AppUpdater.download(context, release) { url, dest -> AppUpdater.httpDownload(url, dest) }
+    val apk = AppUpdater.download(context, release) { url, dest -> AppUpdater.httpDownload(url, dest, onProgress) }
     context.startActivity(AppUpdater.installIntent(context, apk))
 }
