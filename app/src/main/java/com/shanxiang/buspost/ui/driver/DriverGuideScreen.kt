@@ -360,6 +360,7 @@ private fun AmapNaviSurface(
     }
 
     failed?.let { reason ->
+        val scale = LocalBusFontScale.current
         // 视图起不来时的实话 + 出路：这一屏不许变成一块黑屏
         Box(
             Modifier.fillMaxSize().background(Color(0xFF14181C)),
@@ -376,12 +377,16 @@ private fun AmapNaviSurface(
                     tint = Color(0xFFE8C271),
                     modifier = Modifier.size(34.dp),
                 )
-                Text("车道级导航不可用", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(reason, color = Color(0xFFD6D0C2), fontSize = 12.5.sp)
+                // 字号必须乘全局字阶：这一屏以前写死 17/12.5/12，是全工程唯一没接
+                //   LocalBusFontScale 的一屏 —— 结果适老模式（+22%）与驾驶模式下
+                //   **只有这一块不放大**，而它恰好是"地图起不来时司机唯一能读的一屏"。
+                // 深色底与配色保持原样（那是导航覆盖层的有意设计，属 #31 待拍板项，不擅自动）。
+                Text("车道级导航不可用", color = Color.White, fontSize = (17 * scale).sp, fontWeight = FontWeight.Bold)
+                Text(reason, color = Color(0xFFD6D0C2), fontSize = (12.5f * scale).sp)
                 Text(
                     "可以退回工作台，用「交给高德 / 交给百度」把目的地交给手机里装的导航 App。",
                     color = Color(0xFFB3AC9B),
-                    fontSize = 12.sp,
+                    fontSize = (12 * scale).sp,
                 )
                 Spacer(Modifier.height(4.dp))
                 val nav = LocalNavController.current
