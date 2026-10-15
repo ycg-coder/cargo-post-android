@@ -204,10 +204,22 @@ object AlertEngine {
         temperature: Int,
         wind: String,
     ): Pair<String, String> {
-        val prefix = when (severity) {
-            WeatherSeverity.HEAVY -> "⚠️ 恶劣天气预警"
-            WeatherSeverity.LIGHT -> "🌧 天气提醒"
+        // 图标必须跟**天况**走，不能只跟严重度走。以前 LIGHT 恒为 🌧，
+        // 于是"雾 / 霾 / 高温 / 低温"四种提醒在通知栏上都顶着一张下雨图 ——
+        // 真机 2026-10-15 用户截图就是这条：正文写「当前天气：雾」，图标是 🌧。
+        // 用户读到的信号是图，不是那行小字；图文对不上时人会先不信内容。
+        val glyph = when {
+            severity == WeatherSeverity.HEAVY -> "⚠️"
+            condition.contains("雪") || condition.contains("冰") || condition.contains("冻") -> "❄"
+            condition.contains("雾") || condition.contains("霾") || condition.contains("沙") -> "🌫"
+            condition.contains("雨") -> "🌧"
+            temperature >= 35 -> "☀"
+            temperature <= 0 -> "🧊"
+            else -> "⛅"
         }
+        val prefix = "$glyph " + (
+            if (severity == WeatherSeverity.HEAVY) "恶劣天气预警" else "天气提醒"
+        )
         val body = buildString {
             append("当前天气：$condition，气温 ${temperature}°C")
             if (wind.isNotEmpty()) append("，$wind")
