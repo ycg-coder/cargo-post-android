@@ -683,7 +683,7 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             // ⚠ 必须放在**这一块**里：上面那个 `Column(Modifier.weight(1f))`（:462）没有 verticalScroll，
             //   第一版把卡插在头部，内容一被加高就把下面整段顶出屏幕 —— 真机症状是"页面滑不动、
             //   收藏点不到"（我自己引入的回归，用户报上来的）。滚动区只有这一处。
-            vm.nearby?.stations?.firstOrNull()?.let { stop ->
+            pickBoardStation(vm.nearby?.stations.orEmpty(), vm.lines)?.let { stop ->
                 StationBoardCard(
                     station = stop,
                     arrivals = stationBoard(vm.lines, stop.name),

@@ -93,4 +93,16 @@ class StationBoardTest {
         assertTrue(stationBoard(lines, "").isEmpty())
         assertTrue(stationBoard(lines, "   ").isEmpty())
     }
+
+    @Test
+    fun `挑站要挑真查得到线路的那一站，不是最近的第一站`() {
+        // 复现真机 v86 的形状：附近第一站是现实公交站名，线路里只有项目点位名
+        val lines = listOf(line("347", "老厂", "菜园坝", stop("老厂首发"), stop("文峰公社", 6)))
+        val nearby = listOf(stop("综合实验楼(生物学院门口)(公交站)"), stop("文峰公社"))
+        val picked = pickBoardStation(nearby, lines)
+        assertEquals("文峰公社", picked?.name)
+        // 一站都配不上时退回最近站，让界面老实说"没查到"，而不是整块消失
+        assertEquals("综合实验楼(生物学院门口)(公交站)", pickBoardStation(nearby.take(1), lines)?.name)
+        assertNull(pickBoardStation(emptyList(), lines))
+    }
 }

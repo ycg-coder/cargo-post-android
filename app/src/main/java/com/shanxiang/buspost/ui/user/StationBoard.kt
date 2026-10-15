@@ -142,3 +142,14 @@ fun StationBoardCard(
         }
     }
 }
+/**
+ * 挑"哪一站拿来做站牌"。
+ *
+ * ⚠ 不能直接拿 `nearby.stations.first()`：真机实测（v86，10:58）最近那一站是
+ *   **现实公交站名**「综合实验楼(生物学院门口)(公交站)」，而线路的 `stations` 是项目线网的点位名，
+ *   两者不同源 ⇒ 精确同名匹配必然落空，站牌一上线就念"0 条途经"，等于没做。
+ * 所以按"哪一站真查得到途经线路"来挑：优先附近顺序里第一个有线路停靠的站；
+ * 一站都没有时退回最近站，让界面老实说"没查到"（那是一句真话，不是 bug 被藏起来）。
+ */
+fun pickBoardStation(nearby: List<Station>, lines: List<BusLine>): Station? =
+    nearby.firstOrNull { stationBoard(lines, it.name).isNotEmpty() } ?: nearby.firstOrNull()
