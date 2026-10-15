@@ -48,6 +48,7 @@ import com.shanxiang.buspost.core.net.Api
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusButtonVariant
+import com.shanxiang.buspost.core.ui.BusIconTap
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -1619,11 +1620,13 @@ private fun AddressModeCard(
                                     fontWeight = FontWeight.Medium,
                                 )
                             }
-                            Icon(
-                                BusIcons.close,
-                                null,
+                            BusIconTap(
+                                icon = BusIcons.close,
+                                contentDescription = "清空",
+                                onClick = { onClear() },
                                 tint = t.textTertiary,
-                                modifier = Modifier.size(16.dp).clickable { onClear() },
+                                iconSize = 16.dp,
+                                onClickLabel = "清空",
                             )
                         }
                     }

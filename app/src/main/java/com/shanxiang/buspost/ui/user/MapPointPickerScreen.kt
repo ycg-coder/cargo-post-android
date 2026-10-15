@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +96,16 @@ fun MapPointPickerScreen(
         val latLng = LatLng(geo.lat, geo.lng)
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
         updateMarker(map, marker, geo)?.let { marker = it }
+    }
+
+    // 缺陷 #77：这一页过去只 `onCreate`/`onResume`，离场从不 `onPause`/`onDestroy`
+    // ⇒ 高德的 SurfaceView 与纹理每开一次选点页漏一份（`BusMap` 早就按宿主对齐做了，这里补齐同一形状）。
+    DisposableEffect(mapView) {
+        val owned = mapView
+        onDispose {
+            owned?.onPause()
+            owned?.onDestroy()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {

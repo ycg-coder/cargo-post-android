@@ -37,6 +37,7 @@ import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
+import com.shanxiang.buspost.core.ui.BusIconTap
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -146,13 +147,12 @@ fun ParcelScreen(standalone: Boolean = false, vm: ParcelViewModel = viewModel())
                         modifier = Modifier.padding(top = 3.dp),
                     )
                 }
-                Icon(
-                    BusIcons.refresh,
-                    null,
+                BusIconTap(
+                    icon = BusIcons.refresh,
+                    contentDescription = "重新查询",
+                    onClick = { vm.load() },
                     tint = t.primary,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clickable { vm.load() },
+                    onClickLabel = "重新查询",
                 )
             }
 

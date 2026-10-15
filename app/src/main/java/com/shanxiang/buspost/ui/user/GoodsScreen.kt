@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.core.ui.NetworkImage
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusCard
+import com.shanxiang.buspost.core.ui.BusIconTap
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusLazyPage
 import com.shanxiang.buspost.core.ui.BusPullRefresh
@@ -274,10 +275,13 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                             icon = BusIcons.search,
                             trailing = {
                                 if (search.isNotEmpty()) {
-                                    Icon(
-                                        BusIcons.close, null,
+                                    BusIconTap(
+                                        icon = BusIcons.close,
+                                        contentDescription = "清空搜索",
+                                        onClick = { AppState.search.value = "" },
                                         tint = t.textTertiary,
-                                        modifier = Modifier.size(18.dp).clickable { AppState.search.value = "" },
+                                        iconSize = 18.dp,
+                                        onClickLabel = "清空搜索",
                                     )
                                 }
                             },
@@ -346,7 +350,7 @@ fun GoodsScreen(vm: GoodsViewModel = viewModel()) {
                     item { SectionTitle("今日在售", subtitle = "价格含班车运费，到村自提") }
                     // ⚠ 末行补位用 `cols - row.size` 而不是旧写法的 `if (row.size == 1)`：
                     // 旧写法只在 2 列时凑巧成立，列数一变末尾几张卡就会被拉宽到占满整行。
-                    itemsIndexed(vm.shown.chunked(goodsCols)) { _, row ->
+                    itemsIndexed(vm.shown.chunked(goodsCols), key = { _, row -> row.joinToString("-") { it.id.toString() } }) { _, row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             row.forEach { p ->
                                 GoodsCard(p, Modifier.weight(1f)) { nav.navigate(Routes.goodsDetail(p.id)) }

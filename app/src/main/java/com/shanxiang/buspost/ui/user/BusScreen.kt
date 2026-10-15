@@ -45,6 +45,7 @@ import com.shanxiang.buspost.core.net.safeApiCall
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
+import com.shanxiang.buspost.core.ui.BusIconTap
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -476,9 +477,13 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                     modifier = Modifier.padding(end = 8.dp),
                 )
             }
-            Icon(
-                BusIcons.refresh, null, tint = t.primary,
-                modifier = Modifier.size(22.dp).clickable { vm.load(context) },
+            // 缺陷 #77：原来只有 22dp 见方的一颗图标可点，命中区没撑到下限
+            BusIconTap(
+                icon = BusIcons.refresh,
+                contentDescription = "重新加载",
+                onClick = { vm.load(context) },
+                tint = t.primary,
+                onClickLabel = "重新加载",
             )
         }
 
@@ -494,10 +499,13 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                 icon = BusIcons.search,
                 trailing = {
                     if (vm.lineQuery.isNotEmpty()) {
-                        Icon(
-                            BusIcons.close, null,
+                        BusIconTap(
+                            icon = BusIcons.close,
+                            contentDescription = "清空搜索",
+                            onClick = { vm.lineQuery = "" },
                             tint = t.textTertiary,
-                            modifier = Modifier.size(18.dp).clickable { vm.lineQuery = "" },
+                            iconSize = 18.dp,
+                            onClickLabel = "清空搜索",
                         )
                     }
                 },

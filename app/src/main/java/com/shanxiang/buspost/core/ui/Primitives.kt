@@ -87,6 +87,41 @@ fun BusBackArrow(onBack: () -> Unit, tint: Color = Color.White, modifier: Modifi
 }
 
 /**
+ * 一枚**图标热区**：视觉可以小（默认 22dp），命中区必须撑到 [LocalBusTouch] 下限。
+ *
+ * 缺陷 #77 那一族：各屏自己写 `Modifier.size(18.dp).clickable { … }`（刷新、清空搜索词、编辑、删除…），
+ * 于是指尖要点 18dp 见方的地方 —— 手机上是 6mm，戴上手套或在车上颠着按就点不中，
+ * 点不中还会误触旁边那颗。UB-g/UB-h 钉的是"按钮状块"与"轮播视口"这两形，图标形一直没人管，
+ * 所以这里收成一份原语，配 UB-i 的判据（页面里 `.size(N.dp).clickable` 且 N 低于下限必须为 0）。
+ */
+@Composable
+fun BusIconTap(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp = 22.dp,
+    onClickLabel: String? = null,
+) {
+    val touch = LocalBusTouch.current
+    Box(
+        modifier
+            .defaultMinSize(touch.min, touch.min)
+            .clip(CircleShape)
+            .clickable(onClickLabel = onClickLabel, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
+/**
  * 站牌头：主题深板渐变 + 顶部落款横档 + 角落光晕，等价 app.wxss 的 .signpost。
  * 页面顶部通栏与卡片内均复用本原语。
  *
@@ -469,7 +504,10 @@ fun SkeletonCard(modifier: Modifier = Modifier, rows: Int = 3, leading: Boolean 
 /** 列表项阶梯入场：等价 .anim-rise + inline animation-delay */
 @Composable
 fun AnimatedEnter(index: Int = 0, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    var visible by remember { mutableStateOf(false) }
+    // 缺陷 #77：这里以前是 `remember` —— 列表项随滚动进出组合时 remember 会被丢掉，
+    // 于是"入场阶梯动画"每次滚回来都重播一遍（订单列表实测滑回去就重排一次淡入）。
+    // `rememberSaveable` 在外层 LazyList 给了稳定 key 的前提下能跨回收存活 ⇒ 只播第一次。
+    var visible by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (index > 0) kotlinx.coroutines.delay((index.coerceAtMost(8) * 45).toLong())
         visible = true

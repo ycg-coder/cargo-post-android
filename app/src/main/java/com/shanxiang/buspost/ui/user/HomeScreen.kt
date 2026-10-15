@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -67,6 +68,7 @@ import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
+import com.shanxiang.buspost.core.ui.LocalBusTouch
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.PriceText
 import com.shanxiang.buspost.core.ui.RoadLine
@@ -898,6 +900,9 @@ private fun LocationHintBar(
         )
     }
     val textColor = t.onPrimary
+    // 缺陷 #77：这几行状态条里的动作只有 12.5sp 一行字，命中区没撑到下限（指尖要点的是一整行文字的高度）。
+    // 动作全部按 UB 那套规矩走：**视觉不放大，命中区 `defaultMinSize` 撑到 48/56dp**。
+    val touch = LocalBusTouch.current
 
     when {
         fix.denied -> Bar {
@@ -913,7 +918,9 @@ private fun LocationHintBar(
                 color = textColor,
                 fontSize = (12.5f * scale).sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable(onClick = onOpenSettings).padding(horizontal = 4.dp),
+                modifier = Modifier
+                    .defaultMinSize(minHeight = touch.min)
+                    .clickable(onClick = onOpenSettings).padding(horizontal = 4.dp),
             )
             Icon(BusIcons.next, null, tint = textColor, modifier = Modifier.size(14.dp))
         }
@@ -931,7 +938,9 @@ private fun LocationHintBar(
                 color = textColor,
                 fontSize = (12.5f * scale).sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable(enabled = !relocating, onClick = onRelocate).padding(horizontal = 4.dp),
+                modifier = Modifier
+                    .defaultMinSize(minHeight = touch.min)
+                    .clickable(enabled = !relocating, onClick = onRelocate).padding(horizontal = 4.dp),
             )
         }
 
@@ -948,6 +957,7 @@ private fun LocationHintBar(
                 fontSize = (12 * scale).sp,
                 modifier = Modifier
                     .weight(1f)
+                    .defaultMinSize(minHeight = touch.min)
                     .padding(start = 7.dp)
                     .clickable(enabled = !relocating, onClick = onRelocate),
             )
@@ -956,7 +966,9 @@ private fun LocationHintBar(
                 color = textColor,
                 fontSize = (12 * scale).sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable(onClick = onManualPick).padding(horizontal = 4.dp),
+                modifier = Modifier
+                    .defaultMinSize(minHeight = touch.min)
+                    .clickable(onClick = onManualPick).padding(horizontal = 4.dp),
             )
             Icon(BusIcons.next, null, tint = textColor, modifier = Modifier.size(14.dp))
         }
@@ -969,6 +981,7 @@ private fun LocationHintBar(
                 fontSize = (12.5f * scale).sp,
                 modifier = Modifier
                     .weight(1f)
+                    .defaultMinSize(minHeight = touch.min)
                     .padding(start = 7.dp)
                     .clickable(onClick = onManualPick),
             )

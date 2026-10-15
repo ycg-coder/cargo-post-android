@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
+import com.shanxiang.buspost.core.ui.BusIconTap
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusPage
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -317,6 +319,7 @@ fun ProfileScreen(vm: ProfileViewModel = viewModel()) {
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(BusRadius.pill))
                                     .background(if (on) t.primaryLight else t.card)
+                                    .defaultMinSize(minHeight = LocalBusTouch.current.min)
                                     .clickable { vm.sex = value }
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
                             )
@@ -497,14 +500,22 @@ fun AddressScreen(vm: AddressViewModel = viewModel(), select: Boolean = false) {
                                 }
                             }
                             if (!select) {
-                                Icon(
-                                    BusIcons.edit, null, tint = t.textTertiary,
-                                    modifier = Modifier.size(19.dp).clickable { nav.navigate(Routes.addressEdit(a.id)) },
+                                BusIconTap(
+                                    icon = BusIcons.edit,
+                                    contentDescription = "编辑地址",
+                                    onClick = { nav.navigate(Routes.addressEdit(a.id)) },
+                                    tint = t.textTertiary,
+                                    iconSize = 19.dp,
+                                    onClickLabel = "编辑地址",
                                 )
                                 Spacer(Modifier.size(12.dp))
-                                Icon(
-                                    BusIcons.delete, null, tint = t.danger,
-                                    modifier = Modifier.size(19.dp).clickable { toDelete = a },
+                                BusIconTap(
+                                    icon = BusIcons.delete,
+                                    contentDescription = "删除地址",
+                                    onClick = { toDelete = a },
+                                    tint = t.danger,
+                                    iconSize = 19.dp,
+                                    onClickLabel = "删除地址",
                                 )
                             }
                         }
@@ -744,7 +755,10 @@ private fun RowScope.AreaColumn(items: List<String>, selected: Int, onPick: (Int
     LazyColumn(
         Modifier.width(108.dp).fillMaxHeight(),
     ) {
-        items(items.size) { i ->
+        // 缺陷 #77：懒列表没有 key 的行会在整列被换掉时按位置复用，选中态与文本错位一帧
+        // （省→市→区这一列正是"每次点父级就整列换掉"）。key 用「名字#位置」：
+        // 名字随内容变、位置兜住重名，不会因为后端给了两个同名区划而撞 key 崩掉。
+        itemsIndexed(items, key = { i, name -> "$name#$i" }) { i, _ ->
             val on = i == selected
             Box(
                 Modifier

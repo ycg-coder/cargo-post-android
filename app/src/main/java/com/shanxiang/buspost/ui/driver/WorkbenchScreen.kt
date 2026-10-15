@@ -619,6 +619,16 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
     val serviceHeading by Running.headingDegrees.collectAsStateWithLifecycle()
     val serviceWaiting by Running.waiting.collectAsStateWithLifecycle()
     val serviceFixAt by Running.fixAtElapsedMs.collectAsStateWithLifecycle()
+    // 缺陷 #77：下面这五条流程以前是在 `item(key = "report")` 里面就地 `collectAsStateWithLifecycle()`
+    // 取 `.value`（同一个流还和上面重复收了两个）。收在列表项里 ⇒ 那一格每次随列表进出组合都要重新
+    // 挂一遍收集器，而这张卡是**满屏九格读数**，等于滚动一次就多九个 collector。全部提到屏幕顶层，
+    // 一个流一个收集器，卡片只接现成的值。
+    val serviceLastError by Running.lastError.collectAsStateWithLifecycle()
+    val serviceProvider by Running.provider.collectAsStateWithLifecycle()
+    val serviceDropped by Running.dropped.collectAsStateWithLifecycle()
+    val serviceShiftNote by Running.shiftNote.collectAsStateWithLifecycle()
+    val serviceLocatorState by Running.locator.collectAsStateWithLifecycle()
+    val serviceAccuracy by Running.accuracyMeters.collectAsStateWithLifecycle()
     var verifyTarget by remember { mutableStateOf<PickupTask?>(null) }
     var code by remember { mutableStateOf("") }
     // 「扫码作业」大号三选一的开关：三种扫码动作收敛到这一处入口（见底部操作栏注释）
@@ -952,17 +962,17 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                         on = reportOn,
                         geo = serviceGeo,
                         reported = reported,
-                        waiting = Running.waiting.collectAsStateWithLifecycle().value,
+                        waiting = serviceWaiting,
                         intervalSec = Prefs.reportIntervalSec,
                         lastSuccessAt = Running.lastSuccessAt,
-                        lastError = Running.lastError.collectAsStateWithLifecycle().value,
+                        lastError = serviceLastError,
                         shiftId = Running.shiftId,
-                        fixAtElapsedMs = Running.fixAtElapsedMs.collectAsStateWithLifecycle().value,
-                        accuracyMeters = Running.accuracyMeters.collectAsStateWithLifecycle().value,
-                        provider = Running.provider.collectAsStateWithLifecycle().value,
-                        dropped = Running.dropped.collectAsStateWithLifecycle().value,
-                        shiftNote = Running.shiftNote.collectAsStateWithLifecycle().value,
-                        locatorState = Running.locator.collectAsStateWithLifecycle().value,
+                        fixAtElapsedMs = serviceFixAt,
+                        accuracyMeters = serviceAccuracy,
+                        provider = serviceProvider,
+                        dropped = serviceDropped,
+                        shiftNote = serviceShiftNote,
+                        locatorState = serviceLocatorState,
                         onToggle = { want ->
                             if (want) {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)

@@ -1578,7 +1578,7 @@ TH-j 1/1/0 · TH-k 1/1 · TH-l 2/2/0）；负控十三本**全批复跑** rc 全
    （清单见 `THIRD_PARTY_NOTICES.md` §6 F-1 段、状态板 DONE「F-1」的"改动面清点"、审计 §80 七）。
 
 尾巴（在册，不当已通过）：`apiCall` 生产调用点仍 **0**（只登记不谎称已用）；`runCatching` 在 main 仍剩 **34** 处
-（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1067` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
+（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1077` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
 记为"未收"而不是"已判无害"）；§二十 的 Worker 重试语义（真失败回 `retry` 而不是 `success`）**没做**；
 §三十三 的四类失败分型仍只是台账口径，**没落进代码**；设备侧一律 `NOT VERIFIED ON DEVICE`
 （真实取消来自手指划走页面 / Worker 被系统停止 / 进程被杀，JVM 只能造 `cancelAndJoin` 与 `withTimeoutOrNull` 两种）；
@@ -5692,7 +5692,7 @@ id=35 那个 `endpoint=http://www.baidu.com` 的假配置确实存在，但**没
 两个天气生产者（高德实况那一路、open-meteo 那一路）各自调它一次；
 **改后**这两处填两份说法的落点是 `Repo.kt:364`（高德）与 `Repo.kt:462`（open-meteo），本轮实测；
 `WeatherInfo` 只有一个 `tips` 字段 ⇒ 结构上就没有"第二份说法"的位置。
-而 `Repo.weather` 的唯一调用点在用户端首页（`HomeScreen.kt:210`）⇒ **司机工作台既不取也不显示天气**。
+而 `Repo.weather` 的唯一调用点在用户端首页（`HomeScreen.kt:212`）⇒ **司机工作台既不取也不显示天气**。
 所以用户那句"天气提醒司机和用户应该文案不一样"实际缺两样：第二份说法 + 司机端那一栏。
 
 **改了什么**
@@ -5858,7 +5858,7 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
 `shortcuts.xml` 与 `widget_next_bus_info.xml`）；后端 `grep -riE "app_?version|checkUpdate|forceUpdate"` **0 命中**；
 CI 那份 `build-and-release.yml` 只有 `upload-artifact`，**从来不创建 Release**，顶层 `permissions: contents: read`；
 `gh release list` 退出 0 且**输出为空** ⇒ 仓库里一条发布都没有。
-"我的"页只有一行只读的版本号（`MinePages.kt:1051 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
+"我的"页只有一行只读的版本号（`MinePages.kt:1065 InfoRow("版本", BuildConfig.VERSION_NAME)`）。
 
 **按用户口径做的取舍**：数据源**只有 GitHub Releases**（用户选定），不新增后端版本表 —— 多一跳只会把"这一句来自哪一路"抹平，
 同 #41/#42 那条理由。代价如实登记在下面"仍欠"。
@@ -6216,7 +6216,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 5. `mission_route_negative_controls.sh` + `check_mission_route_probes.sh`：MR-c 五条整族重锚（那五句全被 8387929 改短）；
    新增 `MR_C6`＝`这次没问到：$failure`（目标 1）——括号里那半句免责有 `MR_C3` 钉，而**括号前**那半句被换成
    "后端没有可用路线"时 `MR_C3`/`MR_CT` 都不动；MR-e 两处按新缩进重锚；MR-i 重试入口改成**按窗口定位**——
-   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:846` 有路线支 / `:861` 失败支），
+   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:840` 有路线支 / `:855` 失败支），
    按"第一处"删会删错支，而 `MRI_RETRY` 只数失败支那 12 行 ⇒ 那是一条**注入了但打错地方**的破口（`red` 的字节比对挡不住）。
 6. `mission_route_test_negative_controls.sh` MT-2、`navigation_test_negative_controls.sh` 的 M14/M24/M25/M27/M28/M29/M30/M31
    重锚（全是话术字面被顶掉）。⚠ 这两本都是"第一条落空就 exit 2"，所以**报错那条之后的破口连跑都没跑过**
@@ -8081,3 +8081,36 @@ EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / 
 
 读数：`compileDebugKotlin` rc=0；`check_safe_call_probes.sh` SA-g=1/0/0/1 绿、
 `check_caliber_probes.sh` KL-g=1/1/1/1 绿、`safe_call_negative_controls.sh` 破口 29/29 + 自检 3 条全过。
+
+### D-123（10-16 01:5x–02:2x）· #77 图标热区、懒列表 key、入场动画重播、项内收集器、MapView 不释放
+
+五件"看着没事、用着有事"的形状，一起收并立成第 42 本判据 `tools/check_ui_hygiene_probes.sh`（UH-a…UH-f）。
+
+① **图标热区**：页面里有 7 处 `Modifier.size(16~22.dp).clickable { … }`（两处清空搜索、两处刷新、
+地址编辑/删除、性别档位），指尖要点的是一整颗图标的面积 —— 18dp ≈ 6mm，车上颠着按点不中，
+点不中还会误触旁边那颗。新增原语 `BusIconTap`（视觉不放大，命中区 `defaultMinSize` 撑到 `LocalBusTouch.min`），
+7 处全部走它；同一族里 `HomeScreen` 那三条状态条的动作是**文字**（`去设置`/`重新定位`/`手动选择位置`），
+就地加 `defaultMinSize(minHeight = touch.min)`，不改排版只撑命中区。
+② **懒列表 key**：10 处 `items/itemsIndexed` 里 9 处带 key，缺的那处是地址表单的省/市/区那一列
+（整列随父级替换）⇒ 补 `key = { i, name -> "$name#$i" }`：**名字随内容变、位置兜住重名**，
+不会因为后端给了两个同名区划而撞 key 崩页面。判据钉"带 key 数 == 调用点总数 且 总数 ≥10"。
+③ **入场动画重播**：`AnimatedEnter` 的"已入场"以前是 `remember` —— 列表项随滚动进出组合时会被丢掉，
+于是订单列表每滚回来重播一遍阶梯动画。改 `rememberSaveable`（外层两处列表本来就有稳定 key）。
+④ **收集器长在列表项里**：工作台报告卡那 9 个读数以前在 `item(key = "report")` 的参数里就地
+`flow.collectAsStateWithLifecycle().value`，其中两条还与屏幕顶层**重复收同一个流** ⇒ 那一格每进一次组合
+多挂一批收集器。全部提到屏幕顶层（一个流一个收集器），卡片只接值；全工程 `.value` 就地收流现读 0。
+⑤ **MapView 不释放**：选点页 `MapView(ctx).apply { onCreate; onResume }` 而从不 `onPause/onDestroy`
+⇒ 高德那块 SurfaceView 每开一次漏一份。补 `DisposableEffect(mapView)`，与 `BusMap` 同一形状。
+
+**判据与负控**：`tools/ui_hygiene_negative_controls.sh` 7 把全咬（含一条"把 core/ui 的 `defaultMinSize`
+整体改名"的反证自身破口 —— UH-b 那个 0 必须是"真的没有"，不能是"这套写法压根不在仓里"）。
+两处本轮踩到并写进脚本的坑：**(a)** 反证的替换文本里不许带被判图案（`fun BusIconTap(` → `fun BusIconTapRenamed(`
+是自匹配，判据照样数到 1 ⇒ 假失效；改成 `fun IconTapBoxRenamed(` 才咬住）；**(b)** 反证注入要打在**整个目录**上时
+不能拿单文件 `swapall` 去改一个目录路径 —— 第一次它开了目录句柄抛 `PermissionError`，却被 `||` 分支报成
+"锚点没命中"（**报错信息掩盖了成因**，这是"护栏 fail open"的又一形）。
+
+**读数**：`compileDebugKotlin` rc=0；全量 **tests=752 failures=0 errors=0**（73 份 XML，newest 02:17:20）；
+判据簿 **42 本 rc≠0 = 0**；UH 实测 `1/7 · 0（反证 14）· 10/10 · 1/0 · 0/48 · 1/2`；
+台账锚点：机械搬 5 条 + 人工搬 1 条（那句"两处一模一样的 onReplan"，WorkbenchScreen 的两处从 846/861 搬到
+840/855 —— 后者是**裸续号**，重锚工具按规矩不碰裸编号，所以那半句是手工改的）；
+复读 **新增 0 / 消失 0 / ID-MISS 273 / anchors 1487**。
