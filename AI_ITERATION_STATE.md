@@ -13,12 +13,14 @@
   `SensitiveDataMaskTest` 4——这 4 条以前从没真跑过，因为编译就断了）。**新规矩：每个后端提交推之前先本地编译该模块并读 `MVN_RC`。**
 - **红是被 CI 记着的，不是我说的**：run 38869518615（head `0c7a47f2`）= backend failure，其余 changes/drift-check/frontend 三作业 success。
   修在 `064d66b8`（一个词：`UNKNOWN_SHAPE_KEEP` 声明成了 `String`）。教训同形于前端那条"ts:check 绿 ≠ 模板验过"：**判据脚本读的是源码文本，它绿不等于能编译**。
-- **#60 客户端这一半第一次在真机上跑过**（v106→v107，同签名 release 覆盖装，`firstInstallTime` 仍是 10-15 ⇒ 没卸载、数据没清）：
-  选片器在 HyperOS 上可用（`com.android.photopicker`，单选回值无额外确认），选完念"已选 1 张，点击重选"；
-  **咬到一条真缺陷**：重开选片器再按返回 ⇒ 回调给 null、旧代码 `picked = it` 把刚拍的那张静默清掉，页面回到"从没选过"那一形。
-  已改 `it ?: picked` 并同序列重跑（凭证 `tmp/device_v107_cancel_keeps_photo.png`）。EX-m 两格进判据簿，两把反证都红在该管的一格
-  （第一版反证用的是 drop，**drop 只给锚点那几个字加注释、行尾原样留着 ⇒ 判据照样绿**，是假反证，换 swap 才真红）。
-  ⚠ **提交那一格仍未验**：按下会往共享云写一条真异常（段转异常 + 通知管理员），而接受 `photoUrl` 的后端在 PR #195 上没部署；等合入后跑。
+- **#60 客户端形状第一次在真机上跑过**（v106→v107 同签名覆盖装，`firstInstallTime` 不变 ⇒ 没卸载、数据没清）：
+  HyperOS 上 `com.android.photopicker` 可用、单选直接回值；**咬到一条真缺陷**——重开选片器按返回会把刚拍的那张静默清掉（旧代码 `picked = it`），
+  改 `it ?: picked` 后同序列重跑通过（EX-m 两格 + 两把反证；反证第一版用 drop 是空转的，见 D-138）。
+- **#60 的提交那一格在真机上跑通了**（v107/v108 各一次真提交，后端回读把段念成"异常（不可再报）"，状态来自回读而非本机自封）；
+  同时暴露一条新的：**照片传不上去，而回执说不出原因**，且那一段的提交机会已经用掉 ⇒ v108 起 `photoDropText(why)` 把原因带出来
+  （EX-a 12→14、EX-n 三格 1/1/1、反证两把各红在该格、本簿 30 把全绿；全量 **tests=764 failures=0 errors=0**、dex 里逐字节串扫到新句子 1 命中）。
+  ⚠ **那句原因还没在真机上取到**（这个班次两段都已转异常，没有可报段了）；且云上还没部署接受 `photoUrl` 的那版 ⇒ 事件流那一格现在必然仍为空。
+  路由本身活着：`POST /api/app-api/infra/file/upload` 无 token 回 `{"code":401,"账号未登录"}`（我第一次探针漏了 `/api` 前缀，差点误判成 nginx 405）。
 - **#96 修完并实测**：新 helper `tools/ensure_test_xml.sh`（缺产物就真跑一次**无过滤**全量，禁快照还原；必须走 Y:/Z: ASCII runner，
   裸 gradlew 在中文路径下是环境假失败）。验证形状：删掉一本的 XML（74→73）再跑那本书 ⇒ 自动全量 29s、`tests=762 failures=0 errors=0`、
   XML 回 74、`NW-h 14/0/0`、rc=0。
