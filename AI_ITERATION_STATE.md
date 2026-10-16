@@ -22,8 +22,10 @@
 - **#96 修完并实测**：新 helper `tools/ensure_test_xml.sh`（缺产物就真跑一次**无过滤**全量，禁快照还原；必须走 Y:/Z: ASCII runner，
   裸 gradlew 在中文路径下是环境假失败）。验证形状：删掉一本的 XML（74→73）再跑那本书 ⇒ 自动全量 29s、`tests=762 failures=0 errors=0`、
   XML 回 74、`NW-h 14/0/0`、rc=0。
-- **#90 走了一半**：本地 release 现在真带签名（`storeFile` 解析补成认两种形状；`apksigner` 读回 SHA-256 `32d02b97…0045b39f` 与在册指纹一致）。
-  **CI 那一半没做**：没有任何一步验"发出去的产物签过名"，上传还是 `ls *.apk | head -1`。
+- **#90 收口**（`a04a355`，台账 D-139）：新闸 `tools/release_artifact_signed_gate.sh` 三条 fail closed（恰好一只 / 验签过 / 证书等于在册指纹），
+  排在"扫包取证"之后、上传之前；发布那一步的 `ls *.apk | head -1` 改成固定名 + 存在性检查。
+  反证 7 把本机全跑在真产物上（K1 绿、K2–K5 红、K6–K7 rc=2）；K7 第一版是空转的——判据找工具的三个来源我只关了前两个。
+  ⚠ 文件名**故意不带 `check_` 前缀**：verify 作业的 `for s in tools/check_*.sh` 没有 release 产物，被 glob 抓到就会以 rc=2 逼我加第三本豁免。
 - **装包这一格**：`pm install -r -t /data/local/tmp/xxx.apk` 两轮都是直接 `Success`，**MIUI 那个"继续安装"倒计时对话框只在 `adb install` 流式安装时才出现**
   —— 我先按配方写了点框脚本，结果是空转的一份代码；这条记下来省下一轮。
 - **并行那条线（AI 辅助）已经在同一个工作树里动了码**：`yudao-module-ai-assist/`（10 个文件，0 条用例）、`V050__ai_event_calendar.sql`、
@@ -33,8 +35,8 @@
   K1–K6 六把刀；工作树现读判 2 组（真撞车），干净 HEAD 导出判 0 组（CI 看到的是这一面）。
 - **推送与 PR**：分支 `ci/admin-gates-2026-10-16` 已推到 `5abba2f9`（`git ls-remote` 实测 == 本地 HEAD）；
   PR #195 提交数在推之前实读 **23**（`gh pr view 195 --json commits`），这轮又加 3 ⇒ 待 CI 复跑后重读。**master 未动、未合、未写库**。
-- **仍在册**：#90 只剩 CI 那一半（验产物已签名 + 上传别用 `ls *.apk | head -1`）、#93 的维护页那一半（页面在并行那一套里，要先改指向 `/transport/town-event/*`）、
-  #94/#95 两项非 AI、#71 生产排序键（算法码按用户明令不提交）、#25/#31/#81 等人拍板。
+- **仍在册**：#93 的维护页那一半（页面在并行那一套里，要先改指向 `/transport/town-event/*`）、
+  #94/#95 两项非 AI、#71 生产排序键（算法码按用户明令不提交）、#25/#31/#81 等人拍板；#98 等并行那条线按契约 §6.1 收手。
 - **`tmp/` 不许随手清**（我早先把它列进"收尾要清的垃圾"，实测推翻）：`cargo-post-android/tmp/` 210 个文件被 `DECISION_LOG.md` 引用 **171 处**，
   那是留档证据而不是垃圾。要清得先迁进受版本控制的证据目录。
 
