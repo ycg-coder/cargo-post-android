@@ -8558,3 +8558,12 @@ TS1003/TS1005/TS1128。同时 `ci.yml` 里被我重复插入过一条同名步�
 顺带 eslint 对新写的三个 `el-alert` 报出 4 条 `vue/first-attribute-linebreak`，按项目风格改成属性换行，
 使"本轮新增 warning = 0"成立。收口读数：`vue-tsc` 全量 rc=0 / 0 错、两文件 eslint 0 error 0 warning、
 七本静态闸全 rc=0；**没做浏览器点验**（这几格要真实交互才看得见）。
+
+**收口时又抓到一条自己的工务错（值得单独记，因为它骗过了"看 staged 清单"这一步）**：
+`4c59843b` 那次 `git add` 逐个文件名列了 7 个改站点调用的文件，`git diff --cached --name-only` 也确实列出
+`route/RouteForm.vue` —— 但**提交里那个 blob 没有我的改动**（`git show <sha>:<file> | grep -c stationDict` = 0，
+其余 6 个都是 3）。也就是说"文件在暂存清单里"≠"内容进去了"。
+补一笔 `cbb21975` 之后逐文件核过提交 blob 才收工。
+⇒ 固定动作改一条：**批量提交后要按文件读提交里的 blob**（`git show HEAD:<path> | grep -c 新标记`），
+不要只看 `git status` 干净或 `--stat` 里有这个文件。与"改动没落盘却照样投作业"是同一族，只是这次
+伪装得更像：暂存清单是对的、文件列表是对的、只有内容不是。
