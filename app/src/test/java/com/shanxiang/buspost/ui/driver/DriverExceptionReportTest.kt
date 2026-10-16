@@ -127,4 +127,21 @@ class DriverExceptionReportTest {
         assertEquals("单号尾 TO7 · 第 3 段 · 已完成（不可再报）", legOptionTitle(done, actionable = false))
         assertEquals("单号尾 TO7 · 第 3 段「已完成」", legReceiptText(done))
     }
+
+    /**
+     * 请求体里 `photoUrl` 的纪律（队列 #60）：**上传成功才带这个键**。
+     * 后端那一格是「没带就不写」，带空串等于让事件流里出现一条指向空地址的照片 ——
+     * 事后查的人会说「司机传了张空照片」，而真相是他没传 / 没传上去。
+     */
+    @Test
+    fun `照片没上传成功时请求体里不留 photoUrl`() {
+        assertEquals(setOf("remark"), exceptionActionBody("车辆故障：爆胎", "").keys)
+    }
+
+    @Test
+    fun `照片上传成功后 photoUrl 随同一条上报出去`() {
+        val body = exceptionActionBody("车辆故障：爆胎", "https://x/exception-9711.jpg")
+        assertEquals(setOf("remark", "photoUrl"), body.keys)
+        assertEquals("https://x/exception-9711.jpg", body["photoUrl"])
+    }
 }

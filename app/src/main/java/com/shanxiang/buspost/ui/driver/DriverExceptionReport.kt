@@ -6,10 +6,13 @@ import com.shanxiang.buspost.data.model.TransportLeg
  * 指令 §54 的七个异常分类。
  *
  * **这是客户端的选项目录，不是后端枚举** —— 契约是实测来的：`AppDriverLegActionReqVO` 只有
- * `driverId / legId(@NotNull) / photoUrl / remark` 四个字段，`DriverAppServiceImpl#legAction` 的
- * `case "exception"` 只把 `reqVO.getRemark()` 交给 `reportLegException`，整条链路上没有任何异常类型码。
+ * `driverId / legId(@NotNull) / photoUrl / remark` 四个字段，**没有任何异常类型码**。
  * §54 原文因此写死了边界："先读取真实 enum。不要自己发一套后端无法接受的 type。"
  * 于是分类**落在 remark 文本的开头**，后台告警、订单事件时间线、用户通知读到的都是同一句话。
+ *
+ * ⚠ 旧版这里还写着"`case "exception"` 只把 remark 交给 reportLegException、照片无人接"——
+ *   那句到今天不再成立：队列 #60 之后，后端把 `photoUrl` 记进订单事件的 `extra_data`，
+ *   后台订单详情的时间线会画出来。类型码这件事没变（仍然只有自由文本 + 一张照片）。
  */
 internal enum class DriverExceptionReason(val label: String) {
     VEHICLE_FAULT("车辆故障"),
@@ -34,6 +37,15 @@ internal enum class DriverExceptionReason(val label: String) {
  * 200 同时也是通知气泡里能读完的长度。**上限输入由 UI 侧限住，这里只做最后一道截断。**
  */
 internal const val EXCEPTION_REMARK_MAX = 200
+
+/**
+ * 异常上报的请求体（队列 #60）。`photoUrl` **只在真的上传成功时才带**：
+ * 后端那一格是"没带就不写"（与交接确认 `photoUrl` 同一条纪律），传空串会把这一格写成一条空地址，
+ * 事后看起来像"司机传了一张没有内容的照片"。
+ */
+internal fun exceptionActionBody(remark: String, photoUrl: String = ""): Map<String, String> =
+    if (photoUrl.isEmpty()) mapOf("remark" to remark)
+    else mapOf("remark" to remark, "photoUrl" to photoUrl)
 
 /** 选定分类后，补充说明最多还能写多少字（`：` 占一位） */
 internal fun exceptionDetailBudget(reason: DriverExceptionReason?): Int =

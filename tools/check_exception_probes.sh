@@ -90,8 +90,15 @@ EJ=$(grep -n 'legOptionTitle(leg' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 EJ2=$(grep -n 'legReceiptText(back)' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 EJ3=$(grep -n '第 ${.*} 段' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 EJ4=$(grep -cF '?: "单号未给 · "' "$RP")
+# EX-k 现场照片的键纪律（队列 #60 / 台账 D-135）：后端那一格是「没带就不写」。
+#   ① 空串不写键这条判断必须在（=1）：删掉它，事件里就会出现一条指向空地址的照片，
+#      事后查的人会说「司机传了张空照片」，而真相是他没传 / 没传上去；
+#   ② 页面里不许内联拼 "photoUrl" 键（=0）：同一份键两处各拼一份就是两条可以各自漂移的契约，
+#      与后台 api 层今天刚清掉的「同端点两个包装」同病。
+EK=$(grep -cF 'if (photoUrl.isEmpty()) mapOf("remark" to remark)' "$RP")
+EK2=$(grep -n '"photoUrl" to' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 
-echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥10/≥6）"
+echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥12/≥6）"
 echo "EX-b legAction 出口/页面自发热请求   = $EB/$EB2 （目标 1/0）"
 echo "EX-c 自造 type 键/三键集合契约        = $EC/$EC2 （目标 0/1）"
 echo "EX-d 分类条目数/缺失标签数            = $ED/$ED_MISS （目标 7/0）"
@@ -102,9 +109,13 @@ echo "EX-g 幂等闸拦下那一格：分支在/句里宣布已提交 = $EG4/$EG
 echo "EX-h 本机自改状态的 copy()            = $EH （目标 0）"
 echo "EX-i 终态守卫字面量（出网前/按钮/入口/选段） = $EI/$EI2/$EI3/$EI4 （目标 1/1/1/1）"
 echo "EX-j 消歧调用（选段行/回执）·页面残留直出串·缺单号兜底 = $EJ/$EJ2/$EJ3/$EJ4 （目标 1/1/0/1）"
+echo "EX-k 照片键纪律（空串不写键 / 页面不内联 photoUrl） = $EK/$EK2 （目标 1/0）"
 
 fail=0
-[ "$EA" -ge 10 ] || { echo "× EX-a 纯函数用例少于 10 条（含 #43 的三条消歧用例）"; fail=1; }
+# ⚠ 下限 10 → 12（2026-10-16，D-135）：#60 给照片键纪律补了两条具名用例，文件实读 12 条 @Test。
+#   不抬的话"注释掉一条用例"这种破口注进去仍然绿 —— 本轮就是负控自己报出来才看见的
+#   （EX-a 第一条：✘ 负控制失效（exit 0））。下限只按实跑的条数抬，不按估、不按"大概十几条"。
+[ "$EA" -ge 12 ] || { echo "× EX-a 纯函数用例少于 12 条（含 #43 三条消歧 + #60 两条照片纪律）"; fail=1; }
 [ "$EA2" -ge 6 ] || { echo "× EX-a 契约用例少于 6 条（报文与回执没人钉）"; fail=1; }
 [ "$EB" = 1 ]    || { echo "× EX-b 异常上报不再走 Repo.legAction 单一出口（幂等闸与 401 收口都会被绕过）"; fail=1; }
 [ "$EB2" = 0 ]   || { echo "× EX-b 司机页面开始自己 Api.post：绕过闸门、绕过会话失效处理"; fail=1; }
@@ -132,6 +143,8 @@ fail=0
 [ "$EJ2" = 1 ] || { echo "× EX-j 提交回执不再带订单标识：回读那句仍然认不出是哪张单"; fail=1; }
 [ "$EJ3" = 0 ] || { echo "× EX-j 页面里回来了手写的「第 N 段」直出串（$EJ3 处）：段序是单内序号，跨单必歧义"; fail=1; }
 [ "$EJ4" = 1 ] || { echo "× EX-j 缺单号的兜底句被删：没单号时会退回只念段序，正是缺陷 #43 的写法"; fail=1; }
+[ "$EK" = 1 ]  || { echo "× EX-k 「照片没传上就不写 photoUrl」这条判断没了：事件里会留下指向空地址的凭证"; fail=1; }
+[ "$EK2" = 0 ] || { echo "× EX-k 页面里又内联拼了 photoUrl 键（$EK2 处）：一份键两处拼，改一处漏一处"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "§54 异常上报判据通过"; else echo "§54 异常上报判据失败"; fi
 exit "$fail"

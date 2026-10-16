@@ -76,7 +76,9 @@ echo "[基线] $(echo "$BASE" | tail -1)"
 kill_test "$TR"; ctl EX-a "纯函数用例被注释掉一条"
 kill_test "$TC"; ctl EX-a "契约用例被注释掉一条"
 
-drop "$DS" 'val ack = Repo.legAction(LegDriverAction.EXCEPTION.api, leg.legId, mapOf("remark" to remark))'
+# ⚠ D-135 重锚：提交体改走 exceptionActionBody 这个纯函数出口（照片键的纪律要能被 JVM 用例钉住）。
+#   旧锚点匹配不上 ⇒ drop 报 ANCHOR-MISS 并退 2（本轮实测：整本在 EX-b 那一站就断在这里）。
+drop "$DS" 'val ack = Repo.legAction(LegDriverAction.EXCEPTION.api, leg.legId, exceptionActionBody(remark, uploaded))'
 ctl EX-b "页面不再经 Repo 单一出口"
 
 after_line() { python - "$1" "$2" "$3" <<'PY'
@@ -102,6 +104,13 @@ ctl EX-d "§54 的分类标签被改写"
 
 swap "$RP" $'    HANDOVER_IMPOSSIBLE("无法交接"),\n' ''
 ctl EX-d "§54 的七项少了一项"
+
+swap "$RP" 'if (photoUrl.isEmpty()) mapOf("remark" to remark)' \
+     'if (photoUrl.isEmpty()) mapOf("remark" to remark, "photoUrl" to photoUrl)'
+ctl EX-k "空串也写 photoUrl：事件里会出现一条指向空地址的凭证"
+
+after_line "$DS" 'val ack = Repo.legAction(' '        val inlinePhoto = mapOf("photoUrl" to uploaded)'
+ctl EX-k "页面自己内联拼 photoUrl：同一份键两处可以各写各的"
 
 swap "$RP" 'internal const val EXCEPTION_REMARK_MAX = 200' 'internal const val EXCEPTION_REMARK_MAX = 2000'
 ctl EX-e "remark 上限被抬到后端列宽之外（超限=1406=整笔回滚）"

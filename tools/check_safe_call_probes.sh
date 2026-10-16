@@ -80,7 +80,9 @@ D_EMPTY_PROOF=$(grep -c 'emptyList()' "$REPO")
 #   （Repo 预报解析 / 算路受理 / 深链跳转 / TTS 设语种，逐点归因见 docs/android/RUNCATCHING_AUDIT.md 第二节）。
 # ⚠ **11 已经不是今天的数**（D-082 的 SA-d 空转闸门就是这个）：那句"抬完之后'顺手删掉一处'照样红"当时写在
 #   第 76 行的注释里，而负控第 10 条实测**没红** —— 因为下限离实测差着 3 处，删一到三处都不咬。
-#   现在改成**恰好 14**，并把 14 处逐点列在下面（正面枚举就是归因；行号是 **2026-10-16 #78 之后**重量的——
+#   现在改成**恰好 15**（2026-10-16 #60：异常上报页给现场照片上传新加的那一处 attempt 进了这张表 ⇒ 14+1；
+#   口径没变——多一处仍要同轮登记，少一处仍要红），并把 15 处逐点列在下面（正面枚举就是归因；
+#   行号是 **2026-10-16 #78 之后**重量的——
 #   上一版这张表里有两处 `BusPostRoot.kt:118 公告 / :119 附近公交`，那就是 #78 第二格撤掉的闪屏预取，
 #   16−2=14；同轮还修了一处**假注释入口**：`BusPostApp.kt:42` 当年被标成"开屏预取"，
 #   它一直是前台 30 秒轮询里的那一次 `attempt { AlertEngine.check(..) }`（任务 #62 那一族的又一形）。
@@ -94,9 +96,13 @@ D_EMPTY_PROOF=$(grep -c 'emptyList()' "$REPO")
 #     ui/driver/DriverSdkNavCard.kt:270 算路 / ui/driver/HandoverScreen.kt:169 交接照片
 #     ui/driver/HandoverScreen.kt:183 签名图上传（#20 阶段 B：与 :169 的照片同一纪律——
 #       签了却没传上去就必须拦停提交，已完成的交接补不进签名，所以它也要在取消可达作用域里跑）
-#   ⚠ 这条判据的"多一处"本意是"新开一个不走 safeApiCall 的网络读"——上面两处（UpdateDialog、签名上传）
-#   确实都是**不走 safeApiCall 的直连读**（一个 GitHub 资产、一个 infra 文件上传），所以按口径收进表里，
-#   而不是把判据放宽；两处各自有 UI 层的拦停/回执判据兜着（update 簿 U-*、信封簿 E-i）。
+#     ui/driver/DriverExceptionScreen.kt:173 异常现场照片上传（#60：与上面两处同一个 infra 直连上传口，
+#       但出口**不同** —— 照片传不上去不拦异常上报（异常必须先到调度，少一张只是取证不全），
+#       只在回执里明说"照片没传上去"；所以这里用 attempt + getOrDefault("")，不是 getOrThrow）
+#   ⚠ 这条判据的"多一处"本意是"新开一个不走 safeApiCall 的网络读"——上面三处（UpdateDialog、签名上传、
+#   异常现场照片）确实都是**不走 safeApiCall 的直连读**（一个 GitHub 资产、两个 infra 文件上传），
+#   所以按口径收进表里，而不是把判据放宽；
+#   三处各自有 UI 层的拦停/回执判据兜着（update 簿 U-*、信封簿 E-i、异常簿 EX-k）。
 #   再加/再删一处都要同轮改这个数并把该点列进上面这张表（与 TH-f 同一条数，两本不许各说一套）。
 D_ATTEMPT_REPO=$(grep -rn 'attempt {' "$REPO" | grep -vE "$NC" | wc -l | tr -d ' ')
 D_ATTEMPT_FORECAST=$(grep -cF 'val forecast = attempt {' "$REPO")
@@ -198,7 +204,7 @@ echo "SA-c 使用点合计                            = $USE （目标 6：Repo 
 echo "SA-c 五个迁移点点名                        = logout/weather/linePolyline/unread/driverUnread = $C_LOGOUT/$C_WEATHER/$C_POLY/$C_UNREAD/$C_DUNREAD （目标各 1）"
 echo "SA-c 页面消费点                            = $C_VM （目标 1）"
 echo "SA-d 伪装形状 ?: return emptyList()        = $D_EMPTY （目标 0）/ 反证 emptyList() 在 Repo = $D_EMPTY_PROOF"
-echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/恰好 14）"
+echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/恰好 15）"
 echo "SA-d linePolyline 出口 getOrThrow / 签名    = $D_THROW/$D_SIG （目标 1/1）"
 echo "SA-e 页面状态：声明/复位/分类/文案        = $E_DECL/$E_RESET/$E_CLASS/$E_REASON/$E_SUB （目标 1/2/1/2/1）"
 echo "SA-e 旧形状三处（必须归零）                = $E_OLD_CALL/$E_OLD_SUB/$E_OLD_REASON （目标 0/0/0）"
@@ -233,7 +239,7 @@ fail=0
 [ "$D_ATTEMPT_REPO" = 2 ] || { echo "× SA-d Repo 的 attempt 是 $D_ATTEMPT_REPO 处（D-076 之后实测 2 = 预报解析 + 续期）：多出来的是网络读退回旧 helper（分类丢失），少掉的是那两处点名被换形"; fail=1; }
 [ "$D_ATTEMPT_REFRESH" = 1 ] || { echo "× SA-d 续期那处 attempt 的字面量不见了（=$D_ATTEMPT_REFRESH≠1）：第二格豁免要么被扩大，要么已被换形"; fail=1; }
 [ "$D_ATTEMPT_FORECAST" = 1 ] || { echo "× SA-d Repo 唯一的 attempt 不是 ⑨ 点名的预报解析段（整行字面量不见了）：豁免面必须点名，否则'有 1 处'会被用来藏任意 1 处"; fail=1; }
-[ "$D_ATTEMPT_MAIN" = 14 ] || { echo "× SA-d 全 main 的 attempt 是 $D_ATTEMPT_MAIN 处（**恰好 14**，2026-10-16 #78 重量后逐点枚举见本簿上方 SA-d 注释：16−2 = 撤掉的闪屏预取两处；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删掉一~三处都不红 = D-082 的空转闸门）：少一处就是 Worker/定位/引擎那几处被顺手改回 runCatching（取消被吞），多一处就是有人新开了一个不走 safeApiCall 的网络读又没登记"; fail=1; }
+[ "$D_ATTEMPT_MAIN" = 15 ] || { echo "× SA-d 全 main 的 attempt 是 $D_ATTEMPT_MAIN 处（**恰好 15**，2026-10-16 #78 重量后逐点枚举见本簿上方 SA-d 注释：16−2=14 是撤掉的闪屏预取两处，+1 是 #60 异常上报页的现场照片上传；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删掉一~三处都不红 = D-082 的空转闸门）：少一处就是 Worker/定位/引擎那几处被顺手改回 runCatching（取消被吞），多一处就是有人新开了一个不走 safeApiCall 的网络读又没登记"; fail=1; }
 [ "$D_THROW" = 1 ] || { echo "× SA-d linePolyline 的出口不是 getOrThrow（Repo 内 $D_THROW 处）：失败与后端回空又混成一个值"; fail=1; }
 [ "$D_SIG" = 1 ] || { echo "× SA-d linePolyline 的签名被改成「不抛」的形状（$D_SIG）：这一处修复的前提没了"; fail=1; }
 [ "$E_DECL" = 1 ] || { echo "× SA-e 页面没有独立的折线状态字段：失败又要去挤共享的 vm.error，别的接口失败会被说成「这条线路没轨迹」"; fail=1; }

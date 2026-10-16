@@ -95,7 +95,9 @@ red "$DS" 'a = "        if (!DriverLegStateMapper.of(leg).canReportException) {"
 case_run X-6 "终态段的出网守卫被摘掉"
 
 # X-7 报文里塞自造的 type 键：后端 ReqVO 只认 driverId/legId/remark，多一个键就是假契约
-red "$DS" 'a = "mapOf(\"remark\" to remark)"; assert a in s; s = s.replace(a, "mapOf(\"remark\" to remark, \"type\" to (reason?.name ?: \"\"))", 1)'
+# ⚠ D-135 重锚：页面里已经没有内联 mapOf（提交体由 exceptionActionBody 拼），注入点挪到这个纯函数上。
+#   判的还是同一件事：报文里长出后端不认识的键 ⇒ 契约用例必须红。
+red "$RP" 'a = "if (photoUrl.isEmpty()) mapOf(\"remark\" to remark)"; assert a in s; s = s.replace(a, "if (photoUrl.isEmpty()) mapOf(\"remark\" to remark, \"type\" to \"ROAD_BLOCKED\")", 1)'
 case_run X-7 "报文多出后端没有的 type 键"
 
 # X-8 回读不一致也报成功：后端没接受这一段，界面仍说"已按后端回读刷新"

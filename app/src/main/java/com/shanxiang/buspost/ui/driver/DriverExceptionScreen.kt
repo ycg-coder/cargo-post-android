@@ -26,7 +26,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import com.shanxiang.buspost.core.AppState
+import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusCard
@@ -135,7 +142,11 @@ class DriverExceptionViewModel : ScreenViewModel() {
      * 没选段 / 没选分类 / 「其他」没写具体情况。空 remark 会被后端兜成"司机上报异常"，
      * 那等于让后端替司机编原因 —— 宁可不发。
      */
-    fun submit() {
+    /**
+     * `context` 可空只为一件事：JVM 侧用例（没有 Robolectric）要能跑通「不附照片」这条主路径。
+     * 附照片这条要求 photo 与 context 都在，缺任何一个都按「没带照片」走 —— 不默默丢。
+     */
+    fun submit(context: Context? = null, photo: Uri? = null) {
         val leg = selectedLeg
         if (leg == null) {
             receipt = "没有可选中的运输段，本次未发给后端"
@@ -155,7 +166,20 @@ class DriverExceptionViewModel : ScreenViewModel() {
         busy = true
         work(reset = false) {
             try {
-                val ack = Repo.legAction(LegDriverAction.EXCEPTION.api, leg.legId, mapOf("remark" to remark))
+                // 现场照片：#60 之前这条链路没人接（请求里有 photoUrl 字段，后端只读 remark）。
+                // 与交接确认**不同**的一条判断：照片传不上去**不拦异常上报** —— 异常必须先到调度，
+                // 少一张照片是取证不全，不发这一条是整段货没人管。但回执必须说清没带上。
+                val uploaded = if (photo != null && context != null) {
+                    attempt {
+                        val bytes = context.contentResolver.openInputStream(photo)?.use { it.readBytes() }
+                            ?: ByteArray(0)
+                        Repo.uploadPhoto(bytes, "exception-${leg.legId}.jpg").url
+                    }.getOrDefault("")
+                } else {
+                    ""
+                }
+                val photoDropped = photo != null && uploaded.isEmpty()
+                val ack = Repo.legAction(LegDriverAction.EXCEPTION.api, leg.legId, exceptionActionBody(remark, uploaded))
                 val feed = Repo.driverLegs()
                 legs = feed.items
                 mergeDemo(ack.demo, feed.demo)
@@ -167,7 +191,9 @@ class DriverExceptionViewModel : ScreenViewModel() {
                     back == null -> "异常已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     LegStatus.of(back.status) != LegStatus.EXCEPTION ->
                         "异常已提交，但后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
-                    else -> "后端回读：${legReceiptText(back)}，重排由调度处理"
+                    photoDropped -> "异常已提交，但现场照片没传上去（后端那一格仍是空）——可重报一次或让调度补录"
+                    else -> "后端回读：${legReceiptText(back)}，重排由调度处理" +
+                        if (uploaded.isNotEmpty()) "；现场照片已随上报提交" else ""
                 }
             } finally {
                 busy = false
@@ -180,6 +206,10 @@ class DriverExceptionViewModel : ScreenViewModel() {
 fun DriverExceptionScreen(vm: DriverExceptionViewModel = viewModel()) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val context = LocalContext.current
+    /** 选中的现场照片（只在本机活着）：传不上去不拦异常上报，但回执要说清没带上 */
+    var picked by remember { mutableStateOf<Uri?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked = it }
 
     LaunchedEffect(Unit) { if (vm.legs.isEmpty()) vm.load() }
 
@@ -227,13 +257,27 @@ fun DriverExceptionScreen(vm: DriverExceptionViewModel = viewModel()) {
                 modifier = Modifier.padding(top = 4.dp),
             )
 
+            BusButton(
+                text = if (picked == null) "附现场照片（可选）" else "已选 1 张，点击重选",
+                variant = BusButtonVariant.OUTLINE,
+                small = true,
+                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            )
+            Text(
+                if (picked == null) "没附照片也能上报；照片会记进这一单的事件流，事后作为责任凭证。"
+                else "照片会随这次上报一起提交。",
+                color = t.textTertiary,
+                fontSize = (11 * scale).sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
             val canSend = leg != null && DriverLegStateMapper.of(leg).canReportException && vm.reason != null
             BusButton(
                 text = "提交异常上报",
                 enabled = canSend && !vm.busy,
                 loading = vm.busy,
                 variant = BusButtonVariant.DANGER,
-                onClick = { vm.submit() },
+                onClick = { vm.submit(context, picked) },
             )
             if (leg != null && !DriverLegStateMapper.of(leg).canReportException) {
                 Text(
