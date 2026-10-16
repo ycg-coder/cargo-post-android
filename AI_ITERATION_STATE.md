@@ -28,9 +28,17 @@
   ⚠ 文件名**故意不带 `check_` 前缀**：verify 作业的 `for s in tools/check_*.sh` 没有 release 产物，被 glob 抓到就会以 rc=2 逼我加第三本豁免。
 - **装包这一格**：`pm install -r -t /data/local/tmp/xxx.apk` 两轮都是直接 `Success`，**MIUI 那个"继续安装"倒计时对话框只在 `adb install` 流式安装时才出现**
   —— 我先按配方写了点框脚本，结果是空转的一份代码；这条记下来省下一轮。
-- **并行那条线（AI 辅助）已经在同一个工作树里动了码**：`yudao-module-ai-assist/`（10 个文件，0 条用例）、`V050__ai_event_calendar.sql`、
-  `views/transport/ai/`、`api/transport/ai/`，还改了 root `pom.xml` / `yudao-server/pom.xml` / `db-migrate-guarded.yml`（+3 probe）。
-  这些都**没提交**，我这一轮也没有替她提交任何东西（`git add` 全程走显式路径）。撞车处置见 m195 `docs/AI_ASSIST_BOUNDARY.md` §6.1 与新闸 `check_business_table_single_owner.py`。
+- **并行那条线已停手，她的码由我接手提交**（用户授权"完全接替、可以修改可以提交"）：`yudao-module-ai-assist` 36 个 java + 5 个测试类、
+  `V050–V054`、四个后台页、两个 pom 挂载、契约文档更新 ⇒ 全部复核后落进 PR #195（`a7f59b78`）。
+  复核读数：`mvn -B -pl yudao-server -am clean test` **BUILD SUCCESS**，ai-assist 聚合 **19 用例 / 0 失败 / 0 错误**，transport 同轮 387 条 0 红，
+  14 本静态闸在合并后的面上全部 rc=0（`check_admin_ai_data_mask` 真扫到 AI 面三目录，自写掩码 0 处）。
+  **接手时抓到两处是我自己的洞**（不是她的）：① `V037` 从来没进 `db-migrate-guarded.yml` 的 apply 白名单 ⇒ 按下 apply 也不会有那张表，页面必 500；
+  ② 幂等闸的扫描根只看得到 transport ⇒ 她那 5 个写口不在任何闸视野内（#99 已修：按模块名册 + K8/K9 两道覆盖闸）。
+- **一次"红"是环境的，不是库的**：按只读口径投了 guarded 的 `mode=check`（run **38888454957**），红在 `actions/checkout@v4`，
+  后面四步全 skipped，job 日志 blob `BlobNotFound`；这条流水线上次成功是 10-14 10:51Z。⇒ **"云上库现在的形状"这一格本轮没取到读数**，
+  不拿它当"库没问题"报。`runs-on: [self-hosted, cargo-post]` 那台机器要人在宿主上查（我管不到）。
+- **App 侧已推**：`main` 从 `e347cad` → `1eeb732`（25 笔），远端核对一致；CI run 38888401937 `verify=success`、`release=skipped`
+  （`release` 作业写死 `if: github.event_name == 'workflow_dispatch'` ⇒ 这次 push **没构建也没发布任何生产包**，这条skip就是证据）。
 - **静态闸现读 14 本 / 13 个 CI 步骤**（`scripts/` 实数：`grep -oE 'scripts/[a-z_0-9]+\.py'` 去重 = 14）。第 14 本认的是"同一个业务对象两张表 / 两个同名 DO"，
   K1–K6 六把刀；工作树现读判 2 组（真撞车），干净 HEAD 导出判 0 组（CI 看到的是这一面）。
 - **推送与 PR**：分支 `ci/admin-gates-2026-10-16` 已推到 `5abba2f9`（`git ls-remote` 实测 == 本地 HEAD）；

@@ -9157,3 +9157,65 @@ K7 工具不在场（三处来源全关）  rc=2
 后端分支已推到 `b790f2eb`（PR #195；本轮四笔：`064d66b8` 编译红修正 / `c9b11736` 日历 / `5abba2f9` 第 14 本闸 / `b790f2eb` 维护页），
 `master` 未动、未合、**云上没写过任何一行**（`V037` 的 apply 同样要人显式 `confirm=APPLY`）。
 还欠：#60 提交那一格的真机跑（等部署）、日历页的浏览器验证（等部署）、#94/#95 的复核、#25/#31/#71/#81 等人拍板。
+
+---
+
+## D-141 · 接手第二条线：两处洞是**我自己的**，还有一处"红"根本不是库的红
+
+并行那条线停手后，它未提交的 55 个文件归我复核接手（用户 2026-10-16 明确授权"完全接替、可以修改可以提交"）。
+这一笔的价值不在"把她的码搬进仓"，而在**接手时必须重跑一遍她的所有断言**——结果抓到两处是我自己造成的洞。
+
+### 一、V037 从来没进 apply 白名单（我的漏）
+
+`db-migrate-guarded.yml` 的 apply 循环里是 V028、V030–V036、V050–V054 —— **没有 V037**。
+也就是说：我把日历表、六个接口、后台页面都提交进仓了，但那条流水线的唯一执行面不跑它 ⇒
+**就算有人按下 `confirm=APPLY`，云上也永远不会出现 `transport_town_event_calendar`，而那个新页面一打开就是 500。**
+
+"脚本在仓库里" ≠ "脚本会被执行"。这条白名单就是执行面本身。补进循环（13→14 支），
+并按 diff 机械平移格数：新增 3 格（表 / 按 permission 的菜单 / 角色授权）× `probe` 与 `probe_strict` 两面 ⇒ 26→29，
+文中三处"29 格"与实数已核（`grep -c` 两面各 29）。
+
+### 二、幂等闸的扫描根只看得到一个模块（队列 #99）
+
+`check_admin_write_idempotency.py` 的根写死在 `yudao-module-transport/.../controller/admin`，
+所以第二条线的 5 个写口**完全不在任何闸的视野里** —— 她给 `saved-query/create` 钉的 `@Idempotent` 形状是对的，
+但**那句被删掉也不会有人红**。与本仓 #75 同一种病：保护写在一处，绑定漏在另一处，静默。
+
+改法不是"再加一本只管 ai-assist 的闸"（那会变成两套尺子），而是把这本改成**按模块名册**：
+`transport=(49,9)`、`ai-assist=(5,1)`，两个数都是本轮实测；上游 `system(106)/infra(30)/member(16)`
+明确划成不管并写下理由 —— 把它们钉成对照数只会得到一台永远红的闸。
+两道新覆盖闸 K8（名册外模块带写口 ⇒ 红并点名）/ K9（名册挂着、目录被删、pom 还在部署 ⇒ 红）。
+
+**这里有个提交顺序的陷阱，是它自己抓出来的**：只推闸、模块还没落地时，`MUST_COVER` 里那条 ai 口在树上找不到，
+judge 报"端点被改名/删掉了" ⇒ CI 会红。我用 `git archive HEAD` 导出干净面跑了一遍才发现。
+修法不是放宽判决，是**按模块归属跳过并大声打出来**（`MUST_COVER_OWNER` + demand 过滤，读数里留一行
+「本轮因模块未落地而不判的在册口 1 条…模块一进树就恢复被判」）。两个面都实跑：干净导出 rc=0、合并面 rc=0、K0–K9 十把全绿。
+
+### 三、一条"红"根本不是库的红：自托管 runner 在 checkout 就挂
+
+按只读口径投了 `db-migrate-guarded.yml` 的 `mode=check`（一个字都不写）。run 38888454957 = failure，
+逐步看：**红在 `actions/checkout@v4`**，后面四步全 skipped，而 job 日志 blob 直接 `BlobNotFound`。
+对照历史：这条 guarded 流水线上一次成功是 2026-10-14 10:51Z。
+⇒ **这是环境红，不是库红；"云上库现在的形状"这一格本轮没有取到读数**，我不拿它当"库没问题"报，也不去猜是哪一列缺。
+`runs-on: [self-hosted, cargo-post]` —— 那台机器我管不到，需要人在宿主上查 runner 的 workspace/磁盘/服务状态。
+
+### 四、"不带 clean 的整树构建"会给你一个假失败（这条已经记过，今天又上一次岗）
+
+`mvn -B -pl yudao-server -am test`（我随手少了 `clean`）报 `OAuth2TokenServiceImplTest.testGetAccessTokenPage expected <1> but was <2>`，
+红在**上游 system 模块**。同一条命令带上 CI 用的 `clean` ⇒ **BUILD SUCCESS，MVN_RC=0**，那条用例 13/13 过。
+⇒ 归因规则照旧：**要用 CI 的确切命令复现，不能凭手感**；旧 target 状态能造出一条谁都没写的红。
+接手读数的真值那一版：ai-assist 聚合 `Tests run: 19, Failures: 0, Errors: 0`，transport 同轮 387 条 0 红，14 本闸在合并面上全 rc=0。
+
+### 五、App 侧这一轮推上去了
+
+`main` 从 `e347cad` 推到 `1eeb732`（25 笔），远端核对一致。CI run 38888401937：**verify=success**、`release=skipped`
+—— `release` 作业写死 `if: github.event_name == 'workflow_dispatch'`，所以**这次 push 没有构建也没有发布任何生产包**，
+那条发布通路只有人手触发才走（这正是当初分两个 job 的理由）。
+另外补一句实测：本仓的 `tools/release_signing_negative_controls.sh` 那 7 把刀全部要在**真产物**上才判得动，
+所以它不进 CI 的 `check_*.sh` 循环（那一步没有 release 包，会把"没有产物"念成判据失效）。
+
+### 六、还欠的（不掩）
+
+四个 AI 页面**一个都没在浏览器点过**（契约 §9.5 = NOT VERIFIED IN BROWSER）；`buspost.ai.*` 的 yaml 键本线没加（属依赖申请）；
+"关掉 AI 整套后台仍完整可用"这条检查目前是恒真的（没有任何模型功能消费那个开关）；
+云上那一格读数因 runner 故障缺失；#60 提交那一格仍等 PR #195 合入并部署。PR 合不合、`V037`/`V050–V054` 要不要 apply，仍由人点。
