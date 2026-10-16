@@ -17,6 +17,8 @@
 # 未开时 adb install 会报 INSTALL_FAILED_USER_RESTRICTED，脚本会明确停下并给替代路径。
 
 set -uo pipefail
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
 
 # ── 环境：PATH 显式导出（Bash 工具可能清空 PATH）；MSYS_NO_PATHCONV 防设备路径被改写 ──
 export PATH="$PATH:/c/temp/android-sdk/platform-tools"

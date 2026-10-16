@@ -9,6 +9,15 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+# Windows 控制台默认 GBK：中文与 ⇒ 会让 print 抛 UnicodeEncodeError。
+# 崩之前已经打了几行头，看起来像"自检跑过了"，实际后面的逐条结论全丢 —— 这类"跑不动的判据"
+# 比没判据更坏（同一坑在 check_doc_anchors.py 与本仓多处台账里记过）。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 NODE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 
 
