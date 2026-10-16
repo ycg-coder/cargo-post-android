@@ -3,10 +3,62 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
-最后更新：2026-10-16（傍晚收工，D-135 … D-138 · 司机异常照片两端进仓并在**真机**上跑出第一条新缺陷（取消选片清掉已拍那张）、后台 49 个写口里 9 个钉了服务端幂等键、告警队列补 ADMIN 未读口径、敏感字段唯一掩码出口、静态闸 14 本；#96 负控批自毁产物已修；**两条我自己信错的前提**：① 本机一直"以为没有 maven"，于是 `0c7a47f2` 那版后端**没编译过就推上去了**（CI backend=failure 实测）；② 并行那条线照我自己契约里写死的表名建了第二套日历 ⇒ 一个业务两张表，已立第 14 本闸并写明归属）
+最后更新：2026-10-16（晚收工，D-139 … D-143 · **AI 那条线做完**：唯一外呼口 + 5 个模型任务 + 1 条不依赖模型的情景提示，配置收成**一个口** `buspost.ai.*`（云上/自部署只改 base-url+api-key+model），ai-assist 用例 19→**47**、transport 387→**389**，静态闸 **15 本**全绿；**顺手在用户点 apply 之前实测掉一个坑**：guarded 的 15 支白名单跑第二遍会 `ERROR 1061` 中断 + `system_role_menu` 466→481（+15 行）+ 6 格探针从 1 变 2，根因是那张表**没有 (role_id,menu_id) 唯一键**所以 `INSERT IGNORE` 挡不住重复 ⇒ 10 支脚本改成按存在性判重，并立**第 16 本判据**（本机 MySQL 上跑两遍逐表比行数 + 32 格探针对值，连不上就 rc=2 拒判））
 
 
-## CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）
+## CURRENT（2026-10-16 晚 · 台账 D-143 · AI 那条线收工 + 迁移白名单"跑第二遍"实测）
+
+- **AI 做完了，配置只有一个口**（用户原话："留一个配置api接口就行支持云上api或者自部署aiapi"）：
+  `application.yaml` 末尾 `buspost.ai.*`（enabled / base-url / api-key / model / vision-model / timeout-ms / max-input-chars），
+  请求体走 **OpenAI 兼容 `/chat/completions`**、JDK `HttpClient` 自己发、**不引厂商 SDK** ⇒
+  云上（DashScope 兼容模式 / OpenAI）与自部署（vLLM / Ollama 的 openai 层 / 内网网关）**只改 base-url + api-key + model** 三个值。
+  密钥只从环境变量 `BUSPOST_AI_API_KEY` 来（yaml 里写的是 `${BUSPOST_AI_API_KEY:}`），默认"关 + 空" ⇒ 天然未就绪、后台其余页面零变化。
+- **三层分工**：`AiGateway` = 唯一外呼口（未就绪→`not_ready` / 非 2xx→`http_error` / 2xx 无正文→`empty`，
+  **每次都留一条 `ai_invocation_log`**，留痕是旁路不带倒主流程，密钥不入日志）；`AiTasks` = 纯函数
+  （5 套提示词 + 严格解析，**解析不出来就 `parsed=false`，绝不把模型闲聊硬拆成"分类=其它"** + 润色类用数字集合比对判"数字一个都没被改"）；
+  `AiTaskService` = 5 个模型任务 + **1 条不依赖模型的情景提示**（只读 transport 那份日历，不建第二张表）。
+  后台页 `views/transport/ai/assist/index.vue` 6 格只出草稿，菜单 7150/7151（`V055`）。
+- **用例是成对的**（这是唯一能证明"未就绪"不等于"整条链坏了"的办法）：`ai-assist` 聚合 **19 → 47**、`transport` **387 → 389**，
+  `mvn -B -pl yudao-module-ai-assist -am clean test` ⇒ `MVN_RC=0` / `BUILD SUCCESS`。
+  负：开关关掉 ⇒ 五格 `ready=false`、`suggestion/basis/rawText` **全 null**、留痕**恰好 4 条 `not_ready`**（照片那格先判视觉未就绪，**连外呼口都不走到**）；
+  正：端点齐备（本机 `HttpServer`，**不 mock HTTP**）⇒ 真发一次、解析出 `分类：道路阻断`、**请求体里只有 `138****8000`、没有明文号**、留痕 1 条 `ok`。
+- **前端凭证照 CI frontend job 的步骤名与顺序跑**：`build:prod` **rc=0** → `dist-prod/` **373 个文件**，
+  `dist-prod/assets/assist-qeKOAw9D.js` 同时命中 `TransportAiAssist` 与页面那句文案；`vue-tsc --noEmit`（不带 `--incremental`，比 CI 严）**0 错**；
+  `vitest run` **4 文件 / 54 用例**；`eslint src/views/transport` **0 error / 7 warning**（均在既有页）；
+  SFC 结构扫 `views/transport` **43 只全绿**（AI 那 6 只）。15 本静态闸全 `rc=0`
+  （`check_sql_function_arity` 读数 107→**108**：V037 新增那个 `IF(…)`；这本闸验的是实参数目不是总数 ⇒ 仍绿，读数变化留档免得被当漂移）。
+- **⚠ 本轮最值钱的一条：guarded 的 apply 白名单跑第二遍会出事，已在用户点 apply 之前实测修掉。**
+  本机有 MySQL 8.0（3306 在听）⇒ 不必靠猜：开一次性库、照 `sql/mysql/` 六份基线建好、**15 支白名单跑两遍逐表精确 `COUNT(*)` 比对**，
+  再把工作流里 **32 格 `probe_strict` 的原句**跑一遍对期望值。改之前实测：第 2 遍 `V037` 直接
+  `ERROR 1061 Duplicate key name 'idx_town_lookup'` **中断**（它后面 3 条菜单授权因此跑不到）、`system_role_menu` **466 → 481（+15 行）**、
+  32 格里 **6 格从 1 变 2**（钱包 / V050 / V052 / V053 / V054 / V055）。`+15` 与"10 支共 18 条授权、V037 那 3 条因中断没跑到"正好对上
+  （18−3=15）⇒ **归因是算出来的，不是猜的**。根因：`system_role_menu` 只有自增主键、**没有 `(role_id, menu_id)` 唯一键**
+  （`sql/mysql/ruoyi-vue-pro.sql:3695`），基线那种 `INSERT IGNORE` 根本挡不住重复，而 apply **每次都重跑整份白名单**。
+  这批脚本此前**从没在任何库上执行过一次**（V037/V050–V055 都没上过云）⇒ 修的是"第一次点 apply 就会踩"的坑，不是清历史脏数据。
+- **修法（10 支脚本、11 处）**：授权改按存在性判重（`NOT EXISTS`；**原 WHERE 一字未改**，用表名限定而不是别名）、
+  V037 的裸 `CREATE INDEX` 换成 V024 那套 `information_schema.STATISTICS + IF + PREPARE/EXECUTE`；
+  **同行替换**（行数与行尾逐文件量过：V031/V032 是 CRLF、V037/V050–V055 是 LF、V036 是混的 ⇒ 台账/工作流里按行号的锚点不受影响）；
+  10 处还在声称"`INSERT IGNORE` 可安全重复执行"的注释一并改掉（**改完代码不改注释，注释就成了假账**；
+  跑手把仍含该词的行全打出来逐条核，"还在声称安全"的行数 = **0**）。改后实测：两遍 **15/15 干净、逐表零漂移、32/32 探针对得上**。
+- **第 16 本判据** `scripts/check_migration_idempotency.py`（**本机专用**：CI 里没有库 ⇒ 不进 `ci.yml` 那 15 本静态闸）：
+  `rc=1` = 有脚本失败 / 有行数漂移 / 探针对不上；**`rc=2` 拒判** = 找不到 mysql、连不上、读不到口令、基线缺文件、
+  或从工作流抽出来的白名单不是 15 支、探针不是 32 格（**抽不到就不许报绿**）。`--self-test` K1–K7 全绿：
+  K4 非幂等 fixture 第二遍必须被数出来（1→2）、**K5 幂等 fixture 是配对正对照**（两遍都是 1 行，免得 K4 只是"什么都报红"）、
+  K7 把 mysql 客户端指到不存在的路径 ⇒ 实得 `rc=2`。`docs/database.md` 补了一段"逐版清单停在 V022，V023+ 以白名单与文件头为准"。
+- **我自己这轮踩的三次（形状都会复发）**：① 只看到 `MVN_RC=1 / BUILD FAILURE` 就想去归因"哪条用例红了"，
+  实际 `[ERROR]` 第一行写着 `AiTaskService.java:[40,26] 找不到符号 Pattern` —— 是我上一轮把掩码收进唯一出口之后**遗留的死字段**，
+  处理是**删死码，不是补 import 把它养活**；② 后台 shell 里 `mvn` 回 **rc=127**（PATH 里没有 maven），
+  **127 是"命令没找到"不是构建红**（与 D-135"以为本机没有 maven"是同一个坑的另一面），改用绝对路径；
+  ③ 前端产物按 `dist/` 数到 **0**，差点报成"构建没产出"，真相是 `.env.prod` 里 `VITE_OUT_DIR=dist-prod`
+  ⇒ **探错目录 = 假反证**，与 D-138/D-142 同根：探针读的那一格必须等于被测对象真正写的那一格。
+- **仍未做**：五条 AI 页（capacity-conflict / query-builder / capability / invocation-log / **assist**）+ 日历维护页
+  **未在浏览器点验** ⇒ `NOT VERIFIED IN BROWSER`；AI 真能用还差**一个端点**（base-url + `BUSPOST_AI_API_KEY` + model，**服务器归用户管**）；
+  云上库逐格读数仍未取到；#100 那句照片失败原因仍未在真机取到；§9 第 4 条"关掉 AI 仍完整可用"现在只有**用例级**证据，
+  **页面集合级**的对照（开关 true/false 两种下比对既有 transport 路由集合与 15 本闸读数）要与浏览器点验一起做。
+- **master 未动、未合、未写云库**；平台侧这一轮改动待提交到 `ci/admin-gates-2026-10-16`（PR #195 那一支）。
+
+
+## 上一轮 CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）
 
 - **本地能编后端了**（此前那句"只能靠 CI 验"是我自己的错判）：`/c/Users/袁/apache-maven-3.9.16/bin/mvn -B -pl yudao-module-transport test`
   ⇒ BUILD SUCCESS，**模块 387 用例 / 0 失败 0 错误 / 43 个类**（`TownEventCalendarServiceImplTest` 7、`DriverAppServiceImplTest` 41、

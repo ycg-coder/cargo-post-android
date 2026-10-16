@@ -9272,3 +9272,103 @@ judge 报"端点被改名/删掉了" ⇒ CI 会红。我用 `git archive HEAD` �
 ① 照片上传失败的那句**原因**要在真机上取到（下一班有可报段时，或让调度把某段退回可报状态）；
 ② 就算传上去，云上后端还没部署接受 `photoUrl` 的那一版 ⇒ 事件流那一格现在必然还是空，这一格等 PR #195 合入；
 ③ 四个 AI 页面 + 日历维护页仍未浏览器点验；④ 云上库形状的逐格读数仍未取到（runner 抖过一次，重试成功但日志没抽出来）。
+## D-143 · AI 那条线做完（一个配置口同时吃云上与自部署），顺手在点 apply 之前实测出白名单跑第二遍会出事
+
+### 一、AI 这一轮交付的形状
+
+用户的话是「你把 ai 这些全部做好，留一个配置 api 接口就行支持云上 api 或者自部署 aiapi」⇒ 落成的正是**一个口**：
+`buspost.ai.*`（`enabled` / `base-url` / `api-key` / `model` / `vision-model` / `timeout-ms` / `max-input-chars`），
+请求体走 **OpenAI 兼容的 `/chat/completions`**、用 JDK `HttpClient` 自己发，**不引任何厂商 SDK** ——
+所以云上（DashScope 兼容模式 / OpenAI 兼容）与自部署（vLLM、Ollama 的 openai 层、内网自建网关）
+**只改 `base-url` / `api-key` / `model` 三个值**，Java 一行不用动。配置口写在 `application.yaml` 末尾
+（纯 CRLF 追加，9 条配置行；该文件 4 个 YAML 文档都没有 profile 守卫 ⇒ 默认生效），默认 `enabled: false` + 密钥空。
+
+三层分工（每层都能被单独钉）：
+· `core/AiGateway` = **唯一外呼口**：未就绪→`not_ready`、非 2xx→`http_error`、2xx 无正文→`empty`，
+  **每次调用都留一条 `ai_invocation_log`**（旁路：落库失败只打 error，不带倒主流程），密钥永不入日志（用例断言留痕里没有 `sk-test-`）；
+· `core/AiTasks` = 纯函数：5 套提示词（每套都写死"只出参考意见、禁止声称已改数据、依据不足就说依据不足、不许改数字"）
+  + 严格解析（**解析不出来就 `parsed=false`，绝不把模型闲聊硬拆成"分类=其它"**）+ 润色类用数字集合比对判"数字一个都没被改"；
+· `service/task/AiTaskService` = 5 个模型任务 + **1 条不依赖模型的情景提示**（只读 transport 那份日历，不建第二张表 —— 第 14 本闸盯着）。
+
+后台页 `views/transport/ai/assist/index.vue`（6 格，菜单 7150/7151，`V055`）：每格只出草稿，
+未就绪就明写"能力未就绪 + 原因"，解析失败就明写"这一格没有产生任何 AI 输出"，**不留空白也不假装在忙**。
+
+### 二、用例是成对的（这是本轮唯一能证明"未就绪"不是"整条链坏了"的办法）
+
+`ai-assist` 聚合 **19 → 47**（`AiTasksTest` 13 + `AiGatewayTest` 7 + **`AiTaskServiceTest` 8**），`transport` **387 → 389**，
+`mvn -B -pl yudao-module-ai-assist -am clean test` ⇒ `MVN_RC=0` / `BUILD SUCCESS`。
+`AiTaskServiceTest` 8 条里最关键的是那一对：
+· 负：开关关掉 ⇒ 五格一律 `ready=false / parsed=false`，`suggestion`、`basis`、`rawText` **全为 null**，
+  且留痕**恰好 4 条 `not_ready`**（照片那格先判"视觉能力未就绪"，**连外呼口都不走到**）；
+· 正：端点齐备（本机 `HttpServer`，不 mock HTTP）⇒ 真发一次、解析成 `分类：道路阻断`，
+  **请求体里没有明文手机号、只有 `138****8000`**（脱敏在出网之前发生），留痕 1 条 `ok`、密钥不在里面。
+另有：模型把底稿 `15` 改成 `12` ⇒ `numbersPreserved=false` 且依据里明写"这一版不要采纳"；
+日历取数抛异常 ⇒ 念"这一格是「没取到」，不是「没有事件」"；材料不够（1 条上报 / 0 样本）⇒ 先拒绝、0 次外呼。
+
+前端照 CI frontend job 的**步骤名与顺序**跑：`build:prod` **rc=0** → 产物 `dist-prod/` **373 个文件**，
+`dist-prod/assets/assist-qeKOAw9D.js` 同时命中 `TransportAiAssist` 与页面里那句文案 ⇒ 新页真进了产物；
+`vue-tsc --noEmit`（不带 `--incremental`，比 CI 严）**rc=0 / 0 错**；`vitest run` **4 文件 / 54 用例**；
+`eslint src/views/transport` **rc=0**（0 error / 7 warning，均在既有页）；
+SFC 结构扫（`vue/compiler-sfc` 的 parse + compileTemplate + compileScript）`views/transport` **43 只全绿**（其中 AI 那 6 只）。
+15 本静态闸全部 `rc=0`；`check_sql_function_arity` 读数 107→**108**（V037 新增那个 `IF(@idx_exists=0,…)`），
+这本闸验的是每个 IF 的实参数目不是总数 ⇒ 仍绿，但读数变化记在这儿免得被当成漂移。
+
+### 三、真正的发现：**apply 白名单跑第二遍会出事**（在用户点 apply 之前实测掉了）
+
+本机有 MySQL 8.0（`C:\Program Files\MySQL\MySQL Server 8.0`，3306 在听）⇒ 不必靠猜：
+开一次性库 `buspost_mig_probe`、照 `sql/mysql/` 六份基线建好（与云上同一套 DDL）、把 guarded 的 **15 支白名单跑两遍**、
+逐表精确 `COUNT(*)` 拍照比对，再把工作流里 **32 格 `probe_strict` 的原句**在这个库上跑一遍对期望值。
+
+**改之前的实测**：
+· 第 2 遍 `V037` 直接 `ERROR 1061 (42000) at line 55: Duplicate key name 'idx_town_lookup'` **中断** ——
+  它后面那三条菜单授权（第 80 行）因此根本跑不到；
+· `system_role_menu` **466 → 481（+15 行）**，其余所有表零漂移；
+· 32 格探针里 **6 格从 1 变 2**（钱包 / V050 / V052 / V053 / V054 / V055）。
+`+15` 这个数与"10 支脚本一共 18 条授权、V037 那 3 条因为脚本中断没跑到"正好对上（18−3=15）⇒ 归因是算出来的，不是猜的。
+
+**根因**：`system_role_menu` 只有自增主键 `id`、**没有 `(role_id, menu_id)` 唯一键**（`sql/mysql/ruoyi-vue-pro.sql:3695`），
+所以基线那种 `INSERT IGNORE`（`transport-menu.sql:159-160` 起，V022/V031/V032/V036/V037/V050–V055 都抄了它）
+**根本挡不住重复插入**；而 `db-migrate-guarded.yml` 的 apply **每次都把整份白名单重跑一遍**。
+⚠ 这批脚本在改之前**从没在任何库上执行过一次**（V037/V050–V055 都没上过云）⇒ 修掉的是"用户第一次点 apply 就会踩"的坑，
+不是清历史脏数据；而且第二次 apply 之后 6 格 `probe_strict` 会红，用户只会看到"迁移失败"却看不出根因。
+
+**修法（10 支脚本，11 处）**：授权改成按存在性判重
+（`INSERT … SELECT 1, id FROM system_menu WHERE <原句原样> AND NOT EXISTS (SELECT 1 FROM system_role_menu rm WHERE rm.role_id=1 AND rm.menu_id=system_menu.id AND rm.deleted=b'0')`，
+用表名限定而不是别名 ⇒ **原来的 WHERE 一字未改**）；V037 的裸 `CREATE INDEX` 换成 V024 那套
+`information_schema.STATISTICS + IF + PREPARE/EXECUTE`。**同行替换**：行数与行尾一律不动
+（V031/V032 是 CRLF、V037/V050–V055 是 LF、V036 是混的，跑手逐文件量过并会在被动过时回滚）⇒ 台账/工作流里按行号的锚点不受影响。
+顺带把 10 支脚本里那些还在声称"INSERT IGNORE 可安全重复执行"的注释改掉 ——
+**改完代码不改注释，注释就成了假账**；跑手最后把仍含 `INSERT IGNORE` 的行全打出来逐条核，"还在声称安全"的行数 = **0**。
+
+**改之后的实测**：两遍都 **15/15 干净**、**逐表零漂移**、**32/32 探针对得上**；V055 与钱包那两格角色授权都读 **1**。
+
+**立成第 16 本判据** `scripts/check_migration_idempotency.py`（**本机专用**：CI 里没有库 ⇒ 不进 `ci.yml` 那 15 本静态闸）：
+`rc=0` 绿 / `rc=1` 有脚本失败、有行数漂移或探针对不上 / **`rc=2` 拒判**（找不到 mysql、连不上、读不到口令、基线缺文件、
+或从工作流抽出来的白名单不是 15 支、探针不是 32 格 —— **抽不到就不许报绿**）。
+`--self-test` K1–K7 全绿：K4 非幂等 fixture 第二遍必须被数出来（1→2）、**K5 幂等 fixture 是配对正对照**（两遍都是 1 行，
+免得 K4 只是"什么都报红"）、K7 把 mysql 客户端指到不存在的路径 ⇒ 实得 `rc=2`。
+`docs/database.md` 里补了一段："逐版清单停在 V022，V023+ 以 apply 白名单与各文件头注释为准" + 这本判据怎么跑。
+
+### 四、我自己这一轮踩的三次（形状都会复发）
+
+1. **编译红先读 `[ERROR]` 原文，别先猜。** 我只看到 `MVN_RC=1 / BUILD FAILURE` 就准备去归因"哪条用例红了"，
+   实际第一行 `[ERROR]` 写着 `AiTaskService.java:[40,26] 找不到符号 Pattern` ——
+   是我上一轮把掩码收进唯一出口之后**遗留的死字段** `private static final Pattern MOBILE`。
+   ⇒ 处理是**删掉死码**，不是补一个 import 把它养活。
+2. **`rc=127` 是"命令没找到"，不是构建失败。** 后台 shell 的 PATH 里没有 maven，`mvn` 直接 127；
+   我差点把它读成"这一版编不过"。⇒ 用绝对路径 `/c/Users/袁/apache-maven-3.9.16/bin/mvn`，
+   并且**看到 127 先查 `which`**（与 D-135 那条"以为本机没有 maven"是同一个坑的另一面）。
+3. **探错目录 = 假反证。** 前端产物我按 `dist/` 数，数到 `DIST_FILES=0`，差点报成"构建没产出"；
+   真相是 `.env.prod` 里 `VITE_OUT_DIR=dist-prod`。⇒ 与 D-138/D-142 那两条同一根：
+   **探针读的那一格必须等于被测对象真正写的那一格**；跑手脚本已改成读 `VITE_OUT_DIR`。
+
+### 五、还欠的（不含"等用户拍板"那三件）
+
+① 五条 AI 页（capacity-conflict / query-builder / capability / invocation-log / **assist**）+ 日历维护页
+   **仍未在浏览器点验** ⇒ 按 §9.5 登记 `NOT VERIFIED IN BROWSER`；
+② AI 真能用还差**一个端点**：`base-url` + 环境变量 `BUSPOST_AI_API_KEY` + `model`（视觉那格再加 `vision-model`）——
+   **服务器归用户管，我管不到**；在端点配好之前 assist 页六格一律念"未就绪"，这是设计行为不是缺陷；
+③ 云上库的逐格读数仍未取到（guarded `mode=check` 那次 runner 抖过，重试成功但日志没抽出来）；
+④ #100 照片上传失败的那句**原因**仍未在真机取到（要一个"可报"的段）；#60 服务端那一格等 PR #195 部署；
+⑤ §9 第 4 条"关掉 AI 仍完整可用"现在有了**用例级**证据（上面那一对），但**页面集合级**的对照
+   （开关 true/false 两种下比对既有 transport 路由集合与 15 本闸读数）还没做，要与 ① 一起在浏览器里做。
