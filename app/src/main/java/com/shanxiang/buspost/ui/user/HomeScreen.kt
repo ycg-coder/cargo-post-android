@@ -248,6 +248,9 @@ class HomeViewModel : ScreenViewModel() {
             error = nb.error
         }
         lastSync = System.currentTimeMillis()
+        // 报一声"首屏这一轮收场了"：闪屏的阶段③等的就是这个（缺陷 #78 第二格）。
+        // 放在末尾而不是某个字段赋值处 ⇒ 个别端点失败也算收场（失败有各自的错误条，不该把用户关在闪屏外）。
+        AppState.markFirstScreenLoaded()
     }
 
     /** 线路名 → id 的索引：空 id 的条目不进表（宁可退回不可点的标签，也不给一个点进去是空页的假可点态） */

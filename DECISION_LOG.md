@@ -323,7 +323,7 @@ key 为空时 `BusMap` 只会给出空白底图 + 水印，比自绘更误导；
 `CONTEXT_LOCK.md` §八 ① 是**宽口径**（含 `stepping|two.?point|连线|直线`），实测 **19 行** = 4 处假步进违规 + 15 行禁止性说明/带标注值，
 §55 C 是**窄口径**，实测 **0 行**；两者是不同的探针，以后引用时必须说明是哪一条。
 新增的 1 行是 `DriverMissionMap.kt:166` 的注释（"接口没给里程就写'接口未给'，不拿直线距离凑"），属说明文字，不是违规调用点；
-`GeoMath` 命中数保持 **19 行未增长**，唯一违规仍是 `WorkbenchScreen.kt:358`（§32）。
+`GeoMath` 命中数保持 **19 行未增长**，唯一违规仍是 `WorkbenchScreen.kt:363`（§32）。
 
 **验证**：`24 tests completed` / `BUILD SUCCESSFUL`（MissionMapTest + RouteGuideContractTest）、
 `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug` 全绿、`lint-results-debug.txt` **0 条 `: Error:`** 且新文件零 finding。
@@ -1578,7 +1578,7 @@ TH-j 1/1/0 · TH-k 1/1 · TH-l 2/2/0）；负控十三本**全批复跑** rc 全
    （清单见 `THIRD_PARTY_NOTICES.md` §6 F-1 段、状态板 DONE「F-1」的"改动面清点"、审计 §80 七）。
 
 尾巴（在册，不当已通过）：`apiCall` 生产调用点仍 **0**（只登记不谎称已用）；`runCatching` 在 main 仍剩 **34** 处
-（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1077` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
+（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1082` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
 记为"未收"而不是"已判无害"）；§二十 的 Worker 重试语义（真失败回 `retry` 而不是 `success`）**没做**；
 §三十三 的四类失败分型仍只是台账口径，**没落进代码**；设备侧一律 `NOT VERIFIED ON DEVICE`
 （真实取消来自手指划走页面 / Worker 被系统停止 / 进程被杀，JVM 只能造 `cancelAndJoin` 与 `withTimeoutOrNull` 两种）；
@@ -2601,7 +2601,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 - `ui/driver/DriverShell.kt:38`：旧 `AppState.setRole(Role.USER)` → `AppState.setActiveDomain(AppDomain.USER)`；:37 `if (it == 3) {` 与 :39 出壳导航**一字未动**。
 - `ui/user/MineScreen.kt:118-119`：显式授予变成两行 `setAccountRole(Role.DRIVER)` + `setActiveDomain(AppDomain.DRIVER)`（旧写法只改角色再跳壳）。
 - `ui/driver/WorkbenchScreen.kt:238`：`if (next != stored) AppState.setAccountRole(next)`（后端档案**降级**，是账号事实变了才动角色）。
-- `ui/BusPostRoot.kt:146`：登录落壳 `AppState.setActiveDomain(AppDomain.of(role))`。
+- `ui/BusPostRoot.kt:152`：登录落壳 `AppState.setActiveDomain(AppDomain.of(role))`。
 - `notify/AlertEngine.kt:45/:57`：分域轮询的依据从"账号角色"换成 `AppState.activeDomain.value == AppDomain.DRIVER` —— 这一条才是"点用户版能真的停下司机域轮询"的功能本身。
 - **新增** `app/src/test/java/com/shanxiang/buspost/core/DriverRoleIntegrityTest.kt`（107 行 / 4,759 B / 6 例）。
 
@@ -6216,7 +6216,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 5. `mission_route_negative_controls.sh` + `check_mission_route_probes.sh`：MR-c 五条整族重锚（那五句全被 8387929 改短）；
    新增 `MR_C6`＝`这次没问到：$failure`（目标 1）——括号里那半句免责有 `MR_C3` 钉，而**括号前**那半句被换成
    "后端没有可用路线"时 `MR_C3`/`MR_CT` 都不动；MR-e 两处按新缩进重锚；MR-i 重试入口改成**按窗口定位**——
-   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:840` 有路线支 / `:855` 失败支），
+   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:845` 有路线支 / `:855` 失败支），
    按"第一处"删会删错支，而 `MRI_RETRY` 只数失败支那 12 行 ⇒ 那是一条**注入了但打错地方**的破口（`red` 的字节比对挡不住）。
 6. `mission_route_test_negative_controls.sh` MT-2、`navigation_test_negative_controls.sh` 的 M14/M24/M25/M27/M28/M29/M30/M31
    重锚（全是话术字面被顶掉）。⚠ 这两本都是"第一条落空就 exit 2"，所以**报错那条之后的破口连跑都没跑过**
@@ -7987,7 +7987,7 @@ EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / 
 ① 同文件里还留着上一代**零调用点**的轮播渲染件（点标题把人丢进消息中心那一版，而消息中心读
 `/notification/page`、公告读 `/notice/list`，两张表）；② 正文那一栏不滚 —— AlertDialog 的 text 槽不滚就是把
 超出部分直接剪掉，"能点开"被界面当成了"能读完"。本轮删死渲染件（−65 行）、正文加
-`verticalScroll`（`HomeScreen.kt:793`）、`content` 缺失时明说"（这条公告没有正文）"而不是念一格空白
+`verticalScroll`（`HomeScreen.kt:798`）、`content` 缺失时明说"（这条公告没有正文）"而不是念一格空白
 （`HomeScreen.kt:796`）。判据 DN-j 五条（接线 1 / 渲染正文 1 / 可滚 1 / 死码 0 / 活着那件渲染件 1 作反证），
 负控 +5 把（DN-14…DN-18）：18✔ / 失败 0，全部文件与原样一致。
 
@@ -8182,3 +8182,82 @@ NH 实测 `8/1/1/2 · 4/1/1/0（反证含注释 1）· 1/1/1/1+1 · 0/0（反证
 `net_hygiene_negative_controls.sh` 15 把 `✔=15 △=0 ✘=0`；连带重锚那两本复量：RC `41/18/62/26`、RC-d `0/2 + 0/1`、RC-e `45/4`，
 `runcatching_negative_controls.sh` `✔=20`；SU-b 源集 76。取消那条用例里 30 秒延迟的响应在 `job.cancel()` 后立刻收场
 （断言上限 2 秒，实际远不到）；台账锚点机械搬 40 条 + 手工重指 10 条 ⇒ anchors 1486 / ID-MISS 270（≤273，只降不升）/ 在册 248→246。
+
+### D-125（10-16 07:0x–07:5x）· #78 启动路径、闪屏重复取数、release 零裁剪（keep 规则从 0 条到有出处）
+
+三格一起收，立成第 44 本判据 `tools/check_startup_probes.sh`（ST-a…ST-e），另加一只手
+`tools/release_minify_evidence.sh`（扫产物，不扫文本）。
+
+① **启动路径**。`Application.onCreate` 里原本五件事全在主线程。没有分步读数就不能声称知道哪件贵 ——
+所以这一格做了两件可核的事：把 `NotifyWorker.schedule`（内部第一次 `WorkManager.getInstance()`，
+整套初始化：建库 + 恢复未完成任务）压到 `withContext(Dispatchers.IO)`，它的结果没有任何人需要在
+第一帧之前读到；再留一条分步计时进 logcat（`adb logcat -s BUS_BOOT`，不进任何界面，
+符合"诊断进 logcat"那条约定）。**顺序没动**：`Prefs.init` 仍必须在 `Repo.restoreSession()` 之前 ——
+猜"把 Prefs 挪后台"是这一格最容易犯的错，那会让会话永远读成空，比慢更糟；于是这条被写成判据
+（ST-c 的"顺序颠倒=0"，且只取**首次**出现的非注释行，否则读的是我自己在 KDoc 里的讲解顺序）。
+⚠ 本轮**没能在这台真机上量到分步毫秒**：机上装的是发布签名的 v105，而本地 release 构建产的是**未签名**包
+（真因见本节最后那段：签名材料在，但 `keystore.properties` 指的路径多一层目录），
+debug 包又与发布签名不同源（要装就得先卸载，那会丢掉用户在这台机器上的登录态与数据），所以
+`BUS_BOOT` 的实际毫秒数是 `NOT VERIFIED ON DEVICE`，留给下一个能装发布包的人 —— 工具已经在了。
+
+② **闪屏替首屏白问两笔**。`BusPostRoot` 在根上 `async` 两笔（公告、附近公交）只用来推进度条，结果丢在地上。
+量了一下才发现它连"预热"都没做成：首页发的那笔带坐标与半径，URL 与闪屏的 `nearbyBuses(null)` **不同** ⇒
+#79 的白名单缓存也对不上；司机端第一屏更是两笔都用不上。现在阶段③改等首屏自己报一声
+（`AppState.firstScreenLoaded` 是 StateFlow 而不是事件计数 —— 首屏可能比这次组合还早收场，布尔量在那儿等着），
+两处写入点：首页 `fetchAll` 末尾、工作台 `load` 那一轮末尾（含 V-2b 那条"不是司机"的早退，早退也算收场）。
+4 秒兜底那条一个字没动。
+⚠ 这件事与 #32 当年那次"撤掉丢弃式预取被自己的判据驳回"不是同一回事，别看错：那次是**直接删**，
+删完 DN-a / SA-d / TH-f 同轮变红，说明预取是被在册闸钉着的通路；本轮是先给首屏一个真实信号、
+再同轮重锚那三本（DN-a 的闪屏那一格从 1 改成 0 并补同机制反证；SA-d 与 TH-f 的 attempt 逐点表
+从 16 收成 14，两本必须同数）。撤掉的是"取了不用"，不是"预热"这个概念。
+
+③ **release 零裁剪**。`app/proguard-rules.pro` 原本只有一行别的工程留下的占位，规则数 0。
+现在写的每一条都点名它的反射入口，且出处是量出来的：
+`unzip` + 逐字节扫 `navi-3dmap` 里 `lib/arm64-v8a/*.so`，JNI 类描述符命中
+`com/autonavi/ae` 120、`com/amap/api` 75、`com/autonavi/base` 38、`com/autonavi/amap` 8、
+`com/alibaba/idst` 6 ⇒ 这三族按名字 keep；`NotifyWorker` 的类名是 WorkManager 写进数据库再反射实例化的，
+**不在 manifest 里**，AGP 生成的组件规则覆盖不到它（改名后 enqueue 照样成功，重启恢复那一条才炸）；
+两个枚举分开两条写（`…model.{Role,NavIcon}` 那种并列 R8 解析不了 —— 见下）；
+`-keepattributes SourceFile,LineNumberTable` 是给 logcat 诊断留的，不是装饰。
+布局 XML 里没有自定义 View 类名（扫过 `res/layout*`）⇒ **不写**小组件/磁贴那类"通用模板"规则。
+
+**真开了一次 R8**（临时把 release 的 `isMinifyEnabled` 翻 true 跑构建，跑完翻回 false）：
+第一遍 `minifyReleaseWithR8` 直接失败，报 `proguard-rules.pro:42:62 Expected field or method name` ——
+就是我那行花括号并列。**这类语法错文本判据看不见，只有 R8 自己会告诉你**，所以这一格的"取证"必须是构建，
+不是 grep。改对之后：`BUILD SUCCESSFUL in 2m32s`，
+产物 78,882,356 B → **65,791,585 B（−13,090,771 B，−16.6%）**，dex 从 4 份 55,847,808 B 收成 1 份 6,909,516 B。
+`release_minify_evidence.sh` 在这个包上读数：dex 7 项 + mapping 2 项 + 反证 2 项全 ✔
+（其中 mapping 里 `…model.Role -> q8.t0` 类名**确实被改了**，而 `DRIVER -> DRIVER`、`USER -> USER` 原样 ——
+这正是 `-keepclassmembers` 的语义：保成员名不保类名。**取证脚本第一版按 dex 类描述符判枚举，
+把明明保住了的东西读成"被改名"**，假红比漏红更难查，所以枚举那一族改成读 mapping.txt）。
+`isMinifyEnabled` 仍留 false，理由写进构建脚本注释并由 ST-e 钉住：运行时那一遍没在真机上走过，
+不许凭"扫包绿 + 编译过"就把发布包交出去。要翻的人必须重跑取证 + 用发布签名包真机走查核心屏。
+
+**踩到并记进脚本的三条**：
+(a) **注释里写调用式原文会被判据数进去** —— 我给 BusPostRoot 写的新注释里带了 `Repo.notices()` 的字面量，
+DN-a 的全 main 反证立刻从 2 变 3；同一本簿的 `$NC` 是为单文件 `grep -n` 写的（行首"数字:"），
+`grep -rn` 的输出是 `路径:行号:内容`，那条过滤器等于没滤。两处一起改：注释不写调用式原文，
+递归扫描换成 `:[0-9]+:` 形状的模式（D-124 (b) 那一族的递归形）。
+(b) **SA-d 那张逐点表里有一处"假注释入口"**：`BusPostApp.kt:42` 一直标着"开屏预取"，
+它其实是前台轮询里的 `attempt { AlertEngine.check(…) }` —— 表是给人核对用的，标错比不标更坏，本轮改正。
+(c) **判据的计数源不许换成构建产物**：我一度想把规则行数改成读 R8 的 `configuration.txt`（"读产物"），
+但那物什会随上一次构建状态漂，而判据簿在负控沙盒里根本没有 build 目录 ⇒ 同一本簿两个读数就是假闸。
+规则行只数文件里以 `-` 开头的行（注释以 `#` 起头，进不来），钉死恰好 12。
+
+**读数**：`:app:testDebugUnitTest` 全量 **tests=760 failures=0 errors=0**（74 份 XML，newest 07:37:22，
+与 #79 那一轮同数 —— 本轮没有新用例，改动全在组合层与构建层）；判据簿 **44 本 rc≠0 = 0**；
+ST 实测 `0/4 · 3/1/1 · 1/1/1 · 1/1/2 · 8/3/0 · 12/0/36 · 1/1/1/1/2 · 2 · 2/2/1`；
+`startup_negative_controls.sh` 14 把 `✔=14 △=0 ✘=0`；受牵连那三本重锚后负控
+driver_notice 18✔ / safe_call 32✔ / throwable 18✔（其中一条 △：TH-e 的破口咬到兄弟判据 TH-d 的配对，
+本轮没动那一段形状，登记不修）；台账锚点机械搬 6 条 + 手工重指 3 条
+（其中一条是 `AppState.kt:72-75` 那种指向**已删方法**的病历，改成不带冒号的"当时第 72-75 行"）
+⇒ anchors 1485 / ID-MISS 270（≤273，本轮又降 3）/ 在册 246 新增 0 消失 0 / OUT-OF-RANGE 0。
+
+**顺带量到的一条真因（本轮不修，登记）**：`keystore.properties` 里 `storeFile` 指的是
+`release-keystore/buspost-release.jks`（相对该文件所在目录），而工程外备份目录里那张 jks 就叫
+`buspost-release.jks`，**没有 `release-keystore/` 这一层** ⇒ 本地 `assembleRelease` 每次都打印
+"签名文件不存在：Z:\buspost-signing-backup\release-keystore\buspost-release.jks —— release 将产出未签名 APK"
+并正常出未签名包。这不是发布通路的毛病（CI 是另一份由 secret 还原的目录结构），但它正是
+"裁剪包装不上真机 ⇒ #78 第三格的运行时那一遍没法验"的**具体**原因。修法只有两选一，都要签名材料的主人点头：
+补出那一层目录，或把 properties 改成指现有文件名。我没动它 —— 签名材料是发布链的根，
+不该由一次性能优化顺手改路径。

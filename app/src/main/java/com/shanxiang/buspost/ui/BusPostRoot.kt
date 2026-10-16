@@ -28,9 +28,7 @@ import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusMotion
 import com.shanxiang.buspost.core.ui.SplashOverlay
 import com.shanxiang.buspost.data.model.Role
-import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
-import kotlinx.coroutines.async
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.nav.deepLinkTarget
 import com.shanxiang.buspost.nav.startDestinationFor
@@ -79,6 +77,7 @@ fun BusPostRoot() {
     val nav = rememberNavController()
     val kicked by AppState.kicked.collectAsStateWithLifecycle()
     val pending by AppState.pendingRoute.collectAsStateWithLifecycle()
+    val firstScreen by AppState.firstScreenLoaded.collectAsStateWithLifecycle()
 
     // ---------- 启动闪屏（品牌固定画布）：每个进程生命周期只播一次 ----------
     var splashVisible by remember { mutableStateOf(!splashShownOnce) }
@@ -106,18 +105,25 @@ fun BusPostRoot() {
 
     val start = startDestinationFor(Prefs.loggedIn, Prefs.role)
 
-    // 阶段①②：会话恢复完成 → 33%；阶段③：首屏数据任一返回 → 100% 就绪
+    // 阶段①：会话恢复完成 → 33%；阶段③：**首屏那一轮真的收场了**才 100%（缺陷 #78 第二格）。
+    // 旧写法在这里另发两笔取数（公告、附近公交），只用来推进度条、结果丢掉。
+    // ⚠ 这段解释刻意不写调用式原文：判据按字面量数"取数点有几处"，注释里的原文会被数进去
+    //   （本轮全 main 的 2 处就先被这条注释顶成 3 —— 判据命中自己说明文字的老形）。
+    // 结果只用来推进度条、丢掉。首页自己发的正是同一对取数，而且它带坐标与半径 ——
+    // URL 不同 ⇒ 连 #79 之后的白名单磁盘缓存都对不上，等于冷启动白问两笔；
+    // 司机端第一屏（工作台）更是两笔都用不上。所以现在改成"等首屏报一声"。
+    // 兜底仍在：`SplashOverlay` 那条 4 秒自动进入没动，取数挂住/无网也不会把人关在闪屏外。
     LaunchedEffect(Unit) {
         if (!splashVisible) return@LaunchedEffect
         splashShownOnce = true
         splashProgress = 33
         splashStatus = if (Prefs.loggedIn) "正在准备您的班次…" else "正在连接服务站…"
-        // 与小程序一致：首屏数据预取并行发起，任一完成即推进阶段（失败也算完成，不让闪屏卡住）
-        // attempt 只把「取消」原样抛出：离开组合就该停下，不该继续点亮 100%；其余失败收成 Result，
-        // 并留一行日志——预取失败是常态（冷启动无网），但客户端缺陷不能跟着一起被静默。
-        val a = async { attempt { Repo.notices() } }
-        val b = async { attempt { Repo.nearbyBuses(null) } }
-        listOf(a, b).forEach { it.await().onFailure { android.util.Log.w("BUS_SPLASH", it) } }
+        // 未登录也走同一条：起始页仍是用户壳（`startDestinationFor` 只有两个壳），首页那一轮照样会收场，
+        // 所以这里没有"第二套就绪口径"。以前给未登录开一条捷径，等于让闪屏在第一屏数据之前就退场。
+    }
+
+    LaunchedEffect(firstScreen) {
+        if (!firstScreen || !splashVisible) return@LaunchedEffect
         splashProgress = 100
         splashReady = true
         splashStatus = "已就绪，轻触进入"

@@ -80,14 +80,19 @@ D_EMPTY_PROOF=$(grep -c 'emptyList()' "$REPO")
 #   （Repo 预报解析 / 算路受理 / 深链跳转 / TTS 设语种，逐点归因见 docs/android/RUNCATCHING_AUDIT.md 第二节）。
 # ⚠ **11 已经不是今天的数**（D-082 的 SA-d 空转闸门就是这个）：那句"抬完之后'顺手删掉一处'照样红"当时写在
 #   第 76 行的注释里，而负控第 10 条实测**没红** —— 因为下限离实测差着 3 处，删一到三处都不咬。
-#   现在改成**恰好 16**，并把 16 处逐点列在下面（正面枚举就是归因；行号是 2026-10-14 重量）：
-#     BusPostApp.kt:42 开屏预取 / Locator.kt:219 定位取点 / AmapNavigationEngine.kt:447 算路受理
-#     Repo.kt:140 续期（dd7d6093 2026-10-12）/ Repo.kt:478 预报解析 / NotifyWorker.kt:34 后台轮询
-#     BusPostRoot.kt:104 深链跳转 / BusPostRoot.kt:118 公告 / BusPostRoot.kt:119 附近公交
-#     UpdateSection.kt:86 装包申请权限（3687211c 2026-10-12）/ DriverGuideScreen.kt:136 算路
-#     DriverNavScreen.kt:718 TTS 设语种 / DriverSdkNavCard.kt:266 算路 / HandoverScreen.kt:160 交接照片
-#     core/update/UpdateDialog.kt:147 装包申请权限（2026-10-13 合并：对方"启动即弹窗"那一路并到同一出口）
-#     ui/driver/HandoverScreen.kt:176 签名图上传（#20 阶段 B：与 :160 的照片同一纪律——
+#   现在改成**恰好 14**，并把 14 处逐点列在下面（正面枚举就是归因；行号是 **2026-10-16 #78 之后**重量的——
+#   上一版这张表里有两处 `BusPostRoot.kt:118 公告 / :119 附近公交`，那就是 #78 第二格撤掉的闪屏预取，
+#   16−2=14；同轮还修了一处**假注释入口**：`BusPostApp.kt:42` 当年被标成"开屏预取"，
+#   它一直是前台 30 秒轮询里的那一次 `attempt { AlertEngine.check(..) }`（任务 #62 那一族的又一形）。
+#   ⚠ 行号会随源码漂，所以每一处都同时写"文件 + 那句干什么"，核对时按语义找而不是按行号找）：
+#     BusPostApp.kt:77 前台轮询 AlertEngine / core/loc/Locator.kt:219 定位取点
+#     core/navigation/AmapNavigationEngine.kt:485 算路受理 / data/repo/Repo.kt:141 续期（dd7d6093）
+#     data/repo/Repo.kt:483 预报解析 / notify/NotifyWorker.kt:34 后台轮询
+#     ui/BusPostRoot.kt:103 深链跳转 / ui/common/UpdateSection.kt:125 装包申请权限（3687211c）
+#     core/update/UpdateDialog.kt:147 装包申请权限（10-13 合并：与上一处同一个出口）
+#     ui/driver/DriverGuideScreen.kt:203 算路 / ui/driver/DriverNavScreen.kt:718 TTS 设语种
+#     ui/driver/DriverSdkNavCard.kt:270 算路 / ui/driver/HandoverScreen.kt:169 交接照片
+#     ui/driver/HandoverScreen.kt:183 签名图上传（#20 阶段 B：与 :169 的照片同一纪律——
 #       签了却没传上去就必须拦停提交，已完成的交接补不进签名，所以它也要在取消可达作用域里跑）
 #   ⚠ 这条判据的"多一处"本意是"新开一个不走 safeApiCall 的网络读"——上面两处（UpdateDialog、签名上传）
 #   确实都是**不走 safeApiCall 的直连读**（一个 GitHub 资产、一个 infra 文件上传），所以按口径收进表里，
@@ -193,7 +198,7 @@ echo "SA-c 使用点合计                            = $USE （目标 6：Repo 
 echo "SA-c 五个迁移点点名                        = logout/weather/linePolyline/unread/driverUnread = $C_LOGOUT/$C_WEATHER/$C_POLY/$C_UNREAD/$C_DUNREAD （目标各 1）"
 echo "SA-c 页面消费点                            = $C_VM （目标 1）"
 echo "SA-d 伪装形状 ?: return emptyList()        = $D_EMPTY （目标 0）/ 反证 emptyList() 在 Repo = $D_EMPTY_PROOF"
-echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/恰好 16）"
+echo "SA-d Repo 的 attempt 残留 / 预报点名 / 续期点名 / 全 main = $D_ATTEMPT_REPO/$D_ATTEMPT_FORECAST/$D_ATTEMPT_REFRESH/$D_ATTEMPT_MAIN （目标 2/1/1/恰好 14）"
 echo "SA-d linePolyline 出口 getOrThrow / 签名    = $D_THROW/$D_SIG （目标 1/1）"
 echo "SA-e 页面状态：声明/复位/分类/文案        = $E_DECL/$E_RESET/$E_CLASS/$E_REASON/$E_SUB （目标 1/2/1/2/1）"
 echo "SA-e 旧形状三处（必须归零）                = $E_OLD_CALL/$E_OLD_SUB/$E_OLD_REASON （目标 0/0/0）"
@@ -228,7 +233,7 @@ fail=0
 [ "$D_ATTEMPT_REPO" = 2 ] || { echo "× SA-d Repo 的 attempt 是 $D_ATTEMPT_REPO 处（D-076 之后实测 2 = 预报解析 + 续期）：多出来的是网络读退回旧 helper（分类丢失），少掉的是那两处点名被换形"; fail=1; }
 [ "$D_ATTEMPT_REFRESH" = 1 ] || { echo "× SA-d 续期那处 attempt 的字面量不见了（=$D_ATTEMPT_REFRESH≠1）：第二格豁免要么被扩大，要么已被换形"; fail=1; }
 [ "$D_ATTEMPT_FORECAST" = 1 ] || { echo "× SA-d Repo 唯一的 attempt 不是 ⑨ 点名的预报解析段（整行字面量不见了）：豁免面必须点名，否则'有 1 处'会被用来藏任意 1 处"; fail=1; }
-[ "$D_ATTEMPT_MAIN" = 16 ] || { echo "× SA-d 全 main 的 attempt 是 $D_ATTEMPT_MAIN 处（**恰好 16**，2026-10-14 重量后逐点枚举见本簿上方 SA-d 注释；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删掉一~三处都不红 = D-082 的空转闸门）：少一处就是 Worker/定位/引擎那几处被顺手改回 runCatching（取消被吞），多一处就是有人新开了一个不走 safeApiCall 的网络读又没登记"; fail=1; }
+[ "$D_ATTEMPT_MAIN" = 14 ] || { echo "× SA-d 全 main 的 attempt 是 $D_ATTEMPT_MAIN 处（**恰好 14**，2026-10-16 #78 重量后逐点枚举见本簿上方 SA-d 注释：16−2 = 撤掉的闪屏预取两处；旧写法是 -ge 11，与实测差 3 ⇒ 顺手删掉一~三处都不红 = D-082 的空转闸门）：少一处就是 Worker/定位/引擎那几处被顺手改回 runCatching（取消被吞），多一处就是有人新开了一个不走 safeApiCall 的网络读又没登记"; fail=1; }
 [ "$D_THROW" = 1 ] || { echo "× SA-d linePolyline 的出口不是 getOrThrow（Repo 内 $D_THROW 处）：失败与后端回空又混成一个值"; fail=1; }
 [ "$D_SIG" = 1 ] || { echo "× SA-d linePolyline 的签名被改成「不抛」的形状（$D_SIG）：这一处修复的前提没了"; fail=1; }
 [ "$E_DECL" = 1 ] || { echo "× SA-e 页面没有独立的折线状态字段：失败又要去挤共享的 vm.error，别的接口失败会被说成「这条线路没轨迹」"; fail=1; }

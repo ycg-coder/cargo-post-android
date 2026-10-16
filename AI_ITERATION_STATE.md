@@ -3379,7 +3379,7 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
   **台账把 `WorkbenchScreen` 写成"先穿透取消"而实测是"整圈仪式摘掉"**（⚠ 这类"本来就没有 catch"的收法在任何判据里都是隐形的，
   只能靠读到自己写的假话 —— 这是本轮唯一一条**判据抓不到、只有读代码抓到**的缺陷）。
 - **没做（在册尾巴，逐条都是"没做"不是"不需要做"）**：`apiCall` 生产调用点仍 **0**；`runCatching` 在 main 仍剩 **34** 处
-  （本轮只收"try 首段有挂起点"那批，`WorkbenchScreen.kt:1077` 的 `callDriver` 这类纯同步形状记为**未收**而不是"已判无害"）；
+  （本轮只收"try 首段有挂起点"那批，`WorkbenchScreen.kt:1082` 的 `callDriver` 这类纯同步形状记为**未收**而不是"已判无害"）；
   **§二十 的 Worker 重试语义没做**（真失败应回 `Result.retry` 而不是 `success`）；**§三十三 的四类失败分型没落进代码**
   （本轮落的是"缺陷 vs 失败"两类 + 取消不是失败，四分类仍只是台账口径）；`QuoteResult` 缺键塌 `0.0`、
   `Repo.optBoolean(…, true)` 两处仍在；**设备侧一字未验**（`NOT VERIFIED ON DEVICE`，五条新增未验项见 DEVICE_STATUS）；

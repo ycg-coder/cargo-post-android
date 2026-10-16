@@ -122,6 +122,12 @@ android {
             buildConfigField("String", "DEMO_PASSWORD", qu(cfg("demoPassword") ?: ""))
         }
         release {
+            // ⚠ 今天刻意留在 false：R8 构建与"必留项扫 dex/mapping"已经跑过并全绿（10-16 实测：
+            //   未裁剪 78,882,356 B / dex 55,847,808 B ⇒ 裁剪后 65,791,585 B / dex 6,909,516 B，−16.6%），
+            //   但**运行时那一遍还没在这台设备上走过** —— 本机没有发布签名库，debug 签名装不进
+            //   已装的 release 签名包（要卸载重装 = 丢登录态），所以不许凭"扫包绿"就翻这个开关。
+            //   要翻的人必须：① 重跑 tools/release_minify_evidence.sh；② 用发布签名包真机走查核心屏。
+            //   判据：tools/check_startup_probes.sh 的 ST-e（两处 false + 取证脚本在场）。
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             /**

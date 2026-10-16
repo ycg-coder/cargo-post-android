@@ -22,10 +22,21 @@ done
 # 非注释行里某句话的出现次数
 nc_count() { grep -n "$2" "$1" | grep -cvE "$NC" || true; }
 
-# DN-a 取数点：工作台恰好一次；用户端首页与闪屏预取各一次（三处 = 一条通路三个消费者，没有第二套公告来源）
-DNA_WB=$(grep -c 'Repo.notices()' "$WB")
-DNA_HS=$(grep -c 'Repo.notices()' "$HS")
-DNA_BR=$(grep -c 'Repo.notices()' "$BR")
+# DN-a 取数点：工作台恰好一次、用户端首页恰好一次、**闪屏 0 次**。
+# 闪屏那两笔（公告 + 附近公交）在 #78 第二格被撤：结果只用来推进度条、丢在地上，
+# 而首页自己发的正是同一对 —— 公告那笔靠 #79 的白名单缓存在 60 秒内被首页复用，
+# 附近公交那笔连 URL 都对不上（闪屏发的是无坐标无半径的那一条）⇒ 纯白问。
+# ⚠ 三条都必须走 nc_count：本轮第一次改完，`grep -c` 把**我新写的那句解释注释**数成了 1，
+#   于是"闪屏还在取数"这条假绿差点跟着改动一起提交（判据命中自己注释的老形，D-124 (b) 同一族）。
+DNA_WB=$(nc_count "$WB" 'Repo.notices()')
+DNA_HS=$(nc_count "$HS" 'Repo.notices()')
+DNA_BR=$(nc_count "$BR" 'Repo.notices()')
+# 同机制反证：全 main 数得出两处真调用点 ⇒ DNA_BR 那个 0 是"真的没有"，不是模式写窄了。
+# （"往闪屏里再加回一笔预取"这条破口本身由 tools/check_startup_probes.sh 的 ST-a 与其负控第 1 条咬。）
+# ⚠ 这里的过滤模式**不能复用 $NC**：$NC 写的是单文件 `grep -n` 的输出形状（行首"数字:"），
+#   而 `grep -rn` 扫整个目录时输出是 `路径:行号:内容`，用 $NC 过滤等于没滤 —— 本轮那条
+#   "别写调用式原文"的注释被数进来，2 直接变 3（同一个坑在 D-124 (b) 记过一次，这次是它的递归形）。
+DNA_ALL=$(grep -rn 'Repo.notices()' "$M" --include=*.kt | grep -vE ':[0-9]+:[[:space:]]*(\*|//|/\*)' | wc -l | tr -d ' ')
 
 # DN-b 渲染点：占格、判定调用、正文列表各一处（少一处就是某一环断了）
 DNB_ITEM=$(grep -c 'item(key = "notice")' "$WB")
@@ -74,7 +85,7 @@ DNJ_SCROLL=$(grep -A 20 'readingNotice?\.let { n ->' "$HS" | grep -c '\.vertical
 DNJ_DEAD=$(grep -c 'private fun NoticeCarousel(notices: List<Notice>, onClick: () -> Unit)' "$HS")
 DNJ_LIVE=$(grep -c 'private fun NoticeCarouselStrip(notices: List<Notice>, onClick: (Notice) -> Unit)' "$HS")
 
-echo "DN-a 工作台 / 首页 / 闪屏 各一次取数 = $DNA_WB/$DNA_HS/$DNA_BR （目标 1/1/1）"
+echo "DN-a 工作台 / 首页 / 闪屏 取数点 = $DNA_WB/$DNA_HS/$DNA_BR （目标 1/1/0，同机制反证全 main $DNA_ALL）"
 echo "DN-b 占格 / 判定 / 正文列表         = $DNB_ITEM/$DNB_BANNER/$DNB_DETAIL （目标 1/1/1）"
 echo "DN-c 司机端「暂无公告」/ 反证       = $DNC_NO+$DNC_NO2/$DNC_PROOF （目标 0/2：失败与真没有必须两句）"
 echo "DN-d 页面自带措辞 / 反证            = $DND/$DND_PROOF （目标 0/恰好 2：措辞只在判定文件）"
@@ -88,7 +99,9 @@ echo "DN-j 用户侧接线/正文/可滚/死码/活件  = $DNJ_WIRE/$DNJ_BODY/$D
 fail=0
 [ "$DNA_WB" = 1 ] || { echo "× DN-a 工作台的 Repo.notices() 不是恰好一次（现 $DNA_WB）：接了两次就是重复 REST，一次都没接就是这一格又是死的"; fail=1; }
 [ "$DNA_HS" = 1 ] || { echo "× DN-a 用户端首页的取数点变了（现 $DNA_HS）：公告通路出现第二套来源或被撤掉"; fail=1; }
-[ "$DNA_BR" = 1 ] || { echo "× DN-a 闪屏预取点没了（现 $DNA_BR）：首屏预热与冷启动口径断了"; fail=1; }
+[ "$DNA_BR" = 0 ] || { echo "× DN-a 闪屏里又出现公告取数（现 $DNA_BR）：#78 第二格白问一遍的老毛病回来了（结果没人读，首页那一轮还得再问）"; fail=1; }
+# 反证（同一条 NC 过滤机制必须数得出两处真调用点）：少了这一格，上面那个 0 可能是模式根本没命中
+[ "$DNA_ALL" = 2 ] || { echo "× DN-a 反证掉了（全 main 的 Repo.notices() 非注释现 $DNA_ALL，期望 2：工作台 + 首页）：那条 0 无法证明是'真的没有'"; fail=1; }
 [ "$DNB_ITEM" = 1 ] || { echo "× DN-b 公告占格不是恰好一处（现 $DNB_ITEM）"; fail=1; }
 [ "$DNB_BANNER" = 1 ] || { echo "× DN-b 页面没调用 noticeBanner（现 $DNB_BANNER）：判定层成了摆设，措辞会退回页面里各写一份"; fail=1; }
 [ "$DNB_DETAIL" = 1 ] || { echo "× DN-b 正文列表没被渲染（现 $DNB_DETAIL）：点开只剩一条标题，其余公告被藏掉"; fail=1; }

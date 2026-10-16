@@ -71,6 +71,22 @@ object AppState {
     /** 前后台标记：前台时 20 秒级轮询提醒，退到后台交给 WorkManager，省电也省流量 */
     val foreground = MutableStateFlow(false)
 
+    /**
+     * 首屏那一轮取数是否已经收场 —— 闪屏的阶段③等这个信号（缺陷 #78 的第二格）。
+     *
+     * 以前闪屏自己在根上 `async` 两笔请求、只用来推进度条，结果丢在地上；而首页自己也在发同一对。
+     * 更糟的是那笔公交预取是 `nearbyBuses(null)`（不带坐标与半径），与首页那笔 URL 不同，
+     * 连 #79 之后的白名单缓存都对不上 ⇒ 冷启动实打实多问两笔，司机端第一屏还完全用不上它们。
+     * 用 StateFlow 而不是事件计数：首屏可能**比这次组合还早**收场，布尔量在那里等着，不会漏。
+     */
+    private val _firstScreenLoaded = MutableStateFlow(false)
+    val firstScreenLoaded = _firstScreenLoaded.asStateFlow()
+
+    /** 只准由首屏自己的那一轮调用（首页 `fetchAll` 末尾 / 工作台 `load` 那一轮末尾） */
+    fun markFirstScreenLoaded() {
+        _firstScreenLoaded.value = true
+    }
+
     val hasUserSession: Boolean get() = Prefs.loggedIn
 
     /** 通知点击带来的目标路由，根导航消费一次后清空 */

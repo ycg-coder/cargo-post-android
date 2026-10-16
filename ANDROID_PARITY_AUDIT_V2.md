@@ -588,7 +588,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`LOCAL_ONLY`（P1）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/ui/user/MineScreen.kt`
-- **类 / 函数**：`MineScreen` 的 `MineRow(BusIcons.bus, "切换为司机模式", …)`(`:143-149`)，`AppState.setRole(Role.DRIVER)`(`AppState.kt:72-75` 只写 Prefs)
+- **类 / 函数**：`MineScreen` 的 `MineRow(BusIcons.bus, "切换为司机模式", …)`(`:143-149`)，`AppState.setRole(Role.DRIVER)`(当时写在 AppState.kt 第 72-75 行，只写 Prefs；这个方法今天已被 `setAccountRole` 取代，见 AppState 那条 KDoc，所以这里刻意不留冒号行号，免得长出一条指向已删代码的活锚点)
 - **当前行为**：点一下就把本机角色改成 DRIVER 并 `nav.navigate(Routes.DRIVER_SHELL)`，**不调 `Repo.bindDriver()`**，也不看 `Prefs.driverId` 是否 > 0。
 - **后端真实行为**：司机身份来自 `GET /driver/profile` 返回的 `driverId`；`Repo.bindDriver`(`:165-177`) 已经写得很正确——`profile.driverId > 0` 才落盘，否则返回错误"该账号未绑定司机档案，请联系站点核对工号"。登录路径 `LoginViewModel:117-123` **有**这个校验（选 DRIVER 角色登录时若未绑定就拦住），所以工程里存在两套纪律：登录有、切换没有。
 - **小程序行为**：小程序没有"切换角色"按钮，角色由后端 profile 决定（`api.js` 无角色入参）——Android 这个入口本身就是本地概念。
@@ -808,7 +808,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`REAL_PARTIAL`（P1）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/ui/BusPostRoot.kt`、`ui/user/BusScreen.kt`、`ui/user/HomeScreen.kt`、`widget/NextBusWidgetProvider.kt`
-- **类 / 函数**：四处调用 `Repo.nearbyBuses(...)`(`BusPostRoot.kt:119`、`BusScreen.kt:128`、`HomeScreen.kt:168`、`NextBusWidgetProvider.kt:45`)，而 `Repo.nearbyBuses`(`:626-630`) 第三参 `district: String = ""` 全部没传
+- **类 / 函数**：三处调用 `Repo.nearbyBuses(...)` 都没传第三参 `district`(`BusScreen.kt:250`、`HomeScreen.kt:192`、`NextBusWidgetProvider.kt:48`)；声明在 `Repo.kt:953`(`district: String = ""`)。第四处原本是闪屏那一笔，#78 第二格撤的是"取了不用"，与本条的缺参问题无关
 - **当前行为**：无定位时传 `geo = null`，`district` 空串 → 请求只有 `radius`；后端三个可选入参都为空。
 - **后端真实行为**：`AppBusController.java:56-65` `nearby(latitude, longitude, radius, district)`；`AppBusServiceImpl.java:257` `locationLevel = located ? PRECISE : (district 非空 ? DISTRICT : UNKNOWN)`；`:312-319` 明确实现了"无精确坐标时按 district 模糊匹配自建站点的名称/地址"这条兜底路径；`AppBusNearbyRespVO.located/locationLevel` 就是给前端做诚实标注用的。
 - **小程序行为**：`pages/bus/index.js:220` `const district = hasCoords ? '' : ((loc && loc.district) || '')`，`:226` 把它传给 `api.getNearbyRealtimeBuses`（`api.js:398-399` 四参），`:254` 用 `district ? '根据${district}展示' : '定位不可用'` 标注来源。
@@ -3272,7 +3272,7 @@ UI/服务侧按"取消从哪来"分三种收法（`attempt {}` 替换挂起形�
 ① **`apiCall` 仍是"已存在但没人用"**：生产调用点实测 **0**（判据里 Z1=1 是它自己的定义行）。
    §七 点名要的 unified helper 我立的是 `attempt{}`，因为它的用场超出网络层；`apiCall` **没删**（删它要动 `ApiTest` 那条用例，是减量不是收口）。
 ② **`runCatching` 在 main 里仍剩 34 处**（Z2 只打数不判红）：本轮只收了"try 里有挂起点"的那一批（TH-g 七个点名形状 → 0），
-   其余（如 `WorkbenchScreen.kt:1765` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
+   其余（如 `WorkbenchScreen.kt:1770` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
    照实记为"未收"而不是"已判无害"。
 ③ **§二十 的 Worker 重试语义没做**：真失败该回 `Result.retry` 而不是 `success` —— 本轮只收了"取消不许谎报这一轮跑过了"（TH-j）。
 ④ **失败四类分型（§三十三 SOURCE/DEPENDENCY/ENVIRONMENT/DEVICE_UNAVAILABLE）没落进代码**：

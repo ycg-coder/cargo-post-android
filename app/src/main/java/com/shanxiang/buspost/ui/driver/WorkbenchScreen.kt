@@ -224,7 +224,12 @@ class WorkbenchViewModel : ScreenViewModel() {
 
     /** 进入 / 下拉刷新 / 失败重试都走这里：这是唯一会顺带取平台公告的一轮（见 [syncFromServer] 的 withNotices） */
     fun load() {
-        work(reset = shift == null) { syncFromServer(withNotices = true) }
+        work(reset = shift == null) {
+            syncFromServer(withNotices = true)
+            // 司机端的第一屏就是工作台：闪屏阶段③等这一轮收场（含 V-2b 那条"不是司机"的早退，
+            // 早退也算收场 —— 不然用户/司机要对着 4 秒兜底干等）。缺陷 #78 第二格。
+            AppState.markFirstScreenLoaded()
+        }
     }
 
     /**
