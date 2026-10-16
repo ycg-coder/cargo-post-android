@@ -112,6 +112,18 @@ ctl EX-k "空串也写 photoUrl：事件里会出现一条指向空地址的凭�
 after_line "$DS" 'val ack = Repo.legAction(' '        val inlinePhoto = mapOf("photoUrl" to uploaded)'
 ctl EX-k "页面自己内联拼 photoUrl：同一份键两处可以各写各的"
 
+# EX-m 的两把：这一格是**真机上抓到的**（重开选片器按返回 → 回调给的是 null → 刚拍的那张被清）。
+# 第一刀回到"取消即清"的裸赋值 ⇒ EM=0；第二刀把保留写法整段删掉 ⇒ 同样要红在该管的一格。
+swap "$DS" 'picked = it ?: picked' 'picked = it'
+ctl EX-m "选片取消把已拍的那张清掉（页面回到「没附照片」那一形，而司机以为还带着）"
+
+# ⚠ 这里用 swap 而不是 drop：本簿的 drop 只把**锚点那几个字**前面加一句注释，行的其余部分原样留着
+#   （第一版用 drop 摘 `val picker = ...` 那半句，结果 `{ picked = it ?: picked }` 还在行尾 ⇒ EX-m 照样绿，
+#   一条"看着注入了、其实没改到判据认的那一格"的假反证）。swap 换整行才是真的把入口拿掉。
+swap "$DS" 'val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked = it ?: picked }' \
+     '// NEG-CONTROL 选片器整段没了'
+ctl EX-m "选片器整段没了：照片这一格连入口都不存在"
+
 swap "$RP" 'internal const val EXCEPTION_REMARK_MAX = 200' 'internal const val EXCEPTION_REMARK_MAX = 2000'
 ctl EX-e "remark 上限被抬到后端列宽之外（超限=1406=整笔回滚）"
 

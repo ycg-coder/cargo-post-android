@@ -150,10 +150,17 @@ android {
             buildConfigField("String", "DEMO_PASSWORD", "\"\"")
             // 发布版签名：storeFile 按相对 keystore.properties 自身所在目录解析，
             // 这样签名材料与配置文件可以整体放在工程外的备份目录里。
+            // ⚠ 两种形状都必须认（队列 #90）：CI 还原材料时写的是 `storeFile=buspost-release.jks`（就在 props 同目录），
+            //   而本地那份备份里写的是 `release-keystore/buspost-release.jks` —— 那个子目录在备份目录里并不存在，
+            //   jks 与 props 是平级放的。只认前者时本地 release **静默产出未签名 APK**（只 warn 一句，不阻断），
+            //   而上传那一步是 `ls *.apk | head -1`，未签名的那只照样会被当成"发布包"。
             signingProps.getProperty("storeFile")?.let { sf ->
-                val store = File(signingPropsPath).parentFile.resolve(sf)
-                if (!store.exists()) {
-                    logger.warn("⚠ 签名文件不存在：${store.canonicalPath} —— release 将产出未签名 APK。")
+                val dir = File(signingPropsPath).parentFile
+                val candidates = listOf(dir.resolve(sf), dir.resolve(File(sf).name))
+                val store = candidates.firstOrNull { it.exists() }
+                if (store == null) {
+                    logger.error("✘ 签名文件找不到，两种形状都试过：${candidates.joinToString { it.canonicalPath }} " +
+                        "—— release 将产出**未签名** APK，这只包不许进任何发布通路。")
                 } else {
                     signingConfig = signingConfigs.create("release") {
                         storeFile = store

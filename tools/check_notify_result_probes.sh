@@ -86,6 +86,11 @@ NWF_TEXT=$(grep -rn 'error\?\.contains\|errorTextOf(e)\.contains' "$S/notify" --
 NWG=$(grep -rn -A 2 'catch (e: Exception)' "$S/notify" --include=*.kt | grep -c 'Result\.success()')
 
 # ---------- NW-h 用例真实读数（只认 gradle 产物，不认自述） ----------
+# 产物缺失时**先真跑一次无过滤全量**再判（队列 #96 / 台账 D-136 第八格）：
+# 上一批 51 本里有两本就是红的，红因不是判据坏，是批里前面某本用 `--tests <单类>` 跑用例，
+# Gradle 拿那一类的结果**覆盖了整个** test-results 目录 ⇒ 这本再读就"没有产物"。
+# 不许用快照还原旧 XML 冒充新鲜证据，所以只允许"再跑一次"这一条出路。
+bash tools/ensure_test_xml.sh "$XML" || true
 if [ -f "$XML" ]; then
     NWH_T=$(sed -n 's/.*<testsuite[^>]*tests="\([0-9]*\)".*/\1/p' "$XML" | head -1)
     NWH_F=$(sed -n 's/.*<testsuite[^>]*failures="\([0-9]*\)".*/\1/p' "$XML" | head -1)

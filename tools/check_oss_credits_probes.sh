@@ -187,6 +187,9 @@ fail=0
 [ "${OSE_ODBL:-0}" -ge 1 ] || { echo "× OS-e APK 里没有 ODbL 字样（实测 $OSE_ODBL）：同上，必须重打 APK"; fail=1; }
 
 # ---------- OS-f 用例真实读数（只认 gradle 产物，不认自述） ----------
+# 同 NW-h：产物缺就先真跑一次无过滤全量（队列 #96）。这两本是上一批里唯一不是代码红的两本红，
+# 根因是**批自己删产物**，不是判据松；用快照还原等于拿陈旧证据冒充新鲜读数，禁止。
+bash tools/ensure_test_xml.sh "$XML" || true
 if [ -f "$XML" ]; then
     OSF_T=$(sed -n 's/.*<testsuite[^>]*tests="\([0-9]*\)".*/\1/p' "$XML" | head -1)
     OSF_F=$(sed -n 's/.*<testsuite[^>]*failures="\([0-9]*\)".*/\1/p' "$XML" | head -1)

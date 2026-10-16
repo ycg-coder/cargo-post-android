@@ -209,7 +209,12 @@ fun DriverExceptionScreen(vm: DriverExceptionViewModel = viewModel()) {
     val context = LocalContext.current
     /** 选中的现场照片（只在本机活着）：传不上去不拦异常上报，但回执要说清没带上 */
     var picked by remember { mutableStateOf<Uri?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked = it }
+    /**
+     * ⚠ 取消必须**留着**已经选好的那一张（真机抓到的：点"已选 1 张，点击重选"再按返回，回过来的 `it` 是 null，
+     *   直接赋回去就把司机刚拍的照片静默清掉 —— 页面回到"没附照片"那一形，而司机以为自己还有照片，
+     *   提交出去就是又一条"凭证没带上"，与 #60 同一格。所以是 `it ?: picked`，不是 `it`。
+     */
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked = it ?: picked }
 
     LaunchedEffect(Unit) { if (vm.legs.isEmpty()) vm.load() }
 

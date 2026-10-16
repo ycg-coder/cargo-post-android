@@ -98,6 +98,14 @@ EJ4=$(grep -cF '?: "单号未给 · "' "$RP")
 EK=$(grep -cF 'if (photoUrl.isEmpty()) mapOf("remark" to remark)' "$RP")
 EK2=$(grep -n '"photoUrl" to' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 
+# EX-m 选片**取消不许清掉已选**（真机抓的，队列 #60 / 台账 D-138）：
+#   在"已选 1 张，点击重选"那一格再点一次 → 系统选片器起来 → 按返回 → 回调收到的是 null。
+#   第一版写的是 `picked = it`，于是刚拍的那张被静默抹掉，页面回到"没附照片"那一形，
+#   而司机以为自己还带着照片 —— 提交出去就是又一条"凭证没带上"，与我们刚修完的 #60 同一格。
+#   正确形状是 `picked = it ?: picked`（这一格里 `it` 与 `picked` 都是 Uri?，判据按这一处的实际形状认）。
+EM=$(grep -cF 'picked = it ?: picked' "$SC")
+EM2=$(grep -n 'PickVisualMedia())' "$SC" | grep -vE "$NC" | grep -cF '{ picked = it }')
+
 echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥12/≥6）"
 echo "EX-b legAction 出口/页面自发热请求   = $EB/$EB2 （目标 1/0）"
 echo "EX-c 自造 type 键/三键集合契约        = $EC/$EC2 （目标 0/1）"
@@ -110,6 +118,7 @@ echo "EX-h 本机自改状态的 copy()            = $EH （目标 0）"
 echo "EX-i 终态守卫字面量（出网前/按钮/入口/选段） = $EI/$EI2/$EI3/$EI4 （目标 1/1/1/1）"
 echo "EX-j 消歧调用（选段行/回执）·页面残留直出串·缺单号兜底 = $EJ/$EJ2/$EJ3/$EJ4 （目标 1/1/0/1）"
 echo "EX-k 照片键纪律（空串不写键 / 页面不内联 photoUrl） = $EK/$EK2 （目标 1/0）"
+echo "EX-m 选片取消保留已选（保留写法 / 裸赋值残留）      = $EM/$EM2 （目标 1/0）"
 
 fail=0
 # ⚠ 下限 10 → 12（2026-10-16，D-135）：#60 给照片键纪律补了两条具名用例，文件实读 12 条 @Test。
@@ -145,6 +154,8 @@ fail=0
 [ "$EJ4" = 1 ] || { echo "× EX-j 缺单号的兜底句被删：没单号时会退回只念段序，正是缺陷 #43 的写法"; fail=1; }
 [ "$EK" = 1 ]  || { echo "× EX-k 「照片没传上就不写 photoUrl」这条判断没了：事件里会留下指向空地址的凭证"; fail=1; }
 [ "$EK2" = 0 ] || { echo "× EX-k 页面里又内联拼了 photoUrl 键（$EK2 处）：一份键两处拼，改一处漏一处"; fail=1; }
+[ "$EM" = 1 ]  || { echo "× EX-m 选片回调不再保留已选（真机抓的：重开选片器按返回就把刚拍的那张清了，页面回到「没附照片」那一形）"; fail=1; }
+[ "$EM2" = 0 ] || { echo "× EX-m 页面里回来了「取消就把 picked 覆盖成 null」的裸赋值（$EM2 处）：司机以为还带着照片"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "§54 异常上报判据通过"; else echo "§54 异常上报判据失败"; fi
 exit "$fail"
