@@ -9,7 +9,8 @@
 6 根探针 1→2，根因是那张表没有 (role_id,menu_id) 唯一键 ⇒ 10 支改按存在性判重 + 立**第 16 本判据**）→
 **深夜又用一次性库把六页真点了一遍**：抓到三处只有真跑才现形的缺陷（`output` 是 JSqlParser 保留字 ⇒ 调用日志页整页 500，
 **我第一版只改列名没修好**，MP 补的 `AS output` 别名里还是那个词；assist 页三格共用一个输入；空日历那格戴错"依据不足"的帽子），
-三处都已修并复验，台账 **D-144**）
+三处都已修并复验，台账 **D-144** → **收尾又把用户点头的 web 悬浮助手做成了**（D-145：同一套六格共用组件 +
+未就绪整个组件不挂载；本机假的 OpenAI 兼容端点把配置口在真 jar 上跑通，AI 开着 FAB 出真草稿、AI 关掉 FAB 整个不存在））
 
 
 ## CURRENT（2026-10-16 深夜 · 台账 D-143 … D-144 · AI 那条线收工 + 迁移白名单实测 + 六页浏览器点验）
@@ -81,11 +82,19 @@
   （复跑四行命令写在契约 `docs/AI_ASSIST_BOUNDARY.md` §13.7，drop 用 `python3 tmp/build_check_db.py --drop`）。
 - **还欠**：`buspost.ai.*` 端点仍空（服务器归用户管）；云上形态仍未点验 ⇒ 对云上仍记 `NOT VERIFIED IN BROWSER`；
   结果面板在**登录超时**这类失败上该念具体原因，不该写"未知原因"（新立的待改进）；#100、#60 不变。
-- **用户新指令（本轮收口时收到，未开做）**：「把 ai 集成一下 / 或做成 web 端的**悬浮助手**」。
-  建议形状 = 一个 FAB + 抽屉，**复用现有六个接口与同一套草稿渲染**（抽一个共用 composable，页面与悬浮窗各挂一次），
-  **不新增后端写口、权限位不变**；硬约束是 `GET /transport/ai/capability/status` 未就绪时**整个组件不挂载**
-  （否则就成了本仓红线里的"假忙/演示形态"），且不加全局热键（会撞 DENY 清单）。
-  等用户点头再动手。
+- **用户新指令：web 端悬浮助手 —— 已做完并两侧点过（台账 D-145，平台侧 `c6599120`）**。
+  照开工前说好的三条：复用现有六个接口与**同一套六格**（抽成 `AiTaskPanel.vue`，路由页只剩壳）、
+  **不新增后端写口 / 权限位不变**、**不加全局热键**。红线落在 `aiAssistantGate.ts` 那个纯函数
+  （只认 `ready===true`）+ `AiAssistantFab.vue` 的 `v-if="showFab"`（onMounted 探一次、失败缓存 false ⇒ fail closed）
+  + `v-hasPermi` 第二道条件；**组件故意放在 `views/transport/ai/assist/` 而不是 `src/components/`** ——
+  第 13 本闸的 AI 面扫描根就是那条路径（队列 #99 那类"扫描根漏掉新码"，这次靠摆放避开）。
+  **两侧实测**：AI 开着（`--buspost.ai.*` 指到本机假的 OpenAI 兼容端点 8899，密钥 sk-local-mock 是假的）
+  ⇒ FAB 出现、抽屉里点分类真出 `道路阻断 + 塌方挡住车道…`，假端点日志见到 `model=mock-model` + Bearer、
+  库里 `order-semantic-classify | ok | 160`、**明文手机号留痕 0 行**；AI 关掉（默认配置重启+刷新）
+  ⇒ **FAB 整个不存在**、运营概览照常 ⇒ "关掉 AI 后台零变化"在页面上成立。
+  ⚠ 顺带踩到并记下：**`-D` 放在 `-jar` 后面是程序参数不是 JVM 系统属性**（第一版 `enabled` 仍 false），
+  改用 `--buspost.ai.enabled=true` 形式；判据是起完先 curl `capability/status` 读 `enabled/model` 两个真值。
+  读数：vitest **5 文件 / 59 用例**、SFC 68 只 0 失败、vue-tsc 0 错、eslint 0 error、build `dist-prod` **377**、15 本闸全绿。
 
 
 ## 上一轮 CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）

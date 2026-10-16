@@ -9448,3 +9448,59 @@ SFC 结构扫（`vue/compiler-sfc` 的 parse + compileTemplate + compileScript�
 ④ **新**：结果面板在登录超时这类失败上应念具体原因，别写"未知原因"；
 ⑤ 点验栈进程已停（后端 48080 / vite 5173 / 临时 Redis 6390），一次性库 `buspost_ai_check` 留着可复用 ——
    复跑三行命令见 `AI_ASSIST_BOUNDARY.md` §13.7。
+## D-145 · 后台悬浮 AI 助手做成并两侧点过：开 AI 它出真草稿，关 AI 它整个不存在
+
+用户一句"可以"拍板了上一轮末尾我提的形状。**实现照开工前说好的三条走**：
+复用现有六个接口与**同一套六格**（抽成 `AiTaskPanel.vue`，路由页只剩壳）、
+**不新增后端写口 / 权限位不变**、**不加全局热键**（会撞 DENY 清单）。
+
+### 一、红线怎么落到代码里
+
+- `views/transport/ai/aiAssistantGate.ts`：一个纯函数 `shouldMountAiAssistant(status)`，**只认 `ready === true`**；
+  只 import 类型 ⇒ vitest 的 node 环境跑它不用把 axios 整套前端配置拉进来。
+- `AiAssistantFab.vue`：`onMounted` 探一次能力（**模块级缓存，全站只问一次** —— `buspost.ai.*` 是启动期静态配置，
+  会话期间 `ready` 不会翻转，重复问就是白发请求；**问失败缓存成 false ⇒ fail closed**），
+  然后 `<template v-if="showFab">` 决定渲染不渲染；`v-hasPermi(['transport:ai:task:run','transport:ai:scenario:query'])`
+  是第二道条件（`hasPermission` 是 `some` ⇒ 任一即可）。
+- **组件故意放在 `views/transport/ai/assist/` 而不是 `src/components/`**：第 13 本闸（`check_admin_ai_data_mask`）的
+  AI 面扫描根就是那条路径，搬走等于让闸看不见新码 —— 这是队列 #99"扫描根漏掉新码"那类坑，
+  这次靠摆放避开，并在 `Layout.vue` 里写了这句注释，免得下一个人"顺手整理"搬走。
+- `hooks/web/useAiDraft.ts`：把 ask（**调用前先清结果**）、两种失败分档、结果标题按场景分词抽成共用状态机
+  —— 页面与悬浮窗**同一份实现**，两份必然漂移，而漂移点正好是"只出草稿 / 未就绪就明说"这几条最容易破的纪律。
+
+### 二、两侧都真点了（不是看代码推的）
+
+本机栈 + **本机假的 OpenAI 兼容端点** `127.0.0.1:8899`（`tmp/fake_openai_endpoint.py`；
+密钥 `sk-local-mock` 是**假的**，真密钥只从环境变量来）：
+
+· **AI 开着**（`--buspost.ai.enabled=true --buspost.ai.base-url=http://127.0.0.1:8899/v1 --buspost.ai.model=mock-model`）：
+  能力接口 `ready=true / model=mock-model` ⇒ **FAB 出现**；点开抽屉是同一套六格；
+  填"路上塌方了，车过不去，联系 13800138000"点「问一次分类建议」⇒ 抽屉出 **`道路阻断` + `塌方挡住车道，材料里说车过不去`**。
+  两端取证：假端点日志 `[2] path=/v1/chat/completions model=mock-model bearer=Bearer sk-local-mo…`；
+  库里 `order-semantic-classify | ok | 160`，**明文手机号留痕 0 行、掩码形状 3 行**。
+· **AI 关掉**（默认配置重启 + 刷新）：能力接口 `ready=false` ⇒ **FAB 不存在**、页面上搜不到那句标题，
+  运营概览照常显示 ⇒ **"关掉 AI 整套后台零变化"在页面上成立**。
+
+**这同时把配置口在真 jar 上跑通了**（§7 那句"只改三个值"第一次有运行证据）——
+之前只有 `AiGatewayTest` 在 JVM 里起的 HttpServer，没有一次是真进程打真端点。
+
+### 三、我这一轮踩的（形状会复发）
+
+**`-D` 放在 `-jar` 后面是程序参数、不是 JVM 系统属性。** 第一版就是这么起的后端，
+`capability/status` 仍然 `enabled=false`，我差点去查 `@Value` 绑定。改用 Spring 风格的
+`--buspost.ai.enabled=true …`（或把 `-D` 挪到 `-jar` 前面）才生效。
+**判据**：起完之后先 `curl /transport/ai/capability/status` 读 `enabled/model` 两个真值，别凭启动命令"应该生效"。
+
+### 四、读数
+
+vitest **4→5 文件 / 54→59 用例**（`aiAssistantGate.test.ts` 5 条，**正反都钉**：就绪⇒挂、开关没开⇒不挂、
+配了一半 `ready=false`⇒仍不挂、状态接口没回⇒不挂、多带字段不影响判定 —— 少了反面用例，"永远挂载"也能全绿）；
+SFC 结构扫 68 只 0 失败；`vue-tsc --noEmit` 0 错；eslint **0 error**（7 条既有 warning）；
+`build:prod` rc=0（`dist-prod` **373→377**，assist 与 FAB 文案都在产物里）；
+15 本静态闸全 `rc=0`（页面计数 43→45 = 新增两个 `.vue`，**写按钮 21 不变** ⇒ AI 按钮本来就不算写按钮）。
+
+### 五、还欠的（不变）
+
+① 真端点仍未配（`base-url` + `BUSPOST_AI_API_KEY` + `model`，**服务器归用户管**）；
+② 云上形态仍 `NOT VERIFIED IN BROWSER`（PR #195 未合）；③ 结果面板在登录超时这类失败上该念具体原因（上轮立的待改进）；
+④ #100、#60 不变。平台侧四笔：`a7c80070` `33111b8c` `ec2dbd4e` `c6599120`（前三笔 CI 四作业全绿，第四笔在跑）。
