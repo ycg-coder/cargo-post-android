@@ -9551,9 +9551,9 @@ SFC 结构扫 68 只 0 失败；`vue-tsc --noEmit` 0 错；eslint **0 error**（
   部署**一个字节都没写库**（这是设计如此：写库只走 guarded）。
 · 顺手把 **PR #196** 也合了（`18c73167`）：MiMo 单行回包解析 + guarded 的 `actions/checkout` v4→v7。
 
-### 四、迁移卡在 runner 上（**云端库到现在还是老形状**）
+### 四、迁移卡了四次，最后是网络的锅（**第五次成功，已落地**）
 
-`mode=apply`（`confirm=APPLY`）**连着三次红在 `Run actions/checkout`**，守卫/探测/执行一步没跑：
+`mode=apply`（`confirm=APPLY`）**连着四次红在 `Run actions/checkout`**，守卫/探测/执行一步没跑（下面这段是当时的排查过程；**结论与最终结果在四·补**）：
 · 先升了 checkout v4→v7（仓里只有 guarded 还在用 v4，ci.yml 七处都是 v7）⇒ **v7 一样红**，假设被推翻；
 · 同一个 runner 上 **Deploy 刚刚是 success** —— 但 `deploy-dev.yml` **根本不含 `actions/checkout@`**
   （它在服务器持久检出的目录里跑），所以"部署成功"不能反证 checkout 可用；
@@ -9561,7 +9561,28 @@ SFC 结构扫 68 只 0 失败；`vue-tsc --noEmit` 0 错；eslint **0 error**（
 ⇒ 最可能的根因是**本机与 runner 同网段、到 GitHub 的连接间歇不通**，而不是脚本或工作流写法。
 **判断依据留在这**：checkout 失败时 job 日志 blob 取不到（`gh run view --log-failed` 空），
 所以只能靠"部署不经 checkout 却成功" + "本机同时段连 GitHub 超时"这两条旁证。
-⇒ 这一格**没做完**：V037 + V050–V055 仍未在云上执行，AI 的五页菜单在云后台还看不到。
+⇒ 当时的判断（根因是网络、不是 runner）**事后被证实**：见四·补 —— 网络一恢复，同一个 runner 一次就过。
+
+
+### 四·补（2026-10-17 20:0x，网络恢复后重跑，**迁移落地了**）
+
+`mode=apply` 第 5 次重试（`run 38958917904`）**completed/success**，七步全绿：
+
+    Run actions/checkout@v7=success → 守卫=success → 探测当前库状态（只读）=success
+    → 执行幂等迁移（仅 mode=apply）=success → 落地核对（数不出就必须红）=success → 归档探测读数=success
+
+**这反过来证明根因是网络不是 runner**：前四次全红在 `actions/checkout`，同一窗口**我自己的 push 也断过两次**
+（`Failed to connect to github.com:443`）；网络一恢复，同一个 runner、同一份工作流一次就过。
+
+**落地核对为什么能当凭证**：那一步跑的是 **32 格 `probe_strict`**，每格都比对"现读 vs 期望"，
+**任何一格对不上就 `MISSING+1` 并把整步判红**（`[ "${out}" = "${want}" ] || MISSING=$((MISSING + 1))`）。
+它 success ⇒ 云上现在确确实实数得到：`ai_saved_query` / `ai_invocation_log` / `transport_town_event_calendar` 三张表、
+7100 目录与 7110/7120–7123/7130/7140/7150 五个页菜单、以及**每个角色授权恰好 1 行**
+（这一格正是我 D-143 那次把 `INSERT IGNORE` 改成按存在性判重的收益：改之前跑两遍就会变成 2 行、把这一步判红）。
+
+⚠ 两个没拿到的东西（照实记）：**job 日志 blob 取不到**（`BlobNotFound`，这台 runner 一直没上传日志）、
+**归档的 probe 报告 artifact 也不存在** ⇒ 32 格的**具体数字**没留下来，只留下了"全数对上"这个结论。
+要留全表数字，得让那台 runner 能把日志/artifact 传上去。
 
 ### 五、我这一轮判错的两处
 
@@ -9574,7 +9595,7 @@ SFC 结构扫 68 只 0 失败；`vue-tsc --noEmit` 0 错；eslint **0 error**（
 
 ### 六、还欠的
 
-① **云端迁移**：重跑 `mode=apply`（脚本幂等，跑几遍都行；第 16 本判据在本机实测过两遍零漂移）；
+① ~~云端迁移~~ **已落地**（`run 38958917904` completed/success，第 5 次重试）；剩下的是**云上形态还没在浏览器点过**；
 ② 云上 AI 要真能用，还差**服务器上的三个环境变量**：`BUSPOST_AI_API_KEY`、`buspost.ai.base-url`、
 `buspost.ai.enabled=true`（密钥只从环境变量来，仓库里永远没有它）；
 ③ 结果面板在登录超时这类失败上该念具体原因（上一轮立的待改进）；④ #100、#60 不变。

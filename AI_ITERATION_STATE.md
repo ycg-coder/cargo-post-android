@@ -108,12 +108,13 @@
 - **合并与部署**：**PR #195 已合**（`f1b58658`，34 笔）⇒ master 上 `Project validation` 四作业全绿、
   **Deploy to dev server = success**；**PR #196 也合了**（`18c73167`：MiMo 单行解析 + guarded 的 checkout v4→v7）。
   `AUTO_DB_MIGRATE` 未设 ⇒ 部署**一个字节都没写库**（设计如此）。
-- **⛔ 云端迁移仍卡在 runner 上（这一格没做完）**：`mode=apply`（`confirm=APPLY`）**连着 4 次红在 `Run actions/checkout`**，
+- **✅ 云端迁移已落地**（`run 38958917904` completed/success，第 5 次重试；**根因是网络不是 runner**）：`mode=apply`（`confirm=APPLY`）**连着 4 次红在 `Run actions/checkout`**，
   守卫/探测/执行一步没跑，日志 blob 取不到（`BlobNotFound`）。升 v7 没用（假设被推翻）；
   同一 runner 上 Deploy 是 success —— 但 **`deploy-dev.yml` 根本不含 `actions/checkout@`**（它在服务器持久检出目录里跑），
   所以"部署成功"不能反证 checkout 可用；同一窗口内**我自己的 push 也断过 20 秒**（`Failed to connect to github.com:443`）。
   ⇒ 最可能是**本机与 runner 同网段、到 GitHub 的连接/工作目录有问题**，**这一格要人在服务器上看**（重启 Actions runner 或清 `_work`）。
-  结果：**V037 + V050–V055 未在云上执行**，AI 五页菜单在云后台还看不到。
+  **落地核对那一步跑的是 32 格 `probe_strict`、任何一格对不上就整步判红** ⇒ 它 success 就等于云上确实数得到：
+  三张表（`ai_saved_query` / `ai_invocation_log` / `transport_town_event_calendar`）、7100 目录与五个页菜单、**每个角色授权恰好 1 行**（正是 D-143 把 `INSERT IGNORE` 改成按存在性判重的收益）。
   ⚠ 我**没有**绕过它去改部署路径（比如临时置 `AUTO_DB_MIGRATE=1`）：那是写库通道的安全设计，
   且 `deploy-dev.yml` 那份白名单只到 V025、**根本不含 AI 那几支** —— 绕过去也达不到目的，反而把"要不要动云上数据"变回隐式。
 - **还欠**：服务器上三个环境变量（`BUSPOST_AI_API_KEY` / `buspost.ai.base-url` / `buspost.ai.enabled=true`）才能让云上 AI 真能用；
