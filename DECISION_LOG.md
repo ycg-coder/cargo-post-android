@@ -7971,7 +7971,8 @@ ISO 串（`"2026-09-29T09:40:00"` / `"2026-09-29 10:20:00"`），而后端全局
 （`DriverExceptionScreen.kt:170`）。异常上报是**对某一段的状态写入且撤不回来**（后端把段与订单一起置异常并
 告警后台），所以这不是文案口味问题：报错对象了，司机与调度各拿一套事实。
 
-补两个纯函数（`DriverExceptionReport.kt:69`/`:75`/`:80`）：`legOrderTag` 取单号尾 6 位，
+补两个纯函数（`DriverExceptionReport.kt:81`/`:87`/`:92`——#60 之后重锚：那一轮在这三个点之前净加 12 行，
+旧读数 69/75/80 已指不到它们）：`legOrderTag` 取单号尾 6 位，
 **缺单号必须明说"单号未给"**，不许悄悄退回只念段序（那正是缺陷本身，也是这条规矩最容易被人"顺手简化"回来的地方）；
 `legOptionTitle`（选段行）与 `legReceiptText`（回执）各一个出处，两个调用点都改成走函数。
 用例 +3：两单同为第 1 段必须互不相同、缺单号与全空白单号两种都没法顶掉标识、终态段的"不可再报"在文案里留痕。
@@ -8737,3 +8738,208 @@ order / product / productOrder / route / shift / station / vehicle）：这一�
 还原后 `pricingRule/index.vue` 与 HEAD **零差异**。**教训：`--fix` 只对新增代码的形状负责，
 不要顺手对着一整个目录跑**（要跑也先看 `git diff --stat` 里有没有不相干的页）。
 **没做浏览器点验**：三态那几格与"发送成功"回读都要真失败注入或真通知链路才看得见 ⇒ 登记 NOT VERIFIED IN BROWSER。
+
+### D-135（10-16 12:1x–15:5x · 本机钟实测）· #60 异常现场照片接通：请求里那一格后端终于接了，代价是三本闸的锚点全漂移
+
+起点是一句"报文里有 `photoUrl`，后端只读 `remark`"：司机拍了现场照、文件落到 infra、地址发出去了，
+**后端那一格从来没写** ⇒ 取证链在最后一公里断掉，而且断得没有声音（`code=0`，界面念"已提交"）。
+
+**后端半（PR #195 提交 `4466a837`）**：`DriverAppServiceImpl#legAction` 的 `case "exception"` 现在把
+`reqVO.getPhotoUrl()` 交给 `reportLegException(leg, remark, photoUrl)`，非空白才写进订单事件的
+`extra_data`（`JSONUtil.toJsonStr(Map.of("photoUrl", url))`）。**为什么不落新列**：`transport_order_event.extra_data`
+本来就是 `text`、注释原文"扩展数据JSON"，且 `OrderEventRespVO.extraData` 已经回给后台 ⇒ 不碰迁移、
+也就不必动 guarded 工作流那道 `confirm=APPLY` 闸（与 `DispatchServiceImpl` 把弃单写进 `unassigned_orders` 同法）。
+**后台半**：订单详情时间线改走 `constants.ts::eventPhotoState(extraData)` 三态（有图 / 后端没给这一格 /
+给了但读不出），缺值不许画成一张坏图，也不许不吭声 —— 与金额那格是同一条纪律。
+
+**App 半（本轮）**：`DriverExceptionScreen` 加选图器（`PickVisualMedia`，可选、**不拦上报**），提交前在取消可达
+作用域里上传，请求体由新纯函数 `exceptionActionBody(remark, photoUrl)` 拼：**上传成功才带这个键**。
+出口与交接确认**故意不同**并且理由要写清：交接的照片传不上去就拦停（签名/凭证补不进已完成的交接），
+异常的照片传不上去不拦（异常必须先到调度，少一张只是取证不全，不发这条是整段货没人管），
+但回执必须明说"照片没传上去"。用例 +2（键在/键不在两种），文件实读 12 条 `@Test`。
+
+**这一轮真正的代价：一处源码改动把三本闸的锚点顶漂移**（改文案、加函数 ⇒ 行号动 ⇒ 在册锚点与注入锚点全要重指）：
+· `exception_negative_controls.sh` 的 EX-b drop 锚点、`exception_test_negative_controls.sh` 的 X-7 注入锚点 ⇒ 重指新落点；
+· `check_exception_probes.sh` 加 EX-k 两条（守卫字面量=1、页面内联 `"photoUrl" to`=0），
+  EX-a 用例下限 10→**12** 按实跑抬 —— 不抬的话"注释掉一条用例"注进去仍然绿，**是负控自己报出来我才知道的**；
+· 台账第 7974 行的三条锚点（`DriverExceptionReport.kt` 里的 69、75、80 行）按 diff 净加 12 行机械平移到 81、87、92
+  （`DA-d` 先红"新增=1"，重锚后 新增=0/消失=0，`DA-e` 271→**270** = 重锚一条就降一条）；
+· `SA-d` / `TH-f` 那对"两本必须同数"的 attempt 点数：**恰好 14 → 恰好 15**，新落点
+  `DriverExceptionScreen` 第 173 行同轮列进 SA-d 的逐点表，并写清它为什么算"不走 safeApiCall 的直连读"
+  （infra 文件上传，与签名图那格同一个口子，出口是 `getOrDefault("")` 不是 `getOrThrow`）。
+
+**读数**：全批负控 **51/51 本**跑完，49 本 rc=0、2 本 rc=2（`notify_result` / `oss_credits`，成因见 D-136 末尾
+那条"批自毁产物"，不是代码红）；`check_doc_anchor_probes.sh` rc=0（records=1489、越界 0、在册 246 全对齐、ID-MISS 270）；
+App 全量用例与后台 CI 的分项数字见 D-136。
+
+⚠ **没做的一项，别记成做完了**：异常上报那一格的**界面行为**（选图器弹起、真上传、`photoDropped` 回执三态）
+只有 JVM 纯函数用例与静态判据，**没在真机上点过** ⇒ 登记 `NOT VERIFIED ON DEVICE`。
+通路已知（MIUI 装包走 `pm install-create/write/commit` + 自动点「继续安装」，见内存那条更新），
+下一步就是装包把这一格补验。
+
+### D-136（10-16 12:1x–16:0x · 本机钟实测）· 后台线一揽子：幂等键从"12 条里有 4 条假话"收到 9 条；十二本闸在 GBK 控制台上全崩；负控批会自毁证据
+
+这一轮在 PR #195 分支上落了 8 个提交（`0b20a9c1`→`0c7a47f2`+后续），**master 一个字没动**；
+CI 的 backend / frontend / drift-check 每次都出数，本机没有 Maven 也没有 wrapper ⇒ Java 侧读数一律以 CI 为准。
+
+**一、#60 的可执行断言（`0b20a9c1`）**：上一版把 `photoUrl` 接进 `reportLegException` 之后，这条链路
+**没有任何用例**——CI 只证明它编译过。补两条具名用例（带照片 ⇒ `extra_data` 里只有那一个键、值就是那个地址；
+空白 ⇒ 必须 `null`，不许写空串）。CI 类级读数 `DriverAppServiceImplTest` **39 → 41**、全量 **367 → 369**、
+Skipped 0（拿上一版同一个 job 对比，不是只看 rc）。
+
+**二、#89 后台写口幂等：从 12 收到 9，因为我自己写了 4 条假话**
+先纠三句读数：后台写口不是 40 是 **45**（当时）；`driver-vehicle/bind` 是 POST 不是 PUT、
+`feedback/reply` 是 PUT 不是 POST；"11 个口"里 `plan/manual` 当时**漏插了注解**而 `reply` 才是真在列的。
+逐个读实现后发现 12 条在册理由里 **4 条是看方法名编的**：
+· `bind` 先 `unbindAll(按司机)` 再 `unbindAll(按车辆)` 才插入 ⇒ 重复的净效果仍是同一对人车；
+· `reviewPlan` 开头要求 `status=PENDING` ⇒ 第二次被状态机拒；
+· `allocateDynamic → allocateRaw → algorithmClient.allocate` **整条不落库** ⇒ 不存在"生成第二个方案"；
+· `reply` 是一个 `updateById` 覆盖同三个字段 ⇒ 重复=写同一个值。
+撤掉这 4 条注解并把**撤因连实现出处**写进判据头（`9435d858`）。留下的每条都给得出"重复一次多出什么"。
+**这不是缩小判据换绿**：留着假理由的判据比缺判据更贵，它会把猜测固化成下一轮的"已核实前提"。
+
+**三、十二本静态闸在 GBK 控制台上全崩（`871dd3b2`）**：不设 `PYTHONIOENCODING` 时 12/12 本在打印中文那一行抛
+`UnicodeEncodeError`，退出码 **1** —— 与"判据判红"共用同一个码。差点把一条环境红读成"这一本有违规"，
+是回头单独取 rc 才看见 traceback。统一加输出流 UTF-8 头部；`check_training_health.py` 没插（它的
+`from __future__` 必须在开头，补丁脚本的 `py_compile` 当场拦下没落盘，且它属算法侧、不在 CI）。
+同轮把四本**根本没实现 `--self-test`** 的闸补上（`f1af52f0`）：`query_page_reset` K1–K8（真树 16 页 / 49 处入口）、
+`write_button_guard` K1–K9（含"按钮在内层列插槽里也必须被数到"这把历史刀）、`catch_leaves_data` K1–K9
+（含**"修好了不改在册表必须红"**）、`menu_id_collisions` K1–K7（真树 64 条声明 / 61 个 id）。
+另修 `check_admin_no_wallclock_progress.py` 的 K5：注入时写死 `anchor + "\n"`，而 Windows 工作树是 CRLF ⇒
+**本机整把刀静默不注入**，报出来一句像代码坏了的红；CI 在 Linux 是 LF 那边一直绿 ——
+一把只在一台机器上有牙齿的刀不算刀。
+
+**四、CI 探测步的安全加固（同一个提交里，hook 点名后查实的）**：`changes` job 原来把
+`github.event_name`/`base_ref`/`event.before` 直接插进 `run:` 正文 —— runner 先替换再交给 bash，
+分支名里带引号或分号就是别人执行的代码。改成走 `env:` + 形状校验，本机三条路径真跑：push rc=0（范围读数正确）、
+合法 PR rc=0、`BASE_REF='master"; touch /tmp/PWNED'` → **rc=1 且没落文件**。
+
+**五、#92 管理员待处理那一格（`8a7aec94`）**：告警一直写得进表（`sendToAdmin` 全仓 6 处），但后台
+没有口径问得出"还有几条没处理"——`NotificationPageReqVO` 只有 `userId/eventType/orderId/readStatus/createTime`，
+而这张表三类接收方**共用编号空间**（USER 的会员 id、DRIVER 的司机 id、ADMIN 的常量 0）。
+补：`recipientType` 过滤口径 + RespVO 补 `recipientType/level`（原来表里有、接口不回，页面就分不清这行是谁的）+
+`GET /admin-unread-count`（**一次取回内存分档**，不在 mapper 发三条 count —— 那样"总数 ≠ 各档之和"永远查不出来）+
+`PUT /mark-admin-read`（复用既有 `markAsRead` 的接收方类型+编号双校验，不新建第二条写路径、不新增权限位）+
+页面三态与"标记已处理"（成功后**回读那行的 readStatus** 才宣布，并明说记时间不记操作人——表里没那列）。
+用例 4 条，CI 类级 `AdminNotificationQueueTest` Tests run: 4、全量 **376**。
+
+**六、#93 的底座：脱敏唯一出口 + 第 13 本闸（`0c7a47f2`）**：赶在 AI 那条线动手之前放好工具。
+`SensitiveDataMask.mobile/tail4`（空值原样返回 —— 把"后端没给手机号"掩成 `"***"` 会让读的人分不清"没给"
+和"给了被屏蔽"，与金额缺值不许念成 `0.00` 同一条纪律）；闸 `check_admin_ai_data_mask.py` 钉四件事
+（出口在、模块里没有第二处掩码实现、空值守卫恰好 2 处、AI 面出现 `getMobile(`/`.mobile`/`mobile:` 即红），
+七把刀全 ✔，其中 K6 专钉"AI 目录还没落地时打『跳过』而 A1–A3 仍活着"——否则那句跳过就是空转闸的遮羞布。
+现读：transport `.java` **377** 个、自写掩码 **0** 处（说明"唯一实现"这条今天确实是第一条）。
+
+**七、#93 乡镇事件日历（进行中）**：`V037__town_event_calendar.sql` + DO/Mapper/Service/Controller +
+枚举 `TownEventTypeEnum` + 服务层规则校验（起止日、类型、`EVERY_N_DAYS` 的间隔 2–31）+ 同日查重 +
+`listEffectiveOn(day)` 的周期展开 + 6 条用例。**两处设计决定写在脚本头**：① 为什么带 `recurrence`
+（县域场期是周期的，只能存单日的话运营要替每个镇一年填几十行，填不出来的表等于没有表）；
+② **为什么故意不加 DB 唯一键**（本表软删，`UNIQUE(town,type,start_date,deleted)` 在"建→删→再建→再删"的
+第二轮删除上必撞键，而报出来只是一次 update 失败，看不出根因）。
+菜单主键 6950/6951/6952（现读 6xxx 占到 6941），撞号由 `check_menu_id_collisions.py` 拦。
+幂等对照数被我按 +1 写成 47，**被闸当场打回**（新控制器其实带进 3 个写口，现读 49）——
+这一笔记在这儿是因为它正是那本闸存在的意义：**估的不算数**。
+
+**八、负控批会自毁证据（新立案，未修）**：51 本全批跑完，49 绿、`notify_result` 与 `oss_credits` 两本 rc=2，
+读数都是"真身没有 `app/build/test-results/...xml`"。成因不是判据坏，是**批自己删的**：任何
+`*_test_negative_controls.sh` 跑 `testDebugUnitTest --tests <单类>` 会用该类结果覆盖整个目录 ⇒
+排在后面、要读别的类 XML 的书必然看不见产物 ⇒ 按当前次序全批永远不可能全绿。
+恢复实测：重跑全量 ⇒ `tests=762 failures=0 errors=0 badfiles=0`、XML 从 1 个回到 **74** 个。
+修法定了：这两本在自己的 XML 缺失时先跑一次**无过滤全量**再复核，仍没有才红；**禁止用快照还原旧产物冒充新鲜证据**。
+同轮把这两本复跑（证据恢复后）：`notify_result` 14 ✔ rc=0、`oss_credits` 20 ✔ rc=0 ⇒ "环境红"这个定性有读数，不是猜。
+顺带一条**新咬到的**：`DA-d 新增即红` 第一次红在**我刚写的记录**上——台账第 8768 行那句里同时出现
+某个 `.kt` 文件与行号、又在同一段提到 `safeApiCall`，被锚点工具配成一条活的 ID-MISS 锚点（可疑 aid 246→247）。
+改成"某某文件第 173 行"（不把 `file:NN` 形状与标识符放进同一段）后回到 246。⇒ 记这条是因为它反过来说明
+**写台账的句子本身要按判据的形状来写**，而不只是"写完了让闸去核"。
+
+**九、待办与边界**：PR #195 合进 `master` 会触发云端部署 + guarded 迁移，由人点；`V037` 的 apply 同理。
+后台"手动调整余额"开不开口是运营决定（两条技术拦阻已补齐，钱包页那句过期断言也已改成对今天后端的事实，
+`2be7b284`）。AI 侧的边界与并行分工在 `docs/AI_ASSIST_BOUNDARY.md`。
+
+---
+
+## D-137 · 推上去的那版后端**根本没编译过**，以及"一个业务两张表"是我自己那份契约造成的
+
+### 一、真值在哪：CI 的作业结论，不是我读代码的感觉
+
+`gh run list --branch ci/admin-gates-2026-10-16` 实读：run **38869518615**（head `0c7a47f2`，就是"敏感字段掩码唯一出口 + 第 13 本静态闸"那一笔）
+= `conclusion=failure`；逐作业看：`changes` / `drift-check` / `frontend` 三本 success，**只有 `backend` 红**。
+红因是两行编译错误：`SensitiveDataMask` 里那个"只保留首字符"的常量声明成了 `String` 却赋了 `1`，于是下一句
+`Math.min(常量, v.length())` 找不到合适的方法。**改法一个词**（把那个常量的类型改成 `int`），提交 `064d66b8`。
+
+### 二、为什么会把没编译过的码推上去：一条我信了好几轮的前提是假的
+
+我一直以为**本机没有 maven**，所以后端的每一笔改动都只靠 CI 验，而 CI 的作业名与"判据簿绿了"在我这里被当成了同一件事。
+今天实测：`/c/Users/袁/apache-maven-3.9.16/bin/mvn` 在，`.m2` 也在。跑 `mvn -B -pl yudao-module-transport test`（不加任何 `-Dtest` 过滤）：
+
+```
+[INFO] BUILD SUCCESS
+[INFO] Tests run: 387, Failures: 0, Errors: 0, Skipped: 0     # 43 个类
+```
+
+同一条命令在修之前是 `BUILD FAILURE` + `MVN_RC=1`。⇒ **新规矩：后端每一个提交推送前必须本地编译该模块并读 `MVN_RC`**，
+判据脚本（`scripts/` 下那十四本 python）读的是源码**文本**，它们全绿不等于这段 Java 能编译。
+这与前端记过的那条同形：**`ts:check` 绿 ≠ 模板层验过**。`SensitiveDataMaskTest` 那 4 条用例在这之前一次都没真的跑过。
+
+顺带把"读数从哪来"这条也钉实：`387` 是从汇总行数的，`43` 是数 `surefire-reports` 下的 XML 文件名，
+不是我照抄上一轮的账面。
+
+### 三、日历这一块进仓了（`c9b11736`，队列 #93）
+
+- 表 `transport_town_event_calendar(town, event_type, start_date, end_date, recurrence, interval_days, note, ...)`，
+  `recurrence` 只做 `NONE` / `EVERY_N_DAYS` 两种。为什么带周期：县域场期是周期的（多数场镇逢 1/4/7 或 2/5/8），
+  只能存单日就要运营替每个镇一年填几十行，**填不出来的表等于没有表**。
+- 接口五个写 + 一个读口径：`/page`、`/get`、**`/effective-on?day=`**（把周期展开成"这天生效的事件"，AI 那条线要读的就是它）、
+  `/create`（服务端幂等键在册）、`/update`、`/delete`；权限位 `transport:town-event:query|save|delete`；菜单 6950/6951/6952。
+- 用例 `TownEventCalendarServiceImplTest` 实跑 **7 条**（我原先记的是 6，数错了；这一格的数只从产物读）。
+- 幂等在册表 46→**49**、8→**9**：新控制器一次带进三个写口，我先按 +1 估成 47，**被那本闸当场打回**。
+  这是同一条教训的第二次：估的不算数，扫面变了必须重新数。
+- 三本闸的本轮读数：`check_admin_write_idempotency` 真树 49 / 9 rc=0、K1–K7 rc=0；
+  `check_menu_id_collisions` 真树 72 条主键声明无跨文件撞号 rc=0、K1–K7 rc=0。
+
+### 四、`town_event_calendar` 与 `transport_town_event_calendar`：一个业务两张表，根子在我那份契约
+
+2026-10-16 下午，并行那条线（AI 辅助模块）在同一个人工作树里落了码：`yudao-module-ai-assist/`（10 个文件、**0 条用例**）、
+`V050__ai_event_calendar.sql`（建 `town_event_calendar`，菜单 7100–7104、权限 `transport:ai:event-calendar:*`）、
+`views/transport/ai/` 与 `api/transport/ai/`，另外改了 root `pom.xml`、`yudao-server/pom.xml` 和 `db-migrate-guarded.yml`（+3 格 probe）。
+**这些全都没提交，我这一轮也没替她提交任何东西**（`git add` 全程只走显式路径，`git status` 剩 10 格都是她的）。
+
+为什么会撞：我在 `docs/AI_ASSIST_BOUNDARY.md` §6 第 2 项里把表名和列都写死了（`town_event_calendar(town, event_type, start, end, note)`），
+她照这句建了一套；同一天我自己按同一个队列项又建了一套。**表名不同、菜单主键不同 ⇒ 已有的 `check_menu_id_collisions.py` 判绿** ——
+那本闸认的是主键户口，不认业务身份。这不是它的 bug，是它管不到这一格。
+
+代价不落在这次部署，落在运营身上：同一个集日要填两遍，后台读一套、情景提示读另一套，而两边都念"这就是日历"。
+本仓已经记过一条同形的（#66：待调度单数同页两个答案）。
+
+处置（提交 `5abba2f9`，队列 #98）：
+
+1. 新闸 `scripts/check_business_table_single_owner.py` = 第 **14** 本。认两条形：剥掉一个已知模块前缀后与另一方的**全名**同名（两张表）、
+   同名 DO 落在两个顶层模块。明确不判的也钉成用例而不是口头话：同名表写在基线 + 增量两处（本仓既有规矩，实读 5 对）、
+   两边都剥完再比（会把上游 `system_*` 整片误红）、剥完只剩一个词的单名。六把刀 K1–K6 各红在该管的那一格。
+2. 两个面都跑了读数：**工作树**（含她那套未提交文件）⇒ `92 条 CREATE TABLE / 87 个表名 / 92 个 DO`，判出 **2 组** rc=1；
+   **干净 HEAD 导出**（`git archive HEAD | tar -x` 之后跑，也就是 CI 会看到的面）⇒ `90 / 85 / 90`，判出 **0 组** rc=0。
+   ⇒ 这本闸今天绿、她那套一进仓就红。红的是"两张表都要运营填"这件事本身，不是闸坏了。
+3. 归属写了：**留带 `recurrence` 的那一套**（她那一套没有周期规则，正是"填不出来的表"那种形状），
+   并把 §6 那行改成"已由主线做完，本线不再各建一套"，给出退场路径 —— **`V050` 从没进过任何一次云上执行**（`mode=apply` 要人显式 `confirm=APPLY`），
+   所以现在收手不需要 DROP 迁移。这是这件事还便宜的原因，再晚就不便宜了。
+
+### 五、并行在同一棵工作树里干活的操作边界（这条要给人看）
+
+两个 agent 共用 `cargo-post-platform-m195` 这一个工作树、同一个分支 `ci/admin-gates-2026-10-16`：她若 `git add -A` 就会把我的中间态一起提交，
+我若做同样的事就会把她的半成品（无用例、契约字段没逐字节核过）推上 PR #195。**合 PR 会触发云端部署**，所以这一格的纪律是：
+只按显式路径 `git add`、不动她的文件（哪怕我判断它是重复的）、云上写库仍然只走 `db-migrate-guarded.yml`。
+"她那一套该退场"这件事我只写进了契约文档，**没有替她删** —— 删她的码要她停手之后才安全。
+
+### 六、状态板与一条被实测推翻的收尾计划
+
+`AI_ITERATION_STATE.md` 顶部换了新 CURRENT（14 本闸 / 49 与 9 / 387 用例 / #60 两端已进仓但 `NOT VERIFIED ON DEVICE`）。
+我原先把"清掉 `tmp/`"列进收尾清单，实测推翻：`cargo-post-android/tmp/` 有 **210** 个文件，`DECISION_LOG.md` 引用其中路径 **171** 处 ——
+那是留档证据，不是垃圾。要清必须先迁进受版本控制的证据目录，否则台账的每一条"凭证见 X"都会变成指向虚空。
+
+### 七、这一笔之后还欠的
+
+- **#60 真机**：异常照片那一屏从没在设备上点过（MIUI 装包走 pm session 那条路，配方用户已给）。
+- **#90** 发布包签名闸、**#96** 负控批自毁产物（两本依赖 `test-results` 的书要先跑无过滤全量）。
+- **#93 的维护页**那一半：页面现在只在并行那一套里，要先改指向 `/transport/town-event/*` 才算这条线收口。
+- **CI 复跑**：`064d66b8` / `c9b11736` / `5abba2f9` 三笔推上去后的 backend、frontend、drift-check 读数（预期 14 本闸全绿、模块用例 387）。
+- PR #195 合不合、`V037` apply 不 apply：**由人点，我不代决**。

@@ -3,10 +3,32 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
-最后更新：2026-10-16（夜里收工，D-127 … D-134 · 后台与 CI 十条收口：部署不写库、菜单主键撞号、搜索先回第 1 页、写按钮在飞保护、站点字典共享、失败留可见出口、调度页假进度撤掉、五处不可逆写口补确认、三态在册欠账 24→0、api 死导出与金额缺值收成一条出口；**十一本**静态闸挂进 `ci.yml`（其中三本连 `--self-test` 一起跑）；PR #195 = 12 个提交、`mergeable=MERGEABLE`、未强推 master；教训与读数在 D-131 … D-134）
+最后更新：2026-10-16（下午收工，D-135 … D-136 · 司机异常照片两端都进了仓（#60）+ 后台 49 个写口里 9 个钉了服务端幂等键 + 告警队列补了 ADMIN 未读口径 + 敏感字段唯一掩码出口 + 第 14 本静态闸；**两条本轮自抓**：① 我推上去的 `0c7a47f2` 在 CI 是 backend job failure，掩码类根本没编译过（本机一直"以为没有 maven"，实际在 `/c/Users/袁/apache-maven-3.9.16/bin`）；② 我自己写的契约 §6 第 2 项让并行那条线建了 `town_event_calendar`，同一天主线又建 `transport_town_event_calendar` ⇒ 一个业务两张表，已立闸并写清归属）
 
 
-## CURRENT（2026-10-16 后台与 CI 收工 · 台账 D-127 … D-134）
+## CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）
+
+- **本地能编后端了**（此前那句"只能靠 CI 验"是我自己的错判）：`/c/Users/袁/apache-maven-3.9.16/bin/mvn -B -pl yudao-module-transport test`
+  ⇒ BUILD SUCCESS，**模块 387 用例 / 0 失败 0 错误 / 43 个类**（`TownEventCalendarServiceImplTest` 7、`DriverAppServiceImplTest` 41、
+  `SensitiveDataMaskTest` 4——这 4 条以前从没真跑过，因为编译就断了）。**新规矩：每个后端提交推之前先本地编译该模块并读 `MVN_RC`。**
+- **红是被 CI 记着的，不是我说的**：run 38869518615（head `0c7a47f2`）= backend failure，其余 changes/drift-check/frontend 三作业 success。
+  修在 `064d66b8`（一个词：`UNKNOWN_SHAPE_KEEP` 声明成了 `String`）。教训同形于前端那条"ts:check 绿 ≠ 模板验过"：**判据脚本读的是源码文本，它绿不等于能编译**。
+- **#60 两端都进仓**：后端 `4466a837` + 用例 `0b20a9c1`（`photoUrl` 真落 `order_event.extra_data`，无照片时留 `NULL` 不写空串）、
+  App `53bc3de`（选图/上传/随上报带出，失败有回执）。⚠ **NOT VERIFIED ON DEVICE**——真机那一跑还没做（MIUI 装包走 pm session 那条路，用户已给配方）。
+- **并行那条线（AI 辅助）已经在同一个工作树里动了码**：`yudao-module-ai-assist/`（10 个文件，0 条用例）、`V050__ai_event_calendar.sql`、
+  `views/transport/ai/`、`api/transport/ai/`，还改了 root `pom.xml` / `yudao-server/pom.xml` / `db-migrate-guarded.yml`（+3 probe）。
+  这些都**没提交**，我这一轮也没有替她提交任何东西（`git add` 全程走显式路径）。撞车处置见 m195 `docs/AI_ASSIST_BOUNDARY.md` §6.1 与新闸 `check_business_table_single_owner.py`。
+- **静态闸现读 14 本 / 13 个 CI 步骤**（`scripts/` 实数：`grep -oE 'scripts/[a-z_0-9]+\.py'` 去重 = 14）。第 14 本认的是"同一个业务对象两张表 / 两个同名 DO"，
+  K1–K6 六把刀；工作树现读判 2 组（真撞车），干净 HEAD 导出判 0 组（CI 看到的是这一面）。
+- **推送与 PR**：分支 `ci/admin-gates-2026-10-16` 已推到 `5abba2f9`（`git ls-remote` 实测 == 本地 HEAD）；
+  PR #195 提交数在推之前实读 **23**（`gh pr view 195 --json commits`），这轮又加 3 ⇒ 待 CI 复跑后重读。**master 未动、未合、未写库**。
+- **仍在册**：#90 发版签名闸、#96 负控批自毁产物、#93 的维护页那一半（页面在并行那一套里，要先改指向 `/transport/town-event/*`）、
+  #94/#95 两项非 AI、#71 生产排序键（算法码按用户明令不提交）、#25/#31/#81 等人拍板。
+- **`tmp/` 不许随手清**（我早先把它列进"收尾要清的垃圾"，实测推翻）：`cargo-post-android/tmp/` 210 个文件被 `DECISION_LOG.md` 引用 **171 处**，
+  那是留档证据而不是垃圾。要清得先迁进受版本控制的证据目录。
+
+
+## 上一轮 CURRENT（2026-10-16 后台与 CI 收工 · 台账 D-127 … D-134）
 
 - **这一轮的面**：`cargo-post-platform` 的 web 后台 + CI + 算法度量台，不是 App。App 那一半仍以
   2026-10-15 那块为准（下面的读数没有一条是从那里推出来的）。
