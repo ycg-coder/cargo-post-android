@@ -193,6 +193,17 @@ jobs:
           if size > 95_000_000:
               sys.exit('release 包体退回 95 MB 以上（本轮砍完 32 位后实测 78.8 MB）—— 先查是哪一块又长回去了')
           PY
+      # 队列 #90 / 台账 D-139：这一步之前，CI **从头到尾没验过"发出去的产物是签过名的"**。
+      # 上游那两个风险点是接在一起的：gradle 缺签名材料时只 warn 一句照样出包（本机实测过，
+      # storeFile 的相对路径写法有两种，旧解析只认 CI 那一种 ⇒ 本地 release 一直未签名），
+      # 而下面上传与建 Release 挑的都是 `ls *.apk | head -1` —— 未签名那只完全可能被当成发布包发出去，
+      # 下游症状是"装不上 / App 内检查更新静默失败"，没有任何一条错误写着"因为没签名"。
+      # 判据三条（恰好一只 / 验签过 / 证书等于在册指纹），全 fail closed；`apksigner` 找不到是 rc=2 不是通过。
+      - name: 发布包签名取证（未签名或换 key 都不许出 Release）
+        env:
+          PIN: 32d02b9700ffb2a244f363e28e507009514db8afedfe84a38834b0130045b39f
+        run: |
+          bash tools/release_artifact_signed_gate.sh app/build/outputs/apk/release "$PIN"
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
@@ -208,7 +219,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          # 固定名，不再 `ls *.apk | head -1`：上一行那本签名闸判的是 app-release.apk 这一只，
+          # 这里若还按目录顺序挑，"验过的"与"发出去的"就可能不是同一只文件（队列 #90）。
+          APK=app/build/outputs/apk/release/app-release.apk
+          [ -f "$APK" ] || { echo "::error::找不到 $APK —— 发布通路挑的不是刚验过签名的那一只"; exit 1; }
           TAG="v${GITHUB_RUN_NUMBER}"
           echo "发布 tag = $TAG （versionCode=$GITHUB_RUN_NUMBER，来自同一次运行编号）"
           # 资源名固定 app-release.apk：App 侧就是按这个名字挑可安装资源（`AppUpdate.pickApk`）
