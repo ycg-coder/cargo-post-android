@@ -50,11 +50,17 @@ del ls[k[-1]]
 io.open(p, 'w', encoding='utf-8', newline='').write('\n'.join(ls))
 PY
 red "NC-3 削掉最后一条" "DL-a "
+# NC-3b 把本轮新加的那条**改名**（条数不变 ⇒ DL-a 那格不会响，只能靠 DL-b4 点名）
+sub "$DL" $'
+提交异常上报
+' $'
+上报异常
+' && red "NC-3b 改名 提交异常上报" "DL-b4 "
 # NC-4 有人抄第二份硬编码 DENY（单一真值被破）
 printf 'DENY=%s\n' "'退出登录|删除'" > "$SC/tools/second_copy.sh" && red "NC-4 出现第二份硬编码 DENY" "DL-d "
 rm -f "$SC/tools/second_copy.sh"; cp -r "$CLEAN" "$SC"
 
 echo
 echo "负控：$ok 红 / $bad 未红，锚点未命中 $MISS"
-[ "$bad" = 0 ] && [ "$MISS" = 0 ] && { echo "✅ ui_deny_list 负控：4 刀全红，各红在该管的那一格"; exit 0; }
+[ "$bad" = 0 ] && [ "$MISS" = 0 ] && { echo "✅ ui_deny_list 负控：$ok 刀全红，各红在该管的那一格"; exit 0; }
 echo "❌ ui_deny_list 负控未全数抓到破口 —— 判据不可信"; exit 1
