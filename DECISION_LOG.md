@@ -8298,3 +8298,202 @@ driver_notice 18✔ / safe_call 32✔ / throwable 18✔（其中一条 △：TH-
 `ui_deny_list_negative_controls.sh` 5 刀 ✔；异常簿退回原状后复跑 §54 判据通过（EX-a…EX-j 全绿，
 被退回的 EX-k 那五格不再在册）；本轮**没有源码改动**（#60 的实现整体退回），因此用例面与 D-125 同数，
 收尾仍复跑全量 + 44 本判据以确认退回干净。
+
+### D-127（10-16 08:4x–09:1x）· #69 部署不再替人写库；#70 菜单主键撞号；顺带抓到"唯一的写库入口"自己跑不动
+
+**两件登记在册的事都在后端仓库 `cargo-post-platform`，本笔只本地提交、没有 push**（后端 push master 会触发云端部署，要单独点头）。
+
+**#69 的改法**：`deploy-dev.yml` 的 `Run database migration` 整段包进
+`if [ "${AUTO_DB_MIGRATE:-0}" = "1" ]`，取值来自仓库变量（`${{ vars.AUTO_DB_MIGRATE }}` 必须先落到 `env:` 才读得到，
+GitHub 仓库变量没有 `${{ vars }}` 之外的读取路径）。变量不存在或不为 1 ⇒ 只打一行"跳过写库"，
+一个字节都不写；写库的常规路径只剩 `db-migrate-guarded.yml`（`mode=check` 只读，`mode=apply` 还要 `confirm=APPLY`）。
+**这不是把风险藏起来**：紧随其后的 `Validate schema drift columns` 是只读的，DO 用到的列在表里不存在就当场红并逐条列出，
+所以缺列的代价从"被一次静默写库掩盖"变成"部署红 + 明确指向 guarded 工作流"。V026 那段检测依旧在闸外跑（只 SELECT，不写）。
+
+**#70 的实测过程**（先证再改，没凭记性挑数）：`grep -rhoE '\(69[0-9][0-9],' sql/ | sort -u` 现读
+6900-6902 / 6910-6915 / 6920 / 6930-6935 ⇒ 6940 起是空段。旧版 `V032__pricing_rule_menu.sql` 与基线
+`sql/mysql/transport-multi-leg-menu.sql` 都认领 6930/6931，**两边都自称幂等**，于是结果是"先落地的赢"：
+云上基线菜单先建 ⇒ V032 的 `WHERE NOT EXISTS(id=6930)` 永远为假 ⇒ 计价规则那一页从来没插进去，而 CI 全绿。
+基线文件自己的注释写着"本文件使用 6930-6933，避免编号冲突"——那句"避免冲突"恰恰就是冲突本身。
+改法：V032 主键挪到 6940/6941 且守卫从"按 id 判存在"改成**按 permission 判存在**（id 是户口，permission 才是业务身份；
+拿 id 当身份，id 一改就把"已装过"误判成"没装过"，第二次装多出重复菜单）；新增 `V035__pricing_rule_menu_free_ids.sql`
+专门补"已经跑过旧版 V032 的那类库"，只补缺的那一页、不搬不删不猜，末尾自检必须数到 2。
+
+**两件新闸（都是"红不出来"那一族的解法，挂在 `ci.yml` 的 `drift-check` job 上，每次 PR 必跑）**：
+1. `scripts/check_menu_id_collisions.py`：同一主键被两个**文件**以不同 permission 认领 ⇒ rc=1。
+   反证：对 HEAD 版本跑 ⇒ `× id=6930 被 2 个 permission 认领`、`× id=6931 …`，rc=1；改完的树 ⇒ 数到 64 条主键声明、
+   61 个不同 id，rc=0。数到 0 条声明就 rc=2（"没数到"绝不能读成"没问题"）。
+2. `scripts/check_sql_function_arity.py`：`IF()` 上限 3 参、`IFNULL()` 上限 2 参。这条是本轮的**意外收获**：
+   给 guarded 工作流新写一条只读探测时，照抄了既有两段的形状，sqlglot 直接报"provided arguments (5) > max (3)"——
+   原来 HEAD 里的 `IF(COUNT(*)=3,'已存在 3/3','缺失（当前 ' , COUNT(*), '/3）')` 是五个参，MySQL 会 1064。
+   后果不是"日志少一行"：探测步骤排在 apply 前面，它一红整条 job 就停 ⇒ **那份文件所谓"唯一的写库入口"当时根本跑不动**。
+   三条同形（2 条 pre-existing + 1 条我照抄的）一起改成了 `CONCAT` 嵌套（CONCAT 是变元的）。
+   判据自带 8 刀 `--self-test`（5 参 IF / 3 参 IF / 2 参 IFNULL / 3 参 IFNULL / 注释里的反例 / 多行调用 /
+   字符串里的逗号 / 嵌套括号里的逗号），全 ✔ 才允许扫树；扫树读数：52 个文件、99 个 IF/IFNULL 调用、✘=0。
+   反证：把 HEAD 那版单独拷到 `tmp/negctl-arity-head/` 再扫 ⇒ rc=1、✘=2（HEAD 里没有我新写的那条，数目对得上）。
+
+**顺带把三处文档与四段 SQL 头注释里"每次 push master 无条件重放"这句已经过时的话改对**：
+`docs/deployment.md` 新增「部署不写库：迁移只有一个入口」（含三种意图各走哪条的表、白名单与两支刻意排除的非幂等脚本）；
+`docs/database.md` 把"已纳入 CI 迁移步骤自动执行"改成指向 guarded 工作流；
+`docs/部署操作手册.md` §3.4 原来教的是 `for f in sql/incremental/V*.sql; do … done` —— 这个循环会把
+`V026`（`SET status = 1 - status`，跑两次上下架就翻回去）和 `V029`（裸 ALTER，第二次必然 1060）一起重放，
+现在换成 guarded 的 check→apply→按数量核对三步，并把那条循环明确标成"别再这么跑"。
+V030/V031/V033/V032 头注释里的旧表述一并修正，顺带把 `deploy-dev.yml:154`/`:200` 这种会漂的行号锚换成步骤名锚。
+
+**验证到哪一层（如实）**：`.github/workflows/*.yml` 全部 `yaml.safe_load` 通过（deploy-dev 15 步、guarded 5 步、触发器只有
+`workflow_dispatch`）；两段 run 块抽出后 `bash -n` 通过（抽出的文件 193 行、含 4 处 `AUTO_DB_MIGRATE`，不是空文件——
+上一轮就吃过"提取脚本因 GBK 报错、`bash -n` 对空输入照样 rc=0 假绿"的亏）；工作流里的 9 条 SQL 全部过 sqlglot 的
+mysql 方言。**没跑过的**：真实 MySQL（本机 docker daemon 没起，`docker ps` 报 npipe 找不到）、GitHub Actions
+（这台机器的 hosts 把 api.github.com 指到 127.0.0.1，`gh run list` 直接 connection refused）。
+所以"计价规则这一页在云上出现了"这句**当前还不能说** —— 它要等一次 guarded `mode=apply` 真跑，读数看日志里那行
+`计价菜单 2/2 · 6930 仍是交接 1/1`。
+
+### D-128（10-16 09:0x–10:1x）· #72/#73 算法尺子补闸、#74/#75 后台三件同族缺陷 + 三本新判据
+
+**先说一条归属事实**（免得下轮又去找）：本轮动到的算法侧文件里，`algorithm/benchmarks/lab/` 整棵树与
+14 个新测试文件（`test_fleet_scaling.py`、`test_lab_harness_negative_controls.py`、
+`test_anytime_monotonicity_spec.py`、`test_lab_ledger_gates.py` …）**全部是未跟踪状态**（`git ls-files` 读空），
+另有 45 个算法/后端文件带着别人在飞的改动。所以这几笔**只在树上做完并跑绿，没有提交** ——
+把它们单独提交会切出"测试引用了不存在的 lab"这种半截树，而把整包 WIP 一起提是用户的决定，不是我的。
+后台那一侧（`cargo-post-platform` 的 vue 页面 + 三本判据）同样只改树、本轮未提交（#69/#70 那笔已单独提交，
+见 D-127）。
+
+**#72 复核判据两处空转**（`algorithm/benchmarks/lab/check.py`，度量台自己的负控在
+`tests/test_lab_harness_negative_controls.py`）：
+1. `limit = float(getattr(cfg,"maxDetourDistanceKm",None) or 3.0)` ⇒ `0.0 or 3.0` 得 3.0，
+   "一点都不许绕"的合法请求被吞成 3km 放行额度（本仓 `haco/config.py` 的注释立的正是"按 None 判断"这条规矩）。
+   改成先判 `is None`。
+2. `validators.validate_cargo_load` 写着 standalone 揽派"不进 CargoLoad，由 CargoOut/CargoIn 维度保证"，
+   而那两维此前只在 solver 自己（`feasibility_engine._check_cargo_capacity`）里算 ⇒ 尺子被量的人拿着。
+   新增 9b 段按 `itemCount`/`quantity` 独立复算 CargoOut/CargoIn（口径照抄 engine：`preloaded_delivered`
+   只数**显式** PRELOADED，builder 是原样透传不推断），并给"一份都没判过"补 `ITEM_PROFILE_NOT_CHECKED`
+   这条 fail-closed（"跳过"与"通过"必须是两种结论）。
+   **读数**：4 条新负控（0km 预算 / 件数剖面 / 空判 fail-closed / 预装不足）全过；反向证据是把两处改动
+   撤回去重跑 ⇒ `4 failed`，然后按 sha 逐字节还原（9865aafa→bcd3be74→9865aafa）；
+   语料复扫 104 个实例、47 份 feasible 方案 ⇒ 新码 0 命中（不是"没跑"，`item_checked` 每份都判过）。
+   全量快集合 `pytest tests/ -m "not slow"`：**799 passed, 1 skipped**（再排 benchmark 目录 791 passed），rc=0。
+
+**#73 两处未达项从文档串搬进断言**：
+· `test_fleet_scaling.py` 的 `<= base*1.02` 换成具名等式：`FLEET_WIDE_RESIDUAL_KM = 0.760`（实测
+  V=3 57.736km、V=6 58.496km，重复跑差 0.000000，同题同种子是确定的），容差 0.005km（5 米，比被吞掉的
+  1.32% 紧 26 倍）。两侧都会红：变大＝机制退步，变小/归零＝逼着改数并同步 §13/§14 与上限前置条件。
+  跑满 155s/265s 两条 ⇒ **3 passed**，rc=0。
+· 新增快门 `tests/test_lab_ledger_gates.py`（**不挂 slow**，所以每次 PR 都执行；CI 的 `-m "not slow"`
+  是 PR 必需检查，而 `-m "slow"` 只在算法区有变更时由 `algorithm-verification` job 跑 —— 这就是④的答案）：
+  从 `benchmarks/lab/ledger/rnd_e8_consolidate.json` 的 `per_instance` **独立复算**"多开车"的实例，
+  与 `summary.serve.vehicle_deficit_instances` 互相印证，具名钉死 `r_multidepot-L-08x006`/`L-08x010`
+  （都 veh3/bks2），真正的未达项以 `xfail(strict=True)` 立着。读数 `2 passed, 1 xfailed`；
+  反证是把台账里两个 veh 改成见证值再跑 ⇒ `2 failed, 1 passed`（`[XPASS(strict)]` 那条就是"修好了不许沉默"），
+  台账按 sha 逐字节还原（41b0449f→78680e5c→41b0449f）。
+· `pytest.ini` 开 `xfail_strict = true`，`test_anytime_monotonicity_spec.py` 两处 `strict=False` 摘掉；
+  慢集合实测 `.xx` ⇒ **1 passed, 2 xfailed**（不是 XPASS，所以开关没有立刻造出假红）。
+
+**#74 后台"搜索先回第 1 页"**：清点口径被我自己错过一次 —— v1 的函数体切分要求"至少两行才收"，
+而 `const getList = async () => { ... }` 是一行写完的，于是把下一行 `resetQuery` 里的 `pageNo: 1` 卷进来看成
+同一个函数，把 driver/route 误判成"已达标"（在册描述也说这两页是坏的）。v2 改成从 `{` 起逐字符配平、
+收在同一行也立刻停 ⇒ 真数：16 个分页页面、34 个入口、33 处未达标。修完又把口径补全：
+`el-form` 上的 `@submit.prevent` 是**第三种入口**（浏览器里回车首先触发表单提交），
+只改按钮和 input 上的 keyup 等于留第三条不一致的路径 ⇒ 终数 **49 处入口全部先回第 1 页**。
+新判据 `scripts/check_admin_query_page_reset.py`（只管 transport 域，没有分页的页面不参与，免得误红；
+数到 0 个入口退 2）。负控 5 刀（按钮/函数体/回车/表单提交各退回一刀 + 无分页目录必须 rc=2）全 ✔，
+改完的文件逐字节核对过恢复。
+
+**#75 三条同族**：
+· 写按钮在飞保护：新判据第一版是**空的** —— 它把"`:disabled` 绑了任何东西"当成有保护，
+  于是 dispatch 那个真实缺陷（`:disabled="collectDisabled"` 按"选了几行"禁用，`collectLoading` 从没接进模板）
+  被判成合规；而且模板切分用了 `text.split("</template>")[0]`，这些页面里有 `<template #default="scope">`
+  的列插槽，第一个 `</template>` 是内层闭合 ⇒ 模板被截断在半路，notification/handover 两处真问题"扫不出来"。
+  两处都修了（判据改成"必须认在飞标志本身"），基线从"✅ 10 个写按钮全有保护"变成真数 18 个里 2 个裸、
+  3 个孤儿 Loading。修法：给 `submitSend`/`submitDispute` 补 loading 位并绑 `:loading`（后端这些写口零
+  幂等键，双击就是两条真记录），`eventsLoading` 接进 `v-loading` 且**没读完不许念"后端说没有"**，
+  `accLoading`/`collectLoading` 接进按钮。负控 5 刀全 ✔（含"摘掉两处引用才测得到死变量"那一刀）。
+· 站点全量字典：`simple-list` 后端不分页，此前 6 处各拉一遍（在册描述写的"8 处"，当场 grep 实测是
+  **6 处调用** + API 定义本身 —— 计数以读为准）： ⇒ 新增 `store/modules/stationDict.ts`
+  （TTL 60s + 并发只发一次 + 只有真读到才盖时间戳），6 处改走 `stationDict.load()`，
+  并在 create/update/delete 三处站点写口后 `invalidate()`（否则把性能问题换成"刚建的站点选不到"的正确性问题）。
+  判据 `scripts/check_admin_station_dict_sharing.py`：直连只允许 API 定义与 store 两处；
+  某文件的 `invalidate()` 次数少于站点写调用数就红。读数 483 文件 / 3 写口 / 3 失效 ✅，负控 3 刀 ✔。
+· 独立请求串成链：dispatch-center 的 `await loadPool(); initMap()`、driver-vehicle 的两张字典、
+  expiry 的两份到期清单、ProductOrderShipForm 的三张字典、ProductOrderDetail 的两张字典
+  ⇒ 全部改 `Promise.allSettled` 并发，各自失败各自留空（错误仍由请求层提示，不替后端宣布"没有"）。
+
+**前端凭证到哪一层**：三本新判据 + `check_menu_id_collisions` + `check_sql_function_arity`
+都挂进了 `ci.yml` 的 `drift-check` job（每次 PR 必跑，纯标准库）。
+eslint 对 `src/views/transport` 全目录 + 新增的 store：**0 errors / 6 条 pre-existing 样式 warning**
+（`vue/first-attribute-linebreak`，都落在我没碰的行上）。
+`vue-tsc --noEmit` 全量（非增量）**第一次跑是红的**：我那个批量改 import 的脚本把
+`import { useStationDictStore }` 插到了"最后一条以 `import` 开头的行"之后，
+而 `dispatch/index.vue` 用的是跨行的 `import {
+  orderTypeLabel, …
+} from '../constants'`
+⇒ 插进了那条语句中间，报 `TS1003/TS1005/TS1128`（488/501 行）。
+这就是"少报一个假绿"换来的真红：**判据、负控全绿也不等于产物能编译**，收尾必须带静态检查（D-125 立过这条）。
+把 8 个文件的插入位置逐一核对后重跑 ⇒ **rc=0、0 条错误**。三次同一命令的读数依次是：#74 那轮改完之后 **0 错** ⇒ 站点缓存批量改写之后 **6 行错**
+⇒ 插入位置逐一核对后 **0 错**（中间那次红，正是这轮唯一的产物级回归被抓到的时刻）。
+**没有做浏览器点验**：这几条都是"翻页后改筛选""双击按钮"这类需要真实交互才能看见的形态，
+静态闸能证明判据上岗，不能证明那格 UI 好了 —— 这一格留给真机/浏览器轮。
+
+**本轮三次"我自己写的判据是空的"**（同族，记下来好认）：
+1. 清点脚本 v1 的函数体切分要求"至少两行才收"⇒ 一行写完的箭头函数把下一行 `resetQuery` 卷进来，
+   把两处真缺陷读成"已达标"。
+2. `check_admin_write_button_guard.py` v1 有两处：模板切分用 `split("</template>")[0]`（页面里有列插槽，
+   模板被截断）；`":disabled 绑了任何东西"=有保护`（放过了 `collectDisabled` 那种假保护）
+   ⇒ 基线从"✅ 10 个全有保护"变成真数"18 个里 2 裸 + 3 孤儿"。
+3. 批量 import 插入按"行首是 import"判断，没考虑跨行 import 语句。
+三次的共同点：**都是拿"在册事实"对了一遍才暴露的**（driver/route 该是坏的、dispatch 该是坏的、
+编译该是绿的），所以登记缺陷时必须把可实测的反证一起写进去，否则判据自己骗自己。
+
+**#71 只把"两套尺子"做成可执行的门，没动生产语义**（新增 `algorithm/tests/test_objective_coverage_ruler.py`，
+不挂 slow ⇒ 每次 PR 都跑）：特征化那条当场读到全服务 40km 的键是
+`(0, 0.0, 1, 0.0, 0.0, 40.0, 4800.0)`、甩单 30km 是 `(0, 0.0, 1, 0.0, 0.0, 30.0, 3600.0)`
+⇒ **生产会选"甩掉一票、里程更短"那一版**（`app/solver.py:104` 的 HYBRID 比较就用这把尺子），
+今天这条成立；想要的语义以 `xfail(strict=True)` 立着。反证：临时给 `solution_key` 键首加上
+`len(unassigned_order_ids)` 再跑 ⇒ `2 failed`（特征化该红、strict xfail 该 XPASS 变红），
+生产文件按 sha dc756c1e 逐字节还原。**真改那一刀留给用户点头**：它改的是调度目标语义，会改变云上派单
+选哪一版方案，且必须配套量台 A/B 前后对比，还要同步 `test_haco_141_regression.py` 里
+`len(key) == 7`/`key[0] == 0` 两条键形状断言。
+
+**顺带又抓到一次"自己写的批量脚本造的产物级回归"**：批量插 `import` 时按"行首是 import"定位，
+没考虑跨行的 `import {\n … \n} from '../constants'` ⇒ 插进语句中间，`vue-tsc` 全量报 6 行
+TS1003/TS1005/TS1128。同时 `ci.yml` 里被我重复插入过一条同名步骤（已删，并用一段小脚本扫了
+全部 9 个 job 的**步骤重号**：现在 dup=无）。这两条都属于"判据与负控全绿，产物却是坏的"那一族 ——
+收尾必须带静态检查，不能只看判据脸色。
+
+### D-129（10-16 10:0x–10:2x）· #64 交接状态两套语义解掉；我自己把一棵源文件写空过一次
+
+**#64（后台交接页）**：`views/transport/handover/index.vue` 的筛选项此前写死「待确认0 / 已确认1 / 有争议2」，
+而后端 `TransportHandoverStatusEnum` 实为 0等待交接/1前序已到达/2接收方待接/3交接中/4交接完成/5交接超时/6已取消/7异常，
+`HandoverController#enrich` 又把**真名**打进 `statusName` 那一列 ⇒ 同一列被两套语义读：
+筛"有争议"拿到的是"接收方待接"的单，而 7=异常（`disputeHandover` 真正落到的状态）永远筛不到。
+页面 `v-if="status !== 2"` 与后端 `HandoverServiceImpl#disputeHandover:298` 的"只拦 COMPLETED(4)"也不一致
+—— 对 4 点下去必抛，对 2 该点却被藏掉。
+改法：映射与判据收进 `views/transport/constants.ts`（`HANDOVER_STATUS_LABELS/TAGS` 8 个值一个不少、
+`HANDOVER_DISPUTE_BLOCKED_STATUS = 4`），筛选选项由这张表 `v-for` 生成，列也念同一张表，按钮用同一个常量；
+念不出来的时候兜底写成 `后端新状态(8)` 而不是静默的"未知"（后端加枚举、前端没跟，这格必须是可见的错）。
+配套 4 条 vitest 用例（全名逐字锁定 / LABELS-TAGS 成对 / 争议常量 / 兜底露码值），
+全量 `vitest run` **4 files passed**；`vue-tsc --noEmit` 全量收口读数见下。
+
+**负控 4 刀**（`tmp/constants_negctl.py`）：每刀要求 rc≠0 **且红的是指定那条用例**，收口再验 sha 与基线绿：
+刀A 把 2 改回"有争议" ⇒ `2 failed`；刀B 删掉 7=异常 ⇒ `3 failed`；刀C 常量改成 2 ⇒ `1 failed`；
+刀D 兜底退回"未知" ⇒ `1 failed`。四条 ✔，`constants.ts` sha c15f75a8 前后一致。
+
+**这一轮我自己造成的一次真损失（记下来，别再犯）**：负控脚本的第一版收尾写的是
+`io.open(CONST,'wb').write(io.open(BAK,'rb').read())` —— CPython 先算左边：以 'wb' 打开就**立刻把源文件截成 0 字节**，
+然后右边读 Y: 上的备份抛 `FileNotFoundError`（上一版脚本已经在退出路径里把它删了），
+于是 `constants.ts` 留在空文件状态。恢复走 `git checkout -- <该文件>`（它在 HEAD 里是干净的，我这次的改动只有两个自加块），
+再按原样重新贴上，然后由 20 条 vitest + 行数 140 + sha 复核确认不是"看起来恢复了"。
+**这条正是我自己登记过的规矩（"'w' 先截断再报错；备份 + temp + `os.replace`"）被我自己的辅助脚本破了一次** ——
+规矩写在台账里不等于长在代码里，写脚本时得逐行照着自己的规矩做一遍。
+
+**同轮抓到的另两条"判据自己骗自己"**：
+1. 负控的跑手用 `sys.executable` 去跑 `vitest.mjs` ⇒ python 根本不认这个文件，四次调用全 rc≠0，
+   看起来"四刀都红"其实是解释器没起来。改法：跑手必须显式 `node`，并且**先跑一次基线证明是绿的**
+   （"基线不绿就整批作废"），每条刀再要求红的是**指定那条用例**，不看裸 rc。
+2. 刀B 的锚点写的是 `
+}`，而这个文件是 **CRLF** ⇒ 命中 0 次，那一刀被静默跳过（幸好脚本要求"恰好 1 次"）。
+   锚点里带换行必须先量文件行尾，不能想当然。
+
+**收口读数**：`vue-tsc --noEmit` 全量 rc=0 / 0 错（本轮第三次全量：#74 后 0 错 → 站点缓存改写后 6 行错 → 修完 0 错，
+#64 之后再跑一次仍 0 错）；`eslint src/views/transport + 新增 store`：**0 errors / 6 条 pre-existing 样式 warning**；
+`vitest run` 4 files passed；五本后台静态闸（菜单撞号 / SQL 参数量 / 搜索页码 / 写在飞保护 / 站点字典共享）全 rc=0；
+算法快集合 **804 passed, 1 skipped, 2 xfailed** rc=0。
