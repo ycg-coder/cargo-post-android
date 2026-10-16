@@ -8497,3 +8497,38 @@ TS1003/TS1005/TS1128。同时 `ci.yml` 里被我重复插入过一条同名步�
 #64 之后再跑一次仍 0 错）；`eslint src/views/transport + 新增 store`：**0 errors / 6 条 pre-existing 样式 warning**；
 `vitest run` 4 files passed；五本后台静态闸（菜单撞号 / SQL 参数量 / 搜索页码 / 写在飞保护 / 站点字典共享）全 rc=0；
 算法快集合 **804 passed, 1 skipped, 2 xfailed** rc=0。
+
+### D-130（10-16 10:3x–11:0x）· #63 首页六个快捷入口指到目录节点；第四本路由闸 + 两条"假反证"当场收回
+
+**在册事实复核（两边都读了原文）**：`views/transport/dashboard/index.vue:255-261` 六个入口 push 的是
+`/transport/station|vehicle|route|driver|shift|order`，而 `sql/mysql/transport-menu.sql` 里这些 id
+（6810/6820/6830/6840/6850/6860）是 `type=1`、`component=NULL` 的**目录节点**，真正带页面的叶子是
+6811/6821/6831/6841/6851/6861，path 是 `list` ⇒ 完整路径 `/transport/station/list`。
+点目录节点不报错，只给一具空 Layout —— 六个按钮六个空。
+同一行的 `/transport/monitoring/map`（6878，父 6877）是**正确的**，留作同文件正对照。
+
+**修法**：六个 path 补 `/list` 后缀，并在代码里写清"必须指到 type=2 且有 component 的叶子"。
+
+**第四本静态闸 `scripts/check_admin_dashboard_routes.py`**（挂进 `ci.yml` 的 drift-check）：
+从 `sql/**/*.sql` 读 `system_menu` 固定主键行，按 `parent_id` 递归拼完整路径，取 **type=2 且 component 非空**
+的集合作为"可跳转"，再扫 `views/transport/**/*.vue` 里所有 `path: '/…'` 字面量逐个对照。
+读数：**68 条菜单行 ⇒ 可跳转叶子 21 个、目录节点 12 个；36 个页面里 8 处写死跳转，全部落在叶子上**。
+指到目录节点的那条会连带列出候选叶子（`候选叶子：/transport/station/list`），让红的时候不用再去翻 SQL。
+
+**这一轮我自己收回了两条假证据（都记下来，这一族已经反复出现）**：
+1. 判据第一版的行正则把 component 写成必须带引号，而目录节点那里是裸 `NULL` ⇒ **所有 type=1 行一条都没解析出来**
+   （读数：目录节点 0 个）。后果不是"少报"而是**误报**：拼路径时父级缺失，
+   `/transport/monitoring/map` 被算成 `/map`，于是一条本来正确的跳转被判成"菜单里根本没有"。
+   第一版读数打的是"7 处全错"，而在册事实是"6 处错、1 处对" —— **拿在册事实对一遍**才发现是判据坏了。
+   改成 `(?:'([^']*)'|NULL)` 后读数变成 6 处（正对照恢复通过），这才可信。
+2. 负控 DR-3（"判据跑不动的形态必须 rc=2"）第一版把判据脚本用**相对路径**去跑，换 cwd 之后
+   python 报的是"找不到脚本"的 rc=2 —— 那什么都证明不了。改成绝对路径 + 断言 rc=2 且输出里必须有
+   判据自己那句"扫描根不存在"，才拿到真反证。
+
+**边界照实说**：这一笔修的是**仓库内两侧一致**。至于云上 `system_menu` 是不是就等于这份 SQL，
+仍然 UNVERIFIED（本机没有 mysql 客户端、也不碰共享库）；要证它得跑一次 `db-migrate-guarded.yml`
+的 `mode=check`（只读）再对页面点验。所以"线上首页六个按钮现在能点了"这句**还不能说**。
+
+**收口读数**：`vue-tsc --noEmit` 全量 rc=0 / 0 错；四本后台静态闸 + 两本 SQL 闸全 rc=0；
+新闸负控 3 刀（退回目录节点 / 指一个不存在的路径 / 缺扫描根必须判据自己报 rc=2）全 ✔，
+`dashboard/index.vue` 按 sha c4662d09 逐字节还原后复跑仍绿。
