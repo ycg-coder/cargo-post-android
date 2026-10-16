@@ -3,7 +3,7 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
-最后更新：2026-10-16（下午收工，D-135 … D-136 · 司机异常照片两端都进了仓（#60）+ 后台 49 个写口里 9 个钉了服务端幂等键 + 告警队列补了 ADMIN 未读口径 + 敏感字段唯一掩码出口 + 第 14 本静态闸；**两条本轮自抓**：① 我推上去的 `0c7a47f2` 在 CI 是 backend job failure，掩码类根本没编译过（本机一直"以为没有 maven"，实际在 `/c/Users/袁/apache-maven-3.9.16/bin`）；② 我自己写的契约 §6 第 2 项让并行那条线建了 `town_event_calendar`，同一天主线又建 `transport_town_event_calendar` ⇒ 一个业务两张表，已立闸并写清归属）
+最后更新：2026-10-16（傍晚收工，D-135 … D-138 · 司机异常照片两端进仓并在**真机**上跑出第一条新缺陷（取消选片清掉已拍那张）、后台 49 个写口里 9 个钉了服务端幂等键、告警队列补 ADMIN 未读口径、敏感字段唯一掩码出口、静态闸 14 本；#96 负控批自毁产物已修；**两条我自己信错的前提**：① 本机一直"以为没有 maven"，于是 `0c7a47f2` 那版后端**没编译过就推上去了**（CI backend=failure 实测）；② 并行那条线照我自己契约里写死的表名建了第二套日历 ⇒ 一个业务两张表，已立第 14 本闸并写明归属）
 
 
 ## CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）
@@ -13,8 +13,19 @@
   `SensitiveDataMaskTest` 4——这 4 条以前从没真跑过，因为编译就断了）。**新规矩：每个后端提交推之前先本地编译该模块并读 `MVN_RC`。**
 - **红是被 CI 记着的，不是我说的**：run 38869518615（head `0c7a47f2`）= backend failure，其余 changes/drift-check/frontend 三作业 success。
   修在 `064d66b8`（一个词：`UNKNOWN_SHAPE_KEEP` 声明成了 `String`）。教训同形于前端那条"ts:check 绿 ≠ 模板验过"：**判据脚本读的是源码文本，它绿不等于能编译**。
-- **#60 两端都进仓**：后端 `4466a837` + 用例 `0b20a9c1`（`photoUrl` 真落 `order_event.extra_data`，无照片时留 `NULL` 不写空串）、
-  App `53bc3de`（选图/上传/随上报带出，失败有回执）。⚠ **NOT VERIFIED ON DEVICE**——真机那一跑还没做（MIUI 装包走 pm session 那条路，用户已给配方）。
+- **#60 客户端这一半第一次在真机上跑过**（v106→v107，同签名 release 覆盖装，`firstInstallTime` 仍是 10-15 ⇒ 没卸载、数据没清）：
+  选片器在 HyperOS 上可用（`com.android.photopicker`，单选回值无额外确认），选完念"已选 1 张，点击重选"；
+  **咬到一条真缺陷**：重开选片器再按返回 ⇒ 回调给 null、旧代码 `picked = it` 把刚拍的那张静默清掉，页面回到"从没选过"那一形。
+  已改 `it ?: picked` 并同序列重跑（凭证 `tmp/device_v107_cancel_keeps_photo.png`）。EX-m 两格进判据簿，两把反证都红在该管的一格
+  （第一版反证用的是 drop，**drop 只给锚点那几个字加注释、行尾原样留着 ⇒ 判据照样绿**，是假反证，换 swap 才真红）。
+  ⚠ **提交那一格仍未验**：按下会往共享云写一条真异常（段转异常 + 通知管理员），而接受 `photoUrl` 的后端在 PR #195 上没部署；等合入后跑。
+- **#96 修完并实测**：新 helper `tools/ensure_test_xml.sh`（缺产物就真跑一次**无过滤**全量，禁快照还原；必须走 Y:/Z: ASCII runner，
+  裸 gradlew 在中文路径下是环境假失败）。验证形状：删掉一本的 XML（74→73）再跑那本书 ⇒ 自动全量 29s、`tests=762 failures=0 errors=0`、
+  XML 回 74、`NW-h 14/0/0`、rc=0。
+- **#90 走了一半**：本地 release 现在真带签名（`storeFile` 解析补成认两种形状；`apksigner` 读回 SHA-256 `32d02b97…0045b39f` 与在册指纹一致）。
+  **CI 那一半没做**：没有任何一步验"发出去的产物签过名"，上传还是 `ls *.apk | head -1`。
+- **装包这一格**：`pm install -r -t /data/local/tmp/xxx.apk` 两轮都是直接 `Success`，**MIUI 那个"继续安装"倒计时对话框只在 `adb install` 流式安装时才出现**
+  —— 我先按配方写了点框脚本，结果是空转的一份代码；这条记下来省下一轮。
 - **并行那条线（AI 辅助）已经在同一个工作树里动了码**：`yudao-module-ai-assist/`（10 个文件，0 条用例）、`V050__ai_event_calendar.sql`、
   `views/transport/ai/`、`api/transport/ai/`，还改了 root `pom.xml` / `yudao-server/pom.xml` / `db-migrate-guarded.yml`（+3 probe）。
   这些都**没提交**，我这一轮也没有替她提交任何东西（`git add` 全程走显式路径）。撞车处置见 m195 `docs/AI_ASSIST_BOUNDARY.md` §6.1 与新闸 `check_business_table_single_owner.py`。
@@ -22,7 +33,7 @@
   K1–K6 六把刀；工作树现读判 2 组（真撞车），干净 HEAD 导出判 0 组（CI 看到的是这一面）。
 - **推送与 PR**：分支 `ci/admin-gates-2026-10-16` 已推到 `5abba2f9`（`git ls-remote` 实测 == 本地 HEAD）；
   PR #195 提交数在推之前实读 **23**（`gh pr view 195 --json commits`），这轮又加 3 ⇒ 待 CI 复跑后重读。**master 未动、未合、未写库**。
-- **仍在册**：#90 发版签名闸、#96 负控批自毁产物、#93 的维护页那一半（页面在并行那一套里，要先改指向 `/transport/town-event/*`）、
+- **仍在册**：#90 只剩 CI 那一半（验产物已签名 + 上传别用 `ls *.apk | head -1`）、#93 的维护页那一半（页面在并行那一套里，要先改指向 `/transport/town-event/*`）、
   #94/#95 两项非 AI、#71 生产排序键（算法码按用户明令不提交）、#25/#31/#81 等人拍板。
 - **`tmp/` 不许随手清**（我早先把它列进"收尾要清的垃圾"，实测推翻）：`cargo-post-android/tmp/` 210 个文件被 `DECISION_LOG.md` 引用 **171 处**，
   那是留档证据而不是垃圾。要清得先迁进受版本控制的证据目录。
