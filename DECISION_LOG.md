@@ -8672,3 +8672,68 @@ TS1003/TS1005/TS1128。同时 `ci.yml` 里被我重复插入过一条同名步�
 补上主树那两份生成物后同一命令 rc=0；`node_modules` 用 `_winapi.CreateJunction` 接过来（`cmd /c mklink` 那条路
 在 UTF-8 中文路径上被 OEM 代码页打废了，报"找不到路径"）。
 **没做浏览器点验**：五处确认与回读那句都要真账号/真通知链路才看得见 ⇒ 登记 NOT VERIFIED IN BROWSER。
+### D-134（10-16 11:4x–12:4x · 本机钟实测）· #68 三态在册欠账 24→0；两条"判据自己骗自己"是在自检里抓出来的
+
+队列 #68（后台三态并格 + 金额缺值 + 死导出）一批三刀做完，PR #195 从 9 个提交长到 **12 个**。
+这一轮的账面数字全部是合并后那棵树里实跑的（worktree `cargo-post-platform-m195`，分支 = PR 分支）。
+
+**批次 1 · 13 个列表页**（driver / driver-vehicle / handover / notice / notification / operation-feedback /
+order / product / productOrder / route / shift / station / vehicle）：这一族原来全是
+`getList` 只有 `try/finally`、没有 catch —— 请求失败既不弹错也不清数据，表格继续画上一次的结果，
+而空的旁边写着「暂无数据」。现在 catch 里先 `list=[] / total=0` 再写 `listError`，模板补一条 `el-alert`，
+在册表同轮 24→11。
+
+**批次 2 · 剩下 11 处**：`dispatch` 那 6 格形状各不同（订单池、方案列表、发车核验弹窗的方案明细、
+方案详情、一键调度整轮、两份下拉的空 `ignore`），另外 5 处是表单与详情弹窗里的取数。
+三处值得单独记的坏法：
+· `openCheck` 明细读失败 ⇒ 车辆下拉是空的 ⇒ 界面念成"这版方案没有车"；
+· `OrderForm` / `ShiftForm` 读不回原值 ⇒ 表单停在默认值 ⇒ **点保存就把库里那行抹掉**
+  （ShiftForm 那格原来是 `.then` 且没有 reject 出口，连失败都追不到）；
+· `runAutoSmart` 失败原来只剩一句卡住的"调度中…"，而订单其实还在池里 —— 不留字就被读成"算法说没有可行解"。
+在册表 11 → **空**。表清空之后闸仍然有用：候选数照数（现读 34 处），任何一页把出口删掉都会以
+"新出现的未达标文件"红回来 —— 这一条与 §八 那一族"修完了闸就该删"相反，**不删**。
+
+**批次 3 · 死导出与重复出口**：台账原话是"8 个死导出"，实测是 **7 个**，差额要说清来源：
+第一版扫描把 `own` 判定写成"文件路径 in 符号名列表" ⇒ 恒 False ⇒ 每条**声明行自己算一次引用**
+⇒ 104 个导出全判"有人用"（那是"零"是假的）；剔掉声明行之后现读 7：
+`getDriverVehicleListByDriver`、`getHandover`、`getHandoverListByOrder`、`getOrderEventTimeline`、
+`getSimpleProductList`、`getTopologyByPlan`、`checkConflict`。后端端点一个没动，删的是前端没人调的包装。
+**重复出口 3 组**比死导出更要紧，因为那是"两份可以各自漂移的契约"：
+`/transport/order-event/list-by-order` 有两个包装（一个在用、一个零引用）；
+`/transport/monitoring/map-data` 与 `/transport/monitoring/vehicles` 在大屏模块各有一个别名包装 ⇒
+大屏页改成直接消费 monitoring 那两条。删别名之后 `api/transport/bigscreen` 里那两个具名类型
+变成零使用者，`vue-tsc` 报 TS6192 抓到 —— **收尾静态检查又一次替我扫掉"删一半"的残留**。
+
+**金额与里程收成一条出口** `constants.ts::moneyText / distanceText`：真零念 `0.00`、缺值念「没给」。
+契约一起量过再说这话：`DashboardController.sumOrderAmount` 写的是 `IFNULL(SUM(total_amount), 0)`，
+`buildDailyTrend` 还给空日期补 `BigDecimal.ZERO` ⇒ **今天**这些键恒发数字，
+所以这一改是**防契约漂移**，不是修一条当前错读（趋势图那处的 `?? 0` 因此保留：那是照抄后端自己给的零）。
+
+**第 10、11 本静态闸**（都挂 `ci.yml` drift-check，连 `--self-test` 一起跑）：
+· `check_admin_api_dead_exports.py`：死导出 + 同一 `(method, url)` 成组；6 刀全 ✔；对照数为 0 ⇒ rc=2。
+· `check_admin_money_absence.py`：折叠命中要**三件事凑齐**（同一句里 `.toFixed(` + `?? 0`/`|| 0` + 点名金额类字段），
+  只看 `?? 0` 会误伤 `(rows ?? []).length`；裸 `¥{{` 单独一类；7 刀全 ✔。
+
+**两条 durable 的判据自拦（都是在 --self-test 里抓出来的，不是在生产读数里）**
+· (a) **对照数与命中数必须分开**：金额闸初版把"注释里的反例"判成违规 —— 我自己刚在 KDoc 里写了
+  "原来那是 `Number(value ?? 0).toFixed(2)`"，这条检讨本身撞了正则（§八"判据模式命中自己"）。
+  修法不是把模式调窄，而是**先剥注释再匹配**，且剥块注释要按行数补回换行 —— 否则报出来的行号
+  指向不存在的位置，那种报告没人会去核。
+· (b) **fixture 必须一条一个目录**：死导出闸初版 K1 期望"只数到 neverUsed"，实得两条都算死
+  —— 因为那一刻还没有任何消费者，`getXxxPage` **确实**是死的。**是期望写错了，不是代码写错了**；
+  这种时候顺手把正则调松就会造出一把看不见真死导出的空转刀。
+· (c) 还有一条本轮最贵的自伤：**在 KDoc 里引用 `/* ignore */` 这个字面量**，块注释里的 `*/`
+  把注释提前关掉，后半句变成代码 ⇒ `vue-tsc` 一次报出 **155 条** TS 错。
+  定位用的不是逐行猜，而是把 `@vue/compiler-sfc` 的 `parse + compileScript + compileTemplate`
+  跑成一条**结构扫**（36 个 .vue、比 vue-tsc 快一个量级）：它先指出"哪个文件的 script 段解析不过"，
+  vue-tsc 再给行号。⇒ 固定动作加一条：**改过 .vue 之后，先跑 SFC 结构扫，再跑 vue-tsc**。
+
+**收口读数（合并后的 worktree 实跑）**：`vue-tsc --noEmit` rc=0 / 0 错；`vitest run` 4 files / **50** tests
+（新增 5 条 `moneyText/distanceText` 具名用例：真零、null、空串、字符串数额、非数、单位）；
+`eslint src/views/transport src/api/transport` 0 error（存量 6 条 warning 未动）；
+**十一本**静态闸 rc 全 0。
+另记一次 `eslint --fix` 的误伤：它把三页既有的 `el-alert` / `el-image` 多属性写法改成
+"`<el-alert` 换行 + 首行属性顶格"，语法没错但排版被搅乱 —— 已按"换行后紧跟非空白"这一形机械还原 6 处，
+还原后 `pricingRule/index.vue` 与 HEAD **零差异**。**教训：`--fix` 只对新增代码的形状负责，
+不要顺手对着一整个目录跑**（要跑也先看 `git diff --stat` 里有没有不相干的页）。
+**没做浏览器点验**：三态那几格与"发送成功"回读都要真失败注入或真通知链路才看得见 ⇒ 登记 NOT VERIFIED IN BROWSER。
