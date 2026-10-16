@@ -8567,3 +8567,60 @@ TS1003/TS1005/TS1128。同时 `ci.yml` 里被我重复插入过一条同名步�
 ⇒ 固定动作改一条：**批量提交后要按文件读提交里的 blob**（`git show HEAD:<path> | grep -c 新标记`），
 不要只看 `git status` 干净或 `--stat` 里有这个文件。与"改动没落盘却照样投作业"是同一族，只是这次
 伪装得更像：暂存清单是对的、文件列表是对的、只有内容不是。
+### D-132（10-16 10:5x · 本机钟实测读数）· #66 调度页那条"假进度"撤掉，换成后端真给的句子；第六本后台闸 ＋ 两次判据自己骗我
+
+⚠ 标题里的时间是**本轮实测的机器钟**（`date` = 2026-10-16 10:50）。上一条 D-131 写的是"11:1x–11:5x"，
+与本机的钟不同源；那是上一轮的账面，**本轮不去改它**（改别人的账面时间既不是一次进展，也没有凭证）。
+
+**改的是哪两件事（都先实测过再说）**
+1. `runAutoSmart` 里原来有一句 `window.setInterval(..., 900)`：每 900ms 把 `autoProgress` 推一格，
+   旁边配五个写死的阶段名（分析订单与约束 / 检查车辆运力 / 选择调度站点 / 运行 HACO-CPS / 生成调度方案）。
+   算法请求失败、超时、甚至根本没发出去，**那条带照样走到头** —— 界面念的是"算法跑到哪一步"，
+   实际念的是"过了多久"。这一族在 App 侧已经收过一次（§24 假步进 6→0，靠删掉那台假机器），
+   所以本轮的收法也一样是**删机器**：进度那一行现在只念后端真给出来的句子
+   （`runAutoPlans(onStage)` 每轮报「第 N 套方案：正在调度 M 单」，M 是那一轮真查回来的 `status:1` 总数），
+   取数之间的空档只说"调度中…"，`finally` 里清空。`el-steps` 那两格（智能派单 / 高级设置）**留着** ——
+   它是这个两步表单的真实步骤，不是假仪表。
+2. "待调度订单"这一格在同一页有两个答案：`poolCount = 当前页 status===1 的条数 || poolTotal（全状态总数）`，
+   而同一文件里已经有一条正确算法（`pooledTotal()` 用 `status:1` 单独查 total）。
+   收成一条出口 `refreshPoolPending()`：`null` = 还没读到 ⇒ 界面念"读取中…"，读失败 ⇒ 念"没读到（不拿别的数冒充）"，
+   两个入口（打开弹窗 / 一键派单收口）都走它。顺手补 `openSmart` 里漏掉的 `autoResult` 复位
+   —— 不复位的话第二次打开弹窗会先念上一次的"完成：方案 #x"。
+
+**第六本后台判据 `scripts/check_admin_no_wallclock_progress.py`**（挂 `ci.yml` drift-check；连同 SQL 两本共 8 本）
+· 口径：只在 `setInterval(` 的**实参体内**判"给名字含 progress|percent|stage 的 ref 赋值"这一形；
+  字符串/模板串/注释里的 `setInterval` 不算（有一条 `_code_mask` 专门做这件事）。
+· 在册例外**只有一格**：`transport/dispatch/DispatchVisualDialog.vue` 的路线播放器（2%/120ms 沿后端已算好的
+  折线推进播放位置）。它合法，但它和假进度条**长得一模一样** ⇒ 必须由表里那句理由放行，
+  而不是"看到定时器改 progress 就放过"。
+· 候选数为 0 ⇒ rc=2（"一处都没数到"不能读成"没有假进度"）；出现未登记的文件 / 计数上涨 /
+  降了却不改表，三种都红。
+
+**两次判据自己骗我（durable，下轮直接引用）**
+· (a) **一条正则同时判"名字"和"赋值"，会漏掉裸名**：`\w*(?:[Pp]rogress|...)\w*` 匹配不了 `progress` 本身
+  —— 前导 `[A-Za-z_]\w*` 把 `p` 吃掉之后，后面还要再要一个 `progress`，裸名反而落空；
+  而播放器那一形用的正是裸名 `progress`。改成"先抓 `X.value =`，再用第二条判 X 的名字"。
+  表现是：真树读数 0 处 ⇒ 差点把"提取器瞎了"当成"这棵树干净"。
+· (b) **同一个临时目录里放多条 fixture ⇒ 一条用例的期望值是隔壁给的**：K2「纯轮询不该报」实得 1 是因为
+  数到了 fake.vue，而 K3「播放器该被数到」期望 1 实得 1 是**侥幸绿**（真命中的还是 fake.vue，不是 play.vue）。
+  按 knife 分目录之后每条只可能咬自己。这是 §八 那一族"判据数到东西 ≠ 数到那一处"的新实例。
+· (c) 牙齿要**用真文件证**：K5 是把本轮真删掉的那一块塞回真 `dispatch/index.vue` 的内存副本再扫一遍
+  —— 光有 fixture 只证明正则会认这个形状，证明不了它对现在这棵树还有牙。
+
+**收口读数（全部实跑）**
+`vue-tsc --noEmit` 全量 rc=0、输出 0 字节（0 条 TS 错）；`eslint src/views/transport/dispatch/index.vue` rc=0；
+新闸 `--self-test` rc=0（K1–K6 六刀全 ✔）、基线 rc=0（候选 1 处 = 在册那 1 处）；
+八本静态闸连跑 rc 全 0；`vitest run` 4 files / 45 tests 通过。
+**没做浏览器点验**：一键智能派单要后端在跑 + 订单池里有真单才能看见那句阶段话换一个数；
+这一格登记为 NOT VERIFIED IN BROWSER，不拿静态检查冒充。
+
+**推送这一格本轮仍不成立（实测）**：`git ls-remote origin` rc=**128**
+`Failed to connect to github.com:443 after 2086 ms`；`git rev-list --left-right --count origin/master...HEAD` =
+**16 behind / 5 ahead** ⇒ 网络回来之后走"新分支 + PR"，**不强推 master**（前面那五条提交仍在本地）。
+
+**工作树里我刻意没提交的东西（登记，不顺手 add）**：`algorithm/**` 与 `docs/api/algorithm-api.yaml` 等
+算法侧改动（用户明令算法测试文件不提交）、`sql/mysql/transport-schema.sql` 那 3 行新列
+（它和未提交的 Java DO 字段是同一块活，单独提交会把"表里有列而 DO 没提交"那种红留到干净树上）、
+以及 `src/assets/audio/response.mp3` 的删除（1,736,109 B，全 `yudao-ui` grep `response.mp3`/`assets/audio` **0 引用**，
+但不是我这一轮动的，不替它做决定）。同族的一条**已单独提交**：`pricingRule/index.vue` 里
+`description="…不是"运价为 0"。"` 这种 ASCII 双引号嵌在双引号属性里（上一轮改了没提交）。
