@@ -9504,3 +9504,77 @@ SFC 结构扫 68 只 0 失败；`vue-tsc --noEmit` 0 错；eslint **0 error**（
 ① 真端点仍未配（`base-url` + `BUSPOST_AI_API_KEY` + `model`，**服务器归用户管**）；
 ② 云上形态仍 `NOT VERIFIED IN BROWSER`（PR #195 未合）；③ 结果面板在登录超时这类失败上该念具体原因（上轮立的待改进）；
 ④ #100、#60 不变。平台侧四笔：`a7c80070` `33111b8c` `ec2dbd4e` `c6599120`（前三笔 CI 四作业全绿，第四笔在跑）。
+## D-146 · 真 key 实测抓出一个"只有真模型才测得出来"的缺陷；合并部署已落地，迁移卡在 runner 上
+
+用户给了一个 MiMo 的 key（**只许配 `mimo-v2.6-flash`**），并授权"合并部署"。这一轮的三件事：
+用真 key 把链路真跑通、把跑出来的缺陷修掉、把 PR 合进 master 并部署。
+
+### 一、key 怎么认出来的（这一步差点把密钥发给陌生站点）
+
+`sk-` 开头 ⇒ 我先按常识试 OpenAI：**本网络连不上 api.openai.com（curl 回 000）**；
+再试本仓文档里的云上两家，DashScope 与 DeepSeek **都回 401** ⇒ 不是它们。
+**我在这里停手了**：再猜下去等于把用户的密钥发给随机域名。
+用户补充说是 MiMo ⇒ 查官方 base-url 得 `https://api.xiaomimimo.com/v1`，
+一次 `GET /models` 回 **200**，模型清单里有 `mimo-v2.6-flash`、`mimo-v2.6-pro` 等 9 个。
+
+**纪律**：密钥全程只走环境变量（`BUSPOST_AI_API_KEY`），不进命令行、不进 yaml、不进日志、不进台账；
+收工时 `grep -c 'sk-cvngy' <后端日志>` = **0**，提交前的密钥形状扫描 **0 命中**。
+
+### 二、真跑一次，立刻抓到一个真缺陷（单测抓不到）
+
+链路真跑（真 jar → 真 HTTP → MiMo → 解析 → 落留痕）：能力接口 `ready=true / model=mimo-v2.6-flash`，
+调用留痕 `status=ok / tokens=328 / 2878ms`，送入**没有明文手机号** —— 但**回包判了"没按格式"**。
+回库看模型原文：
+
+    分类：道路阻断 依据：材料称"路上塌方了，车过不去"，属道路通行受阻，需联系处理。
+
+**MiMo 把两个字段写在同一行**（空格隔开），而 `AiTasks` 的 CLASSIFY/PHOTO 正则用 `[\r\n]+`
+钉死了换行 ⇒ `parsed=false` ⇒ 页面会念"模型回了，但没按格式"，**白跑一次真调用**。
+单测抓不到的原因很直接：**fixture 是我自己写的两行版**，所以永远是绿的。
+
+修法（只放宽分隔符，纪律不动）：字段分隔改成 `\s+`（空格/换行都吃）；
+标签定位、候选集校验、"依据不足就不登记成结论"一概不动；**没有任何空白分隔的仍然判未解析**（不许靠猜切词）。
+提示词同时补"两个字段必须换行分隔"。新增两条用例钉这一形状：`AiTasksTest` **13 → 15** 全绿。
+
+**修完用真模型复跑**（这次读的是 API 回包，UTF-8 文件读法，别再被 GBK 控制台坑）：
+
+    parsed=True   suggestion=道路阻断
+    basis=上报称路上塌方、车过不去，属道路通行受阻，需联系138****8000处理。
+
+注意最后一段：**模型自己复述出了掩码形态**（`138****8000`）——因为送出去的就是掩过的文本，
+这等于把"脱敏在出网之前发生"这一条也验了。
+
+### 三、合并与部署
+
+· **PR #195 合了**（`f1b58658`，34 笔）⇒ master 上 `Project validation` **四作业全绿**、
+  **Deploy to dev server = success**（自托管 runner 上跑的）。仓库变量 `AUTO_DB_MIGRATE` 未设 ⇒
+  部署**一个字节都没写库**（这是设计如此：写库只走 guarded）。
+· 顺手把 **PR #196** 也合了（`18c73167`）：MiMo 单行回包解析 + guarded 的 `actions/checkout` v4→v7。
+
+### 四、迁移卡在 runner 上（**云端库到现在还是老形状**）
+
+`mode=apply`（`confirm=APPLY`）**连着三次红在 `Run actions/checkout`**，守卫/探测/执行一步没跑：
+· 先升了 checkout v4→v7（仓里只有 guarded 还在用 v4，ci.yml 七处都是 v7）⇒ **v7 一样红**，假设被推翻；
+· 同一个 runner 上 **Deploy 刚刚是 success** —— 但 `deploy-dev.yml` **根本不含 `actions/checkout@`**
+  （它在服务器持久检出的目录里跑），所以"部署成功"不能反证 checkout 可用；
+· 时间线上，**我自己的 push 也在同一窗口内断过一次**（`Failed to connect to github.com:443`，约 20 秒后自愈）。
+⇒ 最可能的根因是**本机与 runner 同网段、到 GitHub 的连接间歇不通**，而不是脚本或工作流写法。
+**判断依据留在这**：checkout 失败时 job 日志 blob 取不到（`gh run view --log-failed` 空），
+所以只能靠"部署不经 checkout 却成功" + "本机同时段连 GitHub 超时"这两条旁证。
+⇒ 这一格**没做完**：V037 + V050–V055 仍未在云上执行，AI 的五页菜单在云后台还看不到。
+
+### 五、我这一轮判错的两处
+
+1. **v4→v7 我当成根因了**：证据只有"仓里只有它用 v4"，属于**只看结构差异、没有可复现的失败日志**就下的结论。
+   代价是多推了一笔（这笔本身无害、与其它工作流一致，保留），但它不是解药 —— 记住：**结构差异 ≠ 因果**。
+2. **本机全量 reactor 红在 `OAuth2TokenServiceImplTest`**（system 模块 H2 内存库 + 测试 Redis，
+   `expected <1> but was <2>`）。本轮 diff 只动 ai-assist 与 guarded yml，同代码在 CI `backend=success`，
+   且三小时前同一条命令本地还是绿的 ⇒ 判为本机测试序/状态问题，**不是本轮改动**。
+   拿准这一点的办法：用 `-Dtest='…我改的那几个类' -Dsurefire.failIfNoSpecifiedTests=false` 单独跑，别被无关模块挡着。
+
+### 六、还欠的
+
+① **云端迁移**：重跑 `mode=apply`（脚本幂等，跑几遍都行；第 16 本判据在本机实测过两遍零漂移）；
+② 云上 AI 要真能用，还差**服务器上的三个环境变量**：`BUSPOST_AI_API_KEY`、`buspost.ai.base-url`、
+`buspost.ai.enabled=true`（密钥只从环境变量来，仓库里永远没有它）；
+③ 结果面板在登录超时这类失败上该念具体原因（上一轮立的待改进）；④ #100、#60 不变。

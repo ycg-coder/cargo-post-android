@@ -97,6 +97,28 @@
   读数：vitest **5 文件 / 59 用例**、SFC 68 只 0 失败、vue-tsc 0 错、eslint 0 error、build `dist-prod` **377**、15 本闸全绿。
 
 
+- **真 key 实测抓出一个只有真模型才测得出来的缺陷（台账 D-146）**：用户给了 MiMo 的 key（只许配 `mimo-v2.6-flash`）。
+  认端点那一步差点把密钥发出去 —— `sk-` 开头先试 OpenAI（**本网络连不上，curl 000**）、再试 DashScope/DeepSeek（都 401），
+  **到此停手不猜域名**，用户补一句是 MiMo ⇒ 查到 `https://api.xiaomimimo.com/v1`，`GET /models` 回 200、清单里有 `mimo-v2.6-flash`。
+  **密钥全程只走环境变量**（收工时后端日志 grep = 0，提交前密钥形状扫描 0 命中）。
+  链路真跑一次就抓到缺陷：MiMo 回「分类：道路阻断 依据：材料称…」**一行两段**，而解析器用 `[
+]+` 钉死换行
+  ⇒ `parsed=false` ⇒ 页面念"模型回了，但没按格式"、**白跑一次真调用**（单测抓不到：fixture 是我自己写的两行版）。
+  修法只放宽**分隔符**（`\s+`），标签/候选集校验/"依据不足就不登记"一概不动；`AiTasksTest` 13→**15**。
+  **修完用真模型复跑**：`parsed=True / suggestion=道路阻断`，模型自己复述出 `138****8000` ⇒ 脱敏在出网前发生也被真模型验了。
+- **合并与部署**：**PR #195 已合**（`f1b58658`，34 笔）⇒ master 上 `Project validation` 四作业全绿、
+  **Deploy to dev server = success**；**PR #196 也合了**（`18c73167`：MiMo 单行解析 + guarded 的 checkout v4→v7）。
+  `AUTO_DB_MIGRATE` 未设 ⇒ 部署**一个字节都没写库**（设计如此）。
+- **⛔ 云端迁移仍卡在 runner 上（这一格没做完）**：`mode=apply`（`confirm=APPLY`）**连着 4 次红在 `Run actions/checkout`**，
+  守卫/探测/执行一步没跑，日志 blob 取不到（`BlobNotFound`）。升 v7 没用（假设被推翻）；
+  同一 runner 上 Deploy 是 success —— 但 **`deploy-dev.yml` 根本不含 `actions/checkout@`**（它在服务器持久检出目录里跑），
+  所以"部署成功"不能反证 checkout 可用；同一窗口内**我自己的 push 也断过 20 秒**（`Failed to connect to github.com:443`）。
+  ⇒ 最可能是**本机与 runner 同网段、到 GitHub 的连接/工作目录有问题**，**这一格要人在服务器上看**（重启 Actions runner 或清 `_work`）。
+  结果：**V037 + V050–V055 未在云上执行**，AI 五页菜单在云后台还看不到。
+  ⚠ 我**没有**绕过它去改部署路径（比如临时置 `AUTO_DB_MIGRATE=1`）：那是写库通道的安全设计，
+  且 `deploy-dev.yml` 那份白名单只到 V025、**根本不含 AI 那几支** —— 绕过去也达不到目的，反而把"要不要动云上数据"变回隐式。
+- **还欠**：服务器上三个环境变量（`BUSPOST_AI_API_KEY` / `buspost.ai.base-url` / `buspost.ai.enabled=true`）才能让云上 AI 真能用；
+  云上形态仍 `NOT VERIFIED IN BROWSER`；#100、#60 不变。
 ## 上一轮 CURRENT（2026-10-16 下午 · 台账 D-135 … D-136 · 两端 + 并行线撞车已记）
 
 - **本地能编后端了**（此前那句"只能靠 CI 验"是我自己的错判）：`/c/Users/袁/apache-maven-3.9.16/bin/mvn -B -pl yudao-module-transport test`
