@@ -144,4 +144,22 @@ class DriverExceptionReportTest {
         assertEquals(setOf("remark", "photoUrl"), body.keys)
         assertEquals("https://x/exception-9711.jpg", body["photoUrl"])
     }
+
+    /**
+     * 照片没传上去时，回执必须把**原因**带出来（真机抓的：段已经转异常、提交机会用掉了，
+     * 只剩这一句话能说明是登录态、存储配置还是网络）。
+     */
+    @Test
+    fun `照片没传上去的回执带着后端给的原因`() {
+        val t = photoDropText("ApiException: 文件存储配置不存在")
+        assertTrue(t.contains("照片没传上去"))
+        assertTrue("实际句子：$t", t.contains("文件存储配置不存在"))
+    }
+
+    @Test
+    fun `原因缺失时不许留成空白的「原因：」`() {
+        val t = photoDropText("   ")
+        assertTrue("空原因必须换成一句实话，实际：$t", t.contains("都没给原因"))
+        assertTrue("不许出现「原因：」后面一片空白：$t", !t.contains("原因：。"))
+    }
 }

@@ -124,6 +124,16 @@ swap "$DS" 'val picker = rememberLauncherForActivityResult(ActivityResultContrac
      '// NEG-CONTROL 选片器整段没了'
 ctl EX-m "选片器整段没了：照片这一格连入口都不存在"
 
+# EX-n 两把：那句回执的**原因**是唯一线索（段已经转异常，重复上报后端不再接受）。
+# 两把都用 swap 整行 —— 本簿的 drop 只把锚点那几个字注释掉，行尾原样留着（D-138 记过的那条空转）。
+swap "$RP" 'internal fun photoDropText(why: String): String {' '// NEG-CONTROL 纯函数被摘掉：'
+ctl EX-n "带原因的那句纯函数没了（回执会退回只念「没传上去」）"
+
+# ⚠ 这个簿里页面文件叫 $DS（$SC 是判据簿那边的变量名；写成 $SC 就是拿空路径去 swap，
+#   只会报"锚点没命中"，看着像注入失败，其实是刀根本没落到文件上）
+swap "$DS" 'photoDropped -> photoDropText(uploadWhy)' 'photoDropped -> "异常已提交，但现场照片没传上去"'
+ctl EX-n "页面不再走那句纯函数（就地重写 = 14 条用例管不到运行时）"
+
 swap "$RP" 'internal const val EXCEPTION_REMARK_MAX = 200' 'internal const val EXCEPTION_REMARK_MAX = 2000'
 ctl EX-e "remark 上限被抬到后端列宽之外（超限=1406=整笔回滚）"
 

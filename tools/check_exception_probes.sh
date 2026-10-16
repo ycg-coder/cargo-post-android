@@ -103,10 +103,14 @@ EK2=$(grep -n '"photoUrl" to' "$SC" | grep -vE "$NC" | wc -l | tr -d ' ')
 #   第一版写的是 `picked = it`，于是刚拍的那张被静默抹掉，页面回到"没附照片"那一形，
 #   而司机以为自己还带着照片 —— 提交出去就是又一条"凭证没带上"，与我们刚修完的 #60 同一格。
 #   正确形状是 `picked = it ?: picked`（这一格里 `it` 与 `picked` 都是 Uri?，判据按这一处的实际形状认）。
+# EX-n 照片回执要带原因（真机抓的：段已转异常、提交机会用掉了，只剩这句话能说明为什么没带上）
+EN=$(grep -cF 'fun photoDropText(why: String): String' "$RP")
+EN2=$(grep -cF 'photoDropped -> photoDropText(uploadWhy)' "$SC")
+EN3=$(grep -cF 'exceptionOrNull()' "$SC")
 EM=$(grep -cF 'picked = it ?: picked' "$SC")
 EM2=$(grep -n 'PickVisualMedia())' "$SC" | grep -vE "$NC" | grep -cF '{ picked = it }')
 
-echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥12/≥6）"
+echo "EX-a 用例条数（纯函数/契约）        = $EA/$EA2 （目标 ≥14/≥6）"
 echo "EX-b legAction 出口/页面自发热请求   = $EB/$EB2 （目标 1/0）"
 echo "EX-c 自造 type 键/三键集合契约        = $EC/$EC2 （目标 0/1）"
 echo "EX-d 分类条目数/缺失标签数            = $ED/$ED_MISS （目标 7/0）"
@@ -119,12 +123,13 @@ echo "EX-i 终态守卫字面量（出网前/按钮/入口/选段） = $EI/$EI2/
 echo "EX-j 消歧调用（选段行/回执）·页面残留直出串·缺单号兜底 = $EJ/$EJ2/$EJ3/$EJ4 （目标 1/1/0/1）"
 echo "EX-k 照片键纪律（空串不写键 / 页面不内联 photoUrl） = $EK/$EK2 （目标 1/0）"
 echo "EX-m 选片取消保留已选（保留写法 / 裸赋值残留）      = $EM/$EM2 （目标 1/0）"
+echo "EX-n 照片回执带原因（纯函数/上岗/原因取自 Result）  = $EN/$EN2/$EN3 （目标 1/1/1）"
 
 fail=0
 # ⚠ 下限 10 → 12（2026-10-16，D-135）：#60 给照片键纪律补了两条具名用例，文件实读 12 条 @Test。
 #   不抬的话"注释掉一条用例"这种破口注进去仍然绿 —— 本轮就是负控自己报出来才看见的
 #   （EX-a 第一条：✘ 负控制失效（exit 0））。下限只按实跑的条数抬，不按估、不按"大概十几条"。
-[ "$EA" -ge 12 ] || { echo "× EX-a 纯函数用例少于 12 条（含 #43 三条消歧 + #60 两条照片纪律）"; fail=1; }
+[ "$EA" -ge 14 ] || { echo "× EX-a 纯函数用例少于 14 条（含 #43 三条消歧 + #60 两条照片纪律 + 两条照片回执带原因）"; fail=1; }
 [ "$EA2" -ge 6 ] || { echo "× EX-a 契约用例少于 6 条（报文与回执没人钉）"; fail=1; }
 [ "$EB" = 1 ]    || { echo "× EX-b 异常上报不再走 Repo.legAction 单一出口（幂等闸与 401 收口都会被绕过）"; fail=1; }
 [ "$EB2" = 0 ]   || { echo "× EX-b 司机页面开始自己 Api.post：绕过闸门、绕过会话失效处理"; fail=1; }
@@ -156,6 +161,9 @@ fail=0
 [ "$EK2" = 0 ] || { echo "× EX-k 页面里又内联拼了 photoUrl 键（$EK2 处）：一份键两处拼，改一处漏一处"; fail=1; }
 [ "$EM" = 1 ]  || { echo "× EX-m 选片回调不再保留已选（真机抓的：重开选片器按返回就把刚拍的那张清了，页面回到「没附照片」那一形）"; fail=1; }
 [ "$EM2" = 0 ] || { echo "× EX-m 页面里回来了「取消就把 picked 覆盖成 null」的裸赋值（$EM2 处）：司机以为还带着照片"; fail=1; }
+[ "$EN" = 1 ]  || { echo "× EX-n 那句带原因的纯函数没了：回执会退回只念「没传上去」，谁都不知道为什么"; fail=1; }
+[ "$EN2" = 1 ] || { echo "× EX-n 页面不再走 photoDropText（$EN2 处）：那句话被就地重写，纯函数用例就管不到运行时"; fail=1; }
+[ "$EN3" = 1 ] || { echo "× EX-n 页面把上传失败的原因丢了（exceptionOrNull 命中 $EN3）：司机看到的回执与排查无关"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "§54 异常上报判据通过"; else echo "§54 异常上报判据失败"; fi
 exit "$fail"

@@ -47,6 +47,20 @@ internal fun exceptionActionBody(remark: String, photoUrl: String = ""): Map<Str
     if (photoUrl.isEmpty()) mapOf("remark" to remark)
     else mapOf("remark" to remark, "photoUrl" to photoUrl)
 
+/**
+ * 照片没传上去时的那句回执（队列 #60 / 真机抓的取证不全）。
+ *
+ * 为什么要单独一个纯函数、还要把原因带进句子里：真机上试过一次真提交，照片传不上、
+ * 而回执只念"没传上去"——司机和调度都分不出是登录态过期、后端存储没配、还是网络断了，
+ * 而**这一段的提交机会已经用掉了**（段转异常后不再接受重复上报）。
+ * 空原因不许留成"原因："后面一片空白，那比没有更让人误判。
+ */
+internal fun photoDropText(why: String): String {
+    val w = why.trim().take(90)
+    return "异常已提交，但现场照片没传上去（后端那一格仍是空）——原因：${if (w.isEmpty()) "后端与本机都没给原因" else w}。" +
+        "可让调度补录或重报下一段"
+}
+
 /** 选定分类后，补充说明最多还能写多少字（`：` 占一位） */
 internal fun exceptionDetailBudget(reason: DriverExceptionReason?): Int =
     if (reason == null) EXCEPTION_REMARK_MAX

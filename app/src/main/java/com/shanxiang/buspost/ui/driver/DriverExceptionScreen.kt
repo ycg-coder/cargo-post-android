@@ -169,15 +169,17 @@ class DriverExceptionViewModel : ScreenViewModel() {
                 // 现场照片：#60 之前这条链路没人接（请求里有 photoUrl 字段，后端只读 remark）。
                 // 与交接确认**不同**的一条判断：照片传不上去**不拦异常上报** —— 异常必须先到调度，
                 // 少一张照片是取证不全，不发这一条是整段货没人管。但回执必须说清没带上。
-                val uploaded = if (photo != null && context != null) {
+                val up = if (photo != null && context != null) {
                     attempt {
                         val bytes = context.contentResolver.openInputStream(photo)?.use { it.readBytes() }
                             ?: ByteArray(0)
                         Repo.uploadPhoto(bytes, "exception-${leg.legId}.jpg").url
-                    }.getOrDefault("")
-                } else {
-                    ""
-                }
+                    }
+                } else Result.success("")
+                val uploaded = up.getOrNull().orEmpty()
+                // ⚠ 失败原因不能丢：真机上照片传不上去时，回执只念"没传上去"，
+                //   司机和调度都看不出是登录态、存储配置还是网络 —— 而这一格最后一次提交机会已经用掉了。
+                val uploadWhy = up.exceptionOrNull()?.let { "${it.javaClass.simpleName}: ${it.message}" } ?: ""
                 val photoDropped = photo != null && uploaded.isEmpty()
                 val ack = Repo.legAction(LegDriverAction.EXCEPTION.api, leg.legId, exceptionActionBody(remark, uploaded))
                 val feed = Repo.driverLegs()
@@ -191,7 +193,7 @@ class DriverExceptionViewModel : ScreenViewModel() {
                     back == null -> "异常已提交，但回读列表里已经没有这一段，请下拉刷新核对"
                     LegStatus.of(back.status) != LegStatus.EXCEPTION ->
                         "异常已提交，但后端回读仍是「${back.statusLabel}」，可能未被接受，请下拉刷新核对"
-                    photoDropped -> "异常已提交，但现场照片没传上去（后端那一格仍是空）——可重报一次或让调度补录"
+                    photoDropped -> photoDropText(uploadWhy)
                     else -> "后端回读：${legReceiptText(back)}，重排由调度处理" +
                         if (uploaded.isNotEmpty()) "；现场照片已随上报提交" else ""
                 }
