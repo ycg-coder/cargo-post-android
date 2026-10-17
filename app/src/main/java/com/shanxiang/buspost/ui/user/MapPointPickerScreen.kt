@@ -2,7 +2,6 @@ package com.shanxiang.buspost.ui.user
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -26,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -41,14 +38,18 @@ import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.Marker
 import com.amap.api.maps.model.MarkerOptions
 import com.shanxiang.buspost.core.loc.Locator
-import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusElevation
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
+import com.shanxiang.buspost.core.ui.glassmorphic
+import com.shanxiang.buspost.core.ui.glassSheen
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.ui.common.BackTopBar
+import com.shanxiang.buspost.ui.common.CapsuleAction
+import com.shanxiang.buspost.ui.common.CapsuleActions
 import com.shanxiang.buspost.ui.common.LocalNavController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -108,6 +109,54 @@ fun MapPointPickerScreen(
         }
     }
 
+    // 这一页的两个功能按钮搬进**全局悬浮胶囊**（用户口径："点进去具体界面的悬浮导航栏就是具体界面的功能按钮"，
+    // 以及本轮的"能悬浮的都可以做悬浮按钮不要阻挡"）。原来它们是分散在两处的：
+    // 「回到我的位置」是地图右下角一枚自绘白方块，「确认选择此位置」是面板末尾一颗通栏按钮 ——
+    // 两处各有各的高度，谁都不给彼此让位（白方块还会压在面板上）。
+    // 搬进胶囊后：一屏只有一个浮层、确认这一格在没点出位置时是**带着原因**的禁用格而不是灰掉的一颗按钮。
+    var relocating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    CapsuleActions(
+        listOf(
+            CapsuleAction(
+                key = "relocate",
+                label = if (relocating) "定位中" else "回到我的位置",
+                icon = BusIcons.myLocation,
+                enabled = !relocating,
+                disabledReason = "正在取当前位置",
+                onClick = {
+                    relocating = true
+                    scope.launch {
+                        val loc = Locator.once(context, timeoutMs = 10000L)
+                        if (loc != null) {
+                            selectedGeo = loc
+                            mapView?.map?.let { aMap ->
+                                aMap.moveCamera(
+                                    CameraUpdateFactory.newLatLngZoom(LatLng(loc.lat, loc.lng), 15f),
+                                )
+                            }
+                        }
+                        relocating = false
+                    }
+                },
+            ),
+            CapsuleAction(
+                key = "confirm",
+                label = "确认选点",
+                icon = BusIcons.check,
+                selected = selectedGeo != null,
+                enabled = selectedGeo != null,
+                disabledReason = "先在地图上点一下要的位置",
+                onClick = {
+                    selectedGeo?.let { geo ->
+                        nav.previousBackStackEntry?.savedStateHandle?.set("selectedGeo", geo)
+                        nav.popBackStack()
+                    }
+                },
+            ),
+        ),
+    )
+
     Column(Modifier.fillMaxSize()) {
         BackTopBar(title = title)
 
@@ -159,62 +208,22 @@ fun MapPointPickerScreen(
                 }
             }
 
-            // 回到当前位置按钮
-            if (!locating) {
-                var relocating by remember { mutableStateOf(false) }
-                val scope = rememberCoroutineScope()
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.BottomEnd,
-                ) {
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(BusRadius.m))
-                            .background(Color.White)
-                            .clickable {
-                                relocating = true
-                                scope.launch {
-                                    val loc = Locator.once(context, timeoutMs = 10000L)
-                                    if (loc != null) {
-                                        selectedGeo = loc
-                                        mapView?.map?.let { aMap ->
-                                            val latLng = LatLng(loc.lat, loc.lng)
-                                            aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
-                                        }
-                                    }
-                                    relocating = false
-                                }
-                            }
-                            .padding(12.dp),
-                    ) {
-                        if (relocating) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                color = t.primary,
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                BusIcons.myLocation,
-                                "回到当前位置",
-                                tint = t.primary,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                }
-            }
+            // 「回到我的位置」原来在这里 —— 地图右下角一枚自绘白方块，已经搬进悬浮胶囊（见上面的 CapsuleActions）。
+            // 地图下沿因此整块空出来了：不再有一枚浮在地图上的方格去压面板，也不占地图高度。
         }
 
-        // 底部信息面板
+        // 底部信息面板：只念地址与坐标，操作都交给悬浮胶囊。
+        // 玻璃面（半透明渐变 + 顶边一道高光）而不是实色卡：它压在地图边上，实色块会让这一屏看起来像被切掉一截。
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(t.card)
-                .clip(RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l))
-                .padding(16.dp),
+                .glassmorphic(
+                    t,
+                    shape = RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l),
+                    shadowElevation = BusElevation.raised,
+                )
+                .glassSheen(t, shape = RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             if (selectedGeo != null) {
                 // 地址信息
@@ -253,20 +262,18 @@ fun MapPointPickerScreen(
                     )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // 确认按钮
-                BusButton(
-                    text = "确认选择此位置",
-                    onClick = {
-                        nav.previousBackStackEntry?.savedStateHandle?.set("selectedGeo", selectedGeo)
-                        nav.popBackStack()
-                    },
-                    icon = BusIcons.check,
+                // 那颗通栏「确认选择此位置」已经搬进悬浮胶囊；这一行只负责把人指过去，
+                // 而不是留一句"确认后…"让人自己找出口。
+                Text(
+                    if (selectedGeo != null) "点下方悬浮栏的「确认选点」" else "在地图上点一下要的位置",
+                    color = t.textSecondary,
+                    fontSize = (12.5 * scale).sp,
                 )
             } else {
                 Text(
-                    "点击地图选择位置",
+                    "正在取当前位置，或在地图上点一下",
                     color = t.textSecondary,
                     fontSize = (13 * scale).sp,
                     modifier = Modifier.padding(vertical = 8.dp),

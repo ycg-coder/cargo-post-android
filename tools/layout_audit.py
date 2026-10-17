@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""uiautomator dump 的布局几何自检：越过屏幕、兄弟文字重叠、可点热区不足 48dp。
+"""uiautomator dump 的布局几何自检：越过屏幕、兄弟文字重叠、浮层盖住可点格、可点热区不足 48dp。
 
 用法：python tools/layout_audit.py <dump.xml> [<dump2.xml> ...]
 屏幕尺寸默认取 dump 里最大 bounds，可用 --screen 1080x2400 覆盖。
 48dp 在 420dpi（1 dp = 2.625 px）下是 126 px，可用 --min-touch 覆盖。
+浮层遮挡那一档的门槛是"后画的节点盖住 ≥30%"，可用 --min-cover=40 覆盖。
 """
 import re
 import sys
@@ -57,7 +58,51 @@ def label(n):
     return f"{who!r} [{n['bounds'][0]},{n['bounds'][1]}][{n['bounds'][2]},{n['bounds'][3]}]"
 
 
-def audit(path, screen, min_touch):
+def occluded(nodes, min_pct=30):
+    """浮层压住可点格：文档里**后画**的节点盖住**先画**的带标签可点格 ≥ min_pct%。
+
+    为什么单列一档而不是并进"兄弟文字重叠"：那一档只看两段文字，而真正的事故形态是
+    一颗按钮被一枚不画文字的浮层整片盖住 —— 2026-10-17 导航页到站格右下的「回工作台作业」
+    就是被全局悬浮胶囊压在下面（按钮还剩半截看得见，点下去走的是胶囊那一格）。
+    重叠的那档查不到它：被盖住的那一方是 ImageVIew/View，没有并排的文字。
+
+    两条必要的排除，不然满屏假阳：
+    - **祖先/子孙**不算互相遮挡（子节点本来就画在父节点里，父节点的标签在子节点之外）；
+    - 零面积节点跳过（`area==0` 既当不了被盖方也当不了盖人方）。
+
+    已知噪声：弹窗 / 遮罩会把底下整页的可点格都报出来 —— 那一格看清单不看总数，
+    真出弹窗时底下确实点不动，报出来不算冤枉。
+    """
+    issues = []
+    for i, n in enumerate(nodes):
+        if not (n["clickable"] and n["visible"]):
+            continue
+        if not n["text"] and not n["desc"]:
+            continue
+        own = area(n["bounds"])
+        if own <= 0:
+            continue
+        covered = 0
+        by = []
+        for m in nodes[i + 1:]:
+            if not m["visible"]:
+                continue
+            if id(n) in m["chain"] or id(m) in n["chain"]:
+                continue
+            ov = inter(n["bounds"], m["bounds"])
+            if not ov:
+                continue
+            covered += area(ov)
+            by.append(m)
+        pct = min(own, covered) * 100 // own
+        if pct >= min_pct:
+            top = by[-1]
+            issues.append(
+                f"被后画浮层盖住 {pct}%: {label(n)} ← {label(top)}")
+    return issues
+
+
+def audit(path, screen, min_touch, min_cover=30):
     nodes = parse(path)
     if not nodes:
         print(f"{path}: 空 dump")
@@ -104,12 +149,14 @@ def audit(path, screen, min_touch):
     for n in zero:
         issues.append(f"文字零尺寸: {label(n)}")
 
+    issues.extend(occluded(leaves, min_pct=min_cover))
+
     print(f"== {path}: {len(nodes)} 节点 / {len(txt)} 段文字 / 屏幕 {W}x{H} ==")
     if issues:
         for line in issues:
             print("  [LAYOUT] " + line)
     else:
-        print("  无越界 / 无兄弟重叠 / 热区达标")
+        print("  无越界 / 无兄弟重叠 / 无浮层盖按钮 / 热区达标")
     return len(issues)
 
 
@@ -130,6 +177,7 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     screen = None
     min_touch = 126
+    min_cover = 30
     list_to = None
     for a in sys.argv[1:]:
         if a.startswith("--screen="):
@@ -137,6 +185,8 @@ def main():
             screen = (int(w), int(h))
         if a.startswith("--min-touch="):
             min_touch = int(a.split("=", 1)[1])
+        if a.startswith("--min-cover="):
+            min_cover = int(a.split("=", 1)[1])
         if a.startswith("--list="):
             list_to = a.split("=", 1)[1]
     if not args:
@@ -144,7 +194,7 @@ def main():
         return 2
     if list_to:
         listing(args[0], list_to)
-    total = sum(audit(p, screen, min_touch) for p in args)
+    total = sum(audit(p, screen, min_touch, min_cover) for p in args)
     print(f"TOTAL_ISSUES={total}")
     return 0
 

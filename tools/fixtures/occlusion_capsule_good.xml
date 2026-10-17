@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="false" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+    <node index="0" text="" resource-id="" class="android.view.View" package="com.shanxiang.buspost" content-desc="导航地图" checkable="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+      <node index="0" text="" resource-id="" class="android.view.View" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1938][1080,2169]">
+        <node index="0" text="高德说已到第 2 个途经点 · 揽收 · 2 件" resource-id="" class="android.widget.TextView" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,1970][740,2090]">
+        </node>
+        <node index="0" text="回工作台作业" resource-id="" class="android.widget.TextView" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[760,2040][1040,2110]">
+        </node>
+      </node>
+      <node index="1" text="" resource-id="" class="android.view.View" package="com.shanxiang.buspost" content-desc="悬浮胶囊" checkable="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[88,2228][992,2386]">
+        <node index="0" text="播报已开" resource-id="" class="android.widget.TextView" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[120,2240][360,2372]">
+        </node>
+        <node index="1" text="看整段" resource-id="" class="android.widget.TextView" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[400,2240][640,2372]">
+        </node>
+        <node index="2" text="退出导航" resource-id="" class="android.widget.TextView" package="com.shanxiang.buspost" content-desc="" checkable="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[680,2240][920,2372]">
+        </node>
+      </node>
+    </node>
+  </node>
+</hierarchy>
