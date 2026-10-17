@@ -1,10 +1,12 @@
 package com.shanxiang.buspost.ui.user
 
 import com.shanxiang.buspost.TestHost
+import com.shanxiang.buspost.data.model.BusLine
 import com.shanxiang.buspost.data.model.BusVehicle
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.data.model.NearbyResult
+import com.shanxiang.buspost.data.model.Station
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -118,6 +120,56 @@ class BusStateContractTest {
     fun `空报文仍走 empty 而不是 error`() {
         assertEquals("empty", home(geo = geo, nearby = none, loading = false, error = null))
         assertEquals("empty", bus(nearby = none, loading = false, error = null))
+    }
+
+    @Test
+    fun `失败那一格必须把原因带上 不许换成笼统话`() {
+        // 2026-10-17 真机：首页念「网络不太好，稍后再试」，而同一时刻对同一端点发同样的请求是
+        // code:0 + 368500 字节真数据 ⇒ 原因被这句话吃掉了，网络 / 解析 / 鉴权三种病长得一模一样。
+        val t = busFailureText("ApiException: HTTP 500 服务器开小差了")
+        assertTrue("实际句子：$t", t.contains("HTTP 500 服务器开小差了"))
+        assertTrue("不许再出现那句笼统话：$t", !t.contains("网络不太好"))
+        // 真机 2026-10-17 那条原文（104 字）。第一版按"取前 90 字"剪，把尾巴 `after 8000ms` 剪丢了
+        // —— 而那半句才是"这是超时、不是断网"的唯一依据 ⇒ 两头都必须留住。
+        val real = "failed to connect to api.qwer2333.com/1.15.29.107 (port 443) from /10.17.200.82 (port 47808) after 8000ms"
+        val long = busFailureText(real)
+        assertTrue("头（连到哪里）要留：$long", long.contains("failed to connect to api.qwer2333.com"))
+        assertTrue("尾（等了多久）要留：$long", long.contains("after 8000ms"))
+        assertTrue("副标题要有上限，实际长度=${long.length}", long.length < 130)
+        assertTrue("截完仍要留出口：$long", long.endsWith("再试"))
+    }
+
+    @Test
+    fun `原因缺失时换成一句实话 且不许留空白的「原因：」`() {
+        val blank = busFailureText("   ")
+        assertTrue("空原因必须换成一句实话，实际：$blank", blank.contains("都没给原因"))
+        assertTrue("不许出现「原因：」后面一片空白：$blank", !blank.contains("原因：。"))
+        assertTrue("null 与空串同形", busFailureText(null).contains("都没给原因"))
+    }
+
+    @Test
+    fun `经停站点只数这一条线 缺站点时不许拿附近并集顶替`() {
+        // 2026-10-17 用户报："站点有错误 —— 站点是这个路线的站点，不是整体的站点数量"。
+        // 旧写法 `line?.stations?.takeIf { it.isNotEmpty() } ?: vm.nearby?.stations` 在那条线没给站点时
+        // 退回附近所有站点的并集（15km 半径实测 1238 个），标题却仍写「经停站点 · 共 N 站」。
+        val stops = listOf(
+            Station(id = 1L, name = "华一路", geo = geo),
+            Station(id = 2L, name = "北区路", geo = geo),
+            Station(id = 3L, name = "鹅岭公园", geo = geo),
+        )
+        val line = BusLine(
+            id = "R829", name = "829路", from = "海棠溪", to = "鹅岭",
+            stations = stops, vehicles = emptyList(), dataSource = "REAL_TRANSIT",
+        )
+        val shown = viaStationsOf(line)
+        assertTrue("有站点就照它自己数：$shown", shown is ViaStations.Shown && shown.stations.size == 3)
+        assertEquals("标题要点名是哪条线", "829路 共 3 站", viaStationsTitle(shown))
+
+        val bare = viaStationsTitle(viaStationsOf(line.copy(stations = emptyList())))
+        assertTrue("这条线没给站点只许说没给：$bare", bare.contains("没给经停站点"))
+
+        val none = viaStationsTitle(viaStationsOf(null))
+        assertTrue("没选线路时这个问题还不成立：$none", none.contains("还没选线路"))
     }
 
     @Test

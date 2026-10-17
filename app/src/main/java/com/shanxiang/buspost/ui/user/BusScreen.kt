@@ -600,7 +600,7 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
             "error" -> Box(Modifier.fillMaxWidth().height(300.dp)) {
                 EmptyState(
                     title = "实时公交暂时不可用",
-                    subtitle = "网络不太好，稍后再试",
+                    subtitle = busFailureText(vm.error),
                     icon = BusIcons.info,
                     actionText = "重新加载",
                     onAction = { vm.load(context) },
@@ -668,6 +668,8 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         paths = paths,
                         modifier = Modifier.fillMaxWidth().height(320.dp),
                         fitAll = true,
+                        // 取景只跟"看的是哪条线"走：车辆轮询不再把镜头拽回（用户报"地图滑不动"）
+                        fitTag = line?.id?.takeIf { it.isNotEmpty() } ?: "nearby",
                         // 蓝点只在真拿到授权后开：没授权时开图层等于承诺一个永远不来的位置
                         showMyLocation = vm.locationGranted,
                         onUnavailable = { mapFailed = true },
@@ -958,10 +960,12 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // 经停站点
-                    val st = line?.stations?.takeIf { it.isNotEmpty() } ?: vm.nearby?.stations.orEmpty()
+                    // 经停站点：只许数**这一条线路**自己的站（2026-10-17 用户报"那是整体的站点数量"）。
+                    // 标题放在 `if` 外面 —— 没得数的时候也要出声，不许整栏静默消失。
+                    val via = viaStationsOf(line)
+                    val st = (via as? ViaStations.Shown)?.stations.orEmpty()
+                    SectionTitle("经停站点", subtitle = viaStationsTitle(via))
                     if (st.isNotEmpty()) {
-                        SectionTitle("经停站点", subtitle = "共 ${st.size} 站")
                         BusCard(modifier = Modifier.fillMaxWidth()) {
                             StationTimeline(
                                 st.mapIndexed { i, s ->
@@ -1316,6 +1320,7 @@ fun BusDetailScreen(routeId: String, vm: BusViewModel = viewModel()) {
                         paths = detailPaths,
                         modifier = Modifier.fillMaxWidth().height(250.dp),
                         fitAll = true,
+                        fitTag = routeId,
                         showMyLocation = vm.locationGranted,
                         onUnavailable = { detailMapFailed = true },
                     )

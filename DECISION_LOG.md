@@ -5608,7 +5608,7 @@ canonical 仍是 D-070 §3 那一发。
 
 ### D-076 续二（同日 13:5x）· #40 地图"我的位置"：图层从未开启 + 用户端从没申请过权限，两件事叠成一个现象
 
-实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:157-166` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：`AndroidManifest.xml:15-17` 声明了 `ACCESS_FINE_LOCATION`，但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `core/loc/Locator.kt:201` 也拿不到点，所以页面连"按位置排序"都是空的。
+实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:171-180` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：`AndroidManifest.xml:15-17` 声明了 `ACCESS_FINE_LOCATION`，但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `core/loc/Locator.kt:201` 也拿不到点，所以页面连"按位置排序"都是空的。
 
 改法三处：① `BusMap` 新增 `showMyLocation` 参数并真的开图层（**由调用方按授权状态传值** —— SDK 不会替我们弹框，未授权开图层等于承诺一个永远不来的位置）；② 实时公交页进页读一次授权、未授权申请一次，被拒不追弹；授权回来若还没有点就重跑 `load`；③ 定位提示收成**纯函数 `locationHintFor(granted, fix)`** 三态各说各话，顺手收掉 §51 在册那条"定位三态被折叠成 `me==null`"——旧文案在用户已经允许之后还教他去"系统设置里允许定位"。
 
@@ -5621,7 +5621,7 @@ canonical 仍是 D-070 §3 那一发。
 
 先纠我自己任务描述里的一处预设：**"SIMULATED 混在实时里没标注"在卡片级是不成立的** ——
 `BusVehicle.sourceText`（`Models.kt:649-659`，与小程序同口径的"实时/位置可能过期/位置推算/位置暂不可用"）
-已经在每辆车那一行渲染（`BusScreen.kt:1124 SourceTag(v.sourceText)`），新鲜度另有一行
+已经在每辆车那一行渲染（`BusScreen.kt:1128 SourceTag(v.sourceText)`），新鲜度另有一行
 `位置：${formatLocationFreshness(...)}`；地图 marker 也按 `isReal` 分 `KIND_BUS_REAL` / `KIND_BUS_SIM`。
 ⇒ 这一半无需改，改了就是重复造第二个真相。
 
@@ -5777,7 +5777,7 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
    `SendScreen.kt:1127`「请手动选择取货站点；本单不声称车辆可上门」，判据还点着旧字面量「不代表车辆能到」⇒ 0 命中。
    判据跟着换点名对象并在簿头写清旧句→新句的对应，**不是放松**：那句再被删或换成万能提示照样红。
 2. `check_throwable_probes.sh` TH-e 豁免面（1→**2**，rc 1→**0**）。实测两处免检 `catch (e: Exception)`：
-   `DriverSdkNavCard.kt:468`（旧登记在册）+ `BusScreen.kt:846`（步行导航唤起高德、失败退网页版）。
+   `DriverSdkNavCard.kt:468`（旧登记在册）+ `BusScreen.kt:848`（步行导航唤起高德、失败退网页版）。
    逐处看过 try 段：**只有一句 `ctx.startActivity(...)`，一个挂起点都没有** ⇒ §三十一"suspend 不许吞取消"在这两处没有适用对象。
    数量继续钉死恰好 2（再加第三处就得当场改这一行并说为什么）。
 
@@ -6429,7 +6429,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
    （`multiNum` 会把串 coerce 成 0，就是同一个病的另一半）。
 4. **时区不用猜**：反序列化用 `ZoneId.systemDefault()`，而 `deploy/docker-compose.yml:21`、
    `yudao-server/Dockerfile:12`、JDBC URL 三处都是 Asia/Shanghai ⇒ 本机按 `PICKUP_ZONE=Asia/Shanghai` 生成
-   （与 `BusScreen.kt:898` 同口径），设备换时区不会把墙钟挪走。
+   （与 `BusScreen.kt:900` 同口径），设备换时区不会把墙钟挪走。
 
 ⚠ **一条账面结论被代码否掉**：`V024__key_indexes_and_unique_keys.sql:10` 注释写着入池查询
 `ORDER BY earliest_pickup_time`，索引确实按 `:14` 建了，但全仓 `orderByAsc(TransportOrderDO::getEarliestPickupTime)` = **0 处**
@@ -6522,7 +6522,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 2. **名字只在线路列表里**：`BusLine.parse`（`Models.kt:868-871`）的 id/name 来自 `GET /app-api/transport/bus/lines`
    （`Repo.kt:844-849`），本地只存 id ⇒ 首页那一格**不显名字、也不显计数**
    （要显名字就得为它另取一次列表：多一跳网络 + 撞 `MockWebServer` 按序队列那三本计数类，见记忆同族条目）。
-3. **`HomeScreen.kt` 对 favorite 此前 0 命中**，而 `BusScreen.kt:672-674` 那一栏的闸门是 `favLines.isNotEmpty()`
+3. **`HomeScreen.kt` 对 favorite 此前 0 命中**，而 `BusScreen.kt:674-676` 那一栏的闸门是 `favLines.isNotEmpty()`
    ⇒ 线路列表这一轮取失败时整栏消失，用户被引导成"我没有收藏"，本机明明记着 id。
    这就是"没取到"被念成"没有"那一族病（D-079 政策页 / D-080 公告栏 / #42 天气同族），**本轮不是新增功能缺陷，是把这一格拆对**。
 
@@ -7841,7 +7841,7 @@ idempotency / idempotency_test / mission_route / navigation_test / notify_result
 - EI-1：`signUrl = o.multiStr("signUrl", "handoverSignUrl"),` 这串在 Repo.kt 里早就不存在（别名那轮撤的），
   真读点搬到了 **`Models.kt:1851`** 且只剩 `signUrl = o.multiStr("signUrl"),` ⇒ 锚点与落点文件一起改。复跑 **rc=0 ✔=8 ✘=0**（18s）。
 - mission_route 那刀：`val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)` 原本缩进 20 格，#49 把
-  `markerOptionsOf` 提成顶层函数后是 **`BusMap.kt:266`** 的 4 格 ⇒ 子串替换会命中更早的长缩进行（空刀），锚点连缩进一起换。复跑 **rc=0 ✔=52 ✘=0**（621s）。
+  `markerOptionsOf` 提成顶层函数后是 **`BusMap.kt:287`** 的 4 格 ⇒ 子串替换会命中更早的长缩进行（空刀），锚点连缩进一起换。复跑 **rc=0 ✔=52 ✘=0**（621s）。
 - navigation_test M6/M7：`guide.stops.filter{…}.minByOrNull{ it.visitSequence }` 被 #49 收进了
   `navigableStopsOf`。**M6 的第一版修法是空刀**：只把破口挪到"摘掉 `.sortedBy`"，而"下一站"那一行自己还写着
   `minByOrNull` ⇒ 上游排不排序它都挑得对，62 例照旧全绿 —— 是这本负控自己把它报成 ✘ 的，不是我看出来的。
@@ -9924,4 +9924,122 @@ records 1491 / OK 1206 / ID-MISS 270 / OUT-OF-RANGE 0 / FILE-NOT-FOUND 15 / 在�
 所以那一行只有用例与负控在册，不许说"真机看到了"；
 ② #100 那条"照片上传失败的原因"仍等一次真被派到的段（进后台要点单 ⇒ 还是等那一次滑块）；
 ③ 云后台仍 `NOT VERIFIED IN BROWSER`，像素级美化仍未验。
+
+## D-152 · 用户端"你的修改没成功"量出两条根因：发布通道停在 v105，而失败态把原因换成了一句笼统话（2026-10-17 下午）
+
+司机端收尾（D-151）合进 main 后转用户端。用户说的是"实时公交和公交卡片你的修改没成功"——
+本轮**没有先去改代码**，先在真机与云端两侧把"为什么看不见"量清楚，结果是两条不同的根因加一条环境事实。
+
+### 一、最大的一条不是代码，是分发：最新 Release 停在 v105（10-15），而 main 已经走了 45 个提交
+
+`gh release list` 实测：Latest = **乡邮智联 v105 / 2026-10-15T04:22:56Z**，再往后 v103/v99/v97/v95 全是同一天。
+而 `git log v105..origin/main` 有 **45 个提交**，`ui/` 一片 **28 个文件 +984/−266**。
+App 内「检查更新」只认 GitHub Releases（用户 2026-10-12 定的口径），所以用户手机上装的、以及"看不到改动"的，
+都是 v105 那一版 —— **D-085 之后那一整串用户端修复从来没到过他们手上**。
+⇒ 手工触发 `build-and-release.yml`（run **127** = success，签名闸与发布后回读都在作业里跑）
+⇒ 独立回读：`gh release list` 现在 Latest = **v127 / 2026-10-17T06:49:30Z**。
+⚠ 这条坑是"部署"这个词的歧义：`deploy-dev.yml` 只 rsync 前端到 `/opt/cargo-post-web`，**App 的部署是另一条通路**，
+它一直没被点过。以后凡说"已部署"，得先问是哪一端。
+
+### 二、代码这条：失败态把原因吃掉了，三种病长得一模一样
+
+首页那一格念「实时公交暂时不可用 / 网络不太好，稍后再试」。同一时刻对同一端点发同样的请求：
+
+| 参数形状 | HTTP | code | 字节 |
+| --- | --- | --- | --- |
+| `radius=15000.0&district=` | 200 | 0 | 368500 |
+| `radius=15000.0`（无 district） | 200 | 0 | 368500 |
+| `district=县城` / `district=乡村` | 200 | 0 | 368500 |
+| 只给经纬度 | 200 | 0 | 169608 |
+
+`nearbyStations[0]` = 华一路 0.13km、`dataSource=REAL_TRANSIT`、`lines=[829路…]` ⇒ **后端与数据都是好的**。
+而状态机里 `error` 明明带着这一轮的真实原因（`HomeScreen.kt:622` 与 `BusScreen.kt:603` 两处渲染时把它换成了那句笼统话）
+⇒ 网络 / 解析 / 鉴权三种病在界面上**不可分辨**，用户与我都只能猜。
+修法是复用 D-142 那条纪律（司机端异常回执的 `photoDropText`）：原因上屏、缺失时换成一句实话。
+两处共用一个纯函数 `busFailureText`（`NearbyFailure.kt:20`）。
+
+### 三、这句话立刻量出了真因，也顺手抓到我自己的一处错
+
+装本地仪器包（versionCode=130，MD5 与 109 那只不同，`dumpsys package` 复核过）后，首页那一格念：
+
+> 这一轮没读到实时公交数据——原因：failed to connect to api.qwer2333.com/1.15.29.107 (port 443) from /10.17.200.82 (port 4780…
+
+**真因是连不上**：这台手机的 WiFi（CQUPT-5G，10.17.200.82/16）带 `CAPTIVE_PORTAL` 能力位且
+`currentCaptivePortalDetected` 在跳，`toybox nc -w 8 1.15.29.107 443` ⇒ `Timeout`，`ping` 3 包全丢；
+`svc data enable` 后 `mDataConnectionState=0`（没有可用蜂窝数据），关掉 WiFi 依旧不通 ⇒ **环境到不了公网**，
+不是 App 的病。测完已 `svc wifi enable` 恢复（SSID 与 IP 回到 CQUPT-5G / 10.17.200.82）。
+连接超时是 8 秒（`Api.kt:340`）—— 山区弱网下这个值够不够紧，登记成待观察，本轮不动它（没有一条真机失败是"8 秒不够、15 秒就够"的证据）。
+
+⚠ **第一版的截断是我写错的**：按"取前 90 字"剪，把尾巴 `82) after 8000ms` 剪丢了 ——
+而那半句恰恰是"这是超时、不是断网"的唯一依据。改成**从中间剪**（头 62 + `…` + 尾 28），
+用例直接拿真机那条 104 字原文钉两头都在（`failed to connect to api.qwer2333.com` 与 `after 8000ms`）。
+**这条是读屏读出来的，不是想出来的** —— 界面文案的截断规则只有装到机器上看一眼才知道剪掉了什么。
+
+### 四、用户随后给了三条具体症状，逐条落到代码与契约上
+
+**① 「公交卡片路线没有地图显示」= 后端两个端点口径不一致，App 修不了。** 拿真报文量的：
+
+| 端点 | 条数 | 键 | 有编号？ | 有站点？ |
+| --- | --- | --- | --- | --- |
+| `/bus/nearby` 的 `lines[]` | 189 个名字 | `routeName,startStation,endStation,dataSource` | **无** | **无** |
+| `/bus/lines`（radius=15km） | 80 条 / 69 个名字 | `routeId,routeCode,routeName,…,points,buses` | 有 | 有（`points[]` 带 `sequenceNo/stationId/stationName/经纬度/plannedMinutes`） |
+| `/bus/lines`（radius=**50km**） | **80 条 / 69 名，字节一模一样 207046** | 同上 | — | — |
+
+⇒ 首页卡片是"附近哪些线停这一站"（189 名），而编号与路线形状只在 `/bus/lines` 那 80 条里 ——
+**189 个名字只有 68 个能对得上**，其余 121 条既没编号也没站点 ⇒ `HomeScreen` 那行
+`openDetail = if (card.lineId.isEmpty()) null else …` 让它们**整卡不可点**，界面上写着
+「这条线还没拿到线路编号，暂时点不进详情」。而且把 radius 从 15km 抬到 50km **一条线都没多**
+⇒ 这个端点要么忽略 radius 要么有 `LIMIT 80`，**加大半径救不了**。
+真修法在后端（给 `nearby.lines[]` 补 `routeId`，或放开 `/bus/lines` 的 80 条上限），
+而 **CI 的 deploy 只 rsync 前端、不重启云上那个 Java 服务**（我够不到宿主机）⇒ 这条**只能登记给人**，
+本轮不给界面加假按钮（"在实时公交页搜这条线"对那 121 条同样搜不到，加了就是承诺做不到的动作）。
+
+**② 「实时公交地图固定在上面滑动不了」= 取景每轮抢镜头。** `BusMap` 的 `AndroidView.update` 每次重组都无条件
+`animateCamera(...)`，而实时公交页**每几秒轮询一次车辆位置** ⇒ 点集一直在变 ⇒ 镜头一直在被拽回去，
+用户拖动等于没拖。改法是给 `BusMap` 加一个 `fitTag`（"现在为哪一组点集取景"）：
+传了值就**只在 `fitTag` 变了（换线路）且用户没拖过**时才动镜头，`setOnMapTouchListener` 一碰就把镜头交还用户，
+换线路时清掉这个标记。司机任务地图**不传** `fitTag` ⇒ 保持"跟着车走"的原行为，那条是故意的。
+⚠ 这一条**只到编译面**：这台手机现在到不了公网（见下面第三条），高德瓦片也拉不到 ⇒ 手势没在真机上验过。
+
+**③ 「站点是这个路线的站点，不是整体的站点数量」= 一行退路。** 病根
+`val st = line?.stations?.takeIf { it.isNotEmpty() } ?: vm.nearby?.stations.orEmpty()` ——
+选中的那条线一旦没给站点，就退回**附近所有站点的并集**（实测这一格 15km 半径下是 **1338 个站**），
+而标题仍写「经停站点 · 共 N 站」⇒ 用户读到"这条线停 1338 站"。
+抽成纯函数 `viaStationsOf(line)` 三格分开（没选线路 / 这条线没给站点 / 就数它自己的），
+标题移到 `if` 外面（没得数也要出声，不许整栏静默消失），"附近有多少站"仍由页头那枚
+「附近 N 个站点」标签独立说（`BusScreen.kt:529`），两件事不再混用一份数据。
+
+### 五、凭证（本轮全部实测）
+
+- `BusStateContractTest` **10 例**（+3：原因上屏 / 空原因换成实话 / 经停站点只数这一条线），
+  `GRADLE_RC=0 / PRODUCT tests=10 failures=0 errors=0`。
+- 负控两本，各自都能红：`tmp/negctl_busfailure.py` 把原因换成笼统话 ⇒ `RC=1 / failures=2`；
+  `tmp/negctl_via.py` 把"没给站点"那格换成一个数字 ⇒ `RC=1 / failures=1`，且它同时断言接线
+  （旧退路 `?: vm.nearby?.stations.orEmpty()` 在 `BusScreen` 里残留 **0** 处、新调用恰好各 **1** 处）；两者还原后均 `RC=0 / failures=0`。
+- 全量（收尾那一遍）：`BUILD SUCCESSFUL in 1m 25s`（26 tasks executed），计数只读产物 =
+  **75 类 / 774 例 / 0 失败 / 0 错误 / 0 跳过**，771→774 的增量 = 本轮 3 条用例，XML timestamp 全为 2026-10-17。
+- 真机：v130 装成后首页与司机工作台两格都念出**原文原因**（这是"上屏"这一半的唯一凭证）。
+- 静态闸 **44 本 = 44 绿 / 0 红**（收尾整批复跑）。中途两本被本轮改动带红，两本都是**我自己的账**：
+  `check_domain_probes.sh` 的 P-a 数"用户域不得出现 `/driver/` 字面量"，而我在新文件的注释里写了
+  `ui/driver/photoDropText` 这个路径 ⇒ 命中 1 处 ⇒ 改成按函数名指它、不写路径（**没有动闸门**）；
+  `check_doc_anchor_probes.sh` 则是行号位移那一格重演 —— `BusMap.kt`（净 +16）与 `BusScreen.kt`（净 +5）
+  推动 **10 条**锚点，而闸门只报 **1 条红 + 1 条消失**。
+  ⚠ 并且机械平移脚本**把本轮新写的锚点也当成旧行号二次平移了**（`BusMap.kt:210`→226、`BusScreen.kt:965`→969）
+  ⇒ 规矩补一句：**平移的输入只能是"改动前那份扫描结果"，新写的锚点要单独逐条打回源码核**
+  （`tmp/check_new_anchors.py` 干的就是这件事：把台账两段里每个 `文件:行` 印出那一行的真面目）。
+  终读：records 1515 / OK 1231 / ID-MISS **269**（比 HEAD 的 270 降 1 —— 那条旧锚点
+  「BusScreen.kt 672-674」平移后重新命中自己的标识符，属"真转绿"，故在册表按规矩重生成 **246→245**）/ 新增 0 / 消失 0。
+
+### 六、还欠的
+
+① **`/bus/nearby.lines[]` 缺 `routeId`（189 个名字里只有 68 个能在 `/bus/lines` 那 80 条里找到）** ——
+这是"公交卡片点不进地图"的真因，要后端改（补 `routeId`，或放开 `/bus/lines` 的 80 条上限）。
+⚠ **CI 的 deploy 只 rsync 前端，不重启云上那个 Java 服务** ⇒ 这条我改完也上不去，必须给人做；
+② **地图取景不再抢镜头这一条只到编译面**（`fitTag` 与 `setOnMapTouchListener`）—— 这台手机到不了公网，
+高德瓦片拉不到，手势没法在真机上验；换一台有网的机器或热点再复拍，本轮不许说"验过"；
+③ **经停站点三格在屏上也没验**：同一原因（`/bus/nearby` 取不到 ⇒ 整页停在带原因的失败态），
+只有用例与负控在册；本机后端 + `adb reverse` 走 USB 通路能验 ②③，本轮没做，不冒充验过；
+④ 用户手机上的实际版本要等他们点一次「检查更新」（v127 已在 Latest）；
+⑤ 8 秒连接超时对山区弱网是否偏紧，等一条真机超时样本再判；
+⑥ #100 那条"照片上传失败的原因"照旧等一次真被派到的段。
 
