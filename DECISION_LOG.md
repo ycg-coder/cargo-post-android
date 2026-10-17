@@ -343,7 +343,7 @@ key 为空时 `BusMap` 只会给出空白底图 + 水印，比自绘更误导；
 **决策 1：门槛整体删除，不降级成"提醒"**。
 `canArrive()`、`ARRIVE_RADIUS_METERS` 常量、以及 VM 里那个从未被写入也从未被读的 `canArrive` 状态位一并删。
 依据是后端事实而非偏好：`AppDriverArriveReqVO` 只收 `shiftId + stationId`，**不吃坐标、不做距离校验**；
-`Repo.arrive`(`Repo.kt:1427`) 发的 body 也只有 `driverId/shiftId/stationId`。
+`Repo.arrive`(`Repo.kt:1432`) 发的 body 也只有 `driverId/shiftId/stationId`。
 既然服务端按司机声明受理，客户端自设 50 米门槛就是"既严又不管用"的随机行为（无定位时形同虚设）。
 工程里不存在"GPS 自动到站提醒"，所以没有走 §32 方案的第 ③ 分支（常量改作提醒）；将来若加提醒，**只能提示，不得改按钮可用性**。
 
@@ -996,7 +996,7 @@ R-h 0 / R-i 1 / R-j 17 / R-k 1 / R-k2 0 / R-l 5 / R-m 2 / R-n 3 / R-n2 0 / R-n3 
      所以"用例数判据"必须由负控表周期性替双方对账。
    - **T-ah 第一次响，响的是我自己写的注释**（说明注释里引用了旧文案 `"在途 ${nextStation}"`）。
      处置是按内容过滤注释行（与 T-s/T-v 同一写法），**不是删注释** —— 删说明凑绿等于把"这轮为什么改过"抹掉。
-9. **契约边界优先于"顺手一起修"**：ETA 候选名里还剩 6 处自造别名 `"eta"`，其中 `Repo.kt:1253` 的 `RouteGuide`   读的是**导航引擎自己的报文**、不是 app VO —— 没核过那份契约就不能动（"如果 SDK 当前 API 能力不确定，
+9. **契约边界优先于"顺手一起修"**：ETA 候选名里还剩 6 处自造别名 `"eta"`，其中 `Repo.kt:1258` 的 `RouteGuide`   读的是**导航引擎自己的报文**、不是 app VO —— 没核过那份契约就不能动（"如果 SDK 当前 API 能力不确定，
    必须先查当前依赖 API，不能自行编造"）。同理 `QuoteResult` 三个金额字段仍 `multiNum` 塌 0，登记不并轮。
 10. **四条过程纪律由本轮事故立下**（不是代码问题，但会让"抄数"抄到假东西，所以记进决策层）：
    - **负控脚本一次只跑一个**。本轮把 `eta_negative_controls.sh` 起了两份（一份前台超时被转后台、一份又后台起），
@@ -1701,7 +1701,7 @@ GUARD `1/29/34/7`），`default_value_negative_controls.sh` **16 ✔ / 0 ✘ / 0
 **决定的第一件事：复用现成闸门，但**不复用同一个实例**。** 指令第 6 步写的是"复用既有 `ActionGate`，不重写闸门" ——
 本轮的实现是：`ActionGate` 这个**类**一字未改（mtime **20:05:17**，早于本轮 20:49 起的编辑窗口；语义仍是 V-1 那套：
 `tryLock` **丢弃**而非排队、成功保留 10 s、异常即放），`object Repo` 上却因此出现了**两把**实例：
-`actionGate`（`Repo.kt:1325`，司机域十个出口）与 `userCreateGate`（`:453`，用户域两个出口）。
+`actionGate`（`Repo.kt:1330`，司机域十个出口）与 `userCreateGate`（`:453`，用户域两个出口）。
 为什么不能共用一把：硬规则 1 要求两个业务域分开，共用一把就是"用户下一次单，去挡司机的一次 `leg/start`"——
 那是**用防重复点击的名义制造跨域串扰**，比没有闸门更糟。
 证据不是主张而是两条实测：判据 `U-c` 数 `= ActionGate()` 实例**恰好 2**（`U-c2`/`U-c3` 两个方向钉"不许跨域借用名字"），
@@ -2414,7 +2414,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 ### 3 三方核对的关键结论（逐字段表在 `CONTRACT_EVIDENCE.md` §八，这里只记判定）
 - 三格（车辆位置 / 上报时间 / 当前任务）在寄货与商城两侧的 VO 里**都有真实生产者**，缺的是客户端读取；
-  `geoOf`（`Repo.kt:1389`）要求 `lat!=0 && lng!=0` 才建点 ⇒ `0.0` 不会被画成一个"真点"。
+  `geoOf`（`Repo.kt:1394`）要求 `lat!=0 && lng!=0` 才建点 ⇒ `0.0` 不会被画成一个"真点"。
 - `lastReportTime` 只有商城侧有（`AppProductOrderTraceRespVO.java:72` ← `ProductOrderServiceImpl.java:379`）；
   寄货 `/send/track` 侧 `PRODUCER_NOT_FOUND` ⇒ 恒"上报时间未给"。旧写法拿订单创建时间当车辆上报时刻，本轮用 `reportTimeOf`（不回落 `createTime`）收口。
 - `carrierLocationSource` 值域只有 `REAL_FRESH`/`REAL_STALE`（`AppSendController.java:473-474`，阈值 `CARRIER_FRESH_MINUTES = 5` @ `:114`）⇒ `STALE` 不升格成"实时"。
@@ -2560,7 +2560,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 ### 5 三态（分开写，不混）
 - `SOURCE_COMPLETE`：六族的读取侧真键化、模型可空化、消费侧"未给"分支、`D-②-1…4` 登记、判据与负控同轮扩建。
-  ⚠ **② 要求的"清零"这一半没有完成**：在册基数被本轮实测推翻为 **65**，其中"真待收口 **23** 处"（字符串族 11、里程/steps/段状态族 5、arr 车道、`Repo.kt:1255-1271` `crs`、
+  ⚠ **② 要求的"清零"这一半没有完成**：在册基数被本轮实测推翻为 **65**，其中"真待收口 **23** 处"（字符串族 11、里程/steps/段状态族 5、arr 车道、`Repo.kt:1260-1276` `crs`、
   `SendScreen` 草稿 `?: 0L` 等）按 §四之二 各自排进 ③⑥⑦⑬⑭⑯⑰，本轮一处都没有"顺手"收（顺手收就违反 ⑲ 的不扩大战线约束）。
 - `BUILD_VERIFIED`（debug 面）：第 2 节的 gradle / 用例 / lint / APK 四条读数（42 类 410 例 0 红、lint Error 0、APK 已产出、DV-k 116）。
   release 面 **BLOCKED**（产物从未产出）、`lintRelease` 未跑 ⇒ 不许把 debug 读数当全变体。
@@ -3379,7 +3379,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 ⑧ 的指令是队列 #148（状态板原话）：`DriverMissionMap` / `MissionMarkers` 在"后端没有路线"那一支现在**说什么、画什么** —— 不许用直线补几何，也不许把"没问到"说成"没有"。
 
 收口前的真实形状（本轮实测，不是推测）：
-- `Repo.routeGuide()` 的 catch 支回 `One(RouteGuide.EMPTY, error = errorTextOf(e))`（`Repo.kt:1260`），而 EMPTY 的 `routeUnavailableReason` 是 **null**；
+- `Repo.routeGuide()` 的 catch 支回 `One(RouteGuide.EMPTY, error = errorTextOf(e))`（`Repo.kt:1265`），而 EMPTY 的 `routeUnavailableReason` 是 **null**；
 - 页面旧写法是 `vm.guide?.let { … }`，注释写着"两者都没有就不占屏（后端确实没给，不是加载失败）"⇒ **请求失败**与**压根没问过**两种情形都整块静默消失，屏幕上没有一格说法；
 - 同时 `DriverMissionMap` 自带兜底句"后端没有下发这一班的真实道路折线…"、`MapCanvas.RouteUnavailableState` 自带 `reason ?: "…后端没有下发…"` ⇒ 那是把**自己没问到**说成**后端说过没有**，与 F-2 ⑧ 登记、F-3 ⑤ 收口的是同一族假话。
 - ⚠ 本轮顺带实测出一个**比"两处兜底同形"更精确**的事实：正式链路里 EMPTY 的**唯一**生产者就是 `Repo.kt:1159` 那一条 catch 支 —— 后端真说"没有可用道路"时必然带非空原因（`routeGuideOf` 的 `Rejected` 与 `routeAvailable=false` 两支都给原因）。所以"EMPTY 且 reason=null"这一组合**本身就是"这次没问到"的证据**，不需要、也不许由页面替后端造一句结论。`DriverNavScreen.kt:95`（初值）与 `:138`（回落）那两处 EMPTY 写在 #51 关进 DEBUG 闸门的旧屏里，不在正式链路。
@@ -5499,7 +5499,7 @@ canonical 仍是 D-070 §3 那一发。
 
 ### D-072 补 · 上传面实测：本机后端的"主文件存储配置"是坏的占位符，`infra_file` 0 行 ⇒ 拍照装车从来没真上传成功过（2026-10-10 11:5x）
 
-- App 侧走的是真端点 `POST /app-api/infra/file/upload`（`Repo.kt:1456`，`Api.upload` 真发 multipart），**没有** `DemoData` 回落 —— 所以这一格的真实与否完全取决于后端。
+- App 侧走的是真端点 `POST /app-api/infra/file/upload`（`Repo.kt:1461`，`Api.upload` 真发 multipart），**没有** `DemoData` 回落 —— 所以这一格的真实与否完全取决于后端。
 - 实测：直打该端点回 `code=500 系统异常`；查 `infra_file_config`，`master=1` 的那条 id=35 名字就叫「1」，是 S3 形状的空壳（`bucket=1`、`domain=http://www.xxx.com`、accessKey/accessSecret 是占位），而 `infra_file` 表 **0 行** ⇒ **这台后端从未成功收过一个文件**。连带不成立的账面结论：装车拍照 / 妥投凭证 / 异常上报带照片，此前任何一次"能用"都不可能是真的。
 - 处置（**只动本机开发库，App 源码一字未改**）：把主配置切到 id=29「本地存储」，并把它的 `basePath` 从上游作者机器上的 macOS 路径 `/Users/yunai/tmp/file` 改成本机可写目录 `C:/temp/buspost-files`、`domain` 改成设备侧可达的 `http://127.0.0.1:48080`（真机经 `adb reverse` 打得开）。回滚 = 把 29/35 两条的 `master` 位换回去。
 - 复测读数：`UPLOAD code=0 url=http://127.0.0.1:48080/admin-api/infra/file/29/get/20261010/probe.png` → 文件落盘 `C:/temp/buspost-files/20261010/probe.png` → `infra_file` 行数 **0→1** → 该 URL 回读 `http=200 / 70 B`。**上传面从此才是真实可用**（此前登记为"未验"的拍照类结论，现在才有通路可验）。
@@ -7032,7 +7032,7 @@ D-087 与本轮两批负控里 `doc_anchor_negative_controls.sh` 都以 rc=2 收
 看到一张图却分不清是哪种凭证，两件事的可追溯性一起毁掉。所以 `V034` 加独立列 `sign_url`。
 
 **接口形状**：`HandoverServiceImpl.java:207` 的 `confirmHandover(handoverId, toDriverId, photoUrl)` 扩成 4 参，
-**旧 3 参保留成 default 委托** ⇒ 既有调用点与既有用例不必一起改（`Repo.kt:1341` 那一族 `pickupConfirm/productLoad/productDeliver`
+**旧 3 参保留成 default 委托** ⇒ 既有调用点与既有用例不必一起改（`Repo.kt:1346` 那一族 `pickupConfirm/productLoad/productDeliver`
 同族形状，阶段 B 加 signUrl 时一起核）。写入侧与照片同一条纪律：**没带就不写，不许落空串**——
 空串在后台会被念成"核对过、这人确实没签"，那是编出来的结论。
 
@@ -7862,10 +7862,10 @@ idempotency / idempotency_test / mission_route / navigation_test / notify_result
 **③ 台账 22 条漂移锚点，全部按内容重锚，一条没进在册表**：改前 DA-d 新增 **22** / DA-e ID-MISS **295**（上限 273）；
 改后 **新增 0 / 消失 0 / miss 273 / FILE-NOT-FOUND 15**，锚点总数 1461→**1463**。手法：拿 HEAD 工作树逐字切出被指片段，
 在工作树里找同一切片 ⇒ 纯平移 16 条（每文件位移一致：WorkbenchScreen +33、Repo +35/+38/+53、AlertEngine +6/+19、DriverLegStateMapper +16）；
-3 条改指**语义块**：`AlertEngine.kt:64-92`（司机域通知整块）、`Repo.kt:1255-1271`（crs/steps 读块）、
-`Repo.kt:1490-1501`（confirmHandover 现体）；3 条动台账原文 —— 目录前缀 `ui/driver/`、`notify/` 会被 `assign_tokens`
+3 条改指**语义块**：`AlertEngine.kt:64-92`（司机域通知整块）、`Repo.kt:1260-1276`（crs/steps 读块）、
+`Repo.kt:1495-1506`（confirmHandover 现体）；3 条动台账原文 —— 目录前缀 `ui/driver/`、`notify/` 会被 `assign_tokens`
 判给紧随其后的锚点，而源码窗口里永远不可能出现那个串 ⇒ 这类锚点**天生不可核验**，只能去前缀或扩到真含该串的块。
-⚠ 第一版想用"HEAD 切片"自动平移**裸续号**（`Repo.kt:1310/727/740/746` 里的 727/740/746），实测会把 `**65**`、
+⚠ 第一版想用"HEAD 切片"自动平移**裸续号**（`Repo.kt:1315/727/740/746` 里的 727/740/746），实测会把 `**65**`、
 `字符串族 11` 这类**计数**当行号改掉，而 `}` 这种短行一次命中 12–21 处 ⇒ 自动重写废掉，裸号只做"原地内容等值核验"。
 核验结果：10 个裸号里 9 个已漂移，其中两处是**在册判据结构上看不见的谎**：
 那三条 `canReportException` 断言其实在 `DriverLegStateMapperTest.kt:174-176`（被指的那个源文件只有 137 行，容不下这个号）；
@@ -9629,7 +9629,7 @@ nginx `root /opt/cargo-post-web` ⇒ 管理端就在域名根。
 
 于是换入口验**同一条腿**：用 App 自己的登录口拿到 App token
 （`POST /app-api/member/auth/login`），再打 App 真正在用的上传口
-（`Repo.kt:1559` → `Api.upload("/app-api/infra/file/upload", …)`，字段 `file`）：
+（`Repo.kt:1564` → `Api.upload("/app-api/infra/file/upload", …)`，字段 `file`）：
 
     POST https://api.qwer2333.com/api/app-api/infra/file/upload
     → {"code":0,"data":"https://api.qwer2333.com/api/admin-api/infra/file/4/get/20261017/probe.png"}
@@ -9841,4 +9841,87 @@ PR #199（集成本体）/ #200（汇总注解，被 #202 纠正）/ #201（chec
 ① 云后台仍 `NOT VERIFIED IN BROWSER`（要用户拉一次滑块）；② 像素级美化仍未验（视口/截图面不可用）；
 ③ 云上点亮 AI 只差服务器侧四个值（`BUSPOST_AI_API_KEY` 走环境变量、`buspost.ai.enabled/base-url/model`）；
 ④ `cargoadmin` 这个号到底开不开，等人拍板（开的话要给口令并决定 V001 是否收进白名单）。
+
+## D-151 · 司机端顶部那行「当前： → · 状态暂不可用」：那一格根本没有身份，是 App 替它造了一个段（2026-10-17 下午）
+
+**屏上先于代码**：USB 那台（1f71ee9b）进「我的路线」，顶部两行都在念
+`当前： → · 状态暂不可用` —— 箭头两侧全空，看着像在加载；而**同屏两张段卡却有名字**。
+同一个"现在有没有段"的问题在一屏上给了两个答案，因为顶部读的是 `Repo.currentLeg()` 那一格、段卡读的是 legs 那条出口，
+两处不同源，而顶部这一格**从来没被单独验过**。
+
+### 一、病根：空报文被 parse 成"存在但全空"的段
+
+改前那一行（Repo.kt 旧 1231）写的是 `TransportLeg.parse(p.obj ?: JSONObject())`。
+先核契约才看清：`Api.kt:486` 把 `data` 缺失或为 null **归一成 `Payload(JSONObject())`**（不是 null obj）
+⇒ "后端没给这一格"与"后端给了空对象"在 `obj` 这一层**同形**，旧写法于是 parse 出一个
+`legId` 为空、站名为空、状态走默认文案的**幽灵段**交给页面。
+
+改法是把"有没有段"判在身份上（`Repo.kt:1236`：`One(leg?.takeIf { it.legId.isNotEmpty() }, p.demo)`）——
+`legId` 是这一格唯一的身份字段，空身份的段不该出现在任何一屏上。
+
+**这条反证不是靠猜的**：修后顶部那一行**整行消失**（v109 装机后屏上读 `按段接单、装车、交接` / `暂无班次`）。
+`takeIf` 只认 `legId`，所以"整行消失"这件事本身就证成了**后端那一轮给的报文里根本没有 legId**。
+至于它当时回的是 `null` 还是 `{}`，设备上取不到独立证据（`Api` 不记成功报文，curl 要过登录滑块），
+⇒ 两种形状在 `CurrentLegContractTest` 里各钉一条用例（`data:null` 一条、`{}` 一条），**不许再靠其中一种去解释屏上那一格**。
+
+三格分开的口径：没有当前段 = null（整行不出现）/ 这一格没取到 = error（页面说"没读到"）/
+有一段但站名没给 = `RoutesScreen` 的 `legPairText` 明说"站点名未给（第 N 段）"——
+第三种过去会塌成第一格旁边的空位。
+
+### 二、顺手补的第二格：段卡认不出自己属于哪张单
+
+两张卡角标都念"1"不是巧合：段序是**每张单内**的序号（后端按单发号，#43 早就立过这条口径），
+一趟挂两张单时"第 1 段"就有两个对象，而段卡第二行只写车牌与司机 ⇒ 司机认不出报错的是哪张单。
+新增 `DriverExceptionReport.kt:117` 的 `legMetaLine` 把这一行收成**与选段行、异常回执共用 `legOrderTag`** 的唯一措辞
+（单号尾 6 位；缺号明说"单号未给"），`RoutesScreen` 不再自造一种"单 …"写法。
+**不自造跨单序号**：顺序只许来自后端（#49 那条口径），这一格只补身份、不发明排序。
+
+### 三、凭证（全部是实测输出）
+
+- `CurrentLegContractTest` **5 例**：其中"未绑定"那条是**脚手架反证** —— `Repo.kt:1114` 的 `driverIdParam()` 在未绑定时直接抛、
+  请求根本不发，不先钉住这一格，那两条"应当为 null"就会因为"根本没发请求"而成立（空集上的真）；另有一条**正对照**
+  （带 `legId` 的段必须照常返回），否则 ①② 只是把这一格永远判成 null。
+- `DriverExceptionReportTest` **16 例**（本轮 +2：段卡第二行带单号标识且跨单可分辨 / 缺单号时明说"单号未给"）。
+- 负控：把 `legMetaLine` 里的单号标识摘掉 ⇒ `GRADLE_RC=1 / PRODUCT tests=16 failures=2`；还原 ⇒ `RC=0 / failures=0`。
+- 全量：`BUILD SUCCESSFUL in 1m 29s`，**计数只读产物** = 75 类 / **771 例** / 0 失败 / 0 错误 / 0 skipped，
+  XML timestamp 全为 2026-10-17；`SU-c` 同一轮念 `@Test 注解行 771` —— 两边独立对上。
+- 静态闸 **44 本 = 43 绿 / 1 红**，红的就是 `check_test_suite_hygiene_probes.sh` 的 `SU-b`"恰好 76"被新测试文件顶成 77
+  ⇒ 按 `find` 差集实测（只新增 `CurrentLegContractTest.kt` 一条）随动重登 **SU-b 76→77**，复跑绿、配套负控 7✔/0✘、恢复后基线绿。
+- 真机：v109（`versionCode=109 / versionName=1.0.109-android`，`lastUpdateTime=2026-10-17 13:51:55`）
+  经 `/data/local/tmp` + `pm install -r -d` 装上，工作台与「我的路线」两屏复拍。
+  ⚠ 这一格踩了老的 `MSYS_NO_PATHCONV` 坑：`adb shell pm install /data/...` 不带它会被转成
+  `C:/Program Files/Git/data/...`，报的是"Unable to open file: C:/Program"而不是装包失败。
+
+### 四、台账锚点被推动 27 条，闸门只报得出 8 条
+
+`Repo.kt` 那一处 +5 行 ⇒ 台账里指向 1231 之后的锚点整体漂移。先按 `git diff -U0` 的 hunk 头机械算出受影响面
+（**27 条**，全部在 `Repo.kt`；`RoutesScreen.kt`/`DriverExceptionReport.kt` 的 9 条锚点都落在我改动点之前，逐条比过），
+再等长平移。平移后 `check_doc_anchor_probes.sh` 读数与 HEAD **一字不差**：
+records 1491 / OK 1206 / ID-MISS 270 / OUT-OF-RANGE 0 / FILE-NOT-FOUND 15 / 在册 246。
+
+⚠ **闸门本身只报出 8 条**（`DA-e` 270→278、`DA-d` 新增 8）。剩下 19 条分两种：
+12 条**照样念绿**——判定窗口是目标行 ±`--tolerance`（默认 3），5 行的位移被窗口吸掉了，
+可它指的行已经不是说的那一行了；另有 7 条本来就挂在 #159 的在册表里，位移对它们只是**换了一个错处**。
+⇒ 规矩：**改过源码就要自己按 diff 算受影响面，不能只修闸门报红的那几条**（进 [[feedback-idle-gates-three-root-causes]]）。
+
+在册表用 `--pin-write` 重生成：**总数仍 246**，只是 6 个 aid 换了锚点文本（同一批句子、行号改成新的），逐条点名比过 ——
+旧 `Repo.kt:1325×2 / 1271 / 1456 / 1341 / 1231` → 新 `1330×2 / 1276 / 1461 / 1346 / 1236`。
+
+交给 #159 的一条新线索（本轮**不搬**，搬了会连带改那句的说法）：
+`CONTRACT_EVIDENCE` 里"`roadEtaSeconds` / `NavStep.etaSeconds` 两处都是 `multiNum ⇒ 0`"那句，
+前者真落点是 `Repo.kt:1294`（读 `routeDurationSeconds`），而后者是 `Repo.kt:1391` 的 **`multiNumOrNull`**
+—— 与句中"都是 multiNum ⇒ 0"**不同形**，照搬会把那句写成假话。
+
+⚠ 本轮**自己写台账的那句又咬了自己一口**（比上面那些更值得记）：状态板里指 Repo.kt 1114 的那条锚点，
+被邻近的类名 `CurrentLegContractTest` 抓走了词 —— 标识符是按**最近锚点**分配的，而 1114 的 ±3 窗口里没有这个类名。
+改法不是删锚点、也不是放宽窗口，而是给那个类名一条自带行号、能自证的锚点（就是它的类声明那一行），
+词于是回到自己身上：`CurrentLegContractTest.kt:27`。
+复跑：新增 0 / 消失 0 / ID-MISS 回到 270。全批静态闸终读 **44 本 = 44 绿 / 0 红**。
+
+### 五、还欠的
+
+① 段卡第二行的单号标识**屏上没验到**：这一轮云上该司机确实没有段（屏上念 `今天没有被分配运输分段`），
+所以那一行只有用例与负控在册，不许说"真机看到了"；
+② #100 那条"照片上传失败的原因"仍等一次真被派到的段（进后台要点单 ⇒ 还是等那一次滑块）；
+③ 云后台仍 `NOT VERIFIED IN BROWSER`，像素级美化仍未验。
 

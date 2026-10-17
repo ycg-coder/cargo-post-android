@@ -146,7 +146,7 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
         BusPage(spacedBy = 12.dp) {
             Signpost(
                 title = "今日排班班次",
-                subtitle = vm.current?.let { "当前第 ${it.seq} 段：${it.fromStation} → ${it.toStation}" } ?: "按段接单、装车、交接",
+                subtitle = vm.current?.let { "当前第 ${it.seq} 段：${legPairText(it)}" } ?: "按段接单、装车、交接",
                 badge = if (vm.legs.isEmpty()) "暂无班次" else "${vm.legs.size} 段",
             ) {
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -225,6 +225,18 @@ fun RoutesScreen(vm: RoutesViewModel = viewModel()) {
         }
     }
 }
+
+/**
+ * 段名那一行的唯一写法：**两个站名都给了才念「A → B」**。
+ * 真机抓到过 `当前： → · 状态暂不可用` —— 空位比"少一格"更坏：它看着像在加载，
+ * 而实际是后端这一格没给名字（或干脆没有当前段，见 `Repo.currentLeg` 的 legId 判定）。
+ */
+private fun legPairText(leg: TransportLeg): String =
+    if (leg.fromStation.isNotEmpty() && leg.toStation.isNotEmpty()) {
+        "${leg.fromStation} → ${leg.toStation}"
+    } else {
+        "站点名未给（第 ${leg.seq} 段）"
+    }
 
 @Composable
 private fun VehicleCard(v: BusVehicle) {
@@ -305,7 +317,7 @@ private fun ProgressSummary(legs: List<TransportLeg>, current: TransportLeg?) {
             )
             current?.let {
                 Text(
-                    "当前：${it.fromStation} → ${it.toStation} · ${it.statusLabel}",
+                    "当前：${legPairText(it)} · ${it.statusLabel}",
                     color = t.textTertiary,
                     fontSize = (11.5 * scale).sp,
                     modifier = Modifier.padding(top = 8.dp),
@@ -349,7 +361,7 @@ private fun LegRow(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${leg.fromStation} → ${leg.toStation}",
+                        legPairText(leg),
                         color = t.ink,
                         fontSize = (14.5 * scale).sp,
                         fontWeight = FontWeight.Bold,
@@ -357,7 +369,11 @@ private fun LegRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        listOf(leg.plate, leg.driverName).filter { it.isNotEmpty() }.joinToString(" · "),
+                        // 单号标识与异常上报那两处共用 `legOrderTag`（#43 立的口径）：
+                        // `leg.seq` 是**每张单内**的段序（后端 `MultiLegServiceImpl:276` 按单发号），
+                        // 一趟车挂两张单时两格角标都会念"1"（2026-10-17 真机就是这样），
+                        // 光靠车牌认不出是哪张单的段。不自造跨单序号（顺序只许来自后端，#49 口径）。
+                        legMetaLine(leg),
                         color = t.textSecondary,
                         fontSize = (12 * scale).sp,
                         modifier = Modifier.padding(top = 3.dp),

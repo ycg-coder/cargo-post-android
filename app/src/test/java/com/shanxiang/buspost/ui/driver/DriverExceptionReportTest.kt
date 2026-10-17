@@ -162,4 +162,34 @@ class DriverExceptionReportTest {
         assertTrue("空原因必须换成一句实话，实际：$t", t.contains("都没给原因"))
         assertTrue("不许出现「原因：」后面一片空白：$t", !t.contains("原因：。"))
     }
+
+    /**
+     * 2026-10-17 真机：`我的路线` 两张段卡的角标都念"1"，第二行只有车牌与司机 ⇒ 认不出是哪张单的段。
+     * 这一行与选段行、回执共用 `legOrderTag`（#43 立的口径），所以三处措辞必须一起对得上。
+     */
+    @Test
+    fun `段卡第二行带单号标识且跨单可分辨`() {
+        val a = TransportLeg.parse(
+            obj("id" to "9101", "legSequence" to 1, "plateNo" to "渝A·B5201",
+                "driverName" to "何伟", "orderNo" to "TO20261017000000123", "status" to 7),
+        )
+        val b = TransportLeg.parse(
+            obj("id" to "9102", "legSequence" to 1, "plateNo" to "渝A·B5201",
+                "driverName" to "何伟", "orderNo" to "TO20261017000000456", "status" to 7),
+        )
+        assertEquals("两格角标确实同号（这正是缺陷的形状）", a.seq, b.seq)
+        val la = legMetaLine(a)
+        val lb = legMetaLine(b)
+        assertTrue("两行一字不差就是缺陷本身：$la", la != lb)
+        assertEquals("渝A·B5201 · 何伟 · 单号尾 000123", la)
+    }
+
+    /** 缺单号时不许把标识整段省掉 —— 省略等于退回缺陷本身（#43 同一条） */
+    @Test
+    fun `段卡缺单号时明说单号未给`() {
+        val noOrder = TransportLeg.parse(
+            obj("id" to "9103", "legSequence" to 2, "plateNo" to "渝A·B5201", "status" to 7),
+        )
+        assertEquals("渝A·B5201 · 单号未给", legMetaLine(noOrder))
+    }
 }

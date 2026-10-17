@@ -105,3 +105,16 @@ internal fun legOptionTitle(leg: TransportLeg, actionable: Boolean): String =
 /** 提交后回执里那一格：同样要带订单标识，否则"后端回读：第 1 段"念的还是那笔歧义账 */
 internal fun legReceiptText(leg: TransportLeg): String =
     "${legOrderTag(leg.orderNo)}第 ${leg.seq} 段「${leg.statusLabel}」"
+
+/**
+ * `我的路线` 段卡第二行。措辞与选段行、回执**共用 `legOrderTag`** —— 同一个司机在两个屏上
+ * 看到"第 1 段"时，必须能认出说的是同一张单，而不是两套各自发明的标识。
+ *
+ * 2026-10-17 真机：两张卡的角标都念"1"（`leg.seq` 是**每张单内**的段序，后端
+ * `MultiLegServiceImpl:276` 按单发号），而那一行只有车牌与司机 ⇒ 认不出是哪张单的段。
+ * 不自造跨单序号（顺序只许来自后端，见 #49 口径），只把单号补上；缺号明说"单号未给"。
+ */
+internal fun legMetaLine(leg: TransportLeg): String =
+    listOf(leg.plate, leg.driverName, legOrderTag(leg.orderNo).removeSuffix(" · "))
+        .filter { it.isNotEmpty() }
+        .joinToString(" · ")
