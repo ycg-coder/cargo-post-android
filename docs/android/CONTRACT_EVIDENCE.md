@@ -489,7 +489,7 @@ return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.
   会安静存成 **1970-01-01**，而界面上一切正常。这是本轮所有"只认数字 / 不许拼串"判据的来源；
 - `ZoneId.systemDefault()`：`deploy/docker-compose.yml:21` 与 `yudao-server/Dockerfile:12` 都是 `TZ=Asia/Shanghai`，
   MySQL URL 亦 `serverTimezone=Asia/Shanghai` ⇒ 本机用固定 `PICKUP_ZONE = Asia/Shanghai` 生成毫秒
-  （与 `BusScreen.kt:898` 同口径），设备换时区不会把墙钟挪走。
+  （与 `BusScreen.kt:900` 同口径），设备换时区不会把墙钟挪走。
 
 ### 18.3 小程序对照
 

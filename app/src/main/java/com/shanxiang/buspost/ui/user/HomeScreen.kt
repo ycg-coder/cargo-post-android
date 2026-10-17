@@ -619,7 +619,7 @@ fun HomeScreen(
                 "error" -> BusCard(modifier = Modifier.fillMaxWidth(), border = true) {
                     EmptyState(
                         title = "实时公交暂时不可用",
-                        subtitle = "网络不太好，稍后再试",
+                        subtitle = busFailureText(vm.error),
                         icon = BusIcons.info,
                         actionText = "重新加载",
                         onAction = { vm.load(context) },

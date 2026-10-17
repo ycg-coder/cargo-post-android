@@ -115,6 +115,15 @@ fun BusMap(
      * 以前只开了 `isMyLocationButtonEnabled`（`BusMap.kt:157-166`），于是按钮在、点了没蓝点。
      */
     showMyLocation: Boolean = false,
+    /**
+     * 「现在为哪一组点集取景」。传了值就变成**取景一次就不再抢镜头**：只有这个标记变了（换了线路）
+     * 才重新自适应视口，而用户自己拖过地图之后连这个也不再自动做，直到他换一条线。
+     * 不传（默认 null）保持旧行为：每次点集变化都重新取景 —— 司机任务地图要跟着车走，那是故意的。
+     *
+     * 2026-10-17 用户报「实时公交地图固定在上面滑动不了」：实时公交页每几秒轮询一次车辆位置，
+     * 点集一直在变 ⇒ 旧的无条件 `animateCamera` 每轮都把镜头拽回去，用户拖动等于没拖。
+     */
+    fitTag: String? = null,
     onUnavailable: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -124,9 +133,14 @@ fun BusMap(
     var unavailable by remember { mutableStateOf(false) }
     var prevMarkersKey by remember { mutableStateOf(0) }
     var prevPathsKey by remember { mutableStateOf(0) }
+    var userMoved by remember { mutableStateOf(false) }
+    var fittedTag by remember { mutableStateOf<String?>(null) }
 
     val currentMarkersKey = markers.hashCode()
     val currentPathsKey = paths.hashCode()
+
+    // 换点集（换线路）= 用户主动要看新的那一组 ⇒ 允许重新取景一次，并把"他拖过"这一格清掉
+    LaunchedEffect(fitTag) { userMoved = false }
 
     // MapView 生命周期必须与宿主对齐，否则会漏内存 / 黑屏
     DisposableEffect(lifecycleOwner) {
@@ -192,6 +206,8 @@ fun BusMap(
                 // 不另设 MyLocationStyle：本 SDK 版本的样式常量名与文档不一致（实测
                 // `LOCATE_TYPE_LOCATION_CENTER_MAP` 不可解析），默认样式已是"定位到并把地图居中"。
                 aMap.isMyLocationEnabled = showMyLocation
+                // 用户一碰地图，镜头就交还给他：fitTag 模式下此后不再自动拽回（换线路才恢复）
+                aMap.setOnMapTouchListener { _ -> userMoved = true }
                 val markersChanged = currentMarkersKey != prevMarkersKey
                 val pathsChanged = currentPathsKey != prevPathsKey
                 if (markersChanged || pathsChanged) {
@@ -222,28 +238,33 @@ fun BusMap(
                 val all = markers.map { it.geo } + paths.flatMap { it.validated().orEmpty() }
                 // tilt 先立即置好，再让视口走动画：反过来会让每次位置更新都重播一次"抬起来"，
                 // 而 ⑫ 要的 tilt 是固定视角。真机上 tilt 是否被 bounds 更新重置尚未复核（§无设备）。
-                if (tiltDegrees > 0f) aMap.moveCamera(CameraUpdateFactory.changeTilt(tiltDegrees))
-                when {
-                    fitAll && all.size >= 2 -> {
-                        val b = all.fold(
-                            LatLngBounds.builder().include(LatLng(all[0].lat, all[0].lng)),
-                        ) { acc, g -> acc.include(LatLng(g.lat, g.lng)) }
-                        aMap.animateCamera(
-                            CameraUpdateFactory.newLatLngBounds(b.build(), 80),
+                // ⚠ fitTag 非空时整段镜头都要让位给用户：轮询一直在改点集，无条件取景 = 他拖不动（2026-10-17 报）。
+                val wantCamera = fitTag == null || (!userMoved && fittedTag != fitTag)
+                if (wantCamera) {
+                    if (fitTag != null) fittedTag = fitTag
+                    if (tiltDegrees > 0f) aMap.moveCamera(CameraUpdateFactory.changeTilt(tiltDegrees))
+                    when {
+                        fitAll && all.size >= 2 -> {
+                            val b = all.fold(
+                                LatLngBounds.builder().include(LatLng(all[0].lat, all[0].lng)),
+                            ) { acc, g -> acc.include(LatLng(g.lat, g.lng)) }
+                            aMap.animateCamera(
+                                CameraUpdateFactory.newLatLngBounds(b.build(), 80),
+                                Map3DVisual.CAMERA_ANIMATION_MS,
+                                null,
+                            )
+                        }
+                        focus != null -> aMap.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(focus.lat, focus.lng), zoom),
+                            Map3DVisual.CAMERA_ANIMATION_MS,
+                            null,
+                        )
+                        all.size == 1 -> aMap.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(all[0].lat, all[0].lng), zoom),
                             Map3DVisual.CAMERA_ANIMATION_MS,
                             null,
                         )
                     }
-                    focus != null -> aMap.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(focus.lat, focus.lng), zoom),
-                        Map3DVisual.CAMERA_ANIMATION_MS,
-                        null,
-                    )
-                    all.size == 1 -> aMap.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(all[0].lat, all[0].lng), zoom),
-                        Map3DVisual.CAMERA_ANIMATION_MS,
-                        null,
-                    )
                 }
             }.onFailure { unavailable = true }
         },
