@@ -1228,7 +1228,12 @@ object Repo {
 
     suspend fun currentLeg(): One<TransportLeg> = try {
         val p = Api.get("$T/driver/current-leg", driverIdParam())
-        One(TransportLeg.parse(p.obj ?: JSONObject()), p.demo)
+        // `data:null` 的意思是"此刻没有当前段"（2026-10-17 真机：两条段都被判异常时后端就这么回），
+        // 不是"有一段但字段没给"。旧写法把空报文 parse 成一个全空段交给页面 ⇒
+        // 顶部念成 `当前： → · 状态暂不可用`（段卡有名字、顶部没有，因为这两处读的不是同一格）。
+        // 判"有没有段"用 legId：它是这一格唯一的身份，空身份的段不该出现在任何一屏上。
+        val leg = p.obj?.let { TransportLeg.parse(it) }
+        One(leg?.takeIf { it.legId.isNotEmpty() }, p.demo)
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

@@ -3,7 +3,35 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-17（下午，**D-151** · 用户口径"司机端修完了再去用户端"⇒ 本轮把司机端收尾做尽）：
+真机「我的路线」顶部念 `当前： → · 状态暂不可用`，同屏段卡却有名字 —— 顶部读 `Repo.currentLeg()`、段卡读 legs，
+两处不同源而前者从没被单独验过。病根在**把"没有段"读成"有一段但字段没给"**：先核契约才看清
+`Api.kt:486` 把缺失/null 的 data 归一成 `Payload(JSONObject())`（不是 null obj），旧写法的 `?: JSONObject()`
+于是 parse 出 `legId` 为空的幽灵段。改法判在身份上（`Repo.kt:1236` 的 `takeIf { it.legId.isNotEmpty() }`）；
+**修后顶部整行消失**这件事本身就是反证 —— `takeIf` 只认 `legId`，所以后端那一轮的报文里根本没有 legId，
+至于当时回的是 `null` 还是 `{}`（设备上取不到独立证据）改由两条用例各钉一种形状。三格分开：
+没段=null（整行不出现）/ 没取到=error（说"没读到"）/ 有一段但站名没给=`legPairText` 明说"站点名未给（第 N 段）"。
+第二格补的是**段卡认不出自己属于哪张单**：两张卡角标都念"1"是段序按**每张单**发号（#43 口径），
+新增 `DriverExceptionReport.kt:117` 的 `legMetaLine` 把第二行收成与选段行、异常回执**共用 `legOrderTag`** 的唯一措辞，
+`RoutesScreen` 不再自造写法；只补身份不发明排序（#49）。
+凭证：`CurrentLegContractTest.kt:27` 5 例（**未绑定那条是脚手架反证** —— `Repo.kt:1114` 的 `driverIdParam()` 在未绑定时直接抛、请求根本不发，
+不钉它则两条 null 断言是"空集上的真"；另带正对照）、`DriverExceptionReportTest` 16 例（+2）、
+负控摘掉单号标识 ⇒ `RC=1 / failures=2`，还原 ⇒ `RC=0 / failures=0`；全量产物 **75 类 / 771 例 / 0 失败 0 错误 0 跳过**
+（XML timestamp 全 2026-10-17，`SU-c` 同轮独立念 `@Test 注解行 771`）；v109 已 `pm install -r -d`（13:51:55）并复拍两屏。
+⚠ 台账锚点这一格值得记：`Repo.kt` +5 行推动 **27 条**锚点，而闸门只报出 **8** 条 —— 判定窗口是目标行 ±3（`--tolerance`），
+5 行的位移被窗口吸掉、12 条**照样念绿却已经指错行**，另 7 条本就挂在 #159 在册表里（位移只是换个错处）。
+⇒ 规矩：**改过源码要自己按 `git diff -U0` 的 hunk 算受影响面，不能只修闸门报红的那几条**；
+等长平移后 DA 簿读数与 HEAD 一字不差（1491/1206/270/15/0/246），本轮新写 7 条锚点全判绿（1498/1213）。
+`SU-b` 的"恰好 76"被新测试文件顶成 77 ⇒ 按 `find` 差集实测随动重登 **76→77**、配套负控 7✔/0✘、恢复后基线绿；
+全批静态闸终读 **44 本 = 44 绿 / 0 红**（本轮写状态板时自己那句被邻近类名抓走了词、`DA` 先红一次，
+改法是给那个类名一条自带行号的可验锚点，见 D-151 §四）。
+仍欠三格（不许冒充已修）：① 段卡第二行的单号标识**屏上没验到** —— 云上该司机这一轮确实没有段（念 `今天没有被分配运输分段`），
+只有用例在册；② #100 的"照片上传失败原因"仍等一次真被派到的段（要登录 ⇒ 等滑块）；③ 云后台仍 `NOT VERIFIED IN BROWSER`。
+NEXT：用户端「实时公交 + 公交卡片」复查（用户点的名，司机端已收尾）—— 起点是**屏上现在到底念什么**，
+不是"我改过哪几处"：`/bus/realtime` 那一格是 #46 证伪后**刻意没接**的（commit 3dde9b9 删的是孤儿演示分支并立了 DP 闸）。
+
 最后更新：2026-10-17（上午，**D-149** · 用户提"web 页面有点多，集成一下" ⇒ 先数真实面，
+
 **结果抓到自家判据在低读**：`check_admin_dashboard_routes.py` 的行首锚死正则只认 `VALUES (…)`，
 折行写的 `INSERT … SELECT` 整片没进集合 ⇒ 它念"叶子 21 个"而真实是 **30 个**（差的九个含整个 `/ai/**` 五页 +
 钱包/计价/日历）；同仓 `check_menu_id_collisions.py` 早就两种形状都认 —— **两本闸口径不齐**。
@@ -130,7 +158,7 @@
     （鉴权过滤器在路由映射之前短路），所以**不能拿接口判"路由存不存在"**；第一次我拿 200 当"已部署"其实是 nginx 的 SPA fallback。
   · **#100 换入口做完了**：真机今天这个班次**两段都已是"异常（不可再报）"**、工作台没有可报入口（`上报` 匹配 0 个）
     ⇒ App 那张回执现在拿不到。于是用 **App 自己的登录口**（`/app-api/member/auth/login`）拿 token，
-    打 **App 真正在用的上传口**（`Repo.kt:1559` → `/app-api/infra/file/upload`，字段 `file`）：
+    打 **App 真正在用的上传口**（`Repo.kt:1564` → `/app-api/infra/file/upload`，字段 `file`）：
     `code:0` 返回 URL，**回取该 URL 200、69 字节与原文件逐字节相同** ⇒ **传输层在已部署的云上是好的**，
     D-142 那次失败更可能是当时版本/配置或 App 那一层。
     ⚠ 云上文件库因此留了个 **69 字节**测试文件（`…/infra/file/4/get/20261017/probe.png`），删除要后台权限，等顺手清。
@@ -2177,7 +2205,7 @@ CURRENT_ANDROID_STATUS:  F-3 ⑩⑪⑮ 收工（2026-10-01 13:5x–14:55，三�
                   **命令原文已写进 D-045 第 2 节**——上一轮那串 `6e263735675020c1…`（146 文件）的算法没记在案，**跨轮不可比对，别再拿这两个数互相引用**。
                   判据面：`tools/check_*.sh` 20 本全 `rc=0 / ✘=0`；`DV-k=132`（只许降，本轮未升）；
                   census `rows=474 / B=400 / C=74`（D-044 是 472/398/74 ⇒ **+2 行全落 B、C 集合一条没动**，
-                  新增读点 `Repo.kt:1325/728/741/747` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
+                  新增读点 `Repo.kt:1330/728/741/747` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
                   负控 20 本 18 本 `rc=0`，`notify_result`/`oss_credits` 两本先 `rc=2`（自家预检：TEST XML 不在就不许交差）、
                   接力全量跑完单独复跑 `RESULT=PASS`；⚠ `eta` 本 `rc=0` 但 `✘=2` ⇒ **D-⑰⑱-1 本轮复现，未修**。
                 **release / device / git（各自单算，不许顶替上面那两态）**：
@@ -3473,7 +3501,7 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
 
 **落点**（生产源 **3** 个文件）：`Repo.kt:508` 第二把 `ActionGate` 实例 `userCreateGate`、`:475-493` 键（`digest.update(path)` / `update(Prefs.mobile)` / `body.entries.sortedBy` 三个维度，null 与空串用 `update(1)`/`update(2)` 分开，**只存摘要**——键表是进程级的，收货人姓名/手机号/地址进明文就是个人信息留存）、`:501` 唯一出口 `gatedUserCreate`、`:529/:532` 商城下单、`:573/:576` 寄货下单；`GoodsDetailScreen.kt:115`、`SendScreen.kt:530` 两处 `if (ack.notSent) { … return@work }`，**位置在"回读列表"之前**（继续往下走就会把上一次点击的单号张冠李戴给这一次）。
 
-**司机域一字未动**：`actionGate`（`Repo.kt:1325`）、`gatedAction`（`:1162`）、十个走闸出口、`I-*` 十条读数全部保持原值。分域不是排版：`UserCreateIdempotencyTest` 第 8 条用反射数 `Repo` 上 `ActionGate` 类型的字段 ⇒ 恰好 `["actionGate","userCreateGate"]`，**并成一把就红**。
+**司机域一字未动**：`actionGate`（`Repo.kt:1330`）、`gatedAction`（`:1162`）、十个走闸出口、`I-*` 十条读数全部保持原值。分域不是排版：`UserCreateIdempotencyTest` 第 8 条用反射数 `Repo` 上 `ActionGate` 类型的字段 ⇒ 恰好 `["actionGate","userCreateGate"]`，**并成一把就红**。
 
 **实测**（`NOT VERIFIED ON DEVICE`：真机连点、900 的实际渲染证不到）：
 
@@ -3854,7 +3882,7 @@ APK 23:59:33 / 57,941,374 B）；`:app:lintDebug` **真重跑**（8 executed，*
    **复用既有 `@Valid AppDriverLegActionReqVO`，不新增字段、不新增服务层逻辑**。
    ⚠ **该改动跨仓、未提交（本工作区无 git）、未部署** ⇒ "异常真落库/真推通知"**端到端未验**，见下面尾巴①。
    其余动作是**一个动作一个 endpoint**（`/leg/accept` … `/leg/complete`，`:163-224`）⇒ **动作名走 URL path，不在报文里**
-   （Android 侧 `Repo.kt:1494`：`Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra)`）。
+   （Android 侧 `Repo.kt:1499`：`Api.post("$T/driver/leg/$action", driverIdParam() + mapOf("legId" to legId) + extra)`）。
 3. 请求契约 `AppDriverLegActionReqVO.java:9-23` 是**四个键**：`driverId` / `legId`（**唯一 `@NotNull`**）/ `photoUrl` / `remark`，
    且 `remark` 的 `@Schema` 原话就是"备注（**异常/争议原因**）"—— §54 的自由文本**有既有落点，不是新造字段**。
    异常上报发其中**三个**（`driverId + legId + remark`，**不带** `photoUrl`：异常动作不需要凭证照片）。
@@ -4224,7 +4252,7 @@ key/凭证**字面量**0（⚠ 按裸 token `grep -rn "AMAP_KEY" app/src/main` �
 `--rerun` 只作用于命名到的那个任务，不会带着依赖一起重跑 —— 想真重跑要 `--rerun-tasks`）。
 
 **尾巴（登记不冒充已修）**：① ETA/里程候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt` 四处 + `Repo.kt:623/947`，
-其中 `Repo.kt:1253` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
+其中 `Repo.kt:1258` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 **0.0**，
 `distanceFee > 0` 才显示"里程费" ⇒ 同病不同族（金额不是 ETA），并入下一轮；
 ③ `TransportLeg` 的 `navigationPolyline/fromGeo/toGeo` 后端**不下发**（⑫ 实测），段卡"在途进度"仍是状态驱动的示意，
