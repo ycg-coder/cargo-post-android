@@ -76,7 +76,7 @@ expect_red "NC-1 第二处画胶囊" "× CN-a 根上画它的地方不是恰好�
 # NC-2 撤掉用户壳的登记（主导航少一格）→ CN-b 该红
 sub "$US" '    CapsuleActions(items)
 ' ''
-expect_red "NC-2 少一屏登记" "× CN-b 登记胶囊的屏数不是 4"
+expect_red "NC-2 少一屏登记" "× CN-b 登记胶囊的屏数不是 5"
 
 # NC-3 有人把旧的通栏 tab 塞回来 → CN-c 该红（这条同时证明"注释里的 BusTabBar"不会被数）
 ins "$DS" '    CapsuleActions(items)' '    BusTabBar(items, selected) { selected = it }'
@@ -99,7 +99,7 @@ expect_red "NC-6 上限被抄第二份" "× CN-e 有页面自己抄了上限判�
 # NC-7 反证：摘掉一条用例的 @Test 注解，CN-g 必须红（证明它数的是真文件里的注解行，不是写死的常量）
 sub "$CT" '    @Test
     fun `一屏不登记就没有这一栏`() {' '    fun `一屏不登记就没有这一栏`() {'
-expect_red "NC-7 用例条数变了" "× CN-g 契约用例不是 6 条"
+expect_red "NC-7 用例条数变了" "× CN-g 契约用例不是 7 条"
 
 # NC-8 格子等宽下限被压回触控下限（短文案那一格又跟着内容缩）→ CN-h 该红
 sub "$CN" 'internal const val CAPSULE_CELL_MIN_WIDTH_DP = 76' 'internal const val CAPSULE_CELL_MIN_WIDTH_DP = 48'
