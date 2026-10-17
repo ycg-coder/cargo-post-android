@@ -12,6 +12,7 @@ import com.shanxiang.buspost.core.net.UnauthorizedException
 import com.shanxiang.buspost.data.model.Role
 import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.data.store.Prefs
+import com.shanxiang.buspost.notify.AlertEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -155,6 +156,11 @@ class LoginViewModel : ViewModel() {
                     }
                 }
                 Prefs.loginRedirect = ""
+                // 换账号必须把提醒水位一起归零：`AlertEngine` 的 primed / lastSeenNotifyId 是"上一位读到哪儿"，
+                // 留着它 = 新账号永远收不到比自己上一条消息更早的那些提醒（也收不到刚发给自己的第一条）。
+                // 与 `Repo.saveSession` 里那句 clearDriverBinding() 是同一类病：登录成功只换了 token，
+                // 没换"这台设备替谁记着进度"。
+                AlertEngine.resetWatermark()
                 // onDone 会立刻导航到业务壳；busy 必须先进终态，否则回调方读到的还是"正在提交"
                 busy = false
                 onDone(chosen)

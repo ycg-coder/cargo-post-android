@@ -2602,7 +2602,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 - `ui/user/MineScreen.kt:118-119`：显式授予变成两行 `setAccountRole(Role.DRIVER)` + `setActiveDomain(AppDomain.DRIVER)`（旧写法只改角色再跳壳）。
 - `ui/driver/WorkbenchScreen.kt:238`：`if (next != stored) AppState.setAccountRole(next)`（后端档案**降级**，是账号事实变了才动角色）。
 - `ui/BusPostRoot.kt:160`：登录落壳 `AppState.setActiveDomain(AppDomain.of(role))`。
-- `notify/AlertEngine.kt:45/:57`：分域轮询的依据从"账号角色"换成 `AppState.activeDomain.value == AppDomain.DRIVER` —— 这一条才是"点用户版能真的停下司机域轮询"的功能本身。
+- `notify/AlertEngine.kt:46/:57`：分域轮询的依据从"账号角色"换成 `AppState.activeDomain.value == AppDomain.DRIVER` —— 这一条才是"点用户版能真的停下司机域轮询"的功能本身。
 - **新增** `app/src/test/java/com/shanxiang/buspost/core/DriverRoleIntegrityTest.kt`（107 行 / 4,759 B / 6 例）。
 
 ⚠ 关于指令点名的两个名字：落成了 `Prefs.role`（已有、后端档案派生）+ `AppDomain`，**没有**再造一个叫 `AccountRole` 的类型。
@@ -2729,7 +2729,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
   ⇒ **ID-MISS 总 612**（A 类 98 = 缺的全是锚点自己的文件名；B 类 239 = 自身文件名与别的名字一起缺；C 类 275 = 缺里没有自身文件名）。
   ⚠ **(b) C 类经抽查仍是假报**，机制与 A/B 不同但同源：`--strict-id` 的标识符是**按整个表格单元**取的，再要求它们出现在**每一个**锚点的 ±3 窗口里
   （实测**本文件**"⑤ ⚠ `--strict-id` 那一遍抓到 6 条 ID-MISS"那一行一格并列 6 个锚点 ⇒ `Api.kt:211` 被要求包含 `UserIdempotentKeyResolver`、`Models.kt:834` 被要求包含 `Repo` 侧的名字；
-  `AI_ITERATION_STATE.md` 常驻自检表"分域"那一行的三个写入点锚点各缺另两个文件名；同表"提醒"行 `AlertEngine.kt:45` 缺 `AlertEngine` 自身）。⇒ **一格多锚点必然红**。
+  `AI_ITERATION_STATE.md` 常驻自检表"分域"那一行的三个写入点锚点各缺另两个文件名；同表"提醒"行 `AlertEngine.kt:46` 缺 `AlertEngine` 自身）。⇒ **一格多锚点必然红**。
   ⚠ 上面这几处**按内容引用、不写行号**：本轮一边写台账一边抄行号，等 ⑦ 落笔时那两行的行号已经漂了（这正是"绝对行号是读数不是判据"那条纪律的又一次自证）。
   ⚠ 所以 ⑤ 提的"**每轮连抄 ID-MISS 数**"这个便宜替代机制**不成立**：612 这个数今天主要由工具口径撑着，**升它不表示锚点变好、降它也不表示变坏**，
   拿来当闸门就是自己造一个假信号（与 `D-040`/`D-③-1` 同族）。#159 退回原口径：**要么按锚点逐个分配标识符（工具改动，排 ⑰），要么逐条人核**；本轮只保证"**本轮新写的锚点逐条打过行内容核对**"（④ 那批）。
@@ -3123,7 +3123,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
   `routeFromDeepLink()`（**:59-61**，不匹配前缀 → `null`）、`trace()`（**:67**）与 `busDetail()`（**:68**）两个 builder 都过 `encodeSegment`（**:82**，纯 Kotlin；`RESERVED_OTHER` **:99** / `HEX` **:101**）；
   `DRIVER_ONLY`（**:43**）四条路由全部**无参数**——这不是巧合：闸门是精确集合成员判断，带参数的路由串永远进不了那个集合。
 - `nav/ShellDecision.kt`：`internal fun deepLinkTarget(route, role)`（**:35**）的两支 `-> null`（**:36** 壳路由丢弃、**:37** 非司机角色命中 `DRIVER_ONLY`）；唯一消费点 `ui/BusPostRoot.kt:91`。
-- 出网口四处统一走 `Routes`：`MainActivity.kt:100`（Intent 的 `dataString` → `routeFromDeepLink`）、`notify/Notifier.kt:92` 与 **:100**、`widget/NextBusWidgetProvider.kt:80`、`AlertEngine.kt:106`（`Routes::trace`）与 **:137**。
+- 出网口四处统一走 `Routes`：`MainActivity.kt:100`（Intent 的 `dataString` → `routeFromDeepLink`）、`notify/Notifier.kt:92` 与 **:100**、`widget/NextBusWidgetProvider.kt:80`、`AlertEngine.kt:107`（`Routes::trace`）与 **:137**。
 - **新** `ui/user/BusDetailSlot.kt`（51 行 / 2,206 B / CRLF 0）：`enum class DetailSlot`（**:17**）四格 **:19/:22/:25/:28**，
   `internal fun detailSlotOf(target, lines, selectedId, loading, error)`（**:39**）优先级 **:46-50**（`Ready` > `Loading` > `Failed` > `NotInList` > 兜底 `Failed`）；
   本文件**零** `androidx.compose` 依赖（`SR-m2` 钉），所以四态是纯派生、JVM 可直接喂满组合。
@@ -5663,7 +5663,7 @@ id=35 那个 `endpoint=http://www.baidu.com` 的假配置确实存在，但**没
 ⇒ **现状是纯本地 NotificationCompat + 轮询（前台 20s + WorkManager 15min）**。
 
 本轮只落"与厂商无关、现在就该对"的两格：
-1. **锁屏不再摊开行程**：`AlertEngine` 拼的正文含站名与"几分钟到"（`AlertEngine.kt:69/90/118`），而以前从没设过可见性
+1. **锁屏不再摊开行程**：`AlertEngine` 拼的正文含站名与"几分钟到"（`AlertEngine.kt:70/90/118`），而以前从没设过可见性
    ⇒ 手机不解锁就能被旁人读出"某村 3 分钟"。现在由纯函数 `lockScreenTextFor(channel)` 决定：
    **白名单只放"正文确认不含个人信息"的 SERVICE 一条，其余（含以后新增、忘了登记的渠道）默认遮掩**
    —— 反过来写会埋雷：加新渠道时忘了改这里，默认就是"锁屏摊开正文"。遮掩句固定为
@@ -7862,7 +7862,7 @@ idempotency / idempotency_test / mission_route / navigation_test / notify_result
 **③ 台账 22 条漂移锚点，全部按内容重锚，一条没进在册表**：改前 DA-d 新增 **22** / DA-e ID-MISS **295**（上限 273）；
 改后 **新增 0 / 消失 0 / miss 273 / FILE-NOT-FOUND 15**，锚点总数 1461→**1463**。手法：拿 HEAD 工作树逐字切出被指片段，
 在工作树里找同一切片 ⇒ 纯平移 16 条（每文件位移一致：WorkbenchScreen +33、Repo +35/+38/+53、AlertEngine +6/+19、DriverLegStateMapper +16）；
-3 条改指**语义块**：`AlertEngine.kt:64-92`（司机域通知整块）、`Repo.kt:1260-1276`（crs/steps 读块）、
+3 条改指**语义块**：`AlertEngine.kt:65-93`（司机域通知整块）、`Repo.kt:1260-1276`（crs/steps 读块）、
 `Repo.kt:1495-1506`（confirmHandover 现体）；3 条动台账原文 —— 目录前缀 `ui/driver/`、`notify/` 会被 `assign_tokens`
 判给紧随其后的锚点，而源码窗口里永远不可能出现那个串 ⇒ 这类锚点**天生不可核验**，只能去前缀或扩到真含该串的块。
 ⚠ 第一版想用"HEAD 切片"自动平移**裸续号**（`Repo.kt:1315/727/740/746` 里的 727/740/746），实测会把 `**65**`、
@@ -10283,6 +10283,59 @@ App 内「检查更新」只认 GitHub Releases（用户 2026-10-12 定的口径
   地图铺到屏底、底部浮着三格胶囊 播报已关 / 看整段 / 退出导航；
   `tmp/r143_b_bar.png` 按"退出导航"回工作台 —— **四格 tab 胶囊在**（工作台带未读点、选中态高亮）。
   ⇒ 悬浮胶囊与沉浸式在**发出去的那只包**上成立。
+
+## D-158 · 天气提醒：屏上早就是分角色的，**推送那一条不是**（2026-10-17 深夜）
+
+### 一、先核用户那句"你也没完成"到底对不对
+
+对了一半，而且是关键的那一半。逐段实测（`AlertEngine.kt` / `Repo.kt` / `WeatherCard.kt` / `DriverWeatherTip.kt`）：
+
+| 那一格 | 现状 |
+| --- | --- |
+| 屏上的天气卡 | **已经分角色**：`weatherTipsFor` 返回"用户说法 to 司机说法"两份，首页读 `.first`、司机工作台读 `.second`，`DriverWeatherContractTest` 8 条在钉 |
+| 司机域收不收天气推送 | **收**：#52 那轮已把 `pushWeatherAlert` 提到司机域那条 `return` 之前（`AlertEngine.kt:63`） |
+| **推送的正文** | **没分角色，而且抄了第二张表**：`weatherAlertText` 里自己写了一份"天气→建议"的 when，只有一份正文，里面同时写着"出行请带雨具"（乘客的话）和"山货装车加盖苫布"（寄件/司机的话）——同一条提醒推给两种人，总有一半人在读跟自己无关的话 |
+| 现象词表 | **两边不是一张**：通知侧只认"沙尘"、卡片侧只认"雾/霾/沙"，而高德实况常见产出词是"浮尘" ⇒ 一场浮尘在通知里不响、在卡片上拿到的是万能句；"冰雹/台风"更夸张 —— 通知判成 HEAVY 拉警报，卡片却说"出行前留意山区路况" |
+| 提醒水位 | `resetWatermark()` 长期 **0 个调用点**（旧注释自己承认）⇒ 换账号后 `primed`/`lastSeenNotifyId` 还是上一位的，新账号刚发给自己的第一条会哑掉 |
+| 测试保护 | 严重度表、图标映射、推送文案**零用例**（2026-10-15 那条"正文写雾、图标是🌧"就是没钉住才靠真机截图抓回来的） |
+
+### 二、改法：把第二张表拆掉，只留一份
+
+- `weatherAlertText(...)` 多收一个 `domain: AppDomain`，正文 = 事实句（天况/气温/风）+ **`weatherTipsFor` 里属于这个角色那一份**，一字不增；
+  调用处传 `AppState.activeDomain.value`（**视图域**，不是账号角色 —— 司机点回用户版看乘客班次时，他该收到乘客那句）。
+- 严重度与图标两处的现象集合与卡片对齐（补 `尘`），并新增"强对流"一支（冰雹/雷/台风），**排在降水之后**
+  —— "雷阵雨"这种带雨字的常见产出词仍走降水那句（苫布/刹车），不会被说成"延后或改日"。
+- `AlertEngine.resetWatermark()` 接到 `LoginViewModel` 登录成功那一步（与 `Repo.saveSession` 里 `clearDriverBinding()` 同一落点、同一理由）。
+- 天气推送**继续不带 route**（SR-g / D-100 那条：通知不许替角色决定进哪个壳），本轮只判据化，没有顺手放宽。
+- 锁屏遮掩：`Channels.WEATHER` 从"走默认 else"改成**点名进名单**（fail-closed 的默认不变；要不要让天气预警锁屏直读是产品口径，没替用户决定）。
+
+### 三、新判据 + 负控
+
+`tools/check_weather_alert_probes.sh`（WA-a…WA-f 六格）+ `tools/weather_alert_negative_controls.sh`
+**七条注入逐条能红**（`RESULT ok=7 bad=0 miss=0`）：第二张表复活 / 建议被读两次 / 角色参数被写死 /
+推送开始带 route / 现象词单边缺项 / 水位重置口又没人调 / 摘掉一条用例。
+新用例 `WeatherAlertContractTest` **7 条**；`NotificationPrivacyContractTest` 仍 3 条（WEATHER 进点名名单）；
+SU-b 源集 **78 → 79**（`find` 差集实测就 `WeatherAlertContractTest.kt` 这一条）。
+
+### 四、凭证与没验到的
+
+- JVM：`WeatherAlertContractTest tests=7 failures=0`、`DriverWeatherContractTest tests=8 failures=0`（一字未动，改文案没碰坏旧钉）。
+- 静态闸：`check_weather_alert_probes.sh` 绿（一张表 1 / 角色 1+1 / 无 route 0 / 尘 2-1 / 水位 1 / 用例 7）。
+- 收尾整批：**46 本 = 46 绿 / 0 红**（44 旧 + CN + WA）；全量用例产物实读 **77 类 / 792 例 / 0 失败 / 0 错误 / 0 跳过**。
+- 台账锚点：本轮改动面（`AlertEngine.kt` +25/−8、`Repo.kt` +8、`LoginViewModel.kt` +6）推动在册锚点 **22** 条
+  ⇒ 机械等长平移 + `--pin-write`；终读 anchors 1518 / 越界 0 / 在册 245（新增 0 / 消失 0）/
+  **ID-MISS 269（仍与本轮开工前一致）** / 反证 739 与 455。
+- 判据自己也被迫改了一格：`check_weather_probes.sh` 的 W-j 原来只数"`weatherTipsFor(` 调用点 = 2"，
+  它分不清"第三个天气**生产者**"（要红）与"第三个来**读同一张表**的人"（正是本轮要的防重复做法）。
+  拆成两条读数：生产者（`Repo.kt` 内）仍钉 **2**、读者总数钉 **3** —— 两条都能红，比原来更严而不是更松。
+- ⚠ **推送那一跳真机没验到**：今天本机定位处天况是"多云 24°C"，`weatherSeverity` 正确返回 null ⇒ 不该推也没推。
+  要拿到"暴雨/大雾当天推送落在通知栏"的凭证，得等一次真实恶劣天气（登记为待复验，不拿 adb 手发通知冒充）。
+- ⚠ **两处屏上的角色文案行也没在 v144 上定位到像素**：司机工作台导航卡里那一行（`ui/driver/WorkbenchScreen.kt` 内，
+  经 `DriverWeatherTip.lineOf` 出）与首页天气卡的展开态，
+  本轮真机只验到"v144 装得上、工作台/悬浮胶囊/整段导航都正常"（`tmp/w144_a_small.png`、`tmp/w144_c_crop.png`），
+  那两行的分角色文案仍只有 JVM 用例与判据背书 —— 记为 NOT VERIFIED，不写成已验。
+- 后端那一侧：`/transport/weather` 在 App 的缓存白名单里、也有用例引用，但**全工程没有调用点**，
+  而后端仓（cargo-post-platform）里 `weather` 零命中 ⇒ 这条路径是僵尸登记，天气的真生产者只有高德 REST 与 open-meteo（与 `DECISION_LOG` 里 E-类外部生产者同一口径）。本轮不动它，只把这条记下来。
 
 ## D-157 · #111"冷启动被恢复到导航页"不是状态恢复，是那条"在途司机打开 App 就给导航"的口径在工作（2026-10-17 深夜）
 

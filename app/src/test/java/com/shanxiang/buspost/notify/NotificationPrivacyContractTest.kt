@@ -20,7 +20,10 @@ class NotificationPrivacyContractTest {
 
     @Test
     fun `行程类渠道必须给出锁屏替代句`() {
-        for (ch in listOf(Channels.ORDER, Channels.SHIFT, Channels.ARRIVAL)) {
+        // WEATHER 也在名单里点名：天气正文本身不含行程（D-158 之后更是只带天况/气温/建议），
+        // 但这一格的规矩是"白名单只放确认无个人信息的那一条，其余默认遮掩"——
+        // 天气要不要放进白名单（锁屏直接可见）是产品口径，不在这里顺手放宽。
+        for (ch in listOf(Channels.ORDER, Channels.SHIFT, Channels.ARRIVAL, Channels.WEATHER)) {
             val pub = lockScreenTextFor(ch)
             assertTrue("$ch 应被遮掩", pub != null)
             assertTrue("遮掩句要让用户知道该解锁看：$pub", pub!!.contains("解锁"))

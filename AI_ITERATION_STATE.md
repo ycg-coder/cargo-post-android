@@ -3,6 +3,22 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-17（深夜续，**D-158** · 用户："还有分角色和具体天气的提醒消息你也没完成"——对了一半，是关键那半）：
+屏上的天气卡**早就分角色**（`weatherTipsFor` 两份说法、`DriverWeatherContractTest` 8 条在钉），司机域也确实收得到天气推送（#52 修过）；
+**没分角色的是推送正文**：`weatherAlertText` 自己抄了第二张"天气→建议"表，只有一份正文，
+里面同时写着"出行请带雨具"（乘客）和"山货装车加盖苫布"（寄件/司机）⇒ 一条提醒喊两种人，总有一半在读废话。
+还有两处两张皮：现象词表通知侧只认"沙尘"、卡片侧只认"雾/霾/沙"（高德实况常见的是"浮尘"，两边都漏）；
+"冰雹/台风"在通知里是 HEAVY 警报、在卡片上是万能句"出行前留意山区路况"。
+改法：**拆掉第二张表** —— `weatherAlertText` 多收 `domain`，正文取 `weatherTipsFor` 里当前**视图域**那一份，一字不增；
+严重度/图标补 `尘`、新增"强对流"一支且**排在降水之后**（"雷阵雨"仍走苫布那句）；
+`resetWatermark()`（长期 0 调用点，换账号后新账号第一条提醒会哑）接到登录成功那一步，与 `clearDriverBinding()` 同落点；
+天气推送**继续不带 route**（SR-g：通知不许替角色选壳）、`Channels.WEATHER` 点名进锁屏遮掩名单（默认 fail-closed 没放宽）。
+凭证：新用例 `WeatherAlertContractTest` **7 条**、旧 8 条一字未动；新簿 `check_weather_alert_probes.sh` 绿 +
+负控 `weather_alert_negative_controls.sh` **七条注入逐条能红（ok=7 bad=0）**；SU-b 源集 78→79。
+⚠ **推送那一跳真机没验到**：今天本地天况"多云 24°C"，`weatherSeverity` 正确返回 null ⇒ 没得推也不该推；
+要拿"暴雨当天通知落在通知栏"的凭证得等一次真实恶劣天气（不用 adb 手发通知冒充）。
+另记一条：`/transport/weather` 在缓存白名单里也有用例引用，但全工程 0 调用点、后端仓 `weather` 零命中 ⇒ 僵尸登记。
+
 最后更新：2026-10-17（深夜，**D-156** · 用户那条"全局悬浮胶囊 + 导航沉浸式 + 任务点标记"）：
 **主导航从通栏 tab 换成浮在内容上的一枚胶囊**：全工程只画一处（根上），每屏自己 `CapsuleActions(...)` 登记
 （两个壳登记原来那四个 tab、实时公交登记 返回/刷新、车道级导航登记 播报/看整段/退出导航）。
@@ -1972,7 +1988,7 @@ CURRENT_ANDROID_STATUS:  F-3 ⑥ 收工（2026-10-02 17:3x–19:5x，源码改�
                 **SOURCE_COMPLETE**：本轮买的是**"入口只有一处"这类话从口头变成 grep 可测**。
                   出网口全部收进 `nav/Routes.kt`：前缀 `DEEP_LINK_PREFIX`（**:50**，全树唯一）、`deepLink()`（**:53**，唯一拼装体）、`routeFromDeepLink()`（**:59-61**，不匹配前缀 → `null`）、
                   `trace()` **:67** / `busDetail()` **:68** 两个 builder 都过纯 Kotlin `encodeSegment`（**:82**）。
-                  四个消费点各一处：`MainActivity.kt:72`、`notify/Notifier.kt:69`/`:100`、`widget/NextBusWidgetProvider.kt:80`、`notify/AlertEngine.kt:96`/`:127`；
+                  四个消费点各一处：`MainActivity.kt:72`、`notify/Notifier.kt:69`/`:100`、`widget/NextBusWidgetProvider.kt:80`、`notify/AlertEngine.kt:97`/`:127`；
                   分域闸仍是**唯一**一道：`nav/ShellDecision.kt:35` `deepLinkTarget`（两支 `-> null` 在 **:36/:37**）+ 唯一消费点 `ui/BusPostRoot.kt:91`。
                   **`D-⑤-1` 收口**：新 `ui/user/BusDetailSlot.kt`（51 行 / 2,206 B，`enum class DetailSlot` :17 四格 + `internal fun detailSlotOf` :39，优先级 **:46-50**，本文件**零 Compose**），
                   选线改到列表落地之后（`BusScreen.kt:147-160` + `openDetail()` **:168-169**），页面只读一个结论（`when (vm.detailSlot())` **:593-600**）。
@@ -2146,7 +2162,7 @@ CURRENT_ANDROID_STATUS:  F-3 ③ 收工（2026-10-01 19:0x–22:15，三态分�
                   `setAccountRole`（:123-126，写 `Prefs.role` 之后过 `domainAfterRoleChange`）；**死镜像 `AppState.role` 已删**（它与 `Prefs.role` 是两份真相）。
                   动线逐处落点：`DriverShell.kt:38` 由 `AppState.setRole(Role.USER)` 换成 `AppState.setActiveDomain(AppDomain.USER)`（:37 `if (it == 3) {` 与 :39 出壳导航一字未动）、
                   显式授予拆两行 `MineScreen.kt:97-98`、档案降级 `WorkbenchScreen.kt:180`、登录落壳 `BusPostRoot.kt:120`、
-                  **后台提醒的分域依据从"账号角色"换成"在看哪个域"** `AlertEngine.kt:45/:57`（这一条才是"点用户版能真的停下司机域轮询"的功能本身）。
+                  **后台提醒的分域依据从"账号角色"换成"在看哪个域"** `AlertEngine.kt:46/:57`（这一条才是"点用户版能真的停下司机域轮询"的功能本身）。
                   新增 `app/src/test/…/core/DriverRoleIntegrityTest.kt`（107 行 / 4,759 B / **6 例**：切回用户版只改视图不动账号角色 / 非司机账号切不出司机视图 /
                   撤档降级时视图离开司机域 / 后端授予身份不会自动把视图搬进司机域 / 撤档之后切不回司机视图直到身份重新被授予 / 两层各自的真值表）。
                   ⚠ **没有新建一个叫 `AccountRole` 的类型**（登记 `D-③-4`）：账号角色那份事实仍由 `Prefs.role` 承担，再包一层同名类型只会多出一个可写入口，与"不叠第二份真相"冲突。
@@ -2717,7 +2733,7 @@ RRt-10 `setAccountRole` 不再把视图带出司机域 → 只红在 `撤档降�
    `^    LaunchedEffect(vm.demoted) {$` 之后，这条与 RR-d 另两条才真的红过；
 ② **跨文件的"恰好 N"要写清是哪几个文件**：RR-d 的 `RD4` 期望 2，第一版只扫 `WorkbenchScreen.kt` 得 **1**
    （另一处"回用户壳"在 `DriverShell.kt`）⇒ 判据改成**两文件合数**，**不是把期望从 2 降到 1**（降期望就是把判据改松凑绿）；
-③ **`grep` 会把"读"也算成"写"**：RR-e 的 `Prefs\.role =` 实测 **4** 而不是 2，多出来的是 `AlertEngine.kt:155/:44` 的
+③ **`grep` 会把"读"也算成"写"**：RR-e 的 `Prefs\.role =` 实测 **4** 而不是 2，多出来的是 `AlertEngine.kt:160/:44` 的
    `Prefs.role ==`（比较不是赋值）⇒ 收紧成 `Prefs\.role = [a-z]`，并把这条坑写进脚本注释。
 **§八 探针 V-3 复跑（2026-09-29 23:0x–23:13，四本台账写完之后再跑一遍才算收口）**：
 **十套全部 exit 0**：`check_authenticity_counts / domain / envelope / eta / exception / idempotency / location /
@@ -3395,7 +3411,7 @@ dex **defined 29,828 与 D-050 逐项相同且归因得清**（main 源集零新
 | 出口 | 唯一性怎么证的（实测，不是"我写的就是唯一"） |
 |---|---|
 | 前缀与拼装 | `nav/Routes.kt` 里 `DEEP_LINK_PREFIX`:50 / `deepLink()`:53 / `routeFromDeepLink()`:59-61；`SR-i 1/0/1/1/1` 的第二位 0 = **别处再手写一遍 `buspost://` 就红** |
-| 出网口四个消费点 | `MainActivity.kt:72`、`notify/Notifier.kt:69`/`:100`、`widget/NextBusWidgetProvider.kt:80`、`notify/AlertEngine.kt:96`/`:127`；`SR-l 3/0/1/1`（后两位钉"通知那行"与"小组件那行"这两个**具体位置**，只数总次数会随重构漂走） |
+| 出网口四个消费点 | `MainActivity.kt:72`、`notify/Notifier.kt:69`/`:100`、`widget/NextBusWidgetProvider.kt:80`、`notify/AlertEngine.kt:97`/`:127`；`SR-l 3/0/1/1`（后两位钉"通知那行"与"小组件那行"这两个**具体位置**，只数总次数会随重构漂走） |
 | 分域闸 | `nav/ShellDecision.kt:35 deepLinkTarget(route, role)` 两支 `-> null`（:36 壳路由丢弃 / :37 非司机角色命中 `DRIVER_ONLY`）+ 唯一消费点 `ui/BusPostRoot.kt:91`；`SR-c 1/0` 的第二位 0 = 不许有第二份答案 |
 | 详情页选线 | 新 `ui/user/BusDetailSlot.kt`（51 行 / 零 Compose）：`detailSlotOf` :39，优先级 :46-50 四格各说各话；`SR-m 1/0/1/1/0` 末位 0 = `D-⑤-1` 那个"异步 `load()` 未落地就 `lines.firstOrNull { it.id == routeId }`"的抢读形状**不许回来** |
 
@@ -4794,7 +4810,7 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
   档案返回"非演示 + 有条目 + 无 driverId"→ 视为撤销并清绑定，返回 `data:null`/失败/演示回落 → 视为**未知**并保留
   （第一版写成"driverId<=0 就清"，自查发现一次网络抖动会把真司机锁死，改成三态并补用例）。
 - **§64 三处串域已修**：`DriverShell.kt:38` 点"用户版"先 `AppState.setRole(Role.USER)`（否则 `AlertEngine`
-  继续按司机域轮询 `/driver/messages`）；`AlertEngine.kt:64-92` 司机通知落 `Routes.DRIVER_MESSAGES`、单号进正文，
+  继续按司机域轮询 `/driver/messages`）；`AlertEngine.kt:65-93` 司机通知落 `Routes.DRIVER_MESSAGES`、单号进正文，
   不再深链村民端 `trace/$orderNo`；`Routes.kt:37 DRIVER_ONLY` + `BusPostRoot.kt:191-192 deepLinkAllowed()`
   给 Intent 深链加角色闸（不允许就留在当前页，不猜不跳不崩）。
 - **判据固化**：`tools/check_domain_probes.sh`（§55 H 组）+ §56 两行新的不许回潮不变量 + `CONTEXT_LOCK.md` §八 ⑦。

@@ -197,7 +197,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 | 标记已读 | `api.js:422` `?id=` | `Repo.kt:685`（query ✔） | `@PutMapping("/read") @RequestParam("id")` | `REAL_COMPLETE` |
 | 全部已读 | `api.js:427` body `{orderId}` | `Repo.kt:687-688` query `orderId`（可选） | `:58-61 @RequestParam(required=false)` | `REAL_COMPLETE` |
 | 司机消息 / 未读 / 已读 | `api.js:471/476/481` | `Repo.kt:1017-1032`（⑥ 后行号，原 `:992-1007`；三处都改走 `driverIdParam()`） | `AppDriverController.java:226-240` | `REAL_PARTIAL`（未读裸数字同 §22）→§23 |
-| 角标状态写入 | 单一来源（`unread-count`） | `AppState.unread` 被 3 处写入：`AlertEngine.kt:25`（列表计数，**正确**）vs `ParcelScreen.kt:86`/`NotificationScreen.kt:102`（`Repo.unreadCount()`，**恒 0**） | `/notification/page` 的 `readStatus` + `/notification/unread-count` 裸 Long | `CONTRACT_MISMATCH`（谁最后写谁赢）→§52 |
+| 角标状态写入 | 单一来源（`unread-count`） | `AppState.unread` 被 3 处写入：`AlertEngine.kt:26`（列表计数，**正确**）vs `ParcelScreen.kt:86`/`NotificationScreen.kt:102`（`Repo.unreadCount()`，**恒 0**） | `/notification/page` 的 `readStatus` + `/notification/unread-count` 裸 Long | `CONTRACT_MISMATCH`（谁最后写谁赢）→§52 |
 
 ---
 
@@ -217,7 +217,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 | 公告 | `api.js:196` | `Repo.kt:198-199` | `/transport/notice/list` | `REAL_COMPLETE` |
 | 文件上传 | `api.js:486-492`（`res` 即 URL 字符串） | `Repo.kt:1012-1014` 读 `url/fileUrl/data` | `AppFileController.java:34-38 CommonResult<String>` | `CONTRACT_MISMATCH`（URL 恒空）→§22 |
 | 司机模式切换 | `mine.js:79-82` 只 `requireLogin` 后 `reLaunch` 到司机工作台；真正的门在页面里：`workbench.js:163-168` profile 为空即 toast"未找到司机档案，请联系管理员"且**不发任何司机请求**，`:147/603/669/799` 每个动作前 `if (!this.driverId) return` | `MineScreen.kt:163` → `MineViewModel.enterDriverMode`(`:85-97`) 先 `Repo.bindDriver()`，未授予 driverId 不进司机域并显示"未绑定司机档案…"；`Repo.driverIdParam()`(`Repo.kt:764`) 是 19 个司机调用点的唯一 driverId 入口，未绑定直接抛（`driverId=0` 的 URL 构造不出来） | 司机端所有按 id 的接口 `@RequestParam driverId` 且 `requireCurrentDriver` 做归属校验（`DriverAppService.java:91-96`） | `REAL_COMPLETE`（**⑥ 前为 `LOCAL_ONLY`**；真机四条仍 `ENVIRONMENT_BLOCKED`）→§29、§64 |
-| 「用户版」退出 / 通知落地页 / Intent 深链 | `driver-tab-bar/index.js:41-44` 用 `switchTab` 回用户 tab（页面路径即域，没有本机角色变量）；`notification.js:184-188` 司机模式一律 `navigateBack()`，注释写明"司机消息里的 orderId 是货运单 id，没有对应的村民端页面"；小程序无 Intent 深链 | `DriverShell.kt:38` 退出回写 `Role.USER`（否则 `AlertEngine` 继续轮司机域）；`AlertEngine.kt:53` 司机通知 `route = DRIVER_MESSAGES`、单号进正文；`BusPostRoot.kt:82` + `deepLinkAllowed`(`:183-184`) 按 `Routes.DRIVER_ONLY`(`:37`) 拦角色不符的深链 | 角色在后端不存在（同一会员既可能是村民也可能是司机，域由 token + driverId 决定） | `REAL_COMPLETE`（⑥ 修；**此前没有任何矩阵行抓到这三处串域**）→§64 |
+| 「用户版」退出 / 通知落地页 / Intent 深链 | `driver-tab-bar/index.js:41-44` 用 `switchTab` 回用户 tab（页面路径即域，没有本机角色变量）；`notification.js:184-188` 司机模式一律 `navigateBack()`，注释写明"司机消息里的 orderId 是货运单 id，没有对应的村民端页面"；小程序无 Intent 深链 | `DriverShell.kt:38` 退出回写 `Role.USER`（否则 `AlertEngine` 继续轮司机域）；`AlertEngine.kt:54` 司机通知 `route = DRIVER_MESSAGES`、单号进正文；`BusPostRoot.kt:82` + `deepLinkAllowed`(`:183-184`) 按 `Routes.DRIVER_ONLY`(`:37`) 拦角色不符的深链 | 角色在后端不存在（同一会员既可能是村民也可能是司机，域由 token + driverId 决定） | `REAL_COMPLETE`（⑥ 修；**此前没有任何矩阵行抓到这三处串域**）→§64 |
 
 ---
 
@@ -423,7 +423,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：OkHttp 拿到 `{"code":0,"data":12}` 时，`root.opt("data")` 是一个 **JSON number/boolean/String**（不是对象也不是数组），`toPayload` 把它塞进 `{"v":12}`。而 `Payload.str/multiStr/multiNum` 只认业务键名，不认 `v` → 一律返回默认值。
 - **后端真实行为**：`AppNotificationController.java:44-48` 是 `CommonResult<Long> unreadCount()`（裸数字）；`AppFileController.java:34-38` 是 `CommonResult<String> uploadFile(...)`（**裸 URL 字符串**）；`AppDriverController.java:239-243` 是 `CommonResult<Long> messagesUnreadCount`。这些都是 yudao `CommonResult<T>` 的正常形态。
 - **小程序行为**：`api.js:417`/`api.js:486-492` 直接把 `res` 当数字 / 当 URL 字符串用（小程序封装里 `resolve(res.data)` 不做对象假设），所以它一直是对的。
-- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:99`、`NotificationScreen.kt:102`、`AlertEngine.kt:39` 三处写入）里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
+- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:99`、`NotificationScreen.kt:102`、`AlertEngine.kt:40` 三处写入）里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
 - **修改方案**：在 `Payload` 上补一个**标量出口**，而不是去改后端信封（硬规则：不重设计后端）：
   1. `Payload` 增 `val scalar: Any?` 与 `fun scalarStr(vararg fallback: String): String` / `fun scalarNum(): Double`，`toPayload` 的非对象/非数组分支同时填 `scalar` 与保留 `{"v"}`（旧调用点不破，符合"不删字段保兼容"）；
   2. `Repo.unreadCount` 改 `p.scalarNum().ifEmpty{ multiNum("count","unreadCount") }` 口径：先标量、后对象键；`Repo.uploadPhoto` 改先 `scalarStr()`（即后端裸 String），再退回 `url/fileUrl`；`Repo.kt:1039` 同步；
@@ -480,7 +480,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   - **未绑定不请求**：`driverIdParam()` 在 `driverId <= 0` 时抛 `DriverUnboundException`，`runCatching` 吞掉后返回 null，请求根本不上网络。测试实测 `server.requestCount == 0`（`ScalarEnvelopeContractTest.司机未绑定角标时一个请求都不发`）；判定条件是"请求数"这种外部行为，不是"返回 null"这种自说自话。
   - 绑定后带后端授予的 driverId：`/driver/messages/unread-count?driverId=61` 断言在 URL 上，值 61 来自 `/driver/profile` 而不是本机猜测。
   - "显示未绑定而不是 0"这一条：角标侧不虚构（null → 保持上一个值，未绑定态初值 0 ⇒ tab 无红点，等于"没有可信提醒"而不是"后端说没有提醒"）；数据侧 `WorkbenchScreen.kt:292` 的 `error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()` 里 `driverTasks()`/`routeGuide()` 未绑定时返回 `DRIVER_UNBOUND`，首页仍显示"未绑定司机档案：后端没有该账号的 driverId，请联系站点核对工号"。**没做**：`/driver/profile` 与 `/driver/shifts` 按后端契约是登录态识别、不受守卫，所以未绑定时首页确实能拿到 profile 的 0 件数据 —— 这是后端口径，不是客户端缺陷。
-  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:36/47` 与 `DriverMessagesScreen.kt:99/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
+  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:37/47` 与 `DriverMessagesScreen.kt:99/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
 
 ---
 
@@ -1325,7 +1325,7 @@ bash tools/check_domain_probes.sh
 #        写裸词不写 `driverIdParam()`（实测会少算 KDoc 里那次引用），数字对不上时无法区分"少了一个调用点"还是"注释被删了"；
 #   P-c：角色切换入口 2（`MineScreen` 先 `bindDriver` / `DriverShell` 退出用户版回写 `Role.USER`）；
 #   P-d：深链分域闸 2（`Routes.DRIVER_ONLY` 声明 + `BusPostRoot.deepLinkAllowed` 判据）；
-#   P-e：司机通知落司机页 1（`AlertEngine.kt:84` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
+#   P-e：司机通知落司机页 1（`AlertEngine.kt:85` = `Routes.DRIVER_MESSAGES`）；脚本还打印全部 3 处 `route = `，
 #        人眼复核 `trace/*` 只能出现在司机分支 `return`(`:57`) 之后的用户分支里；
 #   P-f：`DRIVER_UNBOUND` 引用 5 = Repo 的映射 + 异常类 + 常量，MineScreen 的 import + 使用。
 # 与 §55 C 同一课：**这些判据全部按内容/函数名，不按行号**；行号白名单会随一次插入整段失效。
@@ -1789,7 +1789,7 @@ bash tools/check_eta_probes.sh
 - **修改方案**（全部已落地）：
   1. `DriverShell.kt:38` 退出前 `AppState.setRole(Role.USER)`，注释写明"本机角色决定后台提醒读哪个域的接口"；
      `Prefs.role` 是 `AlertEngine` 唯一的分支依据，所以这一行就把后台轮询带回用户域。
-  2. `AlertEngine.kt:78-83` 司机分支：`route = Routes.DRIVER_MESSAGES`，`orderNo` 进正文（`"${content}（运单 $no）"`），
+  2. `AlertEngine.kt:79-84` 司机分支：`route = Routes.DRIVER_MESSAGES`，`orderNo` 进正文（`"${content}（运单 $no）"`），
      不再拼 `trace/*`；用户分支(`:60-89`)继续按 `orderNo → trace/*` 走（那是村民端合法入口）。
      判据用内容而不是行号：`grep -c 'route = Routes.DRIVER_MESSAGES'` = 1，且司机分支内 `trace/` 命中 0。
   3. `Routes.kt:78-81` `DRIVER_ONLY = setOf(DRIVER_NAV, DRIVER_MESSAGES, HANDOVER)`；
@@ -2609,7 +2609,7 @@ internal fun deepLinkTarget(route: String, role: Role): String?
    于是这条保护反过来把缺陷钉成了"正确行为"。**凡遇到"这样更安全"的前置条件，先问后端会不会这样说话。**
 3. **负控的"预期 0 / 恰好 N"必须钉整行**：RR-d 的"demoted 没人观测"第一次注破口后脚本 **exit 0**（该红不红），
    因为 `grep -c 'LaunchedEffect(vm.demoted)'` 把**被注释掉的那行**也数了进去 ⇒ 改成整行锚定
-   `^    LaunchedEffect(vm.demoted) {$` 之后才真的红。同族：RR-e 的 `Prefs\.role =` 把 `AlertEngine.kt:33/:44` 的
+   `^    LaunchedEffect(vm.demoted) {$` 之后才真的红。同族：RR-e 的 `Prefs\.role =` 把 `AlertEngine.kt:34/:44` 的
    **比较** `Prefs.role ==` 也数成赋值（实测 4 而不是 2）⇒ 收紧成 `Prefs\.role = [a-z]`。
 4. **跨文件的"恰好 2"不能只扫一个文件**：RR-d 的 `RD4` 期望 2，第一版只扫 `WorkbenchScreen.kt` 得 1
    （另一处在 `DriverShell.kt`）⇒ 改的是**扫描范围**，**不是把期望从 2 降到 1**（降期望就是凑绿）。
