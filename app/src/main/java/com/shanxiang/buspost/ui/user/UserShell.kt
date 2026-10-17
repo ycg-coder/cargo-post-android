@@ -12,9 +12,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.ui.common.BusScaffold
-import com.shanxiang.buspost.ui.common.BusTabBar
+import com.shanxiang.buspost.ui.common.CapsuleAction
+import com.shanxiang.buspost.ui.common.CapsuleActions
 import com.shanxiang.buspost.ui.common.LoginGateDialog
-import com.shanxiang.buspost.ui.common.TabItem
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.ui.common.LocalNavController
@@ -28,13 +28,6 @@ fun UserShell() {
     var showLoginGate by remember { mutableStateOf(false) }
     val nav = LocalNavController.current
 
-    val items = listOf(
-        TabItem("首页", BusIcons.home),
-        TabItem("商城", BusIcons.cart),
-        TabItem("快递", BusIcons.parcel, badge = unread),
-        TabItem("我的", BusIcons.person),
-    )
-
     /**
      * 游客点商城/快递/我的 → 弹登录窗而不是切 tab（对标主流 App 的"先体验再注册"）。
      * 首页（index=0）完整开放：实时公交、附近公交、天气、公告都不需要登录。
@@ -47,7 +40,17 @@ fun UserShell() {
         }
     }
 
-    BusScaffold(bottomBar = { BusTabBar(items, selected, ::onTabSelect) }) { modifier ->
+    // 主导航四格交给全局悬浮胶囊（原来是底部那条 tab 栏）。上面那条游客规矩收在 onTabSelect 一处，
+    // 胶囊只是它的另一个入口，不是第二套判断。
+    val items = listOf(
+        CapsuleAction("home", "首页", BusIcons.home, onClick = { onTabSelect(0) }, selected = selected == 0),
+        CapsuleAction("shop", "商城", BusIcons.cart, onClick = { onTabSelect(1) }, selected = selected == 1),
+        CapsuleAction("parcel", "快递", BusIcons.parcel, onClick = { onTabSelect(2) }, selected = selected == 2, badge = unread),
+        CapsuleAction("mine", "我的", BusIcons.person, onClick = { onTabSelect(3) }, selected = selected == 3),
+    )
+    CapsuleActions(items)
+
+    BusScaffold { modifier ->
         Column(modifier.fillMaxSize()) {
             when (selected) {
                 0 -> HomeScreen(

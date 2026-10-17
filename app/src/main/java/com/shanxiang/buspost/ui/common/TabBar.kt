@@ -41,20 +41,6 @@ import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.core.ui.glassmorphic
 import com.shanxiang.buspost.core.ui.pressFeedback
 
-data class TabItem(val label: String, val icon: ImageVector, val badge: Int = 0)
-
-/**
- * 主导航（2026-10-10 定版：**全宽度统一底部 tab，不做侧边导航栏**）。
- *
- * 2026-10-09 那一轮曾按 Material 3 自适应口径给 ≥600dp 的大屏配了 Navigation Rail；
- * 本轮按用户指令撤掉 —— 底部导航两端（手机/平板、用户/司机）只有一套形态：
- * · 交互与视觉的单一答案，两端一致性不再有"宽度分支"这个变量；
- * · 司机端单手/驾驶场景下，底部触达比左侧边栏直接；
- * · 平板上四格 tab 居中铺开依然成立（Row weight 均分，宽度只影响格子内边距观感）。
- *
- * 为什么壳不变：`DriverShell.kt` 曾是在册锚点文件，把宽度判断收在共享组件内部、
- * 两个 Shell 的调用保持一字不动，是那一轮就定下的边界，本轮继续沿用。
- */
 /**
  * 两端共用的内容列上限（2026-10-10 布局统一）。
  *
@@ -66,114 +52,20 @@ data class TabItem(val label: String, val icon: ImageVector, val badge: Int = 0)
  */
 val BusContentMaxWidth = 640.dp
 
-@Composable
-fun BusTabBar(
-    items: List<TabItem>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-) {
-    BusBottomBar(items, selected, onSelect)
-}
-
 /**
- * 底部 tab：站牌横梁式的顶边线 + 主题色激活态，用户端与司机端共用一套视觉，
- * 但项目由各自的 Shell 决定，司机看不到"商城"，用户看不到"发车"。
- */
-@Composable
-private fun BusBottomBar(
-    items: List<TabItem>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-) {
-    val t = LocalBusTokens.current
-    val scale = LocalBusFontScale.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .glassmorphic(t)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-    ) {
-        // 玻璃拟态顶部光线：主色微光，增强悬浮感
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            t.primary.copy(alpha = 0.25f),
-                            t.accent.copy(alpha = 0.18f),
-                            t.primary.copy(alpha = 0.25f),
-                            Color.Transparent,
-                        )
-                    )
-                )
-        )
-        // 背景与那条横梁仍是全宽（它是一条"栏"），只有格子本身收进与内容列同一把尺子并居中：
-        // 平板上四格摊到 2136px 会让图标与文字之间出现无意义的空旷，也让人怀疑点不点得到。
-        Row(
-            Modifier.widthIn(max = BusContentMaxWidth)
-                .align(Alignment.CenterHorizontally)
-                .padding(vertical = 7.dp),
-        ) {
-            items.forEachIndexed { i, item ->
-                val active = i == selected
-                val tabSrc = remember { MutableInteractionSource() }
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .pressFeedback(tabSrc)
-                        .clickable(interactionSource = tabSrc, indication = androidx.compose.foundation.LocalIndication.current) { onSelect(i) }
-                        .padding(vertical = 3.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(contentAlignment = Alignment.TopEnd) {
-                        Icon(
-                            item.icon,
-                            contentDescription = item.label,
-                            tint = if (active) t.tabActive else t.textTertiary,
-                            modifier = Modifier.size((22 * scale).dp),
-                        )
-                        if (item.badge > 0) {
-                            Box(
-                                Modifier
-                                    .size((7 * scale).dp)
-                                    .background(t.danger, CircleShape),
-                            )
-                        }
-                    }
-                    Text(
-                        item.label,
-                        color = if (active) t.tabActive else t.textTertiary,
-                        fontSize = (11 * scale).sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 3.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * 统一页面骨架：纸底 + 底部导航 + 内容，避免每个页面重复 Scaffold。
+ * 统一页面骨架：纸底 + 内容，避免每个页面重复 Scaffold。
  *
- * ⚠ 前置条件：`bottomBar` 必须是 [BusTabBar]（主导航）。动作栏（如 StickyActionBar）
- * 不是页面级导航，塞进来会吃掉内容高度 —— 当前全工程只有两个 Shell 调用本组件，两者都传 BusTabBar。
+ * 2026-10-17 起这一层**不再有 `bottomBar` 参数**：主导航换成全局悬浮胶囊（`CapsuleNav.kt`），
+ * 由根上那一处统一画、由每一屏自己登记内容（用户口径："各个主界面就是原来那些底部导航栏按钮"）。
+ * 内容底部要给胶囊让出来的高度在这里读同一个 host 算，页面自己不用记这个数。
  */
 @Composable
-fun BusScaffold(
-    bottomBar: @Composable () -> Unit = {},
-    content: @Composable (Modifier) -> Unit,
-) {
+fun BusScaffold(content: @Composable (Modifier) -> Unit) {
     val t = LocalBusTokens.current
+    val host = LocalCapsuleHost.current
     Scaffold(
         containerColor = Color.Transparent,
         contentColor = t.ink,
-        bottomBar = bottomBar,
     ) { insets ->
         Box(
             Modifier.padding(insets).consumeWindowInsets(insets).fillMaxSize(),
@@ -181,7 +73,10 @@ fun BusScaffold(
         ) {
             FluidBackground(Modifier.matchParentSize())
             Box(Modifier.widthIn(max = BusContentMaxWidth)) {
-                content(Modifier.fillMaxSize())
+                content(
+                    Modifier.fillMaxSize()
+                        .padding(bottom = if (host.actions.isEmpty()) 0.dp else capsuleReserve()),
+                )
             }
         }
     }
@@ -215,6 +110,7 @@ fun BusRouteBody(content: @Composable () -> Unit) {
     // 内容会顶进状态栏。统一在这里收口并消费掉，页面内的 BackTopBar/Signpost 不再重复避让。
     // systemBars 包含状态栏 + 导航栏；再 union ime 覆盖键盘弹起场景。
     val allInsets = WindowInsets.systemBars.union(WindowInsets.ime)
+    val host = LocalCapsuleHost.current
     Box(
         Modifier
             .fillMaxSize()
@@ -223,7 +119,12 @@ fun BusRouteBody(content: @Composable () -> Unit) {
         contentAlignment = Alignment.TopCenter,
     ) {
         FluidBackground(Modifier.matchParentSize())
-        Box(Modifier.widthIn(max = BusContentMaxWidth)) { content() }
+        // 这一屏登记了胶囊 ⇒ 内容底部让出一格（没登记就是 0，其余 20 多屏布局一字不变）
+        Box(
+            Modifier
+                .widthIn(max = BusContentMaxWidth)
+                .padding(bottom = if (host.actions.isEmpty()) 0.dp else capsuleReserve()),
+        ) { content() }
     }
 }
 

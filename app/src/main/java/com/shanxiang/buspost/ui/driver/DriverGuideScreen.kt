@@ -3,13 +3,11 @@ package com.shanxiang.buspost.ui.driver
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,10 +62,11 @@ import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusDriving
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
-import com.shanxiang.buspost.core.ui.LocalBusTouch
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.driver.Running
+import com.shanxiang.buspost.ui.common.CapsuleAction
+import com.shanxiang.buspost.ui.common.CapsuleActions
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.MapMarker
 import com.shanxiang.buspost.ui.common.RouteUnavailableState
@@ -231,6 +230,47 @@ fun DriverGuideScreen() {
         Unit
     }
 
+    /**
+     * 全览：把这一整段（含全部任务点标记）框进画面。默认关 —— 行车中要的是"跟着车走"，
+     * 停下来找人/看下一站时才按它。它只改高德的显示模式，不改算路、不改顺序。
+     */
+    var overview by remember { mutableStateOf(false) }
+
+    // 本页的功能按钮交给**全局悬浮胶囊**（用户口径："点进去具体界面的悬浮导航栏就是具体界面的功能按钮"）。
+    // 原来那条通栏底部按钮条（播报 / 结束导航）就此撤掉：高德自带面板已经关掉，屏幕下方整块还给地图。
+    // 播报开关改完必须重起一次导航才生效（高德内置播报是进程单例上的开关）—— 这里如实重起，
+    // 而不是只翻本地标签让司机以为已经静音了（这一句原先挂在 GuideBottomBar 的 onClick 里，随按钮搬过来）。
+    val voiceOn = Prefs.voiceGuidance
+    CapsuleActions(
+        listOf(
+            CapsuleAction(
+                key = "voice",
+                label = if (voiceOn) "播报已开" else "播报已关",
+                icon = if (voiceOn) BusIcons.volume else BusIcons.volumeOff,
+                onClick = {
+                    Prefs.voiceGuidance = !voiceOn
+                    engine.stopNavi()
+                    session = engine.startGpsNavi(!voiceOn)
+                },
+            ),
+            CapsuleAction(
+                key = "overview",
+                label = if (overview) "回到跟随" else "看整段",
+                icon = BusIcons.layers,
+                selected = overview,
+                enabled = phase is GuidePhase.Ready,
+                disabledReason = "还没算出路，没有整段可看",
+                onClick = { overview = !overview },
+            ),
+            CapsuleAction(
+                key = "exit",
+                label = "退出导航",
+                icon = BusIcons.back,
+                onClick = exit,
+            ),
+        ),
+    )
+
     val ready = phase is GuidePhase.Ready
     // 任务点标记：与工作台地图同一个出口（`MissionMarkers.stopMarkers`），焦点交给这一趟的终点。
     // 站表为空（逐站模式的旧调用点）时这里就是 0 个标记，画面与本轮之前一致。
@@ -247,7 +287,13 @@ fun DriverGuideScreen() {
     var topPx by remember { mutableIntStateOf(0) }
     var bottomPx by remember { mutableIntStateOf(0) }
     val topReserve = if (topPx == 0) 170.dp else with(density) { topPx.toDp() }
-    val bottomReserve = if (bottomPx == 0) 96.dp else with(density) { bottomPx.toDp() } + 8.dp
+    // 底部原来那条通栏按钮条撤了（功能按钮搬进悬浮胶囊，胶囊是浮在地图上的、不占地图高度），
+    // 所以这一格只剩"到站那一格"的高度；它没出现时就是 0，不许留一条 96dp 的空白把地图压矮。
+    val bottomReserve = when {
+        bottomPx > 0 -> with(density) { bottomPx.toDp() } + 8.dp
+        arrivedStop != null -> 84.dp
+        else -> 0.dp
+    }
 
     /**
      * 导航中把系统两条 bar 收掉（用户口径："开启自带车道级导航后尽量占全屏，去掉无用的按钮和遮挡"）。
@@ -279,6 +325,7 @@ fun DriverGuideScreen() {
                 night = nightUi || driving,
                 laneOn = Prefs.laneGuidance,
                 carUp = carUp,
+                overview = overview,
                 markers = navMarkers,
             )
             // ---- 自绘信息条（顶部）：品牌 + 下一动作 + 剩余里程/时间 + 车道 ----
@@ -298,10 +345,8 @@ fun DriverGuideScreen() {
                 laneText = if (!Prefs.laneGuidance) guidanceSwitchOffText("车道级指引", "已关闭")
                 else laneDisplayTextOf(laneFrame),
                 recalcText = engineRecalcTextOf(recalc),
-                onExit = exit,
             )
-            // ---- 底部：到站那一格（高德说的）+ 语音 / 结束 ----
-            // 两块合在一个容器里量高度：分开量就要各留一段 padding，而这一屏的地图尺寸是"夹在两条之间"算出来的。
+            // ---- 底部：只剩"到站那一格"（高德说的）。语音 / 结束两格搬进悬浮胶囊，不再占通栏 ----
             Column(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomPx = it.height },
             ) {
@@ -311,17 +356,6 @@ fun DriverGuideScreen() {
                         onGoWorkbench = exit,
                     )
                 }
-                GuideBottomBar(
-                    voiceOn = Prefs.voiceGuidance,
-                    onToggleVoice = { on ->
-                        Prefs.voiceGuidance = on
-                        // 高德内置播报是进程单例上的开关，改完必须重起一次导航才生效；
-                        // 这里如实重起，而不是只改本地开关让司机以为已经静音了。
-                        engine.stopNavi()
-                        session = engine.startGpsNavi(on)
-                    },
-                    onStop = exit,
-                )
             }
             (session as? NavigationSession.Refused)?.let { refused ->
                 // 算路过了但 startNavi 被拒：这一条同样要露出来，不能静默停在"看着像在导"
@@ -418,6 +452,7 @@ private fun AmapNaviSurface(
     night: Boolean,
     laneOn: Boolean,
     carUp: Boolean,
+    overview: Boolean,
     markers: List<MapMarker>,
 ) {
     var failed by remember { mutableStateOf<String?>(null) }
@@ -450,7 +485,7 @@ private fun AmapNaviSurface(
                             override fun onMapTypeChanged(type: Int) = Unit
                             override fun onNaviViewShowMode(mode: Int) = Unit
                         })
-                        applyNaviOptions(v, night = night, laneOn = laneOn, carUp = carUp)
+                        applyNaviOptions(v, night = night, laneOn = laneOn, carUp = carUp, overview = overview)
                         v.onResume()
                         viewRef = v
                     }
@@ -464,7 +499,7 @@ private fun AmapNaviSurface(
                 // 夜间 / 车道 / 视角都是"运行中也要跟着改"的：update 里重设一次，
                 // 免得司机关掉车道开关后导航页还画着车道放大图、切了视角标签却不跟着转。
                 runCatching {
-                    (v as? AMapNaviView)?.let { applyNaviOptions(it, night = night, laneOn = laneOn, carUp = carUp) }
+                    (v as? AMapNaviView)?.let { applyNaviOptions(it, night = night, laneOn = laneOn, carUp = carUp, overview = overview) }
                 }
             },
         )
@@ -549,7 +584,7 @@ private fun AmapNaviSurface(
  * `setNaviNight` / `setCompassEnabled`），视角走 `AMapNaviView.setNaviMode` +
  * `setShowMode`（常量 `CAR_UP_MODE=0` / `NORTH_UP_MODE=1` / `SHOW_MODE_LOCK_CAR=1`，同样是 javap 取的值）。
  */
-private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, carUp: Boolean) {
+private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, carUp: Boolean, overview: Boolean) {
     val o: AMapNaviViewOptions = v.viewOptions ?: AMapNaviViewOptions()
     o.isLaneInfoShow = laneOn              // 车道放大图 —— "车道级"三个字在本页的落点
     o.isRealCrossDisplayShow = true        // 路口放大图（真实投影）
@@ -564,9 +599,18 @@ private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, c
     o.isScreenAlwaysBright = true          // 导航中屏幕常亮：不该出现"屏黑了要再点一下"
     o.isNaviNight = night
     o.setCompassEnabled(true)              // 指南针（同为装箱 Boolean）
+    // 高德自带的那套面板（顶部的转向卡 + 底部的"退出 / 全程 / 还有多远"条）**关掉**：
+    // 用户口径是"导航沉浸式、本页功能按钮进悬浮胶囊"，而真机截图里"退出"出现了两次、
+    // 高德底栏的到达时间被我们自己的按钮条压掉半截。关的是它的面板，不是引导信息 ——
+    // 转向、剩余里程/耗时、车道、路口放大图全部由本页自绘条与胶囊给（数据同源：引擎回调）。
+    o.isLayoutVisible = false
     v.viewOptions = o
     v.setNaviMode(if (carUp) AMapNaviView.CAR_UP_MODE else AMapNaviView.NORTH_UP_MODE)
-    v.setShowMode(AMapNaviViewShowMode.SHOW_MODE_LOCK_CAR)
+    // 全览 = 把这一整段的任务点都框进画面（胶囊上那一格给的就是这个）；否则跟着车标走
+    v.setShowMode(
+        if (overview) AMapNaviViewShowMode.SHOW_MODE_DISPLAY_OVERVIEW
+        else AMapNaviViewShowMode.SHOW_MODE_LOCK_CAR,
+    )
 }
 
 /**
@@ -584,11 +628,9 @@ private fun GuideTopStrip(
     frame: NavigationGuidance?,
     laneText: String,
     recalcText: String,
-    onExit: () -> Unit,
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
-    val touch = LocalBusTouch.current
     Column(
         modifier
             .fillMaxWidth()
@@ -626,19 +668,8 @@ private fun GuideTopStrip(
                     )
                 }
             }
-            // 退出按钮：**实心白底 + 深色字**（对比度稳、驾驶中一眼能认），并吃满触控下限
-            Text(
-                "退出",
-                color = t.primaryDark,
-                fontSize = (14 * scale).sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(BusRadius.pill))
-                    .background(Color.White)
-                    .clickable(onClick = onExit)
-                    .defaultMinSize(minWidth = touch.min, minHeight = touch.min)
-                    .padding(horizontal = 18.dp),
-            )
+            // 这一格原来是一颗白底"退出"药丸。2026-10-17 撤掉：本页的功能按钮统一进**全局悬浮胶囊**
+            // （播报 / 看整段 / 退出导航），顶条只负责信息 —— 真机截图里"退出"同时出现两次的样子不像导航，像调试页。
         }
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.Bottom) {
@@ -784,48 +815,6 @@ private fun GuideArrivedCard(arrived: ArrivedStop, onGoWorkbench: () -> Unit) {
     }
 }
 
-/**
- * 底部条：**只留两格**（播报 / 结束导航）。
- *
- * 原来第三格是"车头朝上 / 正北朝上"的视角切换。摘掉它的理由不是嫌挤：
- * 用户口径是"导航尽量占全屏、去掉无用的按钮和遮挡"，而这一格在驾驶中是**唯一会改地图视角**的控件 ——
- * 行车途中误触一下，整屏方向翻转，比少一个选项贵得多。视角仍然固定车头朝上（`carUp` 恒为 true，
- * 走 `applyNaviOptions` 落到底层 `setNaviMode`），也就是说这一格从来不是一个"功能"，
- * 只是一个会把功能调坏开关。
- */
-@Composable
-private fun GuideBottomBar(
-    modifier: Modifier = Modifier,
-    voiceOn: Boolean,
-    onToggleVoice: (Boolean) -> Unit,
-    onStop: () -> Unit,
-) {
-    val t = LocalBusTokens.current
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(t.card)
-            .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BusButton(
-            text = if (voiceOn) "播报已开" else "播报已关",
-            icon = if (voiceOn) BusIcons.volume else BusIcons.volumeOff,
-            variant = if (voiceOn) BusButtonVariant.CLAY else BusButtonVariant.OUTLINE,
-            modifier = Modifier.weight(1f),
-            onClick = { onToggleVoice(!voiceOn) },
-        )
-        BusButton(
-            text = "结束导航",
-            icon = BusIcons.stopCircle,
-            variant = BusButtonVariant.DANGER,
-            modifier = Modifier.weight(1f),
-            onClick = onStop,
-        )
-    }
-}
 
 private fun fmtMeters(meters: Int): String = when {
     meters <= 0 -> "0 米"

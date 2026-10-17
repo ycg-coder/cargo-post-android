@@ -86,6 +86,8 @@ import com.shanxiang.buspost.data.repo.Repo
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.ui.common.BackTopBar
 import com.shanxiang.buspost.ui.common.BusMap
+import com.shanxiang.buspost.ui.common.CapsuleAction
+import com.shanxiang.buspost.ui.common.CapsuleActions
 import com.shanxiang.buspost.ui.common.DemoNote
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.MapMarker
@@ -408,6 +410,17 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
     var mapFailed by remember { mutableStateOf(false) }
     // 收藏状态变化后触发重组（Prefs 不是 State，需要手动驱动 UI 刷新）
     var favTick by remember { mutableStateOf(0) }
+
+    // 本页的功能按钮交给全局悬浮胶囊。
+    // ⚠ 「返回」这一格是补的洞：这一屏从来没有可见的退出口（判据 BA-c 把 BUS 记成"底部标签"豁免，
+    //   而它其实是从首页**推**进来的一屏），底部 tab 撤掉之后这里只剩系统返回手势。
+    // 「刷新」与头部那颗图标是**同一个实现**（`vm.load`）的两个入口，不是两套口径。
+    CapsuleActions(
+        listOf(
+            CapsuleAction("back", "返回", BusIcons.back, onClick = { nav.popBackStack() }),
+            CapsuleAction("refresh", "刷新", BusIcons.refresh, onClick = { vm.load(context) }),
+        ),
+    )
 
     // 运行时定位授权 —— 用户端以前**从没申请过**（`RequestPermission` 只在司机端工作台出现），
     // 而未授权时高德画不出蓝点、`Locator.once` 也拿不到点 ⇒ "地图不显示我的位置"是两件事叠出来的。

@@ -11,8 +11,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.ui.common.BusScaffold
-import com.shanxiang.buspost.ui.common.BusTabBar
-import com.shanxiang.buspost.ui.common.TabItem
+import com.shanxiang.buspost.ui.common.CapsuleAction
+import com.shanxiang.buspost.ui.common.CapsuleActions
 
 /**
  * 司机端四 tab（2026-10-10 调整）：工作台 · 我的路线 · 我的收益 · 我的。
@@ -28,15 +28,16 @@ import com.shanxiang.buspost.ui.common.TabItem
 fun DriverShell() {
     var selected by rememberSaveable { mutableStateOf(0) }
     val unread by AppState.driverUnread.collectAsStateWithLifecycle()
+    // 主导航的四个格子交给**全局悬浮胶囊**（原来是贴在屏幕底下的那条 tab 栏）。
+    // 单一真值就在这一份列表里：切哪一格、哪一格亮、有几条未读，都只有这一个出处。
     val items = listOf(
-        TabItem("工作台", BusIcons.flag, badge = unread),
-        TabItem("我的路线", BusIcons.route),
-        TabItem("我的收益", BusIcons.money),
-        TabItem("我的", BusIcons.person),
+        CapsuleAction("workbench", "工作台", BusIcons.flag, onClick = { selected = 0 }, selected = selected == 0, badge = unread),
+        CapsuleAction("routes", "我的路线", BusIcons.route, onClick = { selected = 1 }, selected = selected == 1),
+        CapsuleAction("earnings", "我的收益", BusIcons.money, onClick = { selected = 2 }, selected = selected == 2),
+        CapsuleAction("mine", "我的", BusIcons.person, onClick = { selected = 3 }, selected = selected == 3),
     )
-    BusScaffold(bottomBar = {
-        BusTabBar(items, selected) { selected = it }
-    }) { modifier ->
+    CapsuleActions(items)
+    BusScaffold { modifier ->
         Column(modifier.fillMaxSize()) {
             when (selected) {
                 0 -> WorkbenchScreen()

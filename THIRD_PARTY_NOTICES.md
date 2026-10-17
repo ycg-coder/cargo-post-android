@@ -453,7 +453,7 @@ DEPENDENCY_FAILURE **4** · ENVIRONMENT_FAILURE **6** · DEVICE_UNAVAILABLE **3*
 
 ⚠ **对 ⑦/⑧ 那笔"OSM 署名欠账"的更正（历史行不删，只在此更正）**：⑧ 段写的 `grep -rni "openstreetmap" app/src/main` 实测 **0**、
 `odbl` 实测 **0**，是 ⑭ 之前的真实状态；⑭ 落地后同一条命令实测 **各 3 命中**（`core/about/OpenSourceCredits.kt:27/:28/:76` 与 `:29`、
-`ui/BusPostRoot.kt:131`、`ui/user/OssLicensesScreen.kt:29`），APK 内 `© OpenStreetMap contributors` 与 `ODbL` 两串各实测 **2 次**（dex；`resources.arsc` 0 次）。
+`ui/BusPostRoot.kt:135`、`ui/user/OssLicensesScreen.kt:29`），APK 内 `© OpenStreetMap contributors` 与 `ODbL` 两串各实测 **2 次**（dex；`resources.arsc` 0 次）。
 ⇒ 那笔欠账在**源码与字节**两侧都已消；但**界面是否真渲染出来仍是 `DEVICE_VERIFIED` 未到位**（⑪ 实测 0 台设备），这条不能顺带写成已验证。
 
 本轮 APK 侧读数（`:app:assembleDebug` rc=0，实测 10:50:46）：**114,447,105 B**、`classes*.dex` **16** 个、打包类(defined) **29,816**、

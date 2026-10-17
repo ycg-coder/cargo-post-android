@@ -24,6 +24,7 @@ BS="$SRC/ui/user/BusScreen.kt"
 BSD="$SRC/ui/user/BusDetailSlot.kt"
 DMS="$SRC/ui/driver/DriverMessagesScreen.kt"
 TB="$SRC/ui/common/TabBar.kt"
+CNV="$SRC/ui/common/CapsuleNav.kt"
 T=app/src/test/java/com/shanxiang/buspost/nav/ShellRoutingContractTest.kt
 T2=app/src/test/java/com/shanxiang/buspost/nav/RouteDomainDeepLinkTest.kt
 NC='(^|[0-9]+:)[[:space:]]*(\*|//)'
@@ -136,7 +137,10 @@ SO_IME=$(grep -n 'systemBars\.union(WindowInsets\.ime)' "$TB" | grep -vE "$NC" |
 #   awk 继续往下扫到 `composable(Routes.SEND) { … BusRouteBody { … } }` 又数到 1 ⇒ 负控 SR-o2 实测**不红**
 #   （本轮亲眼看它灰掉一次）。现在遇到下一条 `composable(` 就停，破口才只落在登录那一格里。
 SO_LOGIN=$(awk '/composable\(Routes\.LOGIN\) \{/{f=1; next} f && /composable\(/{exit} f && !/^[[:space:]]*(\/\/|\*)/ && /BusRouteBody \{/{c++; exit} END{print c+0}' "$RT")
-SO_TAB=$(grep -n 'windowInsetsPadding(WindowInsets\.navigationBars)' "$TB" | grep -vE "$NC" | wc -l | tr -d ' ')
+# 2026-10-17（D-156）：底栏从 TabBar.kt 的通栏 BusBottomBar 搬进了悬浮胶囊，形状从
+# `windowInsetsPadding(WindowInsets.navigationBars)` 换成等价的 `.navigationBarsPadding()`。
+# 钉的还是同一件事：这一栏只吃手势条、不把 ime 并进来（改它要连内容侧的让位一起重做）。
+SO_TAB=$(grep -n '\.navigationBarsPadding()' "$CNV" | grep -vE "$NC" | wc -l | tr -d ' ')
 
 echo "SR-a 壳路由用例条数        = $SA （目标 ≥10）"
 echo "SR-b startDestinationFor 调用/残留 when = $SB/$SB2 （目标 1/0）"
@@ -198,7 +202,7 @@ fail=0
 [ "$SN2" -ge 19 ] || { echo "× SR-n2 两本路由用例合计少于 19 条"; fail=1; }
 [ "$SO_IME" = 1 ] || { echo "× SR-o 壳里不再并 ime：键盘一弹，输入密集屏的主操作就会被盖住（真机实测过的那条，不是假想）"; fail=1; }
 [ "$SO_LOGIN" = 1 ] || { echo "× SR-o2 登录路由退出 BusRouteBody：它是全工程输入最密的一屏，退出等于把那个 P0 原样放回去"; fail=1; }
-[ "$SO_TAB" = 1 ] || { echo "× SR-o3 底栏那一处 navigationBars-only 形状变了（现 $SO_TAB）：并进来就同轮改这条注释与 D-069 §3 的口径，不许让它悄悄变 0"; fail=1; }
+[ "$SO_TAB" = 1 ] || { echo "× SR-o3 悬浮胶囊那一处 navigationBars-only 形状变了（现 $SO_TAB）：并进来 ime 就同轮改这条注释与 D-069 §3 的口径，变 0 就是这一栏不再避让手势条"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "壳路由判据通过"; else echo "壳路由判据失败"; fi
 exit "$fail"
