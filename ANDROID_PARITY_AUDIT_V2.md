@@ -3272,7 +3272,7 @@ UI/服务侧按"取消从哪来"分三种收法（`attempt {}` 替换挂起形�
 ① **`apiCall` 仍是"已存在但没人用"**：生产调用点实测 **0**（判据里 Z1=1 是它自己的定义行）。
    §七 点名要的 unified helper 我立的是 `attempt{}`，因为它的用场超出网络层；`apiCall` **没删**（删它要动 `ApiTest` 那条用例，是减量不是收口）。
 ② **`runCatching` 在 main 里仍剩 34 处**（Z2 只打数不判红）：本轮只收了"try 里有挂起点"的那一批（TH-g 七个点名形状 → 0），
-   其余（如 `WorkbenchScreen.kt:1770` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
+   其余（如 `WorkbenchScreen.kt:1774` 的 `callDriver`，纯同步 `startActivity`）**没有挂起通路 ⇒ 不在本轮缺陷范围内**，
    照实记为"未收"而不是"已判无害"。
 ③ **§二十 的 Worker 重试语义没做**：真失败该回 `Result.retry` 而不是 `success` —— 本轮只收了"取消不许谎报这一轮跑过了"（TH-j）。
 ④ **失败四类分型（§三十三 SOURCE/DEPENDENCY/ENVIRONMENT/DEVICE_UNAVAILABLE）没落进代码**：

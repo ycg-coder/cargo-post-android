@@ -81,7 +81,7 @@ sub "$GD" '            .glassmorphic(
                 shadowElevation = BusElevation.floating,
                 tint = if (t.isDark) t.cardWarm else t.goldLight,
             )' '            .background(t.goldLight)'
-expect_red "NC-4 到站格退回实色" "× GL-b 五个浮面缺一个"
+expect_red "NC-4 到站格退回实色" "× GL-b 四个标准浮面缺一个"
 
 # NC-5 通栏条自己抄一份玻璃 alpha → GL-d 红
 ins "$TB" '            .glassSheen(t, topShape)' '            val why = tint.copy(alpha = if (t.isDark) 0.88f else 0.93f)'
@@ -94,6 +94,10 @@ expect_red "NC-6 深色主题用了浅色那道白边" "× GL-e 深浅两档高�
 # NC-7 判据没有输入（玻璃那一份实现被搬走）→ fail-closed rc=2
 rm -f "$FB"
 expect_red "NC-7 缺 FluidBackground" "× 缺" 2
+
+# NC-8 工作台通栏条用回标准玻璃（背后会滚的正文就会从按钮后面透出来）→ GL-b 红
+sub "$TB" '.glassBar(t, shape = topShape, tint = if (t.isDark) t.cardWarm else t.card)' '.glassmorphic(t, shape = topShape, shadowElevation = 8.dp, tint = if (t.isDark) t.cardWarm else t.card)'
+expect_red "NC-8 通栏条退回标准透明度" "× GL-b 工作台通栏条没走 glassBar 那一档"
 
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1
