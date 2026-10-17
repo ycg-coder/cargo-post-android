@@ -67,6 +67,16 @@ class CapsuleNavContractTest {
     }
 
     @Test
+    fun `格子有等宽下限 短文案那一格不跟着内容缩`() {
+        // 两格的胶囊（选点屏 / 实时公交）以前按内容长：一格七个字、一格"刷新"，整枚歪着。
+        // 这一条钉的是**观感那一半**：宽度下限要撑得住四个汉字 + 图标，且不跟着文案长短抖。
+        assertTrue(
+            "格子宽度下限要 ≥76dp（现 $CAPSULE_CELL_MIN_WIDTH_DP），否则短文案那一格会缩成一条",
+            CAPSULE_CELL_MIN_WIDTH_DP >= 76,
+        )
+    }
+
+    @Test
     fun `一屏不登记就没有这一栏`() {
         assertTrue("空登记必须收成空列表（画出来就是一条空槽占屏幕）", capsuleItemsOf(emptyList()).isEmpty())
         assertEquals(0, capsuleDropped(emptyList()))

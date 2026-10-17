@@ -101,5 +101,13 @@ sub "$CT" '    @Test
     fun `一屏不登记就没有这一栏`() {' '    fun `一屏不登记就没有这一栏`() {'
 expect_red "NC-7 用例条数变了" "× CN-g 契约用例不是 6 条"
 
+# NC-8 格子等宽下限被压回触控下限（短文案那一格又跟着内容缩）→ CN-h 该红
+sub "$CN" 'internal const val CAPSULE_CELL_MIN_WIDTH_DP = 76' 'internal const val CAPSULE_CELL_MIN_WIDTH_DP = 48'
+expect_red "NC-8 格子宽度下限被压小" "× CN-h 格子下限被压到"
+
+# NC-9 有人在页面自己定格子宽度（第二套观感口径）→ CN-h 该红
+ins "$BS" 'private const val LINE_CARDS_MAX = 8' 'private val cellMin = CAPSULE_CELL_MIN_WIDTH_DP.dp'
+expect_red "NC-9 页面自己抄格子宽度" "× CN-h 有"
+
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1

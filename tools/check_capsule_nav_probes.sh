@@ -8,7 +8,8 @@
 #   CN-d 以前被 BA-c 豁免掉、其实没有可见退出口的两屏（BUS / DRIVER_GUIDE）现在各有一格；
 #   CN-e 三条收口规则（上限 / 必须有标签 / 禁用必须带原因）只有 capsuleItemsOf 这一份实现；
 #   CN-f 车道级导航那一屏：高德自带面板关掉、重复的"退出"药丸与通栏底部按钮条撤掉；
-#   CN-g 契约用例条数（下限等于现读）。
+#   CN-g 契约用例条数（下限等于现读）；
+#   CN-h 格子等宽下限（观感那一半）：一份定义、一处使用、不低于 76dp、且不许有第二处在别处定宽度。
 #
 # ⚠ 本簿每一条 `grep -r` 都要过"去注释"这一道（D-156 第一轮就被自己的注释顶红四次：
 #   注释里写一句 `CapsuleActions(...)` 就被数成一个登记点）。判据认的是代码形状，不是散文。
@@ -69,13 +70,19 @@ CF_ONEXIT=$(one_count 'onExit' "$GD")
 CF_BAR=$(one_count 'GuideBottomBar' "$GD")
 
 # CN-g 用例条数
+# CN-h 格子等宽下限（观感那一半）：常量一份、用在 defaultMinSize 一处、且不低于触控下限
+CH_DEF=$(one_count '^internal const val CAPSULE_CELL_MIN_WIDTH_DP' "$CN")
+CH_USE=$(one_count 'minWidth = CAPSULE_CELL_MIN_WIDTH_DP.dp' "$CN")
+CH_NUM=$(grep -oE 'CAPSULE_CELL_MIN_WIDTH_DP = [0-9]+' "$CN" | grep -oE '[0-9]+$' | head -1)
+CH_OUT=$(grep -rn 'CAPSULE_CELL_MIN_WIDTH_DP' "$M" --include=*.kt | grep -v 'CapsuleNav.kt' | wc -l | tr -d ' ')
+
 CG=$(grep -c '^    @Test' "$CT")
 
 fail=0
 
 [ "$CA_DEF" = 1 ] || { echo "× CN-a 胶囊实现不是恰好一份（现 $CA_DEF）：两处实现就会长成两套答案"; fail=1; }
 [ "$CA_USE" = 1 ] || { echo "× CN-a 根上画它的地方不是恰好一处（现 $CA_USE）：多一处就是屏幕上会叠两条"; fail=1; }
-[ "$CB_REG" = 5 ] || { echo "× CN-b 登记胶囊的屏数不是 5（现 $CB_REG，预期 两个壳 + BusScreen + DriverGuideScreen + MapPointPickerScreen）：新增一屏要同轮登记，撤一屏要写理由"; fail=1; }
+[ "$CB_REG" = 5 ] || { echo "× CN-b 登记胶囊的屏数不是 5（现 $CB_REG，预期 两个壳 + BusScreen + DriverGuideScreen + MapPointPickerScreen）：新增一屏要同轮登记并写清"为什么这一屏的动作非浮不可"，撤一屏要写理由"; fail=1; }
 [ "$CB_HOST" = 1 ] || { echo "× CN-b 根上没有提供那一份共享状态（现 $CB_HOST）：页面登记了也没人画"; fail=1; }
 [ "$CC_TABBAR" = 0 ] || { echo "× CN-c 旧的通栏底部 tab 又出现 $CC_TABBAR 处：主导航只许有悬浮胶囊一份（正对照 CN-c 的 $CC_PROOF）"; fail=1; }
 [ "$CC_BOTTOM" = 0 ] || { echo "× CN-c bottomBar 还在代码里（现 $CC_BOTTOM）：BusScaffold 的底部槽位已撤，留着就是有人往 Scaffold 里塞第二条栏"; fail=1; }
@@ -87,7 +94,10 @@ fail=0
 [ "$CF_LAYOUT" = 1 ] || { echo "× CN-f 高德自带面板没关掉（现 $CF_LAYOUT）：它的「退出 / 全程 / 到达时间」会跟我们的胶囊抢同一块地方"; fail=1; }
 [ "$CF_ONEXIT" = 0 ] || { echo "× CN-f 顶条那颗重复的退出药丸回来了（现 $CF_ONEXIT 处 onExit）：出口只许在胶囊那一处"; fail=1; }
 [ "$CF_BAR" = 0 ] || { echo "× CN-f 通栏底部按钮条 GuideBottomBar 又出现在代码里（现 $CF_BAR）：功能按钮只许在悬浮胶囊里"; fail=1; }
-[ "$CG" = 6 ] || { echo "× CN-g 契约用例不是 6 条（现 $CG）：下限等于现读，改了要连同本行一起改"; fail=1; }
+{ [ "$CH_DEF" = 1 ] && [ "$CH_USE" = 1 ]; } || { echo "× CN-h 格子等宽下限不是"一份定义 + 一处使用"（现 $CH_DEF/$CH_USE）：两处写法就会有一处漏掉，两格的胶囊又会歪"; fail=1; }
+[ "${CH_NUM:-0}" -ge 76 ] || { echo "× CN-h 格子下限被压到 $CH_NUM dp（要 ≥76）：低于这个数，短文案那一格就跟着内容缩，整枚胶囊歪"; fail=1; }
+[ "$CH_OUT" = 0 ] || { echo "× CN-h 有 $CH_OUT 处在 CapsuleNav 之外引用格子宽度：一屏自己改宽度就没有统一观感了"; fail=1; }
+[ "$CG" = 7 ] || { echo "× CN-g 契约用例不是 7 条（现 $CG）：下限等于现读，改了要连同本行一起改"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "悬浮胶囊判据通过（实现 $CA_DEF / 画它 $CA_USE / 登记 $CB_REG 屏 / 旧通栏 $CC_TABBAR / 反证 $CC_PROOF / 用例 $CG）"; else echo "悬浮胶囊判据失败"; fi
 exit "$fail"

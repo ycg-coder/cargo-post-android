@@ -197,7 +197,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 | 标记已读 | `api.js:422` `?id=` | `Repo.kt:685`（query ✔） | `@PutMapping("/read") @RequestParam("id")` | `REAL_COMPLETE` |
 | 全部已读 | `api.js:427` body `{orderId}` | `Repo.kt:687-688` query `orderId`（可选） | `:58-61 @RequestParam(required=false)` | `REAL_COMPLETE` |
 | 司机消息 / 未读 / 已读 | `api.js:471/476/481` | `Repo.kt:1017-1032`（⑥ 后行号，原 `:992-1007`；三处都改走 `driverIdParam()`） | `AppDriverController.java:226-240` | `REAL_PARTIAL`（未读裸数字同 §22）→§23 |
-| 角标状态写入 | 单一来源（`unread-count`） | `AppState.unread` 被 3 处写入：`AlertEngine.kt:26`（列表计数，**正确**）vs `ParcelScreen.kt:86`/`NotificationScreen.kt:102`（`Repo.unreadCount()`，**恒 0**） | `/notification/page` 的 `readStatus` + `/notification/unread-count` 裸 Long | `CONTRACT_MISMATCH`（谁最后写谁赢）→§52 |
+| 角标状态写入 | 单一来源（`unread-count`） | **2026-10-18 按现状重写**：`AppState.unread` 只有 `reportUserUnread`(`AppState.kt:223`) 一个写入函数，调用点 `AlertEngine.kt:40`（列表+标量）、`ParcelScreen.kt:100`（**只给标量**）、`NotificationScreen.kt:109`（列表+标量）；发现时的形态是"三处各写各的、谁最后写谁赢" | `/notification/page` 的 `readStatus` + `/notification/unread-count` 裸 Long | 已收口，剩 `ParcelScreen.kt:100` 依赖裸标量 →§52 |
 
 ---
 
@@ -423,7 +423,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **当前行为**：OkHttp 拿到 `{"code":0,"data":12}` 时，`root.opt("data")` 是一个 **JSON number/boolean/String**（不是对象也不是数组），`toPayload` 把它塞进 `{"v":12}`。而 `Payload.str/multiStr/multiNum` 只认业务键名，不认 `v` → 一律返回默认值。
 - **后端真实行为**：`AppNotificationController.java:44-48` 是 `CommonResult<Long> unreadCount()`（裸数字）；`AppFileController.java:34-38` 是 `CommonResult<String> uploadFile(...)`（**裸 URL 字符串**）；`AppDriverController.java:239-243` 是 `CommonResult<Long> messagesUnreadCount`。这些都是 yudao `CommonResult<T>` 的正常形态。
 - **小程序行为**：`api.js:417`/`api.js:486-492` 直接把 `res` 当数字 / 当 URL 字符串用（小程序封装里 `resolve(res.data)` 不做对象假设），所以它一直是对的。
-- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:99`、`NotificationScreen.kt:102`、`AlertEngine.kt:40` 三处写入）里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
+- **问题**：① 未读角标**永远 0**：`AppState.unread`（`ParcelScreen.kt:100`、`NotificationScreen.kt:109`、`AlertEngine.kt:40` 三处写入（**发现时的行号已漂，2026-10-18 按真位改；这三处后来收成 `AppState` 里的一个合并器（真位见 §52 那一格）**））里前两处走 `Repo.unreadCount()`，恒 0 → 首页"消息"红点永不出现，用户收不到"货主待客户操作"这类提醒；② **上传 URL 永远空**：`HandoverScreen.confirm`(`:121-126`) 拿到 `url = ""`，`photoUrl` 传空串给 `Repo.confirmHandover`，后端 `HandoverServiceImpl.java:222-223` 见空就**不写 photoUrl** → 交接凭证照片实际从未入库，而 UI 显示"交接已提交后端"。这是"看起来成功、数据没落库"的双层失真，比报错更坏。
 - **修改方案**：在 `Payload` 上补一个**标量出口**，而不是去改后端信封（硬规则：不重设计后端）：
   1. `Payload` 增 `val scalar: Any?` 与 `fun scalarStr(vararg fallback: String): String` / `fun scalarNum(): Double`，`toPayload` 的非对象/非数组分支同时填 `scalar` 与保留 `{"v"}`（旧调用点不破，符合"不删字段保兼容"）；
   2. `Repo.unreadCount` 改 `p.scalarNum().ifEmpty{ multiNum("count","unreadCount") }` 口径：先标量、后对象键；`Repo.uploadPhoto` 改先 `scalarStr()`（即后端裸 String），再退回 `url/fileUrl`；`Repo.kt:1039` 同步；
@@ -480,7 +480,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   - **未绑定不请求**：`driverIdParam()` 在 `driverId <= 0` 时抛 `DriverUnboundException`，`runCatching` 吞掉后返回 null，请求根本不上网络。测试实测 `server.requestCount == 0`（`ScalarEnvelopeContractTest.司机未绑定角标时一个请求都不发`）；判定条件是"请求数"这种外部行为，不是"返回 null"这种自说自话。
   - 绑定后带后端授予的 driverId：`/driver/messages/unread-count?driverId=61` 断言在 URL 上，值 61 来自 `/driver/profile` 而不是本机猜测。
   - "显示未绑定而不是 0"这一条：角标侧不虚构（null → 保持上一个值，未绑定态初值 0 ⇒ tab 无红点，等于"没有可信提醒"而不是"后端说没有提醒"）；数据侧 `WorkbenchScreen.kt:292` 的 `error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()` 里 `driverTasks()`/`routeGuide()` 未绑定时返回 `DRIVER_UNBOUND`，首页仍显示"未绑定司机档案：后端没有该账号的 driverId，请联系站点核对工号"。**没做**：`/driver/profile` 与 `/driver/shifts` 按后端契约是登录态识别、不受守卫，所以未绑定时首页确实能拿到 profile 的 0 件数据 —— 这是后端口径，不是客户端缺陷。
-  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:37/47` 与 `DriverMessagesScreen.kt:99/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
+  - "本地提醒与未读数合并显示"：tab 角标与系统通知都读 `AppState.driverUnread`（`DriverShell.kt:25`），`AlertEngine.kt:37/47` 与 `DriverMessagesScreen.kt:103/107` 都通过 `reportDriverUnread(serverCount, listCount)` 单一入口写入（见 §52）。
 
 ---
 
@@ -634,7 +634,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 
 **本轮复核（P1-2 ⑥，2026-09-29）：状态不变，但把"空转范围"量出来了**
 `Bits.kt:46` 的 `DemoNote` 体内首行仍是裸 `return`（横幅实现整段注释），调用点实测 **24 处**：司机侧 6 处
-（`DriverMessagesScreen.kt:127`、`DriverNavScreen.kt:221`、`EarningsScreen.kt:84`、`HandoverScreen.kt:187`、`RoutesScreen.kt`、`WorkbenchScreen.kt`）
+（`DriverMessagesScreen.kt:129`、`DriverNavScreen.kt:221`、`EarningsScreen.kt:84`、`HandoverScreen.kt:187`、`RoutesScreen.kt`、`WorkbenchScreen.kt`）
 + 用户侧 18 处。所以"司机端把用户域演示态带进来"这一疑虑的正解是：**两个域的演示态都不可见**，同一条根因。
 不依赖 `DemoNote` 的写操作回执仍正常（`HandoverScreen.kt:66-67`、`RoutesScreen.kt:103` 的"演示模式：未提交后端"），
 这说明修法只要恢复 `DemoNote` 渲染就能一次覆盖 24 处，不必逐页改。**本轮未动**：属演示诚实性而非分域（硬规则 1），
@@ -1137,8 +1137,8 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`CONTRACT_MISMATCH`（P1，§22 的连带后果）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/notify/AlertEngine.kt`、`ui/user/ParcelScreen.kt`、`ui/user/NotificationScreen.kt`
-- **类 / 函数**：`AlertEngine.check`(`:24-25` `AppState.unread.value = msgs.items.count { !it.read }`)；`ParcelScreen.kt:86` 与 `NotificationScreen.kt:102` `AppState.unread.value = Repo.unreadCount()`（**恒 0**，见 §22）；`AppState.driverUnread` 同理（`:36`/`:41` 用列表计数，`Repo.kt:1039` 用恒 0 标量）
-- **当前行为**：`AppState.unread` 是全局 `MutableStateFlow`，被 3 处写入。用列表计数的写法是**正确**的（后端 `AppNotificationRespVO.readStatus` 是 Integer，`NotifyMsg.parse`(`Models.kt:920`) 已正确兼容）；用 `Repo.unreadCount()` 的写法恒得 0。
+- **类 / 函数**（2026-10-18 按现状重写：这一格原来是"三处直写 `AppState.unread.value`、谁最后写谁赢"，§52 那轮已经收成一个合并器）：写入唯一入口 `AppState.reportUserUnread`(`AppState.kt:223`) 与 `AppState.reportDriverUnread`(`AppState.kt:228`)，两者都走 `reportUnread`(`AppState.kt:238`)；调用点 `AlertEngine.kt:40`、`ParcelScreen.kt:100`、`NotificationScreen.kt:109`、`DriverMessagesScreen.kt:101`。
+- **当前行为**：`AppState.unread` / `AppState.driverUnread` 各只有一个写入函数。合并规则是 `serverCount`（后端 `unread-count`，全量真值）与 `listCount`（本页列表数出的未读）取 **max**，两个都读不到时返回 null ⇒ **保持原值**，"这次没读到"绝不写成 0（红点自己闪没就是这么来的）；不与上一次取 max，否则读完消息角标降不下来。`ParcelScreen.kt:100` 只给 `serverCount`、`listCount` 传 null，是本机唯一"标量单独说话"的一处 —— 它依赖 §22 那个裸 `Long` 接口，后端返回 0 时角标就是 0（这一格仍未消除，见 §22）。
 - **后端真实行为**：`/notification/unread-count` 给裸 `Long`（§22）；`/notification/page` 给 `PageResult{list,total}`，`total` 是**全量未读+已读**总数，不能当未读用。
 - **小程序行为**：`api.js:417` 用裸数字，配合 `handle401` 重放，值是对的。
 - **问题**：谁最后写谁赢 —— 用户从首页进消息中心（`NotificationScreen` 写 0）再退回，角标消失；20 秒轮询的 `AlertEngine` 又把它写回真实值。表现是"红点会自己闪没"，很难复现，因此一直没人当 bug 报。司机侧 `AppState.driverUnread` 同样两条写入路径（`AlertEngine:36` 列表计数 vs `Repo:1003` 标量 0）。
