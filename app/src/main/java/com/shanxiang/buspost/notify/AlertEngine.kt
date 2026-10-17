@@ -4,6 +4,7 @@ import android.content.Context
 import com.shanxiang.buspost.core.AppDomain
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.data.repo.Repo
+import com.shanxiang.buspost.data.repo.weatherTipsFor
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
 import kotlinx.coroutines.CancellationException
@@ -150,6 +151,10 @@ object AlertEngine {
      * 于是常驻司机端的司机一次都收不到恶劣天气推送，而「我的→设置」里那条开关照样摆着。
      * 提出来同时保住两件单一：开关只有一个读点，4 小时去重与"天况变了立即推"的时钟也只有一份
      *（复制成两份就会变成同一个问题两个答案）。
+     *
+     * D-158：文案按**当前视图域**分角色（`AppState.activeDomain`，与上面两条列表读同一个判据源）。
+     * 以前这一条只有一份正文，里面同时写着"出行请带雨具"（乘客的话）和"山货装车加盖苫布"（寄件/司机的话）
+     * —— 同一句提醒推给两种人，总有一半人在读跟自己无关的话。
      */
     private suspend fun pushWeatherAlert(context: Context): Int {
         var weatherAlerted = 0
@@ -170,7 +175,9 @@ object AlertEngine {
                                 Prefs.lastWeatherAlertTimestamp = now
                                 Prefs.lastWeatherAlertCondition = w.text
                                 weatherAlerted++
-                                val (title, body) = weatherAlertText(severity, w.text, w.temperature, w.wind)
+                                val (title, body) = weatherAlertText(
+                                    severity, w.text, w.temperature, w.wind, AppState.activeDomain.value,
+                                )
                                 Notifier.push(
                                     context,
                                     Channels.WEATHER,
@@ -199,27 +206,44 @@ object AlertEngine {
      * 天气严重程度判定：返回 null 表示不需要预警，非 null 表示需要预警并给出等级。
      * 与 Repo.farmTips 同口径但更严格 —— farmTips 给建议，这里决定是否推送通知。
      * 等级：LIGHT（提示）/ HEAVY（警告），影响文案措辞。
+     *
+     * `internal` 只为 JVM 用例能直接驱动这张表（与 [outcomeOf] 同一先例）：
+     * 判据本体没有为测试改形，工程无 Robolectric，而 `check()` 要 Context 才走得到推送。
      */
-    private enum class WeatherSeverity { LIGHT, HEAVY }
+    internal enum class WeatherSeverity { LIGHT, HEAVY }
 
-    private fun weatherSeverity(condition: String, temperature: Int): WeatherSeverity? {
+    internal fun weatherSeverity(condition: String, temperature: Int): WeatherSeverity? {
         val c = condition.lowercase()
         // 暴雨、大雪、冰雹等 → 重度预警
         if (c.contains("暴雨") || c.contains("大") && (c.contains("雨") || c.contains("雪")) ||
             c.contains("冰雹") || c.contains("雷暴") || c.contains("台风")
         ) return WeatherSeverity.HEAVY
-        // 普通雨雪、大雾、极端高温/低温 → 轻度预警
-        if (c.contains("雨") || c.contains("雪") || c.contains("雾") || c.contains("沙尘") ||
-            c.contains("霾") || temperature >= 38 || temperature <= -10
+        // 普通雨雪、低能见度（雾 / 霾 / 沙 / 尘）、极端高温/低温 → 轻度预警。
+        // ⚠ 这一支的现象集合必须与 `Repo.weatherTipsFor` 的能见度那一支**同一批词**：
+        //   以前这里只认"沙尘"，而高德实况常见产出词是"浮尘" ⇒ 卡片给了建议、通知却不响（D-158 两张皮）。
+        if (c.contains("雨") || c.contains("雪") || c.contains("雾") || c.contains("霾") ||
+            c.contains("沙") || c.contains("尘") || c.contains("雷") ||
+            temperature >= 38 || temperature <= -10
         ) return WeatherSeverity.LIGHT
         return null
     }
 
-    private fun weatherAlertText(
+    /**
+     * 推送文案：**建议部分不再自己写一份**，直接取 [Repo.weatherTipsFor] 里属于这个角色那一份。
+     *
+     * 理由就是本仓反复踩的那条"同一个问题不许有第二个答案"：天气→建议这张表原先有两处
+     *（`weatherTipsFor` 给屏上的天气卡，`weatherAlertText` 里又抄了一份 when 给通知栏），
+     * 两处一漂移，用户就会在同一场雨里看到两句不同的话。现在通知与卡片同源，只差"推不推"这一层判断。
+     *
+     * 角色取自**当前视图域**而不是账号角色（F-3 ③ 的同一口径）：司机从司机壳点回用户版时，
+     * 他此刻看的是乘客的班次，收到的就该是乘客那句。
+     */
+    internal fun weatherAlertText(
         severity: WeatherSeverity,
         condition: String,
         temperature: Int,
         wind: String,
+        domain: AppDomain,
     ): Pair<String, String> {
         // 图标必须跟**天况**走，不能只跟严重度走。以前 LIGHT 恒为 🌧，
         // 于是"雾 / 霾 / 高温 / 低温"四种提醒在通知栏上都顶着一张下雨图 ——
@@ -228,7 +252,8 @@ object AlertEngine {
         val glyph = when {
             severity == WeatherSeverity.HEAVY -> "⚠️"
             condition.contains("雪") || condition.contains("冰") || condition.contains("冻") -> "❄"
-            condition.contains("雾") || condition.contains("霾") || condition.contains("沙") -> "🌫"
+            condition.contains("雾") || condition.contains("霾") || condition.contains("沙") ||
+                condition.contains("尘") -> "🌫"
             condition.contains("雨") -> "🌧"
             temperature >= 35 -> "☀"
             temperature <= 0 -> "🧊"
@@ -237,26 +262,23 @@ object AlertEngine {
         val prefix = "$glyph " + (
             if (severity == WeatherSeverity.HEAVY) "恶劣天气预警" else "天气提醒"
         )
+        val tips = weatherTipsFor(condition, temperature)
+        val tip = if (domain == AppDomain.DRIVER) tips.second else tips.first
         val body = buildString {
             append("当前天气：$condition，气温 ${temperature}°C")
             if (wind.isNotEmpty()) append("，$wind")
-            append("。")
-            when {
-                condition.contains("雨") -> append(" 出行请带雨具，山货装车前请加盖苫布防淋。")
-                condition.contains("雪") -> append(" 路面可能湿滑，发车请减速慢行。")
-                condition.contains("雾") || condition.contains("霾") -> append(" 能见度低，山路发车请注意安全。")
-                temperature >= 38 -> append(" 气温偏高，生鲜件建议走早班车。")
-                temperature <= -10 -> append(" 气温极低，注意防寒保暖。")
-                else -> append(" 请关注天气变化，合理安排出行。")
-            }
+            if (tip.isNotEmpty()) append("。$tip") else append("。")
         }
         return prefix to body
     }
 
     /**
-     * 水位重置口。⚠ **当前全工程 0 个调用点**（实测 `grep -rn resetWatermark app/src` 只命中本行），
-     * 所以换账号后 `primed` 仍是 true、上一个账号的 `lastSeenNotifyId` 继续当水位用。
-     * 本轮只登记不接线（接它要选登录成功的落点，属 ⑩ 之外），已进 ⑰ 的 OPEN_DEFECT 清单。
+     * 水位重置口。D-158 起有一个调用点：`LoginViewModel` 登录成功之后（与 `Repo.saveSession` 里
+     * 那句 `clearDriverBinding()` 同一落点）。
+     *
+     * 为什么必须重置：`primed` 与 `lastSeenNotifyId` 记的是"这台设备替**上一个账号**读到哪儿"，
+     * 换账号不重置 ⇒ 新账号只能收到比自己上一条历史消息更新的推送，刚发给自己的第一条反而哑掉。
+     * 之前这里长期是 0 个调用点（本文件的旧注释自己承认了），登记在 OPEN_DEFECT 里，本轮接上。
      */
     fun resetWatermark() {
         primed = false

@@ -111,7 +111,9 @@ done
 # 76→77（2026-10-17，D-151）：本轮只新增一个测试文件，find 差集实测就 CurrentLegContractTest.kt 这一条。
 # 77→78（2026-10-17 晚，D-156）：同样只新增一个，find 差集实测就 ui/common/CapsuleNavContractTest.kt 这一条
 #   （6 条 @Test，钉悬浮胶囊那三条收口规则：必须有标签、禁用必须带原因、一栏最多五格）。
-SUSB_EXPECT=78
+# 78→79（2026-10-17 深夜，D-158）：再 +1 也只是新增一个，find 差集实测就 notify/WeatherAlertContractTest.kt 这一条
+#   （7 条 @Test，钉"天气提醒"那张表只剩一份、推送按当前视图域取角色那一句、图标跟天况不跟严重度）。
+SUSB_EXPECT=79
 
 echo "SU-a *Test.kt 文件数 / 其中 0 条 @Test 的空壳 = $SUA_FILES/$SUA_EMPTY （目标 ≥47/0：凑数空类归零）$SUA_EMPTY_LIST"
 echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 $SUSB_EXPECT/2：同一机制数得出 0 条，SU-a 的 0 不是空跑）"

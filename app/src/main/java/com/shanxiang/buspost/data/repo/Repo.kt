@@ -1589,8 +1589,16 @@ internal fun weatherTipsFor(condition: String, temp: Int): Pair<String, String> 
     condition.isEmpty() -> "" to ""
     condition.contains("雨") || condition.contains("雪") ->
         "有降水，装车前请给山货加盖苫布" to "降水：出发前检查苫布与刹车，山路减速、拉大跟车距离"
-    condition.contains("雾") || condition.contains("霾") ->
-        "能见度偏低，山路发车请减速慢行" to "能见度偏低：使用雾灯并降速；能见度过低时延后发车，并通知候车乘客"
+    // 强对流（冰雹 / 雷暴 / 台风）单列一支，且**排在降水之后**：像"雷阵雨"这种带雨字的常见产出词
+    // 该走降水那句（检查苫布），只有不带雨雪的强对流才说"延后或改日"。
+    // 以前这一支根本不存在，冰雹/台风落到最后的万能句"出行前留意山区路况"，
+    // 而通知那边 `weatherSeverity` 早就把这三类判成 HEAVY 预警 ⇒ 同一天况"卡片说普通话、通知拉警报"（D-158）。
+    condition.contains("冰雹") || condition.contains("雷") || condition.contains("台风") ->
+        "强对流天气，今天寄件建议延后或改日" to "强对流：先停到安全处等过程过去，必要时报调度延后发车间"
+    // 能见度的口径按**现象**收，不按字面词：以前只认"雾/霾/沙"，而高德实况里"浮尘"是常见产出词，
+    // 于是一场浮尘在屏上拿到的是万能句、在通知里也不响（`weatherSeverity` 同样只认"沙尘"）。
+    condition.contains("雾") || condition.contains("霾") || condition.contains("沙") || condition.contains("尘") ->
+        "能见度偏低，候车请留出提前量，留意班次延误" to "能见度偏低：使用雾灯并降速；能见度过低时延后发车，并通知候车乘客"
     condition.contains("晴") && temp >= 30 ->
         "气温偏高，生鲜件尽量走早班车" to "高温：车厢通风，生鲜件尽量安排早班车"
     condition.contains("晴") -> "晴好天气，适合发车与晾晒" to "天气晴好，按班次正常发车间"

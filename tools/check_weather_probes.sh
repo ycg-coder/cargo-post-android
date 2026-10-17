@@ -45,8 +45,11 @@ WH2=$(grep -c "weather.tips" "$WC")
 WI1=$(grep -c 'tips = "",' "$REPO")
 WI2=$(grep -c 'source = "未取到"' "$REPO")
 
-# W-j 取数点仍只有两处生产者 + 一处调用（新增第三处"就地编天气"就要红）
-WJ=$(grep -rn "${KT[@]}" "weatherTipsFor(" . | grep -v "internal fun" | grep -vE ":[0-9]+: *\*" | wc -l | tr -d ' ')
+# W-j 天气→建议这张表：生产者仍只有两处（高德 / open-meteo 各一，都在 Repo.kt 里）；
+#      读它的人从 2 变 3 是 D-158 有意加的 —— 推送不再自己抄第二张表，而是来读这同一张。
+#      所以这一格拆成两条：生产者数一多就是"第三处就地编天气"，读者数一多也要说清是谁在读。
+WJ=$(grep -rn "${KT[@]}" "weatherTipsFor(" . | grep -v "internal fun" | grep -vE ":[0-9]+: *\*" | grep -c 'data/repo/Repo.kt' || true)
+WJR=$(grep -rn "${KT[@]}" "weatherTipsFor(" . | grep -v "internal fun" | grep -vE ":[0-9]+: *\*" | wc -l | tr -d ' ')
 
 echo "W-a 分档函数生产者      = $WA （目标 1）"
 echo "W-b 两生产者各填两份    = tips $WB1 / driverTips $WB2 （目标 2 / 2）"
@@ -57,7 +60,7 @@ echo "W-f 显示接线            = $WF （目标 1）"
 echo "W-g 15 分钟数字出处      = $WG （目标 1：只有 DriverWeatherTip.kt）"
 echo "W-h 用户侧读 driverTips = $WH （目标 0）；WeatherCard 读 weather.tips = $WH2 （目标 2）"
 echo "W-i 空态两份留空        = tips空 $WI1 / 未取到 $WI2 （目标 1 / 1）"
-echo "W-j 分档函数调用点      = $WJ （目标 2：高德 + open-meteo）"
+echo "W-j 分档函数生产者/读者 = $WJ / $WJR （目标 2 / 3：生产者是高德与 open-meteo 各一处，都在 Repo.kt；第 3 处是 D-158 让推送来读同一张表，不再自己抄一份）"
 
 fail=0
 [ "$WA" = 1 ] || { echo "× W-a 分档函数不是恰好一处生产者（现 $WA）：多了=有人另编一套角色文案，少了=两份说法没出处"; fail=1; }
@@ -73,7 +76,8 @@ fail=0
 [ "$WH2" = 2 ] || { echo "× W-h 首页卡读 weather.tips 的处数不是 2（现 $WH2）：那份文案的出口被改动"; fail=1; }
 [ "$WI1" = 1 ] || { echo "× W-i 空态生产者不再留空（现 $WI1）：没取到天气时开始编提示"; fail=1; }
 [ "$WI2" = 1 ] || { echo "× W-i 空态来源标签缺失（现 $WI2）：那一路没返回却被显示成有来源"; fail=1; }
-[ "$WJ" = 2 ] || { echo "× W-j 分档函数调用点不是 2（现 $WJ）：多了=第三个天气生产者，少了=某一来源不再出提示"; fail=1; }
+[ "$WJ" = 2 ] || { echo "× W-j 天气生产者不是 2（现 $WJ）：多了=第三处就地编天气，少了=某一来源不再出提示"; fail=1; }
+[ "$WJR" = 3 ] || { echo "× W-j 读这张表的总数不是 3（现 $WJR：两处生产者 + 推送）：多一处就是有人又起了第二张天气→建议表"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "天气分角色判据通过"; else echo "天气分角色判据失败"; fi
 exit "$fail"
