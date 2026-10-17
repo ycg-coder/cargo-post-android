@@ -97,6 +97,15 @@
   读数：vitest **5 文件 / 59 用例**、SFC 68 只 0 失败、vue-tsc 0 错、eslint 0 error、build `dist-prod` **377**、15 本闸全绿。
 
 
+- **V056（云管理员账号改名）已合未落地 + 一条新的 runner 欠账（台账 D-148）**：
+  根因是上游 `AuthLoginReqVO` 的 `^[a-zA-Z0-9]{4,30}$` 把带下划线的 **`cargo_admin`** 挡在鉴权之前
+  ⇒ 部署手册写给用户用的号一次都登不进去（**这个号是我上一轮指给人去登录的，错记我头上**）。
+  PR #197 已合（V056 改成 `cargoadmin`，密码/id/role 不动；在册 15→**16** 支、探针 32→**34** 格），
+  第 16 本判据当场抓了我一个洞：本机一次性库缺 `sql/cloud/V001` ⇒ V056 是空转、探针数不到 1 ⇒ 补基线后转绿。
+  **apply 的 `落地核对` 红了一格**（`执行幂等迁移` 是绿的），但**拿不到是哪一格**：
+  这台 runner 的**日志 blob 与归档 artifact 都传不上来**、annotation 又被 GitHub 每步截到 10 条 ⇒ 三条通道全断。
+  ⇒ **过渡期用基线自带的 `admin` / `admin123` 登录**（同一份基线，本地已验证）。PR #198 给 `mode=check` 也加了那两格（只读）。
+  **新欠账**：runner 传不上日志/产物 ⇒ CI 失败时没有现场，下次连上服务器要查空间与 `_work/_temp`。
 - **两条"够不到"的欠账又推进了（台账 D-147）**：
   · **云后台找到地址了**：`api.qwer2333.com`（`deploy/nginx/nginx.conf` + `docs/deployment.md` 里读的），
     浏览器打开页面正常渲染（新前端已上线），接口前缀 `.env.prod` 的 `VITE_API_URL=/api/admin-api` + nginx `location /api/` 去前缀。
