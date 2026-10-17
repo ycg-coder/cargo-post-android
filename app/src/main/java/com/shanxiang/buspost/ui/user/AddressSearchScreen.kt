@@ -141,8 +141,10 @@ fun AddressSearchScreen(
                             BusButton(
                                 text = "清除",
                                 onClick = { vm.clear() },
-                                variant = BusButtonVariant.OUTLINE,
-                                modifier = Modifier.weight(1f),
+                                // TONAL：左边「查询」是实心主色板，这颗原来是描边档 ⇒ 一排里两颗差一个重量档
+                                //（与 D-161 工作台那一排同一个毛病，同一个修法）。
+                                variant = BusButtonVariant.TONAL,
+                                modifier = Modifier.weight(0.78f),
                             )
                         }
                     }

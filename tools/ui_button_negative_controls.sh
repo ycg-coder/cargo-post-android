@@ -134,6 +134,20 @@ import androidx.compose.ui.unit.dp
 ) { p -> Row(Modifier.fillMaxWidth().clickable { }) {} } }' \
   && ctl UB-h "轮播视口数从在册 1 变 2 ⇒ 又有一条热区被视口钉住"
 
+# UB-j：同一排里放一颗实心 + 一颗描边（D-161 用户指的那个形状）⇒ 必须红
+injected ui/NegctlProbeMix.kt 'package com.shanxiang.buspost.ui
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.Composable
+import com.shanxiang.buspost.core.ui.BusButton
+import com.shanxiang.buspost.core.ui.BusButtonVariant
+@Composable fun NegctlMix() {
+    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        BusButton(text = "次要", onClick = {}, variant = BusButtonVariant.OUTLINE)
+        BusButton(text = "主要", onClick = {})
+    }
+}'   && ctl UB-j "同排出现实心 + 描边 ⇒ 用户说的那句不搭配又回来了"
+
 # 正控制：改一颗按钮的文案与 onClick 内容 —— 规格没动，不该红
 injected ui/NegctlProbePos.kt 'package com.shanxiang.buspost.ui
 import androidx.compose.runtime.Composable

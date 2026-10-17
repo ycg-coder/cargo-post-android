@@ -162,5 +162,59 @@ printf 'UB-i 档位定义/TONAL 出现/板色/扫码那颗 : %s/%s/%s/%s （坏�
 [ "$ub_i_scan" = 1 ] || { echo "× UB-i 工作台「扫码作业」没吃 TONAL（现 $ub_i_scan）：它左边那颗是实心 PRIMARY，两颗差一个重量档就是用户说的那句不搭配"; ok=0; }
 [ "$ub_i_bad" = 0 ] || { echo "× UB-i 工作台「扫码作业」又长回描边档（现 $ub_i_bad）：同上一条"; ok=0; }
 
+# UB-j 同一排里"实心 + 描边"的混档 = 0（D-161 用户那句"和这个界面不太搭配"的通用形状）
+#     唯一豁免：那颗描边档是 DEBUG-only（调试包才画出来），司机/乘客在正式包里看不见它 ⇒ 不构成一排的搭配问题。
+#     豁免要**点名**：整行块里必须出现 BuildConfig.DEBUG，否则不认。
+ub_j=$("$PY" - <<'PYJ'
+import io, os, re
+ROOT = "app/src/main/java/com/shanxiang/buspost"
+ROW = re.compile(r"^\s*(?:\w+\.)*Row\s*[({]")
+BTN = re.compile(r"(^|[^A-Za-z])BusButton\s*\(")
+VAR = re.compile(r"variant\s*=\s*BusButtonVariant\.(\w+)")
+n = 0
+for dp, _, fs in os.walk(ROOT):
+    for fn in sorted(fs):
+        if not fn.endswith(".kt"):
+            continue
+        pth = os.path.join(dp, fn)
+        src = io.open(pth, encoding="utf-8", errors="replace").read().split("\n")
+        for i, line in enumerate(src):
+            if not ROW.search(line):
+                continue
+            d, end = 0, i
+            for j in range(i, min(len(src), i + 120)):
+                d += src[j].count("{") - src[j].count("}")
+                end = j
+                if d <= 0 and j > i:
+                    break
+            block = "\n".join(src[i:end + 1])
+            variants = []
+            for k in range(i, end + 1):
+                if not BTN.search(src[k]):
+                    continue
+                depth = 0
+                w = []
+                for q in range(k, min(len(src), k + 45)):
+                    depth += src[q].count("(") - src[q].count(")")
+                    w.append(src[q])
+                    if depth <= 0 and q >= k:
+                        break
+                m = VAR.search("\n".join(w))
+                variants.append(m.group(1) if m else "PRIMARY")
+            if len(variants) < 2:
+                continue
+            if "PRIMARY" in variants and ("OUTLINE" in variants or "GHOST" in variants):
+                if "BuildConfig.DEBUG" in block:
+                    continue
+                n += 1
+                print("MIX %s:%d %s" % (pth, i + 1, variants))
+print(n)
+PYJ
+)
+ub_j_bad=$(printf '%s\n' "$ub_j" | grep -c '^MIX' | tr -d ' ')
+ub_j_n=$(printf '%s\n' "$ub_j" | tail -1)
+printf 'UB-j 同排"实心+描边"混档          : %s （目标 0；豁免=DEBUG-only 那一处，现点名 %s 条）\n' "$ub_j_n" "$ub_j_bad"
+[ "$ub_j_bad" = 0 ] || { echo "× UB-j 有 $ub_j_bad 排把实心主色板和描边档并排放：这就是用户说的那句不搭配（第二颗该吃 TONAL）"; printf '%s\n' "$ub_j" | grep '^MIX' | head -5; ok=0; }
+
 [ "$ok" = 1 ] || exit 1
 echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处）"
