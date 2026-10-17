@@ -8,7 +8,10 @@ import com.shanxiang.buspost.core.ui.BusTone
 import com.shanxiang.buspost.data.model.NearbyResult
 import com.shanxiang.buspost.data.model.Station
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -170,6 +173,38 @@ class BusStateContractTest {
 
         val none = viaStationsTitle(viaStationsOf(null))
         assertTrue("没选线路时这个问题还不成立：$none", none.contains("还没选线路"))
+    }
+
+    @Test
+    fun `附近线路卡片的小字只放三样 缺的就说缺`() {
+        // 用户要"每条路线做成卡片、只保留简单信息"：三样 = 起→止、停几站、现实公交还是项目线路。
+        val full = BusLine(
+            id = "R347", name = "347路(老厂--菜园坝火车站)", from = "老厂", to = "菜园坝火车站",
+            stations = List(19) { Station(id = it.toLong(), name = "S$it", geo = geo) },
+            vehicles = emptyList(), dataSource = "REAL_TRANSIT",
+        )
+        assertEquals("起终点 · 站数 · 来源，一样不多", "老厂 → 菜园坝火车站 · 19 站 · 现实公交", lineBriefSubtitle(full))
+
+        val bare = full.copy(from = "", to = "  ", stations = emptyList(), dataSource = "")
+        val t = lineBriefSubtitle(bare)
+        assertTrue("缺起终点要明说：$t", t.contains("起终点没给"))
+        assertTrue("缺站点数不许写 0 站：$t", t.contains("站点数没给") && !t.contains("0 站"))
+        assertTrue("来源不含 REAL 就是项目线路：$t", t.contains("项目线路"))
+    }
+
+    @Test
+    fun `卡片点不点得进详情由编号决定 没编号不许跳成没有这条线路`() {
+        val noId = BusLine(
+            id = "", name = "347路(老厂--菜园坝火车站)", from = "老厂", to = "菜园坝火车站",
+            stations = emptyList(), vehicles = emptyList(), dataSource = "REAL_TRANSIT",
+        )
+        val reason = lineCardNoDetailReason(noId)
+        assertNotNull("没编号必须给出点不进去的原因", reason)
+        assertTrue("原因要说的是没给编号，不是「线路不存在」：$reason", reason!!.contains("没给这条线的编号"))
+        assertFalse("没编号不许把锅甩成后端说没有这条线：$reason", reason.contains("没有这条线路"))
+
+        assertNull("有 routeId 就打得开：详情页/地图/经停全按它取数",
+            lineCardNoDetailReason(noId.copy(id = "R347")))
     }
 
     @Test

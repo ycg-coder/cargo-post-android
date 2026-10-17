@@ -718,30 +718,32 @@ fun BusScreen(vm: BusViewModel = viewModel()) {
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // 线路选择 chip（横滑）
-                    if (vm.filteredLines.size > 1) {
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            vm.filteredLines.take(8).forEach { l ->
-                                val on = l.id == vm.selected?.id
-                                Column(
-                                    Modifier
-                                        .clip(RoundedCornerShape(BusRadius.m))
-                                        .background(if (on) t.primaryLight else t.card)
-                                        .clickable { vm.pick(l) }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                ) {
-                                    Text(
-                                        l.name.ifEmpty { "未命名线路" },
-                                        color = if (on) t.primaryOnLight else t.ink,
-                                        fontSize = (12 * scale).sp,
-                                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
+                    // 附近线路：一条一张卡，卡上只留"认得出是哪条 + 从哪到哪 + 停几站"这三样；
+                    // 点卡片进详情页看地图与经停。原先这一栏是横滑 chip（只有名字、点了只换主图），
+                    // 用户要的是"每条路线都能点进去"——所以点卡片同时做两件事：选给主图 + 跳详情，
+                    // 返回时主图与站点都还聚焦在这条线上。
+                    // ⚠ 后端没给编号的那半数线路（`/bus/nearby` 的 `lines[]`）不许许下"点进去"这个动作，
+                    //   口径与那句提示都在 lineCardNoDetailReason（台账 #110）。
+                    if (vm.filteredLines.isNotEmpty()) {
+                        SectionTitle("附近线路", subtitle = "点一条看它的地图与经停")
+                        vm.filteredLines.take(LINE_CARDS_MAX).forEach { l ->
+                            LineBriefCard(
+                                line = l,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                onOpen = {
+                                    vm.pick(l)
+                                    if (lineCardNoDetailReason(l) == null) nav.navigate(Routes.busDetail(l.id))
+                                },
+                            )
+                        }
+                        if (vm.filteredLines.size > LINE_CARDS_MAX) {
+                            Text(
+                                "上面列了 $LINE_CARDS_MAX 条，这一屏共 ${vm.filteredLines.size} 条 —— " +
+                                    "要找的线不在里面就用上方搜索框缩小范围",
+                                color = t.textTertiary,
+                                fontSize = (11 * scale).sp,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
                         }
                         Spacer(Modifier.height(12.dp))
                     }
@@ -1040,6 +1042,65 @@ private fun formatLocationFreshness(raw: String): String? {
         diffMin < 60 -> "$diffMin 分钟前更新"
         diffMin < 1440 -> "${diffMin / 60} 小时前更新"
         else -> null
+    }
+}
+
+/** 附近线路这一栏最多列几条（不封顶会把详情区挤出屏幕；截断在卡片下方出声说明） */
+private const val LINE_CARDS_MAX = 8
+
+/**
+ * 附近线路的一张卡：**只放简单信息**（线路名 + 一行小字），点它进详情页看地图与逐站。
+ * 小字的口径在 `lineBriefSubtitle`、"点不点得进去"的口径在 `lineCardNoDetailReason`（都是纯函数，用例钉），这里只渲染。
+ */
+@Composable
+private fun LineBriefCard(
+    line: BusLine,
+    modifier: Modifier = Modifier,
+    onOpen: () -> Unit,
+) {
+    val t = LocalBusTokens.current
+    val scale = LocalBusFontScale.current
+    val blocked = lineCardNoDetailReason(line)
+    BusCard(
+        modifier = modifier.fillMaxWidth(),
+        border = true,
+        onClick = onOpen,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    line.name.ifEmpty { "未命名线路" },
+                    color = t.ink,
+                    fontSize = (14.5 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    lineBriefSubtitle(line),
+                    color = t.textSecondary,
+                    fontSize = (11.5 * scale).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            if (blocked == null) {
+                Icon(
+                    BusIcons.next,
+                    "看这条线的地图与经停",
+                    tint = t.textTertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Text(
+                    blocked,
+                    color = t.textTertiary,
+                    fontSize = (10.5 * scale).sp,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
     }
 }
 
