@@ -359,6 +359,29 @@ class NavigationContractTest {
         assertEquals(900, route.roadEtaSeconds)
     }
 
+    /**
+     * 途经点必须**跟着进闸门**：引擎那一跳漏传，全任务段那条路就会被"首末直线"这个分母顶死
+     * （真机读数 `road=33230m / straight=2014m` ⇒ windiness 16.4，导航每次都在起跑前被自己拒掉，台账 D-155）。
+     * 两条一起写：没带途经点的那一条仍然红 —— 这一格钉的是"传了没有"，不是"闸门变松了"。
+     */
+    @Test
+    fun `算路产物把途经点交给同一道闸门`() {
+        val origin = Geo(29.5560, 106.5680)
+        val far = Geo(29.6500, 106.6500)
+        val dest = Geo(29.5380, 106.5700)
+        val pts = listOf(origin, far, dest)
+        val noVia = naviRouteCheck(points = pts, roadDistanceMeters = 33_230, roadEtaSeconds = 3_000)
+        assertTrue("不报途经点时闸门按首末直线判：$noVia", noVia is RouteCheck.Rejected)
+        val withVia = naviRouteCheck(
+            points = pts,
+            roadDistanceMeters = 33_230,
+            roadEtaSeconds = 3_000,
+            viaGeos = listOf(far),
+        )
+        assertTrue("报了途经点就该过闸：${(withVia as? RouteCheck.Rejected)?.detail}", withVia is RouteCheck.Accepted)
+        assertEquals(1, (withVia as RouteCheck.Accepted).route.viaGeos.size)
+    }
+
     /** 点数不足：一帧都凑不出线，就是没有线 */
     @Test
     fun `高德只回一个点时判为没有道路`() {

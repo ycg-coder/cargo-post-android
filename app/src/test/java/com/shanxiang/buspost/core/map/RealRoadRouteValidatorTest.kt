@@ -122,6 +122,50 @@ class RealRoadRouteValidatorTest {
     }
 
     @Test
+    fun `全任务段那一条不该被首末直线顶死`() {
+        // 真机读数（2026-10-17，1f71ee9b）：导航页念 `road=33230m / straight=2014m`、windiness 16.4 被拒，
+        // 而**同一趟**司机工作台念的是"本班 6 站 · 道路里程 33.2 公里"⇒ 高德回的就是全任务段那条真路，
+        // 错的是分母：终点绕回出发点附近、中间还压着 5 个途经点，首末直线当然只有 2 公里。
+        val origin = Geo(29.5560, 106.5680)
+        val far = Geo(29.6500, 106.6500)
+        val dest = Geo(29.5380, 106.5700)
+        val points = listOf(origin, Geo(29.60, 106.60), far, Geo(29.60, 106.62), dest)
+        val check = RealRoadRouteValidator.validate(
+            sourceRaw = "amap",
+            points = points,
+            roadDistanceMeters = 33_230,
+            viaGeos = listOf(far),
+        )
+        assertTrue("这一条必须过闸，否则全任务段导航永远起跑不了：${(check as? RouteCheck.Rejected)?.detail}",
+            check is RouteCheck.Accepted)
+        val route = (check as RouteCheck.Accepted).route
+        assertTrue("前提要成立：首末直线确实很小（${route.straightDistanceMeters}m）",
+            route.straightDistanceMeters < 3_000)
+        assertTrue("下界必须把途经点算进去（bound=${route.boundDistanceMeters}m）",
+            route.boundDistanceMeters > route.straightDistanceMeters * 5)
+        assertTrue("绕路比回到正常区间：${route.windiness}", route.windiness in 1.0..2.5)
+    }
+
+    @Test
+    fun `带途经点时里程短于逐段下界判为没有真的绕经`() {
+        // 反方向：号称绕了 far 那个点，里程却只给了首末那点距离 ⇒ 折线没真的过去，这一趟不许开始导航。
+        // 旧分母下这条是**过闸**的（5_000 > 首末 2_011），所以它同时是上一格的反证。
+        val origin = Geo(29.5560, 106.5680)
+        val far = Geo(29.6500, 106.6500)
+        val dest = Geo(29.5380, 106.5700)
+        val check = RealRoadRouteValidator.validate(
+            sourceRaw = "amap",
+            points = listOf(origin, far, dest),
+            roadDistanceMeters = 5_000,
+            viaGeos = listOf(far),
+        )
+        assertTrue(check::class.simpleName, check is RouteCheck.Rejected)
+        val rejected = check as RouteCheck.Rejected
+        assertTrue(rejected.reason, rejected.reason.contains("逐段直线和"))
+        assertTrue("detail 要数得出途经点有几个：${rejected.detail}", rejected.detail.contains("via=1"))
+    }
+
+    @Test
     fun `非法坐标与全点重合都被拒收`() {
         assertFalse(RealRoadRouteValidator.isValidGeo(Geo(0.0, 0.0)))
         assertFalse(RealRoadRouteValidator.isValidGeo(Geo(Double.NaN, 106.6)))
