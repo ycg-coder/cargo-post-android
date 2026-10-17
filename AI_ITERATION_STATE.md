@@ -3,6 +3,22 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-17（上午，**D-149** · 用户提"web 页面有点多，集成一下" ⇒ 先数真实面，
+**结果抓到自家判据在低读**：`check_admin_dashboard_routes.py` 的行首锚死正则只认 `VALUES (…)`，
+折行写的 `INSERT … SELECT` 整片没进集合 ⇒ 它念"叶子 21 个"而真实是 **30 个**（差的九个含整个 `/ai/**` 五页 +
+钱包/计价/日历）；同仓 `check_menu_id_collisions.py` 早就两种形状都认 —— **两本闸口径不齐**。
+修成正则按语句展平（68 行/21 叶 → **94 行/37 叶**）并补上它一直缺的 `--self-test`（K2/K3 成对形状刀）。
+集成**不动任何业务页**：`WorkbenchShell` 把现有 `index.vue` 当子组件挂进 tab（`lazy` 只取当前那格的数），
+旧叶只 `visible=b'0'`（`routerHelper.ts:92` ⇒ 路由仍生成、深链不断、回退一条 UPDATE），
+被抽空的 11 个目录一起藏（`Menu/src/helper.ts:43` 会把零可见子节点的目录渲染成可点单条=空 Layout），
+新叶 permission 留空、授权从子叶去重继承（**没人因合并多权或少权**），逐格筛用 `checkPermi` 不用 `v-hasPermi`。
+30 个入口 → 侧栏 **8 条**。V057（菜单 7160–7166）第 16 本实测：白名单 16→**17**、探针 34→**39**、
+连跑两遍**零行漂移**。浏览器真栈点过：侧栏 8 条、`?tab=vehicle` 直开那一格、tab 条计算样式 `sticky/z-index=3`、
+**悬浮助手真出一稿 `道路阻断`** 且同轮 `ai_invocation_log` 12→**13** 而 `transport_order` **766** 不动。
+凭证：28 条静态闸 `rc=0`、SFC **251** 只 0 失败、`vue-tsc` 0 错、`build:prod` `rc=0`、vitest **5 文件/59 用例**、eslint 0 error。
+⚠ 三格仍欠：V057 云端 **apply 未执行**（要人给 `confirm=APPLY`）、云后台仍 `NOT VERIFIED IN BROWSER`、
+**像素级美化没验**（本机浏览器面 534px 且截图面不可用，只测了结构与计算样式）。）
+
 最后更新：2026-10-16（深夜收工，D-139 … D-144 · AI 那条线做完（唯一外呼口 + 5 个模型任务 + 1 条规则情景提示，
 配置收成**一个口** `buspost.ai.*`，云上/自部署只改 base-url+api-key+model；ai-assist 用例 19→**50**、transport **389**，
 静态闸 **15 本**全绿）→ **顺手在点 apply 之前实测掉白名单跑第二遍的坑**（`ERROR 1061` 中断 + `system_role_menu` 466→481 +

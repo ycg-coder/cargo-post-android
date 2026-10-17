@@ -9718,3 +9718,71 @@ nginx `root /opt/cargo-post-web` ⇒ 管理端就在域名根。
 
 `git fetch` 的网络报错**不能**当成"没合并成功"：这次 PR 合并是通过 API 确认的
 （`gh pr view 197 --json state` = MERGED），而本地 fetch 恰好在断网窗口里失败 —— 两个是不同的通道，别混。
+
+## D-149 · Web 端审计：真实导航面是 30 个入口，而自家判据只看见 21 个（2026-10-17 上午）
+
+用户提"页面有点多，能不能集成一下"。**动手前数了一遍，先抓到自己的闸在低读**：
+
+| 读数 | 修前 | 修后 |
+|---|---|---|
+| `check_admin_dashboard_routes.py` 数到的 `system_menu` 行 | 68 | **94** |
+| 它认得的"可跳转叶子" | **21** | **37** |
+| 真实面（两种 SQL 形状都数） | 页面叶子 30 / 目录 14 / 按钮 43 | — |
+
+根因是那本的正则把行首锚死（`^\s*\(?\s*(\d{3,6})…`）：只认 `VALUES (…)` 的单行菜单行，
+而幂等迁移写的是 `INSERT INTO … SELECT 7100, 'AI 辅助', '' , 1, …` 且**折行** ⇒ 整片没进集合。
+低读的那九个里包含整个 `/ai/**` 五个页面，以及钱包 / 计价规则 / 事件日历。
+同仓的 `check_menu_id_collisions.py` 早就两种形状都认（它头部明写"两处都覆盖到才叫判过"）——
+**两本闸口径不齐**，而这本一直拿"菜单行 68 条 ⇒ 叶子 21 个"当真实面在念。
+这本此前还**没有 `--self-test`**（其余各本都有）：补五把刀，K2/K3 是成对的形状刀
+（K2「只有 SELECT 形状的叶 ⇒ 认得，判绿」，K3「把那条去掉 ⇒ 必须红」—— 没有 K3，K2 的绿不知道是谁给的）。
+
+**教训（进 [[feedback-idle-gates-three-root-causes]]）**：判据按"形状"筛而不按"语义"筛时，
+低读不会报错，只会让台账念一个偏小的数。凡是"数到一个集合"的闸，都要问一句
+**这个集合有几种书写形状，我都认吗**；反证办法就是把其中一种形状单独做成用例（K2/K3 那一对）。
+
+### 一、集成怎么选的形状
+
+- **原页面一行不改**，`WorkbenchShell` 把现有 `index.vue` 当子组件挂进 tab；`lazy` 必需（这些页都在
+  `onMounted` 拉列表，一次挂七格=七个并发请求，用户一次只看一格）。
+- **旧叶不删、只 `visible=b'0'`**：`routerHelper.ts:92` 是 `hidden: !route.visible` ⇒ 路由照样生成，
+  `/transport/station/list` 这类既有深链一条不断；回退不需要重放脚本，一条 `UPDATE` 就回去。
+- **被抽空的 11 个目录必须一起藏**：`Menu/src/helper.ts:43` 在可见子节点为 0 时合成
+  `onlyOneChild={noShowingChildren:true}` ⇒ 目录渲染成**可点的单条**，点过去是 `type=1/component=NULL`
+  的空 Layout —— 正是 D-130 / 队列 #63 判红过的形状。只藏叶不藏目录=把"六个按钮六个空"换成"十一个条目点了都白屏"。
+- **新叶 permission 留空、授权从子叶去重继承** ⇒ 没人因为合并多权或少权。逐格筛用 `checkPermi` + `v-if`，
+  不用 `v-hasPermi`：后者只在挂载时判一次并 `removeChild`，而 `el-tab-pane` 的标签头由 `el-tabs` 依 props 生成
+  ⇒ 删内容节点会留下一个空的 tab 头。
+- AI 工作台**留在 `views/transport/ai/` 下**（不放公共 workbench 目录）：第 14、15 本闸按目录认定"AI 面"，
+  搬出去等于把入口挪出闸的视野。
+
+30 个入口 → 侧栏 **8 条**：运力资源(7 格) / 调度(3) / 在途监控(2) / 货运与商品(4) / 通知与反馈(3) /
+规则与账务(3) / AI 工作台(5) + 运营概览、智慧大屏各自独立（后者是全屏"看"的面，不是操作面）。
+看板 7 个快捷入口与调度中心"看运输链"那一跳，改成 `{path: 工作台, query:{tab: 那一格}}`。
+
+### 二、凭证（同轮实测，不是自述）
+
+- 第 16 本：白名单 16→**17** 支、探针 34→**39** 格；V057 连跑两遍**零行漂移**、39/39 对得上。
+- 28 条静态闸命令全 `rc=0`；SFC 扫 **251** 只 `.vue` 0 失败；`vue-tsc` 0 错；`build:prod` `rc=0`（dist-prod 290 个 js）；
+  vitest **5 文件 / 59 用例**；eslint 0 error（7 条既有 warning）。
+- 浏览器真栈（一次性库 + 后端 48080 + vite 5173 + Redis 6390，V057 已 apply 到一次性库）：侧栏实测 8 条、
+  `?tab=vehicle` 直接开在车辆那一格、tab 条 `getComputedStyle` 现读 `sticky / z-index=3`、调度订单池真出 20+ 行；
+  **悬浮助手真出一稿 `道路阻断`**，同轮 `ai_invocation_log` 12→**13**（`order-semantic-classify|ok|325 tokens`），
+  而 `transport_order` 前后都是 **766** ⇒ 草稿确实没落进业务表。
+- 五个需要模型的口对 MiMo（`mimo-v2.6-flash`）：分类/归并/聚类/润色 `ready=true 且 parsed=true`
+  （润色那格底稿里的 4/120/3/87/207/12 一个没丢）；照片支撑度没配 `vision-model` 时 `ready=false` 并给原因，
+  没有拿模板话冒充结论。
+
+### 三、取数时踩到的环境坑（下次别再当成页面坏了）
+
+`sql/promo/*.sql` 的 INSERT 写 `tenant_id = 0`，而 `transport_vehicle` / `transport_station` 这些 DO 继承
+`TenantBaseDO` ⇒ 查询按租户过滤，`admin`（tenant_id=1）进去看全是空表。本机点验要先灌 promo
+再把 `transport_* / member_*` 的 `tenant_id` 归到 1（只在一次性库里做，脚本 `tmp/seed_check_db.py`）。
+
+### 四、这一格还欠着的
+
+① V057 云端 `mode=apply` 未执行（合并 ≠ 写库，要人显式 `confirm=APPLY`）；
+② 云后台仍 `NOT VERIFIED IN BROWSER`（要用户拉一次滑块）；
+③ **像素级美化没验**：本机 in-app 浏览器面只有 534px 且截图面不可用（`visibilityState=hidden`），
+能测的只有结构与计算样式（canvas 431×280/320、无横向溢出、sticky 生效），配色与观感那一格不许凭手感说"好看了"。
+
