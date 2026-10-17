@@ -282,6 +282,9 @@ fun BusCard(
             .then(if (gradientOverlay != null) Modifier.background(gradientOverlay, shape) else Modifier)
             .then(if (!t.isDark) Modifier.background(t.primary.copy(alpha = 0.02f)) else Modifier)
             .then(if (border || t.isDark) Modifier.border(1.dp, t.line, shape) else Modifier.border(0.5.dp, t.line.copy(alpha = 0.4f), shape))
+            // 顶边一道高光（玻璃的边缘感），底面仍是**不透明**卡色：内容卡的对比度不动，
+            // 只有浮起来的那些面（胶囊 / 顶栏 / 通栏条 / 对话框）才许半透明 —— 见 FluidBackground.kt 的 glassmorphic。
+            .glassSheen(t, shape)
             .then(if (pressed) Modifier.background(Color.Black.copy(alpha = 0.04f)) else Modifier)
             .then(
                 if (onClick != null) {

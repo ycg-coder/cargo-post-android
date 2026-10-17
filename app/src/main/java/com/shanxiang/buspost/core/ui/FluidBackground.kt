@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -146,6 +147,27 @@ fun Modifier.glassmorphic(
     .border(
         width = 0.5.dp,
         color = if (tokens.isDark) tokens.line else Color.White.copy(alpha = 0.25f),
+        shape = shape,
+    )
+
+/**
+ * 玻璃的那一道**边缘高光**：只在顶边给一条"中间亮、两端隐"的亮线，到底部 fade 成透明。
+ *
+ * 为什么单列一个 modifier 而不是把 alpha 调高：2026 那一档玻璃感靠的不是透明度，是**边缘**——
+ * 同一块半透明面，有一条亮边就读得出"厚度"，没有就只是一张褪色的纸。
+ * 反过来说它也不能代替对比度：这条线只有 1dp，正文颜色与表面色一律不动。
+ *
+ * 深色模式压到 0.16f：白线在深底上等于一条划痕，浅底上才是玻璃。
+ */
+fun Modifier.glassSheen(tokens: BusTokens, shape: Shape = RoundedCornerShape(0.dp)): Modifier =
+    this.border(
+        width = 1.dp,
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = if (tokens.isDark) 0.16f else 0.80f),
+                Color.Transparent,
+            ),
+        ),
         shape = shape,
     )
 

@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -38,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusIcons
+import com.shanxiang.buspost.core.ui.glassmorphic
+import com.shanxiang.buspost.core.ui.glassSheen
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusSwitch
 import com.shanxiang.buspost.core.ui.LocalBusDriving
@@ -103,12 +104,14 @@ fun StickyActionBar(
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
     val touch = LocalBusTouch.current
+    val topShape = RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l)
     Column(
         modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l))
-            .clip(RoundedCornerShape(topStart = BusRadius.l, topEnd = BusRadius.l))
-            .background(if (t.isDark) t.cardWarm else t.card)
+            // 这一条是**浮在工作台内容之上**的（`StickyBarScaffold` 量它的高度再让内容让位），
+            // 所以它走玻璃面而不是实色卡：半透明渐变 + 顶边高光，跟悬浮胶囊是同一套语言。
+            .glassmorphic(t, shape = topShape, shadowElevation = 8.dp, tint = if (t.isDark) t.cardWarm else t.card)
+            .glassSheen(t, topShape)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         if (!hint.isNullOrBlank()) {

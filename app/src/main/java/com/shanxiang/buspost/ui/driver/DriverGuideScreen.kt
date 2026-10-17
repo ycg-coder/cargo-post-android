@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -59,6 +58,9 @@ import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
 import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
+import com.shanxiang.buspost.core.ui.BusElevation
+import com.shanxiang.buspost.core.ui.glassmorphic
+import com.shanxiang.buspost.core.ui.glassSheen
 import com.shanxiang.buspost.core.ui.LocalBusDriving
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
@@ -69,6 +71,7 @@ import com.shanxiang.buspost.ui.common.CapsuleAction
 import com.shanxiang.buspost.ui.common.CapsuleActions
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.common.MapMarker
+import com.shanxiang.buspost.ui.common.capsuleReserve
 import com.shanxiang.buspost.ui.common.RouteUnavailableState
 import com.shanxiang.buspost.ui.common.markerOptionsOf
 
@@ -289,9 +292,14 @@ fun DriverGuideScreen() {
     val topReserve = if (topPx == 0) 170.dp else with(density) { topPx.toDp() }
     // 底部原来那条通栏按钮条撤了（功能按钮搬进悬浮胶囊，胶囊是浮在地图上的、不占地图高度），
     // 所以这一格只剩"到站那一格"的高度；它没出现时就是 0，不许留一条 96dp 的空白把地图压矮。
+    //
+    // ⚠ 但它不是唯一浮在地图下沿的东西：**全局悬浮胶囊也画在同一格底部**（本页登记了播报 / 看整段 / 退出导航）。
+    // 2026-10-17 自查发现到站那一格右下的「回工作台作业」整枚按钮被胶囊盖在下面 —— 看着还剩半截，
+    // 点下去走的是胶囊那一格。修法是让到站格**浮在胶囊之上**（下面那句 `padding(bottom = capsuleReserve())`），
+    // 而地图让出的高度要一并把胶囊那一格算进去，否则路口放大图又换成被到站格压住。
     val bottomReserve = when {
-        bottomPx > 0 -> with(density) { bottomPx.toDp() } + 8.dp
-        arrivedStop != null -> 84.dp
+        bottomPx > 0 -> with(density) { bottomPx.toDp() } + capsuleReserve() + 8.dp
+        arrivedStop != null -> 84.dp + capsuleReserve()
         else -> 0.dp
     }
 
@@ -347,8 +355,13 @@ fun DriverGuideScreen() {
                 recalcText = engineRecalcTextOf(recalc),
             )
             // ---- 底部：只剩"到站那一格"（高德说的）。语音 / 结束两格搬进悬浮胶囊，不再占通栏 ----
+            // 它浮在胶囊**之上**而不是同一格底部：胶囊正压着这一格右下的「回工作台作业」（见 bottomReserve 注）。
             Column(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomPx = it.height },
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = capsuleReserve())
+                    .onSizeChanged { bottomPx = it.height },
             ) {
                 arrivedStop?.let { arrived ->
                     GuideArrivedCard(
@@ -771,7 +784,14 @@ private fun GuideArrivedCard(arrived: ArrivedStop, onGoWorkbench: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(t.goldLight)
+            .padding(horizontal = 10.dp)
+            .glassmorphic(
+                t,
+                shape = RoundedCornerShape(BusRadius.m),
+                shadowElevation = BusElevation.floating,
+                tint = if (t.isDark) t.cardWarm else t.goldLight,
+            )
+            .glassSheen(t, shape = RoundedCornerShape(BusRadius.m))
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

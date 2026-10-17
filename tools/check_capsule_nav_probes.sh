@@ -75,7 +75,7 @@ fail=0
 
 [ "$CA_DEF" = 1 ] || { echo "× CN-a 胶囊实现不是恰好一份（现 $CA_DEF）：两处实现就会长成两套答案"; fail=1; }
 [ "$CA_USE" = 1 ] || { echo "× CN-a 根上画它的地方不是恰好一处（现 $CA_USE）：多一处就是屏幕上会叠两条"; fail=1; }
-[ "$CB_REG" = 4 ] || { echo "× CN-b 登记胶囊的屏数不是 4（现 $CB_REG，预期 两个壳 + BusScreen + DriverGuideScreen）：新增一屏要同轮登记，撤一屏要写理由"; fail=1; }
+[ "$CB_REG" = 5 ] || { echo "× CN-b 登记胶囊的屏数不是 5（现 $CB_REG，预期 两个壳 + BusScreen + DriverGuideScreen + MapPointPickerScreen）：新增一屏要同轮登记，撤一屏要写理由"; fail=1; }
 [ "$CB_HOST" = 1 ] || { echo "× CN-b 根上没有提供那一份共享状态（现 $CB_HOST）：页面登记了也没人画"; fail=1; }
 [ "$CC_TABBAR" = 0 ] || { echo "× CN-c 旧的通栏底部 tab 又出现 $CC_TABBAR 处：主导航只许有悬浮胶囊一份（正对照 CN-c 的 $CC_PROOF）"; fail=1; }
 [ "$CC_BOTTOM" = 0 ] || { echo "× CN-c bottomBar 还在代码里（现 $CC_BOTTOM）：BusScaffold 的底部槽位已撤，留着就是有人往 Scaffold 里塞第二条栏"; fail=1; }
