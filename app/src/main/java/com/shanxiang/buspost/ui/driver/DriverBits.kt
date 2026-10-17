@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusIcons
-import com.shanxiang.buspost.core.ui.glassmorphic
+import com.shanxiang.buspost.core.ui.glassBar
 import com.shanxiang.buspost.core.ui.glassSheen
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.BusSwitch
@@ -108,9 +108,10 @@ fun StickyActionBar(
     Column(
         modifier
             .fillMaxWidth()
-            // 这一条是**浮在工作台内容之上**的（`StickyBarScaffold` 量它的高度再让内容让位），
-            // 所以它走玻璃面而不是实色卡：半透明渐变 + 顶边高光，跟悬浮胶囊是同一套语言。
-            .glassmorphic(t, shape = topShape, shadowElevation = 8.dp, tint = if (t.isDark) t.cardWarm else t.card)
+            // 这一条是**浮在会滚的正文之上**的（`StickyBarScaffold` 量它的高度再让内容让位），
+            // 所以它走 `glassBar` 那一档（0.97/0.94）而不是标准玻璃：标准档在地图/纸底上好看，
+            // 但背后是一整页任务卡时，"开始车道级导航"这类字会从按钮背后透出来（真机 2026-10-18 用户："也要考虑美观"）。
+            .glassBar(t, shape = topShape, tint = if (t.isDark) t.cardWarm else t.card)
             .glassSheen(t, topShape)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {

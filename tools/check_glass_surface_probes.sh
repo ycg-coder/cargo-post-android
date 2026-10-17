@@ -33,8 +33,10 @@ one_count() { grep -nE "$1" "$2" 2>/dev/null | grep -vE "$CMT" | wc -l | tr -d '
 GA_DEF=$(one_count '^fun Modifier\.glassSheen\(' "$FB")
 GA_USE=$(grep -rnE '\.glassSheen\(' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'fun Modifier.glassSheen' | wc -l | tr -d ' ')
 
-# GL-b 浮面用 glassmorphic 的调用点（定义那一处不算）
-GB_USE=$(grep -rnE '\.glassmorphic\(' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'fun Modifier.glassmorphic' | wc -l | tr -d ' ')
+# GL-b 浮面用玻璃的调用点（定义那两处不算）：标准档 4 + 压正文那一档 1 = 5
+GB_USE=$(grep -rnE '\.glassmorphic\(|\.glassBar\(' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'fun Modifier.glassmorphic' | grep -v 'fun Modifier.glassBar' | wc -l | tr -d ' ')
+GB_HEAVY=$(one_count '\.glassBar\(' "$TB")
+GB_LIGHT=$(one_count '\.glassmorphic\(' "$TB")
 GB_CAPSULE=$(one_count '\.glassmorphic\(' "$CN")
 GB_TOPBAR=$(one_count '\.glassmorphic\(' "$CP")
 GB_STICKY=$(one_count '\.glassmorphic\(' "$TB")
@@ -48,8 +50,8 @@ GC_SHEEN_CARD=$(one_count '\.glassSheen\(t, shape\)' "$CP")
 # GL-d 透明度只写在 FluidBackground 这一份里（里面三处：玻璃面两档 + 高光两档）
 # ⚠ 认的是**那两对数值**，不是"任何带 isDark 的 alpha"：`MapCanvas.kt` 里也有两处按主题分档的 alpha，
 #   那是自绘地图的网格线与路线高光，跟表面玻璃没关系 —— 用形状去认就会把它误判成抄档（第一轮就误在这里）。
-GD_ALPHA=$(one_count 'alpha = if \(tokens\.isDark\)' "$FB")
-GD_OUT=$(grep -rnE '0\.88f else 0\.93f|0\.16f else 0\.80f' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'core/ui/FluidBackground.kt' | wc -l | tr -d ' ')
+GD_ALPHA=$(one_count 'if \(tokens\.isDark\) [0-9.]+f else [0-9.]+f' "$FB")
+GD_OUT=$(grep -rnE '0\.88f else 0\.93f|0\.16f else 0\.80f|0\.95f else 0\.97f|0\.92f else 0\.94f' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'core/ui/FluidBackground.kt' | wc -l | tr -d ' ')
 GD_LEAK=$(grep -rnE 'glassmorphic\([^)]*alpha' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | wc -l | tr -d ' ')
 
 # GL-e 深浅两档的高光值
@@ -60,16 +62,18 @@ fail=0
 [ "$GA_DEF" = 1 ] || { echo "× GL-a 边缘高光不是恰好一份实现（现 $GA_DEF）：两处实现就会长成两套厚薄"; fail=1; }
 [ "$GA_USE" = 4 ] || { echo "× GL-a 吃到高光的面不是 4（现 $GA_USE：内容卡 / 通栏条 / 到站格 / 选点面板）：铺开铺漏了这一格就红"; fail=1; }
 [ "$GB_USE" = 5 ] || { echo "× GL-b 用玻璃浮面的地方不是 5（现 $GB_USE）：浮面与内容面要分得开，多一处就是有人把内容卡也调成半透明"; fail=1; }
-{ [ "$GB_CAPSULE" = 1 ] && [ "$GB_TOPBAR" = 1 ] && [ "$GB_STICKY" = 1 ] && [ "$GB_ARRIVED" = 1 ] && [ "$GB_PICKER" = 1 ]; } || { echo "× GL-b 五个浮面缺一个（胶囊 $GB_CAPSULE 顶栏 $GB_TOPBAR 通栏 $GB_STICKY 到站 $GB_ARRIVED 选点 $GB_PICKER）"; fail=1; }
+{ [ "$GB_CAPSULE" = 1 ] && [ "$GB_TOPBAR" = 1 ] && [ "$GB_ARRIVED" = 1 ] && [ "$GB_PICKER" = 1 ]; } || { echo "× GL-b 四个标准浮面缺一个（胶囊 $GB_CAPSULE 顶栏 $GB_TOPBAR 到站 $GB_ARRIVED 选点 $GB_PICKER）"; fail=1; }
+[ "$GB_HEAVY" = 1 ] || { echo "× GL-b 工作台通栏条没走 glassBar 那一档（现 $GB_HEAVY，标准档 $GB_LIGHT）：它背后是一整页会滚的正文，标准 0.93/0.88 会让字从按钮后面透出来"; fail=1; }
+[ "$GB_LIGHT" = 0 ] || { echo "× GL-b 工作台通栏条又用回标准玻璃（现 $GB_LIGHT）：同上一条，正文会透字"; fail=1; }
 [ "$GC_FILL" = 1 ] || { echo "× GL-c 内容卡的实色底被改掉了（现 $GC_FILL）：卡片一旦半透明，正文就要跟背后的流体背景赌对比度"; fail=1; }
 [ "$GC_SHEEN_CARD" = 1 ] || { echo "× GL-c 内容卡没吃到那道高光（现 $GC_SHEEN_CARD）：玻璃感靠边缘，不靠把卡色调淡"; fail=1; }
-[ "$GD_ALPHA" = 3 ] || { echo "× GL-d 透明度档位不是那三处（现 $GD_ALPHA：玻璃面 2 + 高光 1）：改档要连同本行一起改"; fail=1; }
+[ "$GD_ALPHA" = 5 ] || { echo "× GL-d 透明度档位不是那五处（现 $GD_ALPHA：标准玻璃面 2 + 压正文那一档 2 + 高光 1）：改档要连同本行一起改"; fail=1; }
 [ "$GD_OUT" = 0 ] || { echo "× GL-d 有 $GD_OUT 处在 FluidBackground 之外抄了按主题分档的 alpha：质感要单一真值"; fail=1; }
 [ "$GD_LEAK" = 0 ] || { echo "× GL-d 有页面在调用点抄 alpha（现 $GD_LEAK）"; fail=1; }
 [ "$GE_LIGHT" = 1 ] || { echo "× GL-e 深浅两档高光压成了同一个值（现 $GE_LIGHT）：白线在深色主题上就是划痕"; fail=1; }
 
 if [ "$fail" = 0 ]; then
-  echo "玻璃表面判据通过（实现 $GA_DEF/高光面 $GA_USE/浮面 $GB_USE/内容卡实色 $GC_FILL/alpha 单源 $GD_ALPHA）"
+  echo "玻璃表面判据通过（实现 $GA_DEF/高光面 $GA_USE/浮面 $GB_USE（含压正文那一档 $GB_HEAVY）/内容卡实色 $GC_FILL/alpha 单源 $GD_ALPHA）"
 else
   echo "玻璃表面判据失败"
 fi

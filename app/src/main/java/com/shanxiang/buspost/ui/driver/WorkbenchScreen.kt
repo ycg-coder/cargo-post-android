@@ -1303,9 +1303,13 @@ private fun WorkbenchActionBar(
         BusButton(
             text = "扫码作业",
             icon = BusIcons.qr,
-            variant = BusButtonVariant.OUTLINE,
+            // TONAL 而不是 OUTLINE（真机 2026-10-18 用户："和这个界面不太搭配"）：
+            // 左边那颗是实心主色板，右边这颗只剩一圈描边，两颗差一个视觉重量档，
+            // 在通栏条里像"一颗按钮 + 一个没画完的框"。软色实心板让两颗都有面，主次留给饱和度过渡。
+            variant = BusButtonVariant.TONAL,
             enabled = !busy,
-            modifier = Modifier.weight(1f),
+            // 1 : 0.78 —— 主操作占多一点，这一排就不是"两个一样大的东西抢"，而是一眼看得出先按哪个
+            modifier = Modifier.weight(0.78f),
             onClick = onOpenScanSheet,
         )
     }

@@ -108,8 +108,18 @@ fun NetworkImage(
     )
 }
 
-/** 站牌式按钮：实板 + 顶部浅色落款横档，等价 .btn-primary / .btn-orange */
-enum class BusButtonVariant { PRIMARY, CLAY, GOLD, OUTLINE, GHOST, DANGER, TEXT }
+/**
+ * 站牌式按钮的档位：实板 + 顶部浅色落款横档，等价 .btn-primary / .btn-orange。
+ *
+ * `TONAL` 是"同一排里的第二颗"：软色实心板 + 主色字，介于 `PRIMARY`（实心主色）与
+ * `OUTLINE`（只有一圈描边）之间。
+ *
+ * 为什么要有它（真机 2026-10-18 用户："工作台那两颗按钮和这个界面不太搭配"）：
+ * 通栏条里一边一颗 `PRIMARY`（实心蓝块）+ 一颗 `OUTLINE`（几乎只剩一圈线），
+ * 两颗的**视觉重量差一个档** —— 那颗描边的在浅底上像"还没画完"，
+ * 而实心那颗又重到压住整条。软色实心板让两颗**都有面**，主次仍然交给饱和度过渡。
+ */
+enum class BusButtonVariant { PRIMARY, CLAY, GOLD, TONAL, OUTLINE, GHOST, DANGER, TEXT }
 
 @Composable
 fun BusButton(
@@ -135,6 +145,7 @@ fun BusButton(
         BusButtonVariant.CLAY -> t.clay
         BusButtonVariant.GOLD -> t.goldDeep
         BusButtonVariant.DANGER -> t.danger
+        BusButtonVariant.TONAL -> t.primaryLight
         else -> t.card
     }
     // 不可用不能只靠"把整块板调淡"：45% 白字落在 45% 蓝板上，字与板实测只差 1.37:1，等于把按钮名字抹掉。
@@ -145,6 +156,9 @@ fun BusButton(
         else -> t.primaryOnLight
     }
     val outlined = variant == BusButtonVariant.OUTLINE || variant == BusButtonVariant.GHOST
+    // TONAL 要**吃板**但不算 `filled`：`filled` 一并决定"字用 onPrimary（白）"，
+    // 而软色板上放白字实测只有 1.6:1 —— 白字是给实心主色板准备的，不是给所有有底的档位。
+    val tonal = variant == BusButtonVariant.TONAL
     val pressed = remember { MutableInteractionSource() }
     val isPressed by pressed.collectIsPressedAsState()
     val dimmed = !enabled || loading
@@ -159,7 +173,7 @@ fun BusButton(
             .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
             .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .clip(shape)
-            .background(if (filled) board else Color.Transparent, shape)
+            .background(if (filled || tonal) board else Color.Transparent, shape)
             .then(
                 if (outlined) {
                     Modifier.border(1.dp, if (!enabled) t.line else t.lineDeep, shape)

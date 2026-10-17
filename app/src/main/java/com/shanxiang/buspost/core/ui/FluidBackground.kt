@@ -131,15 +131,14 @@ fun Modifier.glassmorphic(
     shape: RoundedCornerShape = RoundedCornerShape(0.dp),
     shadowElevation: Dp = 4.dp,
     tint: Color = tokens.card,
+    alphaTop: Float = if (tokens.isDark) 0.88f else 0.93f,
+    alphaBottom: Float = if (tokens.isDark) 0.80f else 0.88f,
 ): Modifier = this
     .shadow(shadowElevation, shape)
     .drawBehind {
         drawRect(
             brush = Brush.verticalGradient(
-                colors = listOf(
-                    tint.copy(alpha = if (tokens.isDark) 0.88f else 0.93f),
-                    tint.copy(alpha = if (tokens.isDark) 0.80f else 0.88f),
-                ),
+                colors = listOf(tint.copy(alpha = alphaTop), tint.copy(alpha = alphaBottom)),
             ),
         )
     }
@@ -149,6 +148,33 @@ fun Modifier.glassmorphic(
         color = if (tokens.isDark) tokens.line else Color.White.copy(alpha = 0.25f),
         shape = shape,
     )
+
+/**
+ * **压在会滚的正文之上**的那一类浮面（司机工作台通栏条）用的玻璃：形状、描边、阴影与 [glassmorphic] 完全一样，
+ * 只把透明度提上去。
+ *
+ * 为什么要有第二档（真机 2026-10-18 用户口径"也要考虑美观"）：0.93/0.88 那一档在地图、纸底这类
+ * **没有小字**的背景上很好看，但通栏条背后是一整页会滚的任务卡与按钮 —— 列表滚过去时，
+ * "开始车道级导航""展开更多（定位·路线·里程·车道）"这些字会**从按钮背后透出来**，
+ * 读起来不像玻璃，像没对齐的两层字。
+ * 这一档提到 0.97/0.94（深色 0.95/0.92）：还留着一丝透（滚动能感觉到），但正文不再成字。
+ *
+ * ⚠ 只给"背后是正文"的浮面。胶囊 / 顶栏 / 到站格 / 选点面板仍走 [glassmorphic] 那一档 ——
+ * 全工程透明度档位仍然只有 `FluidBackground.kt` 这一份（判据 GL-d）。
+ */
+fun Modifier.glassBar(
+    tokens: BusTokens,
+    shape: RoundedCornerShape,
+    shadowElevation: Dp = 8.dp,
+    tint: Color = tokens.card,
+): Modifier = glassmorphic(
+    tokens = tokens,
+    shape = shape,
+    shadowElevation = shadowElevation,
+    tint = tint,
+    alphaTop = if (tokens.isDark) 0.95f else 0.97f,
+    alphaBottom = if (tokens.isDark) 0.92f else 0.94f,
+)
 
 /**
  * 玻璃的那一道**边缘高光**：只在顶边给一条"中间亮、两端隐"的亮线，到底部 fade 成透明。

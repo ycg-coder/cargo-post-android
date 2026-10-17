@@ -148,5 +148,19 @@ printf 'UB-h 低于 48dp 的轮播视口          : %s （在册恰好 1 = D-UI-
 [ "$ub_g" = 0 ] || { echo "× UB-g 有低于 48dp 的手搓按钮状块：驾驶模式 56dp 下限对它完全不生效"; ok=0; }
 [ "$ub_h" = 1 ] || { echo "× UB-h 轮播视口数不是恰好 1（现 $ub_h）：多了=新增长在这种视口里的可点块；少了=那一条被抬到 48dp（那要连 D-UI-1 一起销账，不许顺手改闸）。⚠ 2026-10-15 由 2 降到 1 不是抬高：第二条是首页那个**零调用点**的旧轮播渲染件（42dp 视口从来没上过屏，D-UI-1 当时把它记成了真欠账），随 D-120 一起删掉 ⇒ 在册残留只剩活的那一条 HomeScreen.kt 的 28dp 视口"; ok=0; }
 
+# UB-i 一排里的"第二颗"必须吃 TONAL（真机 2026-10-18 用户："工作台的确认发车和扫码作业和这个界面不太搭配"）
+#     实心 PRIMARY 旁边挂一颗只剩描边的 OUTLINE ⇒ 两颗差一个视觉重量档，看着像"一颗按钮 + 一个没画完的框"
+ub_i_def=$(grep -cE '^enum class BusButtonVariant' "$M/core/ui/Components.kt")
+ub_i_tonal=$(grep -cE 'TONAL' "$M/core/ui/Components.kt")
+ub_i_board=$(grep -cE 'BusButtonVariant\.TONAL -> t\.primaryLight' "$M/core/ui/Components.kt")
+ub_i_scan=$(grep -A12 'text = "扫码作业"' "$M/ui/driver/WorkbenchScreen.kt" | grep -c 'variant = BusButtonVariant.TONAL')
+ub_i_bad=$(grep -A12 'text = "扫码作业"' "$M/ui/driver/WorkbenchScreen.kt" | grep -c 'BusButtonVariant.OUTLINE')
+printf 'UB-i 档位定义/TONAL 出现/板色/扫码那颗 : %s/%s/%s/%s （坏形 %s，目标 1/≥3/1/1 且坏形 0）
+' "$ub_i_def" "$ub_i_tonal" "$ub_i_board" "$ub_i_scan" "$ub_i_bad"
+[ "$ub_i_def" = 1 ] || { echo "× UB-i 档位枚举不是恰好一份（现 $ub_i_def）：两套档位表就是同一问题两个答案"; ok=0; }
+[ "$ub_i_board" = 1 ] || { echo "× UB-i TONAL 的板色没接进 when（现 $ub_i_board）：档位加了但画不出来"; ok=0; }
+[ "$ub_i_scan" = 1 ] || { echo "× UB-i 工作台「扫码作业」没吃 TONAL（现 $ub_i_scan）：它左边那颗是实心 PRIMARY，两颗差一个重量档就是用户说的那句不搭配"; ok=0; }
+[ "$ub_i_bad" = 0 ] || { echo "× UB-i 工作台「扫码作业」又长回描边档（现 $ub_i_bad）：同上一条"; ok=0; }
+
 [ "$ok" = 1 ] || exit 1
 echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处）"
