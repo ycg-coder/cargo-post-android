@@ -16,7 +16,7 @@
 连跑两遍**零行漂移**。浏览器真栈点过：侧栏 8 条、`?tab=vehicle` 直开那一格、tab 条计算样式 `sticky/z-index=3`、
 **悬浮助手真出一稿 `道路阻断`** 且同轮 `ai_invocation_log` 12→**13** 而 `transport_order` **766** 不动。
 凭证：28 条静态闸 `rc=0`、SFC **251** 只 0 失败、`vue-tsc` 0 错、`build:prod` `rc=0`、vitest **5 文件/59 用例**、eslint 0 error。
-⚠ 三格仍欠：V057 云端 **apply 未执行**（要人给 `confirm=APPLY`）、云后台仍 `NOT VERIFIED IN BROWSER`、
+⚠ 三格仍欠：V057 云端 apply **已执行且作业转绿**（run 38997935472 = success，五格 7/7/27/11/8 全数满，D-150）、云后台仍 `NOT VERIFIED IN BROWSER`、
 **像素级美化没验**（本机浏览器面 534px 且截图面不可用，只测了结构与计算样式）。）
 
 最后更新：2026-10-16（深夜收工，D-139 … D-144 · AI 那条线做完（唯一外呼口 + 5 个模型任务 + 1 条规则情景提示，

@@ -9786,3 +9786,59 @@ nginx `root /opt/cargo-post-web` ⇒ 管理端就在域名根。
 ③ **像素级美化没验**：本机 in-app 浏览器面只有 534px 且截图面不可用（`visibilityState=hidden`），
 能测的只有结构与计算样式（canvas 431×280/320、无横向溢出、sticky 生效），配色与观感那一格不许凭手感说"好看了"。
 
+## D-150 · V057 已在云上落地；两件事被实测推翻：我自己那条"让读数可见"的修复是无效的，以及 `cargoadmin` 那格断言的对象从来不存在（2026-10-17 中午）
+
+**先说落地**：`Deploy to dev server`（run 38992175644）成功；guarded `mode=apply` 最终一轮（run 38997935472）**`success`**，
+V057 五格全数满 **7 / 7 / 27 / 11 / 8** ⇒ 云上那张库的侧栏确实收成 8 条，旧路由仍在（只 `visible=0`）。
+
+### 一、我上一条"修复"是无效的，是它自己发的读数把它证伪的
+
+PR #200 的做法是"把 39 格探针汇成**一条注解**、发在同一个步骤的最后"。听着对，实际取不回来：
+`check-runs/{id}/annotations` **每一步只返回最早的 10 条 notice** —— 我那条排第 40，永远不在册
+（run 38994651948 实测：回来的正是 V032/V031/V035/V034/V033/V028/V030 那 10 条，`DBSTATE-ALL` 一条没有）。
+⇒ 改法必须是**形状**改：读数先 `printf > ${RUNNER_TEMP}/all_reads_{probe,verify}.txt` **落盘**
+（apply 侧写在 `exit 1` **之前**），再由一个**独立的、`if: always()` 的步骤**发
+⇒ 它是那一步的第 1 条注解，必然在册（run 38995564762 实测一次取回全量 39 格）。
+
+**教训（进 [[feedback-idle-gates-three-root-causes]]）**：凡是"发出去给人读"的通道，
+在依赖它之前要先证明**那条通道本身取得到**，不能只证明"我发了"。这与"打了日志但日志传不上来"是同一族，
+只是这次的测量对象是 CI 自己的注解配额。
+
+### 二、`cargoadmin=1` 那格红，红的是断言对象，不是迁移
+
+全量读数一取回来就看见：`cargo_admin 现0/期望0` **且** `cargoadmin 现0/期望1` —— 两个名字都在这张云库里不存在。
+⇒ 真因不是"V056 没落地"，而是 `sql/cloud/V001__cloud_accounts_init.sql` **从没在这张云库执行过**（apply 白名单是
+V028、V030–V037、V050–V057，不含 V001）；而 V056 只做"把已存在的号改名"，**它造不出一个本来就没有的号**。
+这一条同时结掉 D-148 那格"看不到"的未知。
+
+处置（纠正断言对象，不是改松凑绿）：
+- `cargo_admin=0` **留在** apply 必数集合 —— 这才是 V056 服务的真不变量（库里不该有会被登录校验
+  `^[a-zA-Z0-9]{4,30}$` 挡在鉴权之前的下划线管理员号）；
+- `cargoadmin=1` 挪出必数集合、改由只读 `check` 步打印 ⇒ 第 16 本 `EXPECT_PROBES` 39→**38**，
+  本机连库实测 17 支两遍零漂移、**38/38 对得上**；
+- `docs/部署操作手册.md` 的账号表按实测改成基线 `admin` / `admin123`（curl 示例那个登不上的号也改了），
+  并写明"要不要在公网机器上开一个默认口令的 `cargoadmin`"是**人的决定**，不由脚本替做。
+
+### 三、归因纠正：`actions/checkout` 在这台 runner 上不是"网络抖"
+
+同一天连着两次 `mode=check` 红在 `Run actions/checkout@v7`，D-148 记的是"GitHub 网络不稳（v4/v7 都抖过）"。
+拉了对照就站不住了：**同机同时间窗**的 `deploy-dev.yml` 一直绿 —— 差别是它**根本不用** `actions/checkout`
+（那一步叫 "Checkout (racing parallel tarball)"），而 `ci.yml` 绿是因为跑在 GitHub 托管 runner 上。
+⇒ 真正的判据是"这台 self-hosted 上有没有用 `actions/checkout`"，与版本无关；已给 guarded 补上同一套竞速下载作兜底（PR #201）。
+**喊"环境问题"之前先问"同一个窗口里谁成功了"**（进 [[feedback-build-attribution-toggles-need-quiet-builds]]）。
+
+### 四、凭证与 PR
+
+PR #199（集成本体）/ #200（汇总注解，被 #202 纠正）/ #201（checkout 兜底）/ #202（汇总独立步）/ #203（探针纠正 + 文档）全合。
+复跑：28 条静态闸命令 0 红；第 16 本 38/38 零漂移；`tmp/verify_wf_allreads.py` rc=0
+（YAML 解析、6 个 run 块逐个 `bash -n` ok、两条反证成立）。新踩一条：workflow 的 **step 名里带 `: `** 会让 YAML 报
+`mapping values are not allowed here` ⇒ 加引号。
+本机点验栈已按端口停干净（48080 / 5173 / 6390 剩余监听 0）；⚠ 裸 `bash` 在 python 里会解析到坏启动器，
+`bash -n` 四条全 rc=1 且 stderr 空 —— 那是**跑手没活**，改用 `C:\Program Files\Git\bin\bash.exe` 才拿到真结论。
+
+### 五、还欠的
+
+① 云后台仍 `NOT VERIFIED IN BROWSER`（要用户拉一次滑块）；② 像素级美化仍未验（视口/截图面不可用）；
+③ 云上点亮 AI 只差服务器侧四个值（`BUSPOST_AI_API_KEY` 走环境变量、`buspost.ai.enabled/base-url/model`）；
+④ `cargoadmin` 这个号到底开不开，等人拍板（开的话要给口令并决定 V001 是否收进白名单）。
+
