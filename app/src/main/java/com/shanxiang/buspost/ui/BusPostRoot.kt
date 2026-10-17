@@ -14,6 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
@@ -32,6 +33,9 @@ import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.nav.Routes
 import com.shanxiang.buspost.nav.deepLinkTarget
 import com.shanxiang.buspost.nav.startDestinationFor
+import com.shanxiang.buspost.ui.common.CapsuleHost
+import com.shanxiang.buspost.ui.common.CapsuleNavOverlay
+import com.shanxiang.buspost.ui.common.LocalCapsuleHost
 import com.shanxiang.buspost.ui.common.LocalNavController
 import com.shanxiang.buspost.ui.driver.DriverNavScreen
 import com.shanxiang.buspost.ui.driver.DriverGuideScreen
@@ -129,7 +133,11 @@ fun BusPostRoot() {
         splashStatus = "已就绪，轻触进入"
     }
 
-    CompositionLocalProvider(LocalNavController provides nav) {
+    // 全局悬浮胶囊的那一份共享状态：根上持有，页面用 CapsuleActions(...) 登记自己那一屏的功能按钮。
+    // remember 而不是类字段：配置变化/重组后仍要能拿到同一个 host（它内部是 mutableStateOf）。
+    val capsuleHost = remember { CapsuleHost() }
+
+    CompositionLocalProvider(LocalNavController provides nav, LocalCapsuleHost provides capsuleHost) {
     Box(Modifier.fillMaxSize()) {
     NavHost(
         navController = nav,
@@ -238,6 +246,10 @@ fun BusPostRoot() {
         // 乘车码：当地公交乘车二维码
         composable(Routes.BUS_QR) { com.shanxiang.buspost.ui.common.BusRouteBody { BusQrScreen() } }
     }
+
+    // 全局悬浮胶囊：浮在导航图之上、闪屏之下。全工程**只这一处**画它（判据 CN-a 钉）。
+    // 内容侧让出的高度由 BusScaffold / BusRouteBody 读同一个 host 决定，见 capsuleReserve()。
+    CapsuleNavOverlay(Modifier.align(Alignment.BottomCenter))
 
     // 闪屏压在导航图之上（含底部导航栏），与小程序"页面内 fixed 遮罩 + 隐藏 tabBar"等效
     if (splashVisible) {

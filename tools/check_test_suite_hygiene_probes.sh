@@ -109,7 +109,9 @@ done
 # SU-b 的期望值只有这一处定义：上一轮把它写成"echo 念 72、断言比 72、失败消息还留着 71"三个地方，
 # 下一次读失败消息的人会照 71 去核，核半天发现断言根本不是那个数（同一个问题两个答案 = 本仓 §八 ㉗ 那条）。
 # 76→77（2026-10-17，D-151）：本轮只新增一个测试文件，find 差集实测就 CurrentLegContractTest.kt 这一条。
-SUSB_EXPECT=77
+# 77→78（2026-10-17 晚，D-156）：同样只新增一个，find 差集实测就 ui/common/CapsuleNavContractTest.kt 这一条
+#   （6 条 @Test，钉悬浮胶囊那三条收口规则：必须有标签、禁用必须带原因、一栏最多五格）。
+SUSB_EXPECT=78
 
 echo "SU-a *Test.kt 文件数 / 其中 0 条 @Test 的空壳 = $SUA_FILES/$SUA_EMPTY （目标 ≥47/0：凑数空类归零）$SUA_EMPTY_LIST"
 echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 $SUSB_EXPECT/2：同一机制数得出 0 条，SU-a 的 0 不是空跑）"

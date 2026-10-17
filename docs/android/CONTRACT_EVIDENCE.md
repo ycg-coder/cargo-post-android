@@ -132,7 +132,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 `Models.kt:807→:816` 与 `:489→:488`（两处 distance 读点）、`Models.kt:1777-1782→:1774-1782`（quote 五键实际在 `:1775/1776/1777/1780/1781`）、
 `Repo.kt:1202→:1165`（`NavStep.etaSeconds`，块是 `:1157-1166`）、`Repo.kt:86→:87`（`Ack.amount` 默认值，`:86` 是 `pickupCode`）、
 以及 §七.3 那格里的 `:1273` 同批改正。
-另有 **2 处不是行号错、是判断错**：七.5 曾把 `BusScreen.kt:297` 记成 `BusLine.distanceMeters` 的消费点（那一行读的是 `Station` 的，
+另有 **2 处不是行号错、是判断错**：七.5 曾把 `BusScreen.kt:299` 记成 `BusLine.distanceMeters` 的消费点（那一行读的是 `Station` 的，
 且它的 `distanceKm` 候选有生产者，所以站点距离是真值），以及 `MultiLegPlanner.java:413` 是包级 `static` 而非"私有"——
 两处的更正写在 D-⑯-5 里，不抹掉初版说法以免看不出这是修正。
 剩下 2 条"解析不出"的是我的抽取器的误报，不是台账错：`.../idempotent/package-info.java:8`（省略号路径，实际存在且内容对）、
@@ -193,7 +193,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | `distanceKm`（司机段） | `Models.kt:1231` `multiNumOrNull`，**不给 `distance` 别名**（单位事故） | `AppDriverLegRespVO.java:59` ← `DriverAppServiceImpl.java:1628` | `12.4` | 键不在 / `null` / 给了 `distance:8000` | `null` ⇒ `legPlanText` 该项消失；两者都缺 ⇒ **整行不出**（`Models.kt:1061-1068`） | `DriverLegRespContractTest.kt:108-122`、`DistanceCaliberContractTest.kt:51-81` |
 | `distanceKm`（用户段 `/send/legs`） | 同上 | **PRODUCER_NOT_FOUND**：`AppSendLegRespVO.java:62-83` 九个字段里没有 `distanceKm`/`durationMinutes`（DO 有：`TransportLegDO.java:40`/`:42`，但 `AppSendController.java:172-185` 没拷进 VO） | — | 恒缺失 | ⇒ `null` ⇒ 时间轴不写"本段 X km" | `DriverLegRespContractTest.kt:126-140` |
 | `durationMinutes`（段） | `Models.kt:1194` ⇒ `null` | `AppDriverLegRespVO.java:62` ← `:1629`；`/send/legs` 无 | `35` | 键不在 | `null` | 同两行 |
-| `distance` / `meters`（裸键） | `Models.kt:843` `BusLine.distanceMeters = multiNum("distance","meters")`（字段声明 `:799` 自陈"旧字段：契约里没有这两个键，只保留解析以兼容旧报文；界面一律改读 `distanceKm`"）、`Models.kt:474` `Station` 的米制候选 `distance/distanceM/meters` | **PRODUCER_NOT_FOUND**：整个 `yudao-module-transport` 里 `private … distance;` / `private … meters;` / `getDistance()` 三种形状**各 0 命中**（`grep -rEc` 实测 0/0/0；只剩 `MultiLegPlanner.java:413` 的包级 `static double distance(StationDO, StationDO)`——那是 Haversine 工具方法，不作为响应字段序列化） | — | 恒缺失 | `BusLine.distanceMeters` ⇒ **恒 0.0**，且本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**已无消费点**（线路页读 `line.distanceKm`，`BusScreen.kt:578-579` 缺键说"里程未给"）。`Station.distanceMeters` 的米制候选同样不命中，但 `:487` 的 `distanceKm` 候选**有生产者**（`AppBusNearbyRespVO.java:120`/`:138`/`:189`）⇒ `BusScreen.kt:297`/`:384`/`:389`、`HomeScreen.kt:474`、`SendScreen.kt:1154` 上的是公里×1000 换算的真值，**不是恒 0 的那一个** | `DistanceCaliberContractTest.kt:36-48`（钉的是"米制不许当公里读"，不是这条缺失面）→ 七.10 缺陷 D-⑯-5 |
+| `distance` / `meters`（裸键） | `Models.kt:843` `BusLine.distanceMeters = multiNum("distance","meters")`（字段声明 `:799` 自陈"旧字段：契约里没有这两个键，只保留解析以兼容旧报文；界面一律改读 `distanceKm`"）、`Models.kt:474` `Station` 的米制候选 `distance/distanceM/meters` | **PRODUCER_NOT_FOUND**：整个 `yudao-module-transport` 里 `private … distance;` / `private … meters;` / `getDistance()` 三种形状**各 0 命中**（`grep -rEc` 实测 0/0/0；只剩 `MultiLegPlanner.java:413` 的包级 `static double distance(StationDO, StationDO)`——那是 Haversine 工具方法，不作为响应字段序列化） | — | 恒缺失 | `BusLine.distanceMeters` ⇒ **恒 0.0**，且本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**已无消费点**（线路页读 `line.distanceKm`，`BusScreen.kt:591-592` 缺键说"里程未给"）。`Station.distanceMeters` 的米制候选同样不命中，但 `:487` 的 `distanceKm` 候选**有生产者**（`AppBusNearbyRespVO.java:120`/`:138`/`:189`）⇒ `BusScreen.kt:299`/`:384`/`:389`、`HomeScreen.kt:474`、`SendScreen.kt:1154` 上的是公里×1000 换算的真值，**不是恒 0 的那一个** | `DistanceCaliberContractTest.kt:36-48`（钉的是"米制不许当公里读"，不是这条缺失面）→ 七.10 缺陷 D-⑯-5 |
 | `routeDistanceMeters` / `nextStopRoadDistanceMeters` | `Repo.kt:1276`（别名表第一位就是真名）、`Repo.kt:1119` | `AppDriverRouteRespVO.java:45`、`:81` ← `DriverAppServiceImpl.java:521`/`:717` | `24600` | 键不在 | `0` | `RouteGuideContractTest`（覆盖来源判定，不覆盖该键缺面） |
 | `distanceKm`（线路级） | `Models.kt:888` ⇒ `null` | `AppBusLineRespVO.java:28` ← `AppBusServiceImpl.java:179`；`NearbyBus:138` ← `:422` | `12.4` | 键不在 | `null` | `DistanceCaliberContractTest.kt:36-48` |
 
@@ -243,7 +243,7 @@ Android 一侧的读法收敛在两个 helper 族里：`Models.kt:37/51/60`（`m
 | D-⑯-2 | 交接 `remark` 发出后被后端静默丢弃（写不进去、读得到别人的） | 要么改 UI 说明（撞 ⑰"不扩大 UI"），要么改后端（撞常驻指令"不要重新设计后端"）。留给用户裁决 |
 | D-⑯-3 | `AppDriverLegRespVO.java:37` 的状态注释与真码表冲突 | 在后端仓，非本工程 |
 | D-⑯-4 | `roadEtaSeconds`/`NavStep.etaSeconds`/`MissionStop.estimatedArrivalMillis` 三处 `multiNum ⇒ 0` 无缺键用例 | 同 D-⑯-1 的口径问题，需要先定"0 秒"算不算谎报 |
-| D-⑯-5 | `BusLine.distanceMeters` 读的 `distance`/`meters` 两个键后端都不产 ⇒ 恒 0；本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**它已没有任何消费点**（线路页改读 `distanceKm`），是一个只保留解析的死字段 | 删字段撞常驻指令"不要删除字段以免破坏旧兼容"，留着就要在注释里钉死"恒 0 不代表真实里程"——两案都请用户裁决。⚠ **本节初版把 `BusScreen.kt:297` 记成它的消费点是错的**：那一行读的是 `Station.distanceMeters`（`Models.kt:473` 的 `distanceKm` 候选有生产者，所以站点距离是真值），已在七.5 改正 |
+| D-⑯-5 | `BusLine.distanceMeters` 读的 `distance`/`meters` 两个键后端都不产 ⇒ 恒 0；本轮复核 `grep -rn '\.distanceMeters' app/src/main` 后**它已没有任何消费点**（线路页改读 `distanceKm`），是一个只保留解析的死字段 | 删字段撞常驻指令"不要删除字段以免破坏旧兼容"，留着就要在注释里钉死"恒 0 不代表真实里程"——两案都请用户裁决。⚠ **本节初版把 `BusScreen.kt:299` 记成它的消费点是错的**：那一行读的是 `Station.distanceMeters`（`Models.kt:473` 的 `distanceKm` 候选有生产者，所以站点距离是真值），已在七.5 改正 |
 | D-⑯-6 | `Ack.amount` 的**键名错配**已收（㊻ 实测改读真键 `totalAmount`，`Repo.kt:572`），剩两半：缺键仍塌 0.0（`multiNum` 非 `multiNumOrNull`）、且目前无消费点 | 补用例要在 `Repo.kt:572` 的缺键形状上定"0 元收据"算不算谎报（与 D-⑯-1 同口径），属第 ⑱ 步之后的补丁 |
 | D-⑯-7 | `NearbyBooleanContractTest` 的样例写 `"vehicles"`，后端产 `"buses"` ⇒ 用例形状不等于线上形状 | 解析侧别名正确、功能不受影响；改样例属于测试数据修订，需同轮复跑 B-* 判据 |
 | D-⑯-8 | `Payload.total` 缺键回落 `list.size`、`NotifyMsg` 单条缺键（`id⇒0`）都无用例 | 补用例是纯增量，下一轮做 |
@@ -489,7 +489,7 @@ return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.
   会安静存成 **1970-01-01**，而界面上一切正常。这是本轮所有"只认数字 / 不许拼串"判据的来源；
 - `ZoneId.systemDefault()`：`deploy/docker-compose.yml:21` 与 `yudao-server/Dockerfile:12` 都是 `TZ=Asia/Shanghai`，
   MySQL URL 亦 `serverTimezone=Asia/Shanghai` ⇒ 本机用固定 `PICKUP_ZONE = Asia/Shanghai` 生成毫秒
-  （与 `BusScreen.kt:900` 同口径），设备换时区不会把墙钟挪走。
+  （与 `BusScreen.kt:913` 同口径），设备换时区不会把墙钟挪走。
 
 ### 18.3 小程序对照
 
@@ -527,20 +527,20 @@ return LocalDateTime.ofInstant(Instant.ofEpochMilli(p.getValueAsLong()), ZoneId.
 
 ### 19.2 旧形状为什么算缺陷（不是风格问题）
 
-`BusScreen.kt:665-667`：
+`BusScreen.kt:678-680`：
 ```kotlin
 val favIds = Prefs.favoriteLineIds
 val favLines = vm.lines.filter { it.id in favIds }
 if (favLines.isNotEmpty()) { …渲染整栏… }
 ```
-`vm.lines` 来自 `Repo.busLines(geo)`（`BusScreen.kt:251-253`），而旧写法只取 `lf.items`、把 `lf.error` 丢掉。
+`vm.lines` 来自 `Repo.busLines(geo)`（`BusScreen.kt:253-255`），而旧写法只取 `lf.items`、把 `lf.error` 丢掉。
 于是**三种完全不同的事共用一个形状**：没收藏（`favIds` 空）、线路列表这一轮没取到（error 非空）、
 收藏的线路确实不在当前列表里（下架/换号）—— 后两种都会让整栏消失，界面把"没取到"念成"没有收藏"。
 这与 D-079（政策页）、D-080（公告栏"没取到 vs 后端确实没有"）、#42（天气按角色）是同一族病。
 
 本轮的拆法：整栏闸门换成 `favoriteRowVisible(favIds.size)`（**本机记着几条**），
 未命中那一格 `favoriteUnresolvedText(idCount, resolvedCount, linesError)` 分两支，
-失败原因原样带出；`linesError` 从 `Feed.error` 接出来（`BusScreen.kt:130/246/714`）。
+失败原因原样带出；`linesError` 从 `Feed.error` 接出来（`BusScreen.kt:132/246/714`）。
 
 ### 19.3 用例先红的一条（红因在纯层，不在判据）
 

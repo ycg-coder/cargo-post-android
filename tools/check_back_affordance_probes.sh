@@ -44,7 +44,7 @@ for base, dirs, files in os.walk(root):
             while j < len(lines) and lines[j] != "}":
                 j += 1
             bodies.setdefault(m2.group(1), []).append("\n".join(lines[i:j + 1]))
-MARK = re.compile(r"BackTopBar\(|BusBackArrow\(|onBack\s*=\s*\{")
+MARK = re.compile(r"BackTopBar\(|BusBackArrow\(|onBack\s*=\s*\{|CapsuleActions\(")
 missing, hit = [], 0
 for d in sorted(dests):
     scr = dests[d]
@@ -67,16 +67,16 @@ BA_ROUGH=$(grep -rn "Icons\.\(Rounded\|AutoMirrored\|Filled\)\.ArrowBack" "$SRC/
 BA_SIGN=$(grep -rn "onBack = { nav.popBackStack() }" "$SRC/ui" --include=*.kt | wc -l | tr -d ' ')
 
 echo "BA-a 整屏路由目的地数        = $DESTS （目标 24：新增一屏就得同轮登记，不许悄悄扩大扫描面）"
-echo "BA-b 有可见出口的屏数        = $HIT （目标 21 = 24 − 下面那三条豁免）"
-echo "BA-c 无出口名单              = ${MISSING:-（空）} （目标恰好 BUS,DRIVER_GUIDE,DRIVER_NAV，按名排序）"
+echo "BA-b 有可见出口的屏数        = $HIT （目标 23 = 24 − 下面那一条豁免）"
+echo "BA-c 无出口名单              = ${MISSING:-（空）} （目标恰好 DRIVER_NAV，按名排序）"
 echo "BA-d 反证：扫到的屏函数体数   = $BODIES （目标 ≥30：数得出 0 缺口的解析器必须也数得出这么多体）"
 echo "BA-e 箭头实现份数 / ui 里手搓 = $BA_ARROW_DEF/$BA_ROUGH （目标 1/0：BusIcons.back 是唯一来源）"
 echo "BA-f 挂上的出口数            = $BA_SIGN （目标 6：BackTopBar 自己接的 1 + 司机消息 1 + 交接 1 + 寄货三步 3）"
 
 fail=0
 [ "$DESTS" = 24 ] || { echo "× BA-a 整屏路由数不是 24（$DESTS）：要么新增了屏没验出口，要么解析面塌了"; fail=1; }
-[ "$HIT" = 21 ] || { echo "× BA-b 有出口的屏不是 21（$HIT）：有整屏路由拿不出看得见的退出口"; fail=1; }
-[ "$MISSING" = "BUS,DRIVER_GUIDE,DRIVER_NAV" ] || { echo "× BA-c 无出口名单变了（$MISSING）：三条豁免是底部标签/沉浸导航/DEBUG-only，动它要写理由"; fail=1; }
+[ "$HIT" = 23 ] || { echo "× BA-b 有出口的屏不是 23（$HIT）：有整屏路由拿不出看得见的退出口"; fail=1; }
+[ "$MISSING" = "DRIVER_NAV" ] || { echo "× BA-c 无出口名单变了（$MISSING）：现在只剩 DEBUG-only 一条豁免（BUS 与 DRIVER_GUIDE 自 D-156 起由悬浮胶囊给出口），动它要写理由"; fail=1; }
 [ "${BODIES:-0}" -ge 30 ] || { echo "× BA-d 只扫到 $BODIES 个屏函数体：解析器没上岗，上面那个缺口读数不采信"; fail=1; }
 [ "$BA_ARROW_DEF" = 1 ] || { echo "× BA-e BusBackArrow 有 $BA_ARROW_DEF 份定义：返回键的形状要单一真源"; fail=1; }
 [ "$BA_ROUGH" = 0 ] || { echo "× BA-e ui/ 里出现 $BA_ROUGH 处手搓 ArrowBack：绕开 BusIcons.back 就没有统一形状与命中下限"; fail=1; }

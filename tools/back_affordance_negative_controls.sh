@@ -74,8 +74,10 @@ subst "$P/ui/BusPostRoot.kt" '        composable(Routes.WALLET)' \
 delline "$P/ui/driver/HandoverScreen.kt" '            onBack = { nav.popBackStack() },
 '; ctl BA-b "撤掉交接屏的返回出口"
 
-# BA-c 豁免名单被改名（BUS → BUSX）：名单必须跟着响，不然豁免成了永久通行证
-subst "$P/ui/BusPostRoot.kt" 'composable(Routes.BUS)' 'composable(Routes.BUSX)'; ctl BA-c "豁免名单里的屏被改名"
+# BA-c 豁免名单被改名（DRIVER_NAV → DRIVER_NAVX）：名单必须跟着响，不然豁免成了永久通行证。
+# 2026-10-17（D-156）换的靶子：原来这条打的是 BUS，而 BUS 自本轮起由悬浮胶囊给出口、已经不在豁免名单里，
+# 改名只会让 BA-a 的屏数跟着变 ⇒ 拿 DRIVER_NAV（现在唯一那条豁免，DEBUG-only）当靶子才还在判同一件事。
+subst "$P/ui/BusPostRoot.kt" 'composable(Routes.DRIVER_NAV)' 'composable(Routes.DRIVER_NAVX)'; ctl BA-c "豁免名单里的屏被改名"
 
 # BA-d 反证：解析器扫不到任何函数体时，"缺口=0"这种读数必须不采信
 subst "$SC/tools/check_back_affordance_probes.sh" 'for base, dirs, files in os.walk(root):' \
