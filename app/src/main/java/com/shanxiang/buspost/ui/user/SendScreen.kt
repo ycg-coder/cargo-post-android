@@ -915,8 +915,9 @@ fun SendScreen(vm: SendViewModel = viewModel()) {
                     BusButton(
                         text = "重新填写",
                         onClick = { vm.resetSend() },
-                        variant = BusButtonVariant.OUTLINE,
-                        modifier = Modifier.weight(1f),
+                        // TONAL + 0.78：与「确认发布」同排，描边档会让这一排像"一颗按钮 + 一个空框"（D-161 同一条）
+                        variant = BusButtonVariant.TONAL,
+                        modifier = Modifier.weight(0.78f),
                     )
                     BusButton(
                         text = "确认发布",

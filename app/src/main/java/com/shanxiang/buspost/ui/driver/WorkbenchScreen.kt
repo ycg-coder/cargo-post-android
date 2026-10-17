@@ -1665,7 +1665,8 @@ private fun PickupCard(
             Row(Modifier.padding(top = 11.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!loaded) {
                     BusButton("扫码装车", small = true, enabled = !busy, modifier = Modifier.weight(1f), onClick = onScanLoad)
-                    BusButton("核验码", small = true, variant = BusButtonVariant.OUTLINE, enabled = !busy, modifier = Modifier.weight(1f), onClick = onManualVerify)
+                    // TONAL：这一排左边那颗是实心 small 板，描边那颗在卡片底上同样"轻一档"（D-161 同一条口径）
+                    BusButton("核验码", small = true, variant = BusButtonVariant.TONAL, enabled = !busy, modifier = Modifier.weight(1f), onClick = onManualVerify)
                 } else if (!delivered) {
                     BusButton("扫码妥投", small = true, enabled = !busy, modifier = Modifier.weight(1f), onClick = onScanDeliver)
                     BusButton("联系寄件人", small = true, variant = BusButtonVariant.TEXT, modifier = Modifier.weight(1f), onClick = onCall)
