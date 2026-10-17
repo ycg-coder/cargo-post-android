@@ -101,9 +101,6 @@ internal fun capsuleDropped(actions: List<CapsuleAction>): Int =
 
 /**
  * 谁登记、谁显示之间的那格共享状态。根上 [LocalCapsuleHost] 提供一份，全工程只有这一份。
- */
-/**
- * 谁登记、谁显示之间的那格共享状态。根上 [LocalCapsuleHost] 提供一份，全工程只有这一份。
  *
  * 它是**一叠**而不是一格：详情页是从壳层**推**上去的，转场那一帧里两屏都活着，
  * 而壳层的 effect 不会重跑。若只存"最后一次写入"，从详情页返回时详情页 dispose 把格子清空、
