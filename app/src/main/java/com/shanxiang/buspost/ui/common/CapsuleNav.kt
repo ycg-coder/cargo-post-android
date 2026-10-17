@@ -79,6 +79,13 @@ data class CapsuleAction(
 internal const val CAPSULE_MAX = 5
 
 /**
+ * 一格的最小宽度（dp）。这是**观感**那一半：格子按内容长，两格的胶囊就会一边宽一边窄
+ * （真机 2026-10-18 用户端消息中心截图：左格念七个字、右格念"刷新"两个字，整枚歪着）。
+ * 撑到 76dp 之后，2 格与 5 格都是"等宽的一排"，而不是随文案长短抖出来的形状。
+ */
+internal const val CAPSULE_CELL_MIN_WIDTH_DP = 76
+
+/**
  * 登记进来的格子 → 胶囊真正显示的格子。规则只在这一份。
  *
  * 无标签的、以及"禁用又没给原因"的都被摘掉：前者点了不知道会发生什么，
@@ -234,7 +241,10 @@ private fun RowScope.CapsuleCell(action: CapsuleAction) {
                     Modifier
                 },
             )
-            .defaultMinSize(minWidth = touch.min, minHeight = touch.min)
+            .defaultMinSize(
+                minWidth = CAPSULE_CELL_MIN_WIDTH_DP.dp,
+                minHeight = touch.min,
+            )
             .padding(horizontal = 10.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

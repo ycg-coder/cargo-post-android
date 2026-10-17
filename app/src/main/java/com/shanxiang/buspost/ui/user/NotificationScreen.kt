@@ -1,11 +1,14 @@
 package com.shanxiang.buspost.ui.user
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,10 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -51,6 +56,8 @@ import com.shanxiang.buspost.core.ui.EmptyState
 import com.shanxiang.buspost.core.ui.ErrorState
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
+import com.shanxiang.buspost.core.ui.LocalBusTouch
+import com.shanxiang.buspost.core.ui.pressFeedback
 import com.shanxiang.buspost.core.ui.SkeletonList
 import com.shanxiang.buspost.data.model.NotifyMsg
 import com.shanxiang.buspost.data.repo.Repo
@@ -131,6 +138,7 @@ fun NotificationScreen(vm: NotificationViewModel = viewModel()) {
     val scale = LocalBusFontScale.current
     val nav = LocalNavController.current
     val context = LocalContext.current
+    val touch = LocalBusTouch.current
     val unread by AppState.unread.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { if (vm.items.isEmpty()) vm.load() }
@@ -140,12 +148,31 @@ fun NotificationScreen(vm: NotificationViewModel = viewModel()) {
             title = "消息中心",
             subtitle = if (unread > 0) "$unread 条未读" else "全部已读",
             actions = {
-                Text(
-                    "全部已读",
-                    color = t.onPrimary.copy(alpha = 0.9f),
-                    fontSize = (12.5 * scale).sp,
-                    modifier = Modifier.clickable { vm.readAll() },
-                )
+                // 这颗原来是裸 `Text + clickable`：实测 112x66px = 41x24dp，两个边都低于 48dp 下限，
+                // 而它做的是"一次清掉所有未读"这种最该一按就中的动作。
+                // 修法是把**命中区**撑到触控下限（视觉不动），不是把这格搬到悬浮胶囊上 ——
+                // 这一屏有顶栏、有返回，动作本来就在它该在的地方（用户口径："有些没必要悬浮就不要悬浮"）。
+                val readAllSrc = remember { MutableInteractionSource() }
+                Box(
+                    Modifier
+                        .clip(CircleShape)
+                        .pressFeedback(readAllSrc)
+                        .clickable(
+                            interactionSource = readAllSrc,
+                            indication = LocalIndication.current,
+                            enabled = unread > 0,
+                            onClick = { vm.readAll() },
+                        )
+                        .defaultMinSize(minWidth = touch.min, minHeight = touch.min)
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "全部已读",
+                        color = if (unread > 0) t.onPrimary.copy(alpha = 0.9f) else t.onPrimary.copy(alpha = 0.4f),
+                        fontSize = (12.5 * scale).sp,
+                    )
+                }
             },
         )
         BusPullRefresh(refreshing = vm.refreshing, onRefresh = { vm.reload() }) {
