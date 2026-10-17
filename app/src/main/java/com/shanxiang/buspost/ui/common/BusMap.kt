@@ -22,6 +22,7 @@ import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.MarkerOptions
+import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
 import com.shanxiang.buspost.core.map.RealRoadRouteValidator
 import com.shanxiang.buspost.core.map.RouteCheck
@@ -203,8 +204,17 @@ fun BusMap(
                 }
                 // 蓝点图层（与上面那个按钮是两回事）：只有调用方确认已授权才开 ——
                 // SDK 不会替我们弹权限框，未授权时开图层等于画一个永远不来位置的点。
-                // 不另设 MyLocationStyle：本 SDK 版本的样式常量名与文档不一致（实测
-                // `LOCATE_TYPE_LOCATION_CENTER_MAP` 不可解析），默认样式已是"定位到并把地图居中"。
+                // ⚠ 样式必须**显式设成"不居中"**：不设样式时高德默认把地图持续居中到我的位置，
+                // 于是"地图固定在上面滑动不了"（2026-10-17 真机 A/B：撤掉定位权限后同一处手势立刻能拖、
+                // 重新授权又拖不动 ⇒ 不是布局吃手势，是定位图层在抢镜头）。
+                // 旧注释说"样式常量名与文档不一致、不可解析"是把名字记错了：真名在
+                // `MyLocationStyle.LOCATION_TYPE_*` 这一族里（javap 实测八个常量都在），
+                // `FOLLOW_NO_CENTER` 正是"蓝点持续更新、地图不动"。
+                if (showMyLocation) {
+                    aMap.setMyLocationStyle(
+                        MyLocationStyle().myLocationType(MyLocationStyle.LOCATION_TYPE_FOLLOW_NO_CENTER),
+                    )
+                }
                 aMap.isMyLocationEnabled = showMyLocation
                 // 用户一碰地图，镜头就交还给他：fitTag 模式下此后不再自动拽回（换线路才恢复）
                 aMap.setOnMapTouchListener { _ -> userMoved = true }
