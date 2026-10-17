@@ -432,17 +432,23 @@ internal fun naviVoiceTypeNameOf(typeCode: Int?): String? = when (typeCode) {
  * 走 [RealRoadRouteValidator] 而不是在引擎里另判一次，理由与审计 §26"两套状态机"同一条：
  * 同一个问题不能有第二个答案。几何声明 GCJ-02（高德自身口径），
  * 因此这里**不**做坐标系换算，也**不许**再调 `Locator.toGcj02`（会把已经偏过的点再偏一次，审计 §17 的二次偏移）。
+ *
+ * [viaGeos] 必须一起交给闸门：**这一趟被要求绕经哪几个点**决定了里程的合理下界。
+ * 只报折线不报途经点，全任务段那一条会被"首末直线"这个分母顶死（真机读数 `road=33230m / straight=2014m`
+ * ⇒ windiness 16.4 > 12 ⇒ 每次导航都在起跑前被自己拒掉，台账 D-155）。
  */
 fun naviRouteCheck(
     points: List<Geo>,
     roadDistanceMeters: Int,
     roadEtaSeconds: Int,
+    viaGeos: List<Geo> = emptyList(),
 ): RouteCheck = RealRoadRouteValidator.validate(
     sourceRaw = RouteSource.AMAP.name,
     points = points,
     roadDistanceMeters = roadDistanceMeters,
     roadEtaSeconds = roadEtaSeconds,
     crsRaw = CoordinateSystem.GCJ02.name,
+    viaGeos = viaGeos,
 )
 
 /**

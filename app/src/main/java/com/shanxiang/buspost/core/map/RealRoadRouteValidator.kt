@@ -31,6 +31,11 @@ data class RealRoadRoute(
     val roadDistanceMeters: Int = 0,
     /** 路网预计耗时（秒）；0 = 来源未提供 */
     val roadEtaSeconds: Int = 0,
+    /**
+     * 这一条路**被要求绕经**的点（顺序 = 交给导航引擎的途经点顺序）。
+     * 空 = 只导一个目的地。它只参与下界计算，不参与里程与耗时。
+     */
+    val viaGeos: List<Geo> = emptyList(),
 ) {
     val available: Boolean get() = points.size >= 2
 
@@ -38,10 +43,31 @@ data class RealRoadRoute(
     val straightDistanceMeters: Int
         get() = if (points.size < 2) 0 else GeoMath.distance(points.first(), points.last()).toInt()
 
-    /** 路网里程 / 首末直线距离：市区绕路通常 1.1~2.5，越界说明数据有问题 */
+    /**
+     * 道路里程的**下界**：带途经点时是"起点 → 各途经点 → 终点"逐段直线之和，
+     * 没有途经点就退回首末直线。
+     *
+     * 为什么不能一直用首末直线：全任务段导航（一趟绕经 5 个站、终点又回到出发点附近的那一条）
+     * 首末直线只有 2 公里，而路真要走 33 公里 —— 用首末直线当分母，`windiness` 必然爆表，
+     * 于是**每一趟全段导航都会被这道真实性闸门自己拒掉**（2026-10-17 真机读数：
+     * `road=33230m / straight=2014m`，而同一趟工作台念的是"本班 6 站 · 道路里程 33.2 公里"）。
+     * 换成逐段和之后判据只会更严：折线若没真的经过这些点，里程就会短于下界，照样拒。
+     */
+    val boundDistanceMeters: Int
+        get() {
+            if (points.size < 2) return 0
+            if (viaGeos.isEmpty()) return straightDistanceMeters
+            val chain = (listOf(points.first()) + viaGeos + listOf(points.last()))
+                .windowed(2) { GeoMath.distance(it[0], it[1]) }
+                .sum()
+            // 下界不许小于首末直线：逐段和在任何几何下都 ≥ 首末直线，取 max 只是防浮点与脏输入
+            return maxOf(chain, straightDistanceMeters.toDouble()).toInt()
+        }
+
+    /** 路网里程 / 下界：市区绕路通常 1.1~2.5，越界说明数据有问题 */
     val windiness: Double
-        get() = if (straightDistanceMeters <= 0 || roadDistanceMeters <= 0) 0.0
-        else roadDistanceMeters.toDouble() / straightDistanceMeters
+        get() = if (boundDistanceMeters <= 0 || roadDistanceMeters <= 0) 0.0
+        else roadDistanceMeters.toDouble() / boundDistanceMeters
 
     /**
      * 画到底图上的那一份点：底图与后端站点都是 GCJ-02，来源声明 WGS-84 时必须先换算，
@@ -64,7 +90,7 @@ object RealRoadRouteValidator {
     /** 折线允许的最短长度：低于 2 点根本不构成线 */
     private const val MIN_POINTS = 2
 
-    /** 道路里程与首末直线距离的合理上限，超过基本是坐标或投影出错 */
+    /** 道路里程与"下界直线"的合理上限，超过基本是坐标或投影出错 */
     private const val MAX_WINDINESS = 12.0
 
     fun validate(
@@ -74,6 +100,7 @@ object RealRoadRouteValidator {
         roadEtaSeconds: Int = 0,
         crsRaw: String? = null,
         stationGeos: List<Geo> = emptyList(),
+        viaGeos: List<Geo> = emptyList(),
     ): RouteCheck {
         val source = RouteSource.parse(sourceRaw)
         if (!source.real) {
@@ -104,6 +131,7 @@ object RealRoadRouteValidator {
             points = points,
             roadDistanceMeters = roadDistanceMeters.coerceAtLeast(0),
             roadEtaSeconds = roadEtaSeconds.coerceAtLeast(0),
+            viaGeos = viaGeos,
         )
 
         // 两个点且正好是两个站 = 把站点连了一条线，包装成"真实道路"也不行
@@ -114,19 +142,22 @@ object RealRoadRouteValidator {
             )
         }
 
-        val straight = route.straightDistanceMeters
-        if (route.roadDistanceMeters > 0 && straight > 0) {
-            // 道路不可能比直线短；给出更小的"里程"就是假数
-            if (route.roadDistanceMeters < straight) {
+        val bound = route.boundDistanceMeters
+        if (route.roadDistanceMeters > 0 && bound > 0) {
+            // 道路不可能比直线短；给出更小的"里程"就是假数。带途经点时下界是**逐段和**，
+            // 折线若没真的绕经那些点，里程就会短于下界 —— 这一支照样拒。
+            if (route.roadDistanceMeters < bound) {
                 return RouteCheck.Rejected(
-                    reason = "路网里程小于首末点直线距离，数据不可信",
-                    detail = "road=${route.roadDistanceMeters}m straight=${straight}m",
+                    reason = if (route.viaGeos.isEmpty()) "路网里程小于首末点直线距离，数据不可信"
+                    else "路网里程小于各途经点的逐段直线和，这一趟没有真的绕经它们",
+                    detail = "road=${route.roadDistanceMeters}m straight=${bound}m via=${route.viaGeos.size}",
                 )
             }
             if (route.windiness > MAX_WINDINESS) {
                 return RouteCheck.Rejected(
                     reason = "路网里程与直线距离比例异常，数据不可信",
-                    detail = "windiness=%.1f road=%dm straight=%dm".format(route.windiness, route.roadDistanceMeters, straight),
+                    detail = "windiness=%.1f road=%dm straight=%dm via=%d"
+                        .format(route.windiness, route.roadDistanceMeters, bound, route.viaGeos.size),
                 )
             }
         }

@@ -523,6 +523,9 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
             points = points,
             roadDistanceMeters = path.allLength,
             roadEtaSeconds = path.allTime,
+            // 这一批途经点必须跟着进闸门：它们决定了"这条路的里程下界是多少"。
+            // 只把折线交给闸门 = 用首末直线当分母，全任务段那一条每次都被判成脏数据（台账 D-155）。
+            viaGeos = wayPoints,
         )
         // 记录与返回必须来自同一个判断：过了闸门才留下 §九 那份凭证，没过就把上一条一起带走
         acceptedRoute = (check as? RouteCheck.Accepted)?.let {
