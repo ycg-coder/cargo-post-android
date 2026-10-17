@@ -84,3 +84,25 @@ internal fun viaStationsTitle(v: ViaStations): String = when (v) {
     ViaStations.NotGiven -> "这条线路没给经停站点"
     is ViaStations.Shown -> "${v.lineName.ifEmpty { "这条线" }} 共 ${v.stations.size} 站"
 }
+
+/**
+ * 附近线路卡片上那一行小字：**只放认得出这条线需要的三样** —— 起→止、停几站、现实公交还是项目线路。
+ * 缺哪样就明说缺哪样（"起终点没给" / "站点数没给"），不许塌成空白、也不许把没给写成 0 站。
+ * 地图、真实折线、逐站时刻都在点进去的详情页，这里不重复铺。
+ */
+internal fun lineBriefSubtitle(line: BusLine): String {
+    val pair = if (line.from.isNotEmpty() && line.to.isNotEmpty()) "${line.from} → ${line.to}" else "起终点没给"
+    val stops = if (line.stations.isNotEmpty()) "${line.stations.size} 站" else "站点数没给"
+    return "$pair · $stops · ${if (line.dataSource.contains("REAL")) "现实公交" else "项目线路"}"
+}
+
+/**
+ * 卡片点下去**打不开详情页**的原因：null = 打得开。
+ *
+ * `/bus/nearby` 的 `lines[]` 只回 `routeName/startStation/endStation/dataSource`，没有 `routeId`
+ * （实测 189 条里 121 条没编号，台账 #110）——详情页、地图、经停、折线全都按 `routeId` 取数，
+ * 编号都没有就许不了"看这条线的地图与经停"这个动作。旧写法把这种卡也挂上跳转，落点是一句"没有这条线路"，
+ * 那是把**后端没给编号**说成**这条线不存在**。现在尾巴上直接念真实原因，点它只把它选给主图。
+ */
+internal fun lineCardNoDetailReason(line: BusLine): String? =
+    if (line.id.isNotEmpty()) null else "后端没给这条线的编号，看不了它的地图与经停"
