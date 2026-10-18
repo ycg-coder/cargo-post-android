@@ -63,18 +63,21 @@ class MainActivity : ComponentActivity() {
                 val latest = (AppUpdater.check() as? UpdateOutcome.Available)?.release ?: return@LaunchedEffect
                 if (latest.tagName != Prefs.updateSkipTag) updateRelease = latest
             }
-            updateRelease?.let { release ->
-                UpdateDialog(
-                    release = release,
-                    onDismiss = {
-                        Prefs.updateSkipTag = release.tagName
-                        updateRelease = null
-                    },
-                )
-            }
-
             BusAppTheme(theme = theme, dark = nightUi, elderly = elderly, driving = driving) {
                 BusPostRoot()
+                // 弹窗必须画在 BusAppTheme **里面**。放在外面它读的是 compositionLocal 的默认值
+                // （`busTokens(BusTheme.BLUE, false)` = 永远浅色、字号永远 1f）⇒ 夜间导航背后顶着一块刺眼的白卡，
+                // 而「深色站牌」「字号放大」对它完全不生效。D-163 把六处字面量换成 t.* 在那时是空转的：
+                // 它读到的 t 就是这份默认令牌（真机 v183 提示弹窗的截图是凭证）。
+                updateRelease?.let { release ->
+                    UpdateDialog(
+                        release = release,
+                        onDismiss = {
+                            Prefs.updateSkipTag = release.tagName
+                            updateRelease = null
+                        },
+                    )
+                }
             }
         }
     }

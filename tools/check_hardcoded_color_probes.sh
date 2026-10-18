@@ -64,6 +64,23 @@ fail=0
 [ "$HC_D_LIT" = 9 ] || { echo "× HC-d 扫描认到的字面量不是 9（现 $HC_D_LIT）：与 HC-a 不同源的两把尺子迟早分叉"; fail=1; }
 [ "$HC_D_OK" = 9 ] || { echo "× HC-d 只有 $HC_D_OK/9 处字面量带着理由注释，没理由的：$HC_D_MISS —— 没理由的字面量就是没人认领的债"; fail=1; }
 
+# HC-e 弹窗有没有**画在主题里面**（D-168）。这一格是 HC-b/HC-c 的**前提**：
+#     MainActivity 里 `UpdateDialog(...)` 曾写在 `BusAppTheme { }` 外面 ⇒ 它读到的 `t` 是
+#     `compositionLocalOf { busTokens(BusTheme.BLUE, false) }` 那份默认浅色令牌，
+#     于是"0 处字面量 + 五个令牌都在"两条全绿，而深色/字号放大对整个弹窗根本不生效。
+#     写法判据看不见这件事 —— 探针 tools/dialog_theme_scope.py 看的是**括号块的归属**。
+SC_OUT=$("$PY" tools/dialog_theme_scope.py 2>&1)
+SC_IN=$(printf '%s' "$SC_OUT" | sed -n 's/.* inside=\([0-9-]*\).*/\1/p')
+SC_OUTSIDE=$(printf '%s' "$SC_OUT" | sed -n 's/.* outside=\([0-9-]*\).*/\1/p')
+SC_BLOCK=$(printf '%s' "$SC_OUT" | sed -n 's/.*theme_block=\([0-9]*\)-.*/\1/p')
+SC_N=$(printf '%s' "$SC_OUT" | sed -n 's/.* dialogs=\([0-9]*\).*/\1/p')
+printf 'HC-e 主题块/弹窗调用点/在块内/在块外   : %s / %s / %s / %s （目标 存在 / 1 / 1 / 0）\n' \
+  "${SC_BLOCK:-none}" "$SC_N" "$SC_IN" "$SC_OUTSIDE"
+[ -n "$SC_BLOCK" ] || { echo "× HC-e 找不到 BusAppTheme 的块（MainActivity 结构变了？探针要跟着改，不许把这格删掉交差）"; fail=1; }
+[ "$SC_N" = 1 ] || { echo "× HC-e 升级弹窗的调用点不是恰好 1（现 $SC_N）：两处弹窗=两套更新口径"; fail=1; }
+[ "$SC_IN" = 1 ] || { echo "× HC-e 弹窗画在 BusAppTheme **外面**（现 inside=$SC_IN outside=$SC_OUTSIDE）：它拿到的是默认浅色令牌，HC-b/HC-c 那两个绿只证明写法换了、不证明深色生效"; fail=1; }
+[ "$SC_OUTSIDE" = 0 ] || { echo "× HC-e 有 $SC_OUTSIDE 处弹窗调用点在主题块外：同一条理由"; fail=1; }
+
 if [ "$fail" = 0 ]; then
   echo "硬编码颜色判据通过（总数 $TOTAL = 弹窗 $A_UD + 导航 $A_GD + HUD $A_NV + 乘车码 $A_QR + 首页 $A_HM；弹窗走令牌 $HC_C/5；理由注释 $HC_D_OK/$HC_D_LIT）"
 else

@@ -19,11 +19,13 @@ PROBE="$SRC/tools/check_hardcoded_color_probes.sh"
 mkdir -p "$SC/tools" "$SC/app/src/main"
 cp -r "$SRC/app/src/main/java" "$SC/app/src/main/java"
 cp "$SRC/tools/hardcoded_color_reasons.py" "$SC/tools/"
+cp "$SRC/tools/dialog_theme_scope.py" "$SC/tools/"
 M=$SC/app/src/main/java/$PKG
 UD=$M/core/update/UpdateDialog.kt
+MA=$M/MainActivity.kt
 QR=$M/ui/user/BusQrScreen.kt
 BT=$M/core/ui/BusTokens.kt
-for f in "$UD" "$QR" "$BT" "$SC/tools/hardcoded_color_reasons.py"; do
+for f in "$UD" "$QR" "$BT" "$MA" "$SC/tools/hardcoded_color_reasons.py" "$SC/tools/dialog_theme_scope.py"; do
   [ -f "$f" ] || { echo "✘ 沙盒缺 $f：判据扫得到、副本没有，本轮负控全部作废"; exit 2; }
 done
 cp -r "$SC" "$CLEAN"
@@ -104,6 +106,13 @@ expect_green "NC-4 令牌定义内的字面量被正确排除" "总数 9"
 # NC-5 探针脚本没了 → fail-closed（判据不许拿"跑不了"当 0）
 rm -f "$SC/tools/hardcoded_color_reasons.py"
 expect_red "NC-5 探针脚本缺失" "× HC-d 扫描认到的字面量不是 9" 1
+
+# NC-6 把弹窗调用点搬回 BusAppTheme **外面**（HC-b/HC-c 仍然全绿的那种写法）→ HC-e 必须红
+#      这一条是整簿最要紧的一条：D-163 那轮"0 处字面量 + 五个令牌都在"念的是绿，
+#      而弹窗当时读的是默认浅色令牌 —— 写法判据看不见归属，归属只有括号知道。
+sub "$MA" "UpdateDialog(" "RetiredDialog("
+ins "$MA" "var updateRelease by remember" "                UpdateDialog(release = null, onDismiss = {})"
+expect_red "NC-6 弹窗画在主题块外" "× HC-e 弹窗画在 BusAppTheme"
 
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1

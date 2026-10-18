@@ -10883,3 +10883,50 @@ UB-l 从"份数 ≥10 + 全量 0 颗"扩成"份数 + **覆盖面 ≥2/≥2/≥4/
 - `check_doc_anchor_probes.sh` → `新增=0 消失=0`、`ID-MISS 266`（未涨）
 - 本轮仍只动 `tools/`、遍历脚本与证据目录，App 源码一字未改 ⇒ **不出 release**
 - ⚠ 未纳入：用户端线路详情（从表单退回时落到了「个人资料」，这一轮没走到）、交接页、商详页只扫了首屏
+
+---
+
+## D-168 · 升级弹窗画在 `BusAppTheme` 外面：D-163 那次"回令牌"其实是空转的（2026-10-18）
+
+### 一、抓现行
+
+去量"深色下的升级弹窗长什么样"（D-163 挂着的那格 NOT VERIFIED）：release 出到 v183、设备还是 v176，
+冷启动弹窗就来了。**浅色那一张确实是好的**（白卡深字、两颗按钮各 330x132=48dp），
+但截图里还有一件我没料到的事：**背景是夜间导航（深色），弹窗是一块刺眼的白卡** ——
+用户开了「深色站牌」，弹窗根本不跟。
+
+### 二、根因不在弹窗文件里，在**它被谁包着**
+
+`MainActivity` 里 `UpdateDialog(...)` 写在 `BusAppTheme { }` **外面**（第 67 行 vs 第 76 行），
+于是它读到的 `LocalBusTokens` 是 `compositionLocalOf { busTokens(BusTheme.BLUE, false) }` 那份**默认浅色令牌**，
+`LocalBusFontScale` 也永远是 `1f` ⇒ 「深色站牌」「适老大字」「驾驶模式夜间」对整个弹窗**一律不生效**。
+
+⇒ **D-163 那轮"把六处字面量换成 `t.ink / t.danger / …`"在这里是空转的**：它换上的 `t` 就是那份默认令牌，
+深色下该读不出的还是读不出（更准确说：深色下它压根不变深，是另一种不对）。
+而判据当时念的是全绿 —— HC-b「弹窗 0 处字面量」+ HC-c「五个令牌都在」。**写法判据看不见归属。**
+
+### 三、修了什么
+
+- `MainActivity`：把 `updateRelease?.let { UpdateDialog(...) }` 整块搬进 `BusAppTheme { }` 里面
+  （`BusPostRoot()` 之后），注释写清"放外面会拿到默认浅色令牌"。
+- 新探针 **`tools/dialog_theme_scope.py`** + 新格 **HC-e**：按**括号块归属**判 ——
+  主题块存在 / 弹窗调用点恰好 1 / inside=1 / outside=0。
+  这是 HC-b/HC-c 的**前提**：那两个绿只证明写法换了，不证明深色生效。
+- 负控 **NC-6**：把调用点搬回主题块外（`RetiredDialog` + 在块外插一处调用）⇒ HC-e 必须红，
+  且红因点名 `inside=0 outside=1`。这条是整簿最要紧的一条负控 —— 它反的是"绿得没错但没用"。
+  ⚠ 第一次跑它报了 ✘ 但不是没咬：`expect_red` 的 needle 里带 `**`，被 grep 当量词用了；
+  needle 换成前缀后 `RESULT ok=6 bad=0 miss=0`。
+- 沙盒补拷 `dialog_theme_scope.py`：漏拷时基线**正确地**念"判据扫得到、副本没有，本轮负控全部作废"，
+  没有假装通过。
+
+### 四、凭证与读数
+
+- 新归档 `docs/device-evidence/20261018-hotzone/03-v176-update-dialog-light.{png,xml}`：
+  这个弹窗**第一次上屏**的取证（标题 245x66、正文 682x150、两颗按钮 330x132=48dp），
+  也正是这张图暴露了"背景夜间、弹窗白卡"。
+- ⚠ **深色那一张仍未复验**：修法在 v186（本地包，已装设备、已开「深色站牌」），
+  而弹窗要**比 186 更新的一次 release** 才会再弹（跳过是按 tag 记的，v183 那一次已经用掉）。
+  ⇒ 下一轮 release（≥187）落地时冷启动即取证。
+- `hardcoded_color_negative_controls.sh` → `RESULT ok=6 bad=0 miss=0`
+- `check_hardcoded_color_probes.sh` → `HC-e 主题块/调用点/块内/块外 : 66 / 1 / 1 / 0` 全绿
+- 本轮**改了 App 源码**（`MainActivity`）⇒ 出包链路与前几轮不同，会随下一次 release 上线
