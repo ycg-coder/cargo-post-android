@@ -66,9 +66,20 @@ CE_MAX=$(one_count 'const val CAPSULE_MAX' "$CN")
 CE_RULE=$(one_count 'fun capsuleItemsOf' "$CN")
 CE_ELSE=$(grep -rn 'CAPSULE_MAX' "$M" --include=*.kt | grep -v 'CapsuleNav.kt' | grep -vE "$CMT" | wc -l | tr -d ' ')
 
-# CN-f 导航那一屏：高德面板关掉、重复出口与通栏按钮条撤掉
-CF_LAYOUT=$(one_count 'o\.isLayoutVisible = false' "$GD")
-CF_ONEXIT=$(one_count 'onExit' "$GD")
+# CN-f 导航那一屏（D-169 按用户口径④反转）：高德**自带面板开着**，本页不再自绘它已经画的那四行。
+#     上一轮钉的是"面板关掉、四行我们画"，这一轮钉的是"面板开着、四行不许留着"——
+#     两轮的同一个目的：引导信息只许有一份。所以这一格认的是**成对**的读数：
+#     开着的赋值恰好 1 + 关掉那行 0 + 四行自绘的出口名全 0 + 顶条本身还在（正对照，证明扫描看得见这一屏）。
+CF_LAYOUT=$(one_count 'o\.isLayoutVisible = true' "$GD")
+CF_OLDLAYOUT=$(one_count 'o\.isLayoutVisible = false' "$GD")
+CF_STRIP=$(one_count 'GuideTopStrip\(' "$GD")
+CF_TURN=$(one_count 'turnIconSpeechOf' "$GD")
+CF_LANE=$(one_count 'laneDisplayTextOf|laneText' "$GD")
+CF_DIST=$(one_count 'fmtMeters|remainSeconds' "$GD")
+# 面板开着 ⇒ 高德那颗返回键就在屏幕上，它必须**真接**到本页的出口（只回 true 不退出 = 一颗点不动的键）；
+# 而顶条那一侧不许再要一份出口（`onExit = onExit` 就是 2026-10-17 撤掉的那颗白底药丸的形状）。
+CF_BACKCALL=$(one_count '^ +onExit\(\)$' "$GD")
+CF_PILL=$(one_count 'onExit = onExit' "$GD")
 CF_BAR=$(one_count 'GuideBottomBar' "$GD")
 
 # CN-g 用例条数
@@ -102,8 +113,14 @@ fail=0
 [ "$CD_EXIT" = 1 ] || { echo "× CN-d 导航那一格「退出导航」不见了（现 $CD_EXIT）：全屏导航里没出口 = 司机被困住"; fail=1; }
 { [ "$CE_MAX" = 1 ] && [ "$CE_RULE" = 1 ]; } || { echo "× CN-e 收口规则不唯一（上限 $CE_MAX / 规则函数 $CE_RULE）"; fail=1; }
 [ "$CE_ELSE" = 0 ] || { echo "× CN-e 有页面自己抄了上限判断（现 $CE_ELSE 处引用 CAPSULE_MAX）：截断口径会长第二套"; fail=1; }
-[ "$CF_LAYOUT" = 1 ] || { echo "× CN-f 高德自带面板没关掉（现 $CF_LAYOUT）：它的「退出 / 全程 / 到达时间」会跟我们的胶囊抢同一块地方"; fail=1; }
-[ "$CF_ONEXIT" = 0 ] || { echo "× CN-f 顶条那颗重复的退出药丸回来了（现 $CF_ONEXIT 处 onExit）：出口只许在胶囊那一处"; fail=1; }
+[ "$CF_LAYOUT" = 1 ] || { echo "× CN-f 高德自带面板没开着（现 $CF_LAYOUT）：D-169 起引导信息只许有一份，那份是高德的"; fail=1; }
+[ "$CF_OLDLAYOUT" = 0 ] || { echo "× CN-f 又有人把高德面板关掉自己重画（现 $CF_OLDLAYOUT 处 isLayoutVisible = false）：同一屏两套答案，司机一眼看到两个数"; fail=1; }
+[ "$CF_STRIP" = 2 ] || { echo "× CN-f 顶条的定义+调用不再是 2（现 $CF_STRIP）：这一格是 CN-f 那几个 0 的正对照，数不出顶条就说明扫描瞎了，那三个 0 不采信"; fail=1; }
+[ "$CF_TURN" = 0 ] || { echo "× CN-f 自绘转向动作那一行回来了（现 $CF_TURN 处 turnIconSpeechOf）：高德面板左上角已经画了同一件事"; fail=1; }
+[ "$CF_LANE" = 0 ] || { echo "× CN-f 自绘车道那一行回来了（现 $CF_LANE 处 laneDisplayTextOf/laneText）：车道放大图由高德画（isLaneInfoShow）"; fail=1; }
+[ "$CF_DIST" = 0 ] || { echo "× CN-f 自绘剩余里程/耗时那一格回来了（现 $CF_DIST 处 fmtMeters/remainSeconds）：面板底部那条就是它"; fail=1; }
+[ "$CF_BACKCALL" = 1 ] || { echo "× CN-f 高德那颗返回键没接回本页出口（现 $CF_BACKCALL 处 onExit()）：面板开着却点不动 = 界面承诺做不到的动作"; fail=1; }
+[ "$CF_PILL" = 0 ] || { echo "× CN-f 顶条又带上一份出口（现 $CF_PILL 处 onExit = onExit）：那颗白底退出药丸 2026-10-17 已经撤过一回"; fail=1; }
 [ "$CF_BAR" = 0 ] || { echo "× CN-f 通栏底部按钮条 GuideBottomBar 又出现在代码里（现 $CF_BAR）：功能按钮只许在悬浮胶囊里"; fail=1; }
 { [ "$CH_DEF" = 1 ] && [ "$CH_USE" = 1 ]; } || { echo "× CN-h 格子等宽下限不是"一份定义 + 一处使用"（现 $CH_DEF/$CH_USE）：两处写法就会有一处漏掉，两格的胶囊又会歪"; fail=1; }
 [ "${CH_NUM:-0}" -ge 76 ] || { echo "× CN-h 格子下限被压到 $CH_NUM dp（要 ≥76）：低于这个数，短文案那一格就跟着内容缩，整枚胶囊歪"; fail=1; }
@@ -114,5 +131,5 @@ fail=0
 [ "${CI_NUM:-0}" -ge 12 ] || { echo "× CN-i 离底间距被压到 $CI_NUM dp（要 ≥12）：低于这个数就又贴回屏幕下沿"; fail=1; }
 [ "$CI_OUT" = 0 ] || { echo "× CN-i 有 $CI_OUT 处在 CapsuleNav 之外引用离底间距：一屏自己调一次，两屏之间就不成一套了"; fail=1; }
 
-if [ "$fail" = 0 ]; then echo "悬浮胶囊判据通过（实现 $CA_DEF / 画它 $CA_USE / 登记 $CB_REG 屏 / 旧通栏 $CC_TABBAR / 反证 $CC_PROOF / 用例 $CG / 离底 $CI_DEF/$CI_DRAW/$CI_RES/$CI_OLD=${CI_NUM}dp）"; else echo "悬浮胶囊判据失败"; fi
+if [ "$fail" = 0 ]; then echo "悬浮胶囊判据通过（实现 $CA_DEF / 画它 $CA_USE / 登记 $CB_REG 屏 / 旧通栏 $CC_TABBAR / 反证 $CC_PROOF / 用例 $CG / 离底 $CI_DEF/$CI_DRAW/$CI_RES/$CI_OLD=${CI_NUM}dp / 导航面板开 $CF_LAYOUT 顶条 $CF_STRIP 自绘四行 $CF_TURN/$CF_LANE/$CF_DIST 返回键接出口 $CF_BACKCALL）"; else echo "悬浮胶囊判据失败"; fi
 exit "$fail"

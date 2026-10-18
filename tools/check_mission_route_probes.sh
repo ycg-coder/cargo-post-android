@@ -217,6 +217,10 @@ MRR_WRITE=$(grep -rnE '(Running|Repo)\.[A-Za-z]+(\.[A-Za-z]+)* = ' "$V3" "$BM" |
 MRR_WRITE_PF=$(grep -rnE '(Running|Repo)\.[A-Za-z]+(\.[A-Za-z]+)* = ' "$DLS" | grep -vE "$NC" | wc -l | tr -d ' ')
 # 视觉层不 import 任何业务模型/契约类型（唯一例外是 LocationReportPolicy：新鲜度阈值必须沿用服务侧那一个）
 MRR_IMP=$(grep -c '^import com\.shanxiang\.buspost\.\(data\.model\|core\)\.' "$V3")
+# 基数 10 → 11 的唯一增量（2026-10-18 D-169）：`MissionMarkers.kt` 多 import 了一行
+# `data.model.TaskItemStatus` —— 地图标记那个动作字与后端动作名必须查同一张表，
+# 在装配层自己抄一份"6 → 停"就是第二个答案。这一格是反证（证明扫描数得出业务 import），
+# 抬一是因为装配层真的多读了一个业务类型，不是把闸调松。
 MRR_IMP_PF=$(grep -c '^import com\.shanxiang\.buspost\.\(data\.model\|core\)\.' "$BM" "$MM" | awk -F: '{s+=$2} END {print s+0}')
 MRR_TEST=$(grep -cE '^[[:space:]]*@Test' "$V3T")
 
@@ -270,7 +274,7 @@ echo "MR-r 视觉层写共享状态/服务侧反证/新用例条数     = $MRR_W
 echo "MR-s 导航卡独立格/卡在该格内/全页调用点        = $MS_CARD/$MS_CALL/$MS_ONE （目标 1/1/1）"
 echo "MR-t 地图按实测高度避让/顶条量/底栏量          = $MT_PAD/$MT_TOP/$MT_BOT （目标全 1）"
 echo "MR-u 仓位填充取 100-空余                       = $MU_FILL （目标 1）"
-echo "MR-r 视觉层 import 业务模型/BusMap+出口对照反证  = $MRR_IMP/$MRR_IMP_PF （目标 0/10）"
+echo "MR-r 视觉层 import 业务模型/BusMap+出口对照反证  = $MRR_IMP/$MRR_IMP_PF （目标 0/11）"
 
 fail=0
 [ "$MRA" = 14 ] || { echo "× MR-a ⑧ 的行为用例不是 14 条（说法那一半或请求条数那一半被删了）：12 → 14 的逐点归因 = 2026-10-15 #49 在 ui/driver/MissionRouteStateContractTest.kt 新加的两格 —— ①「页脚的折线完整性三格各说各的」（routeComplete 的 没发键/后端说断了/后端说完整）②「偏航行三格读数 但一句未偏航都不说」（deviationMeters 的 没发键/-1 无法判定/真实米数，并钉住 deviated 缺键塌 false 时界面不许念'未偏航'）；再变就得逐点重名，不许把"恰好"改成下限"; fail=1; }
@@ -350,7 +354,7 @@ fail=0
 [ "$MRR_WRITE" = 0 ] || { echo "× MR-r 视觉层开始写共享状态：画法的一层反过来改了数据"; fail=1; }
 [ "$MRR_WRITE_PF" -ge 1 ] || { echo "× MR-r 写状态反证掉了（服务侧数不出该写法），WRITE 的 0 不可信"; fail=1; }
 [ "$MRR_IMP" = 0 ] || { echo "× MR-r 视觉层 import 了业务模型/契约类型：画法的一层开始读业务数据"; fail=1; }
-[ "$MRR_IMP_PF" = 10 ] || { echo "× MR-r import 反证掉了（装配层那十处业务 import 数不出），IMP 的 0 不可信"; fail=1; }
+[ "$MRR_IMP_PF" = 11 ] || { echo "× MR-r import 反证掉了（装配层那十一处业务 import 数不出），IMP 的 0 不可信"; fail=1; }
 [ "$MRR_TEST" = 16 ] || { echo "× MR-r 视觉层行为用例不是 16 条（删一条就少一格可证的口径）"; fail=1; }
 [ "$MS_CARD" = 1 ] || { echo "× MR-s 导航卡不再是独立一格（现 $MS_CARD）：塞回有路线支，后端只给空明细时司机整块看不到导航面"; fail=1; }
 [ "$MS_CALL" = 1 ] || { echo "× MR-s 导航卡不挂在 navCard 那一格里（现 $MS_CALL）：挂点漂回路线条件，又回到看不见为什么不能走"; fail=1; }

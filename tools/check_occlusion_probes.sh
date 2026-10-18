@@ -62,7 +62,9 @@ for f in $DUMPS; do
   [ "$n" -ge 1 ] && OD_FILES=$((OD_FILES + 1))
 done
 
-# OC-e 到站格浮在胶囊之上
+# OC-e 到站格浮在胶囊之上，且地图**三个分支**都把胶囊那一格让出来
+#     （基数 3 → 4，2026-10-18 D-169：高德自带面板重新打开后，它的"剩余里程/耗时"那条画在地图视图
+#       自己的下沿，而"没有到站格"那一支原来是 `else -> 0.dp` —— 让 0 就是让胶囊压住高德那条。）
 OE_RESERVE=$(one_count 'capsuleReserve\(\)' "$GD")
 OE_PAD=$(one_count '\.padding\(bottom = capsuleReserve\(\)\)' "$GD")
 
@@ -89,7 +91,7 @@ fail=0
 [ "$OC" = 0 ] || { echo "× OC-c 好 fixture 报 $OC 处：让高写法本身被读成遮挡，判据不能这样"; fail=1; }
 [ "$OD" = 4 ] || { echo "× OC-d 四份真机 dump 合计遮挡不是 4（现 $OD，命中 $OD_FILES 份）：这一档在真实几何上不咬了"; fail=1; }
 [ "$OD_FILES" = 4 ] || { echo "× OC-d 只有 $OD_FILES/4 份真机 dump 有读数：合计对得上但来源不对，反证不采信"; fail=1; }
-[ "$OE_RESERVE" = 3 ] || { echo "× OC-e 导航页给胶囊让高的地方不是 3（现 $OE_RESERVE：bottomReserve 两个分支 + 到站格那一句 padding）：少一处就是胶囊又压回按钮"; fail=1; }
+[ "$OE_RESERVE" = 4 ] || { echo "× OC-e 导航页给胶囊让高的地方不是 4（现 $OE_RESERVE：bottomReserve 三个分支 + 到站格那一句 padding）：少一处就是胶囊又压回按钮或压回高德那条剩余里程"; fail=1; }
 [ "$OE_PAD" = 1 ] || { echo "× OC-e 到站格没有浮在胶囊之上（现 $OE_PAD）：这一格贴屏幕底就是被压的那一版"; fail=1; }
 [ "$OF_REG" = 1 ] || { echo "× OC-f 选点屏没把功能按钮交给胶囊（现 $OF_REG）：反证 $OF_PROOF 处 CapsuleAction("; fail=1; }
 [ "$OF_FAB" = 0 ] || { echo "× OC-f 地图上那枚自绘白方块回来了（现 $OF_FAB 处「回到当前位置」）：两处浮层会互相压"; fail=1; }

@@ -87,9 +87,10 @@ sub "$BS" '            CapsuleAction("back", "返回", BusIcons.back, onClick = 
 ' ''
 expect_red "NC-4 撤掉返回格" "× CN-d 实时公交那一格「返回」不见了"
 
-# NC-5 高德自带面板被打开 → CN-f 该红
-sub "$GD" '    o.isLayoutVisible = false' '    o.isLayoutVisible = true'
-expect_red "NC-5 高德面板回来" "× CN-f 高德自带面板没关掉"
+# NC-5 高德自带面板被关掉（回到"我们自绘一份"那一版）→ CN-f 该红
+#     D-169 反转了这条的方向：以前注入的是"面板被打开"，现在注入的是"面板被关掉"。
+sub "$GD" '    o.isLayoutVisible = true' '    o.isLayoutVisible = false'
+expect_red "NC-5 高德面板被关掉" "× CN-f 高德自带面板没开着"
 
 # NC-6 页面自己抄一份上限判断 → CN-e 该红
 sub "$BS" 'private const val LINE_CARDS_MAX = 8' \
@@ -124,6 +125,27 @@ expect_red "NC-12 间距被压回贴底" "× CN-i 离底间距被压到"
 # NC-13 有人在页面自己引用一次离底间距（第二套口径）→ CN-i 该红
 ins "$BS" 'private const val LINE_CARDS_MAX = 8' 'private val gapCopy = capsuleBottomGap()'
 expect_red "NC-13 页面自己抄离底间距" "× CN-i 有"
+
+# NC-14 自绘转向动作那一行回来（高德面板左上角已经画了同一件事）→ CN-f 该红
+ins "$GD" '                if (stopLine.isNotEmpty()) {' '                    Text(turnIconSpeechOf(0) ?: "", color = Color.White)'
+expect_red "NC-14 自绘转向行回来" "× CN-f 自绘转向动作那一行回来了"
+
+# NC-15 自绘车道那一行回来 → CN-f 该红
+ins "$GD" '                if (stopLine.isNotEmpty()) {' '                    Text(laneDisplayTextOf(null), color = Color.White)'
+expect_red "NC-15 自绘车道行回来" "× CN-f 自绘车道那一行回来了"
+
+# NC-16 自绘剩余里程那一格回来 → CN-f 该红
+ins "$GD" '                if (stopLine.isNotEmpty()) {' '                    Text(fmtMeters(1200), color = Color.White)'
+expect_red "NC-16 自绘剩余里程回来" "× CN-f 自绘剩余里程/耗时那一格回来了"
+
+# NC-17 高德那颗返回键只回 true、不接出口（点不动的键）→ CN-f 该红
+sub "$GD" '                                onExit()
+' ''
+expect_red "NC-17 返回键没接出口" "× CN-f 高德那颗返回键没接回本页出口"
+
+# NC-18 反证：把顶条整块改名（顶条没了 ⇒ 上面那三个 0 就可能是"扫描瞎了"而不是"确实没有"）→ CN-f 该红
+sub "$GD" 'private fun GuideTopStrip(' 'private fun GuideTopStripX('
+expect_red "NC-18 顶条正对照失效" "× CN-f 顶条的定义+调用不再是 2"
 
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1

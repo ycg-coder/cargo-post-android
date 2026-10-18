@@ -95,7 +95,12 @@ expect_red "NC-4 撤掉到站格的让高" "× OC-e 到站格没有浮在胶囊�
 
 # NC-5 bottomReserve 少了胶囊那一格（地图仍被到站格压住）→ OC-e 红
 sub "$GD" 'bottomPx.toDp() } + capsuleReserve() + 8.dp' 'bottomPx.toDp() } + 8.dp'
-expect_red "NC-5 地图让高没算胶囊那一格" "× OC-e 导航页给胶囊让高的地方不是 3"
+expect_red "NC-5 地图让高没算胶囊那一格" "× OC-e 导航页给胶囊让高的地方不是 4"
+
+# NC-10 "没有到站格"那一支改回让 0（D-169 之后的新形状：高德面板那条剩余里程画在地图下沿，
+#       让 0 就是把它压到胶囊底下）→ OC-e 红
+sub "$GD" '        else -> capsuleReserve()' '        else -> 0.dp'
+expect_red "NC-10 没有到站格时不再让高" "× OC-e 导航页给胶囊让高的地方不是 4"
 
 # NC-6 选点屏那枚自绘白方块回来 → OC-f 红
 ins "$PK" '    CapsuleActions(' '    val fabDesc = "回到当前位置"'

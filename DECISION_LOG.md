@@ -264,7 +264,7 @@ junit-platform-launcher 执行）。要点：classpath 必须压成单行；`-cp
    （`:103/:146/:180/:182/:183/:342`），工程无导航 SDK 依赖、无 `core/navigation` 目录。§24 保持 `UI_ONLY`，真导航保持 `BLOCKED`。
 2. **"OrderDetailScreen 取消订单假成功"** → 不成立。该页走 `PUT /product-order/cancel?id=` 并回读服务器列表；
    真问题是 `:101` 把**真实成功**说成"已在演示模式下取消"。定级从 `UI_ONLY` 降为文案诚实性缺陷（§31）。
-3. **"真地图组件已接线 / MapCanvas 零调用点"** → 说反了。当时零调用点的是 `BusMap.kt:99`，全站用自绘 `RouteMap`
+3. **"真地图组件已接线 / MapCanvas 零调用点"** → 说反了。当时零调用点的是 `BusMap.kt:113`，全站用自绘 `RouteMap`
    （`MapCanvas.kt:55`，在 TraceView / BusScreen / DriverNavScreen 均有调用）。→ §44、P1-1。
 
 **根因判定（§49）**：三方字段命名系统性漂移，且没有任何契约守卫；`CONTRACT_MISMATCH` 之所以比崩溃更危险，
@@ -5608,7 +5608,7 @@ canonical 仍是 D-070 §3 那一发。
 
 ### D-076 续二（同日 13:5x）· #40 地图"我的位置"：图层从未开启 + 用户端从没申请过权限，两件事叠成一个现象
 
-实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:172-181` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：`AndroidManifest.xml:15-17` 声明了 `ACCESS_FINE_LOCATION`，但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `core/loc/Locator.kt:201` 也拿不到点，所以页面连"按位置排序"都是空的。
+实测形状（不是"设置被关了"）：全仓 `isMyLocationEnabled` / `MyLocationStyle` **0 命中**；`BusMap.kt:213` 只开了 `isMyLocationButtonEnabled = true` ⇒ 按钮在、点了没蓝点（那两个是高德两个独立开关）。另一半：`AndroidManifest.xml:15-17` 声明了 `ACCESS_FINE_LOCATION`，但**用户端没有任何运行时申请** —— `RequestPermission()` 此前只出现在司机端 `WorkbenchScreen.kt:653/920`。未授权时 `core/loc/Locator.kt:201` 也拿不到点，所以页面连"按位置排序"都是空的。
 
 改法三处：① `BusMap` 新增 `showMyLocation` 参数并真的开图层（**由调用方按授权状态传值** —— SDK 不会替我们弹框，未授权开图层等于承诺一个永远不来的位置）；② 实时公交页进页读一次授权、未授权申请一次，被拒不追弹；授权回来若还没有点就重跑 `load`；③ 定位提示收成**纯函数 `locationHintFor(granted, fix)`** 三态各说各话，顺手收掉 §51 在册那条"定位三态被折叠成 `me==null`"——旧文案在用户已经允许之后还教他去"系统设置里允许定位"。
 
@@ -7841,7 +7841,7 @@ idempotency / idempotency_test / mission_route / navigation_test / notify_result
 - EI-1：`signUrl = o.multiStr("signUrl", "handoverSignUrl"),` 这串在 Repo.kt 里早就不存在（别名那轮撤的），
   真读点搬到了 **`Models.kt:1842-1864`** 且只剩 `signUrl = o.multiStr("signUrl"),` ⇒ 锚点与落点文件一起改。复跑 **rc=0 ✔=8 ✘=0**（18s）。
 - mission_route 那刀：`val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)` 原本缩进 20 格，#49 把
-  `markerOptionsOf` 提成顶层函数后是 **`BusMap.kt:297`** 的 4 格 ⇒ 子串替换会命中更早的长缩进行（空刀），锚点连缩进一起换。复跑 **rc=0 ✔=52 ✘=0**（621s）。
+  `markerOptionsOf` 提成顶层函数后是 **`BusMap.kt:310`** 的 4 格 ⇒ 子串替换会命中更早的长缩进行（空刀），锚点连缩进一起换。复跑 **rc=0 ✔=52 ✘=0**（621s）。
 - navigation_test M6/M7：`guide.stops.filter{…}.minByOrNull{ it.visitSequence }` 被 #49 收进了
   `navigableStopsOf`。**M6 的第一版修法是空刀**：只把破口挪到"摘掉 `.sortedBy`"，而"下一站"那一行自己还写着
   `minByOrNull` ⇒ 上游排不排序它都挑得对，62 例照旧全绿 —— 是这本负控自己把它报成 ✘ 的，不是我看出来的。
@@ -10073,7 +10073,7 @@ App 内「检查更新」只认 GitHub Releases（用户 2026-10-12 定的口径
 而 `BusMap` 里那条旧注释写着"本 SDK 版本的样式常量名与文档不一致（实测不可解析），默认样式已是定位到并把地图居中"
 —— **那是把名字记错了**：`javap` 实测 `MyLocationStyle.LOCATION_TYPE_*` 这一族八个常量全在
 （`SHOW / LOCATE / FOLLOW / MAP_ROTATE / LOCATION_ROTATE / *_NO_CENTER ×3`）。
-修法就是显式设成不居中那一档（`BusMap.kt:214` 的 `setMyLocationStyle` + `LOCATION_TYPE_FOLLOW_NO_CENTER`），
+修法就是显式设成不居中那一档（`BusMap.kt:227` 的 `setMyLocationStyle` + `LOCATION_TYPE_FOLLOW_NO_CENTER`），
 含义正是"蓝点持续更新、地图不动"；按钮（右上角回到我的位置）仍是用户主动点的才居中。
 
 复验（v131，精准定位已授权）：拖拽后地图移到 大渡口区 / 重庆理工大学花溪校区 一带，
@@ -11181,3 +11181,104 @@ product-order cancel 716/703→754（两处）、写路径段 1433-1455→1521-1
 教训一条：`reanchor_ledgers.py` 会把它能匹配上的**旧账**也一起搬走（搬完 aid 变新、DA-e 虚涨），
 而"搬过去仍念不出标识符"的那些根本不是位移问题——是文档一句话里挂了多个不同函数的名字，
 判据把整行的标识符都判给最近的那个锚点（#159 的真正形状）。这种只能人读原话，工具搬不动。
+
+---
+
+## D-169 · 导航页那一屏有两套引导信息在各自说话；途径点标记则是一个都看不见（2026-10-18）
+
+> 用户口径④（2026-10-17 那张参考图批里的第四条）：
+> "app 导航页面就用高德自带的信息我们不要再画蛇添足了（导航内部地图的途径点标记不能舍去，
+> 还需要加强区别站点和任务点，还可以在任务点加上具体任务标记）"
+
+### 一、这一条里其实有两个缺陷，第二个是查旧凭证时撞出来的
+
+底片 `docs/device-evidence/20261018-float/02-v151-nav-immersive-capsule.png`（v151，车道级导航页，真机 1f71ee9b）：
+
+1. **两套引导信息**。顶条自绘了转向动作（"右前方"）、下一段路名、剩余里程（"32.7 公里"）、
+   剩余耗时（"58 分钟"）、车道（"暂时没拿到车道信息"）五行 —— 而高德自带面板本来就会画这四项。
+   上一轮（D-158）为了"沉浸式"把 `isLayoutVisible` 关掉，于是只剩我们这一套；
+   代价是**同一批数据第二次由本机拼一遍**：面板按 SDK 内部状态更新，自绘按 `NavigationGuidance` 的帧更新，
+   两处一旦不同步，司机看到的就是两个数。用户这一条要的是把面板打开、把自绘那四行撤掉。
+2. **我们自己的任务点标记在这张图上一个都数不出来**。图上只有高德画的"途经1…途经5"蓝泡 + 紫色小钉，
+   没有 `MissionMarkers.stopMarkers` 那批带状态色的钉。而贴标记那段代码是**两条静默失败**的写法：
+   `view.map == null` 直接给空列表、`markerOptionsOf` 回 null 被 `mapNotNull` 吃掉 ——
+   屏幕上没有标记与"根本没去贴"在界面上长得一样，logcat 里也没有一行能分辨。
+   这一格本轮先补**可分辨**（三个数分开念：要贴几个 / 换算出几个 / 贴上几个），
+   真机读数才能回答"是没贴上，还是被高德的图层盖住了"。
+
+### 二、改了什么（引导信息那一半）
+
+- `applyNaviOptions`：`o.isLayoutVisible = false` → **`true`**。
+- `GuideTopStrip` 从五行收成三行 + 一句条件行：品牌 / 目的地 / "本段共 k 站 · 途经点 n 个" / （偏航或重算时）那一句。
+  这四格是高德面板**没有**的：面板只说"距终点多远"，不说这一趟去的是哪一站、覆盖几站，也不打字播报偏航。
+- 随之删掉的是出口本身，不是数据的搬运：`frame`/`laneText` 两个参数、`turnIconSpeechOf`/`laneDisplayTextOf`/
+  `guidanceSwitchOffText` 三个 import、`engine.lane` 在本页的收集、以及只服务那一行的 `fmtMeters`。
+  车道帧的 Flow 与工作台那张卡照旧 —— 撤的是这一屏的第二套答案，不是能力。
+- 顶条首帧保守值 `170.dp → 120.dp`：那是按旧五行量出来的高度留的，留着就是地图白让 50dp、
+  高德的转向卡跟着我们的条子一起往下挪。
+- `o.isLayoutVisible = true` 带来一个新前提：**高德那颗返回键现在在屏幕上**。
+  原来 `onNaviBackClick()` 只 `return true`（"退出我自己处理"）却什么都不做 —— 那是一颗点不动的键，
+  属于"界面承诺做不到的动作"那一族。现在 `AmapNaviSurface` 多收一个 `onExit`，回调里真调它再回 true。
+- 面板底部那条"剩余里程/耗时"画在**地图视图自己的**下沿，而悬浮胶囊也浮在同一格 ——
+  `bottomReserve` 的 `else -> 0.dp` 那一支（没有到站格时地图铺到底）会把这条压到胶囊底下。
+  于是那一支改成让出 `capsuleReserve()`：让高的三处现在读的是同一个数，
+  判据 OC-e 的"恰好 3"随之抬到 4（多出来的正是"没有到站格"那一支）。
+
+### 三、改了什么（标记那一半）
+
+形状与颜色**分家**，各认一个来源：
+
+| 这一格是什么 | 判据（后端字段） | 画成什么 |
+| --- | --- | --- |
+| 任务点 | `actionType` ∈ 0..5 | 带字钉：圆心一个汉字（出/客/送/派/揽/返），钉尖落在坐标点上 |
+| 站点 | `actionType == 6`（经停） | 空心圆环：白底 + 有色环 + 中心一点，整体小一圈 |
+| 动作未知 | `actionType` 缺键（-1）或表外码 | **今天那枚默认钉**：不编字，也不许被画成站点 |
+| 状态色 | `status`（`TaskItemStatusEnum`） | 色相仍只由 `markerHue(kind)` 给：未开始蓝 / 进行中橙 / 完成绿 / 失败红 |
+
+- 字与动作名**同一张表**：新增 `TaskItemStatus.ACTION_GLYPHS`，与 `ACTION_NAMES` 同批码，
+  契约测试钉的是关系不是抄一份期望值 —— 每个字必须出现在对应动作名里，且两表**只差 6 经停**
+  （那一格的标记是圆环这个形状，再塞一个"停"字就是同一件事说两遍）。
+- 画不画字、算站点还是任务点，全在装配层（`MissionMarkers.badgeOf` / `stationLikeOf`，纯函数、JVM 里可断言）；
+  新文件 `ui/common/MarkerBadgeDraw.kt` 只管怎么画，且**色相从 `markerHue` 取**（`Color.HSVToColor`），
+  不写 `Color(0x…)` 字面量 —— 位图 marker 与默认 marker 因此不会分叉成两套配色（#31 在册那类债）。
+- 位图按 `形状|字|色相|密度` 进 `LruCache`：`BusMap` 每次标记集变了整批重贴，不缓存就是每滑一次重画十几张。
+- 换算出口仍然只有一个（`markerOptionsOf`）：工作台任务地图与导航面共用，两处不会一个圆环一个钉。
+  代价是它多收一个 `Context`（要按屏幕密度画位图），两个调用点各把自己已有的 context 传进来。
+
+### 四、判据与负控
+
+- `check_capsule_nav_probes.sh` **CN-f 整格反转并重写**：以前钉"面板关掉"，现在钉
+  `面板开着恰好 1 / 关掉那行 0 / 顶条定义+调用 2（正对照）/ turnIconSpeechOf 0 / laneDisplayTextOf|laneText 0 /
+  fmtMeters|remainSeconds 0 / onExit() 真被调用 1 / onExit = onExit 0 / GuideBottomBar 0`。
+  负控方向跟着翻（NC-5 现在注入"把面板关掉"），并多五条：NC-14 自绘转向行回来、NC-15 车道行回来、
+  NC-16 剩余里程回来、NC-17 返回键只回 true 不接出口、NC-18 把顶条整块改名（**反证**：顶条不在时那三个 0
+  就可能是扫描瞎了，而不是"确实没有"）。
+- `check_occlusion_probes.sh` OC-e 让高处 3 → 4；`occlusion_negative_controls.sh` NC-5 的点名文案跟着改。
+- `check_mission_route_probes.sh` MR-r 的 import 反证 10 → 11：装配层确实多读了一个业务类型
+  （`MissionMarkers` 要查 `TaskItemStatus` 那张表），抬它是把新增登记上，不是把闸调松。
+- 用例 +5：`MissionMapTest` 四条（经停画圆环不给字 / 任务点给的是后端那个字 / 表外码不编形状也不编字 /
+  站点形状不改变后端状态的颜色），`StatusMappingContractTest` 一条（两表只差经停 + 字在动作名里）。
+
+### 五、本轮实测凭证（改后复跑，不是改前）
+
+- `PRODUCT classes=78 tests=807 failures=0 errors=0 skipped=0`（`GRADLE_RC=0`；计数只读
+  `app/build/test-results/testDebugUnitTest/TEST-*.xml`，800 → 807 的增量 = 上面那五条用例）
+- 49 本静态判据 `RESULT pass=49 fail=0`
+- `capsule_nav_negative_controls.sh` → `RESULT ok=18 bad=0 miss=0`（13 → 18：NC-5 翻向 + NC-14…NC-18）
+- `occlusion_negative_controls.sh` → `RESULT ok=10 bad=0 miss=0`（9 → 10：NC-10 没有到站格那一支不再让高）
+- 台账锚点：`anchors=1541 越界 0 在册闸门 243 ID-MISS 267（闸门 ≤273）`
+  —— 本轮源码位移打歪 8 条 BusMap 锚点，逐条读原话后重指（`setMyLocationStyle` 214→227、
+  `setOnMapTouchListener` 220→233、`wantCamera` 252→265、`fun BusMap` 99→113、
+  `val v3d = marker3DOf(...)` 297→310、factory/try 窗 172-181→184-193、`isMyLocationButtonEnabled` → 213），
+  在册表因此 244 → **243**（那条真的修好了，按 DA-d 的规矩下调，不是删账）。
+  ⚠ 其中 `172-181` 那一条**在 HEAD 上本来就指错**：那个窗盖的是 `factory`/`try`/`onResume` 那段，
+  而句子说的是"只开了 `isMyLocationButtonEnabled`"—— 那一行在 213。指过去之后它从 ID-MISS 转 OK，
+  这才是"消失一条在册"的真正原因。
+
+### 六、还没验的那一格（不许当成已修）
+
+界面上这三件事**只有真机跑一次导航才看得见**：① 高德面板打开后与悬浮胶囊/到站格互不互压；
+② 我们自己的带字钉与圆环**到底显不显示**（v151 底片数不出它们，本轮补的三个计数就是为了把这件事问出来）；
+③ 限流当天地址查公交那句"没问到 + 原因 + 重试"（D-173 第三格的上屏半边）。
+⇒ 全部等下一次 release 产物装在 1f71ee9b 上取，归档目录另起 `docs/device-evidence/20261018-navmarkers/`
+（不塞进 `20261018-float/`：那一格是 OC-g 的在册证据目录，混进来等于让旧证据替新画面上保）。
