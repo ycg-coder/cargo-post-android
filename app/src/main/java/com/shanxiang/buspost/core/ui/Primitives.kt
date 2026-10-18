@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
@@ -85,6 +86,17 @@ fun BusBackArrow(onBack: () -> Unit, tint: Color = Color.White, modifier: Modifi
         )
     }
 }
+
+/**
+ * 「一行一项」那一类列表行的内边距 —— **全工程只有这一份**（司机「我的」、用户「我的」、驾驶模式那一行共用）。
+ *
+ * 为什么要具名：这些行挂在 `BusCard(padding = 0.dp)` 里（分隔线要通到边，所以卡片自己不留边），
+ * "留不留边"完全由行说了算。三处各写一遍 `horizontal = 14.dp, vertical = 13.dp` 的时候，
+ * 漏掉一处的样子是 2026-10-19 真机那张底片：司机「我的」里驾驶模式那一行的图标比上下两行小一圈、
+ * 说明文字排到第三行直接顶在卡的圆边上 —— 卡片没有、行也没有，这一格等于谁都没留（用户口径③）。
+ * 判据 UH-g 钉的是"一份定义 / 三处消费 / 零处裸字面量"。
+ */
+val busRowPadding = PaddingValues(horizontal = 14.dp, vertical = 13.dp)
 
 /**
  * 一枚**图标热区**：视觉可以小（默认 22dp），命中区必须撑到 [LocalBusTouch] 下限。

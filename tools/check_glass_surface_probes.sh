@@ -8,7 +8,9 @@
 #   GL-c 内容卡 `BusCard` 的底面仍是不带 alpha 的实色（`.background(bg.value, shape)`），
 #        它只许多吃那一道 1dp 高光，不许吃半透明 —— 正文压在半透明上就要赌对比度；
 #   GL-d 透明度那两个数（0.88 / 0.93）只许写在 `glassmorphic` 一份里，页面不许各自抄 alpha；
-#   GL-e 深色模式的高光比浅色的弱（0.16 vs 0.80）：白线在深底上是一条划痕，不是玻璃。
+#   GL-e 深色模式的高光比浅色的弱（0.16 vs 0.80）：白线在深底上是一条划痕，不是玻璃；
+#   GL-f **压在会滚正文之上**那一档（工作台通栏条）不留任何透光，而标准档仍半透明（正对照）——
+#        D-172 的教训：这一档曾经只提到 0.95/0.92，v204 真机上整行公告照样从按钮背后读得出来。
 #
 # 用法：bash tools/check_glass_surface_probes.sh
 set -u
@@ -47,15 +49,24 @@ GB_PICKER=$(one_count '\.glassmorphic\(' "$PK")
 GC_FILL=$(one_count '\.background\(bg\.value, shape\)' "$CP")
 GC_SHEEN_CARD=$(one_count '\.glassSheen\(t, shape\)' "$CP")
 
-# GL-d 透明度只写在 FluidBackground 这一份里（里面三处：玻璃面两档 + 高光两档）
+# GL-d 透明度档位只写在 FluidBackground 这一份里（现在三处：标准玻璃面两档 + 高光一档）
 # ⚠ 认的是**那两对数值**，不是"任何带 isDark 的 alpha"：`MapCanvas.kt` 里也有两处按主题分档的 alpha，
 #   那是自绘地图的网格线与路线高光，跟表面玻璃没关系 —— 用形状去认就会把它误判成抄档（第一轮就误在这里）。
+#   5 → 3 这一格降了两个读数不是放松：压正文那一档在 D-172 里改成了实色（两个 `if (tokens.isDark)` 一起没了），
+#   "它到底透不透"这件事改由下面 GL-f 用**具名值**判，比数条件表达式更硬。
 GD_ALPHA=$(one_count 'if \(tokens\.isDark\) [0-9.]+f else [0-9.]+f' "$FB")
 GD_OUT=$(grep -rnE '0\.88f else 0\.93f|0\.16f else 0\.80f|0\.95f else 0\.97f|0\.92f else 0\.94f' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | grep -v 'core/ui/FluidBackground.kt' | wc -l | tr -d ' ')
 GD_LEAK=$(grep -rnE 'glassmorphic\([^)]*alpha' "$M" --include=*.kt 2>/dev/null | grep -vE "$CMT" | wc -l | tr -d ' ')
 
 # GL-e 深浅两档的高光值
 GE_LIGHT=$(one_count '0\.16f else 0\.80f' "$FB")
+
+# GL-f 压正文那一档**不留光**（D-172：v204 底片上 0.95/0.92 仍让整行公告从按钮后面读得出来）
+# 两个读数钉的是"这一档的两个参数各自就是 1f"，正对照那格钉的是"标准档没被一起改成不透明"——
+# 少了正对照，"全工程一片实色"也能把前两格判绿（那等于把玻璃整个删掉，是另一头的走法）。
+GF_TOP=$(one_count 'alphaTop = 1f' "$FB")
+GF_BOTTOM=$(one_count 'alphaBottom = 1f' "$FB")
+GF_STD=$(one_count 'alphaTop: Float = if \(tokens\.isDark\) 0\.88f else 0\.93f' "$FB")
 
 fail=0
 
@@ -67,13 +78,15 @@ fail=0
 [ "$GB_LIGHT" = 0 ] || { echo "× GL-b 工作台通栏条又用回标准玻璃（现 $GB_LIGHT）：同上一条，正文会透字"; fail=1; }
 [ "$GC_FILL" = 1 ] || { echo "× GL-c 内容卡的实色底被改掉了（现 $GC_FILL）：卡片一旦半透明，正文就要跟背后的流体背景赌对比度"; fail=1; }
 [ "$GC_SHEEN_CARD" = 1 ] || { echo "× GL-c 内容卡没吃到那道高光（现 $GC_SHEEN_CARD）：玻璃感靠边缘，不靠把卡色调淡"; fail=1; }
-[ "$GD_ALPHA" = 5 ] || { echo "× GL-d 透明度档位不是那五处（现 $GD_ALPHA：标准玻璃面 2 + 压正文那一档 2 + 高光 1）：改档要连同本行一起改"; fail=1; }
+[ "$GD_ALPHA" = 3 ] || { echo "× GL-d 透明度档位不是那三处（现 $GD_ALPHA：标准玻璃面 2 + 高光 1）：改档要连同本行一起改"; fail=1; }
 [ "$GD_OUT" = 0 ] || { echo "× GL-d 有 $GD_OUT 处在 FluidBackground 之外抄了按主题分档的 alpha：质感要单一真值"; fail=1; }
 [ "$GD_LEAK" = 0 ] || { echo "× GL-d 有页面在调用点抄 alpha（现 $GD_LEAK）"; fail=1; }
 [ "$GE_LIGHT" = 1 ] || { echo "× GL-e 深浅两档高光压成了同一个值（现 $GE_LIGHT）：白线在深色主题上就是划痕"; fail=1; }
+{ [ "$GF_TOP" = 1 ] && [ "$GF_BOTTOM" = 1 ]; } || { echo "× GL-f 压在正文那一档的两个 alpha 不是 1f/1f（现 $GF_TOP/$GF_BOTTOM）：只要留一丝光，滚过去的正文就会从按钮背后成字（v204 底片实测 0.95/0.92 透出一整行公告）"; fail=1; }
+[ "$GF_STD" = 1 ] || { echo "× GL-f 标准玻璃档被一起改成不透明（现 $GF_STD）：正对照没了＝浮面与内容面重新长成同一张纸，这一族其余读数全部失去意义"; fail=1; }
 
 if [ "$fail" = 0 ]; then
-  echo "玻璃表面判据通过（实现 $GA_DEF/高光面 $GA_USE/浮面 $GB_USE（含压正文那一档 $GB_HEAVY）/内容卡实色 $GC_FILL/alpha 单源 $GD_ALPHA）"
+  echo "玻璃表面判据通过（实现 $GA_DEF/高光面 $GA_USE/浮面 $GB_USE（含压正文那一档 $GB_HEAVY）/内容卡实色 $GC_FILL/alpha 单源 $GD_ALPHA/压正文那一档 $GF_TOP$GF_BOTTOM/标准档正对照 $GF_STD）"
 else
   echo "玻璃表面判据失败"
 fi

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusIcons
+import com.shanxiang.buspost.core.ui.busRowPadding
 import com.shanxiang.buspost.core.ui.glassBar
 import com.shanxiang.buspost.core.ui.glassSheen
 import com.shanxiang.buspost.core.ui.BusRadius
@@ -109,8 +110,9 @@ fun StickyActionBar(
         modifier
             .fillMaxWidth()
             // 这一条是**浮在会滚的正文之上**的（`StickyBarScaffold` 量它的高度再让内容让位），
-            // 所以它走 `glassBar` 那一档（0.97/0.94）而不是标准玻璃：标准档在地图/纸底上好看，
-            // 但背后是一整页任务卡时，"开始车道级导航"这类字会从按钮背后透出来（真机 2026-10-18 用户："也要考虑美观"）。
+            // 所以它走 `glassBar` 那一档（**实色底** + 同一道高光/描边/投影）而不是标准玻璃：标准档在地图/纸底上好看，
+            // 但背后是一整页任务卡时，"开始车道级导航"这类字会从按钮背后透出来（真机 2026-10-18 用户："也要考虑美观"；
+            // 第二档最初只提到 0.95/0.92，v204 底片上通栏条后面那行「国庆中秋双节期间班次调整公告」照样读得出来 ⇒ 这一档现在不留光）。
             .glassBar(t, shape = topShape, tint = if (t.isDark) t.cardWarm else t.card)
             .glassSheen(t, topShape)
             .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -169,11 +171,11 @@ fun DrivingModeRow(modifier: Modifier = Modifier) {
     val dark by AppState.dark.collectAsStateWithLifecycle()
     val drivingNight by AppState.drivingNight.collectAsStateWithLifecycle()
 
-    Column(modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth().padding(busRowPadding)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size((30 * scale).dp)
+                    .size((36 * scale).dp)
                     .clip(RoundedCornerShape(BusRadius.m))
                     .background(if (driving) t.clayLight else t.track),
                 contentAlignment = Alignment.Center,
@@ -182,10 +184,10 @@ fun DrivingModeRow(modifier: Modifier = Modifier) {
                     BusIcons.car,
                     contentDescription = null,
                     tint = if (driving) t.clayDeep else t.textSecondary,
-                    modifier = Modifier.size((16 * scale).dp),
+                    modifier = Modifier.size((19 * scale).dp),
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     "驾驶模式",
@@ -209,7 +211,8 @@ fun DrivingModeRow(modifier: Modifier = Modifier) {
                 Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Spacer(Modifier.width(40.dp))
+                // 47 = 图标那一格 36 + 它与文字之间 11：副开关要跟在主行文字那一列的左沿下面
+                Spacer(Modifier.width(47.dp))
                 Text(
                     "界面夜间暗色",
                     color = t.textSecondary,

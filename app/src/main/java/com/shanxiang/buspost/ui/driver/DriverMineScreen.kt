@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shanxiang.buspost.core.AppDomain
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusDialogAction
+import com.shanxiang.buspost.core.ui.busRowPadding
 import com.shanxiang.buspost.core.ui.BusAvatar
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusDivider
@@ -134,7 +135,8 @@ fun DriverMineScreen() {
                 // 驾驶模式（字号 ×1.2 / 大按钮 / 夜间）此前只有 `DrivingModeRow` 这一个实现、
                 // 而它零调用点 —— 开关做完了却没有一格能按（缺陷 #62）。挂在"通用"这一格最靠上：
                 // 司机在开车前调它，与"个人资料/设置"同一个场景动线。
-                DrivingModeRow(Modifier.padding(top = 10.dp))
+                // 不再另外补 `padding(top = …)`：它与上下两行之间的呼吸位归 `busRowPadding` 那一份。
+                DrivingModeRow()
             }
         }
 
@@ -193,7 +195,7 @@ private fun MineRow(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
+            .padding(busRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.layout.Box(

@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanxiang.buspost.core.AppDomain
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.ui.BusDialogAction
+import com.shanxiang.buspost.core.ui.busRowPadding
 import com.shanxiang.buspost.core.ui.BusAvatar
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -363,7 +364,7 @@ private fun MineRow(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
+            .padding(busRowPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.layout.Box(

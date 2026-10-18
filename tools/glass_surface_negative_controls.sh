@@ -99,5 +99,16 @@ expect_red "NC-7 缺 FluidBackground" "× 缺" 2
 sub "$TB" '.glassBar(t, shape = topShape, tint = if (t.isDark) t.cardWarm else t.card)' '.glassmorphic(t, shape = topShape, shadowElevation = 8.dp, tint = if (t.isDark) t.cardWarm else t.card)'
 expect_red "NC-8 通栏条退回标准透明度" "× GL-b 工作台通栏条没走 glassBar 那一档"
 
+# NC-9 压在正文那一档被"再调回一丝透光"（就是 D-172 之前那一版：0.95/0.92）→ GL-f 红。
+# 这一条是本轮真正的反证：GL-b 只判"走没走 glassBar 那一档"，回到半透明它仍然绿 ——
+# 也就是说"透多少"这件事以前没人管，v204 底片上整行公告从按钮背后透出来时判据一声不响。
+sub "$FB" '    alphaTop = 1f,' '    alphaTop = if (tokens.isDark) 0.95f else 0.97f,'
+expect_red "NC-9 压正文那一档又留了一丝光" "× GL-f 压在正文那一档的两个 alpha 不是 1f/1f"
+
+# NC-10 正对照：把标准玻璃档也一起改成不透明（"全工程一片实色"这种走法）→ GL-f 的第二格该红。
+# 少了这一条，NC-9 那种"把两档都调没"的改法反而能把 GL-f 判绿。
+sub "$FB" 'alphaTop: Float = if (tokens.isDark) 0.88f else 0.93f' 'alphaTop: Float = 1f'
+expect_red "NC-10 标准玻璃档被一起删成实色" "× GL-f 标准玻璃档被一起改成不透明"
+
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1
