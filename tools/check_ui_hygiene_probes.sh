@@ -2,7 +2,7 @@
 # 界面性能与触控形状判据（缺陷 #77，配 tools/ui_hygiene_negative_controls.sh）
 # 用法：bash tools/check_ui_hygiene_probes.sh      退出码非 0 = 这一族被拆了
 #
-# 这一本管五件"看着没事、用着有事"的事，全部是 v86/v95 真机那两轮翻出来的形状：
+# 这一本管六件"看着没事、用着有事"的事，全部是 v86/v95 真机那两轮翻出来的形状：
 #   UH-a/b 图标热区：页面里 `Modifier.size(18.dp).clickable { … }` 这种"要点 6mm 见方"的可点块
 #          （刷新、清空搜索、编辑、删除…）→ 全部走 `BusIconTap`：视觉不放大，命中区撑到令牌下限。
 #   UH-c   懒列表 key：没有 key 的行在排序/筛选后会整行重建，滚动状态与入场动画全部错位。
@@ -12,6 +12,8 @@
 #          进组合挂一串收集器（工作台报告卡曾经九条）。一个流一个收集器，收在屏幕顶层。
 #   UH-f   MapView 释放：选点页自己 `MapView(ctx).apply{onCreate;onResume}` 而从不 onPause/onDestroy
 #          ⇒ 高德那块 SurfaceView 每开一次漏一份。
+#   UH-g   列表行内边距只有一份（`busRowPadding`）：这类行挂在 `BusCard(padding = 0)` 里，
+#          卡片不留边、行也不留，就会长成 D-172 真机那张底片 —— 某一行的说明文字顶在卡的圆边上。
 #
 # 写法沿用本仓规矩：先验文件存在；"目标 0"一律配同机制反证；窗口型判定交给 python（grep 数不到跨行链）。
 set -u
@@ -80,12 +82,23 @@ UHE_TOP=$(grep -rn 'collectAsStateWithLifecycle()' "$M" --include=*.kt | wc -l |
 UFF_PICK=$(cnt "$PICK" '?.onDestroy()')
 UFF_BUS=$(cnt "$BUSMAP" 'mapView?.onDestroy()')
 
+# UH-g 「一行一项」那类列表行的内边距只有一份（D-172：真机上驾驶模式那一行没读它，
+#      文字排到第三行直接顶在卡的圆边上 —— 卡片 `padding = 0`、行自己也没留，这一格等于谁都没留）。
+#      裸字面量认的是 `.padding(horizontal = …)` 这个**调用形状**，不是那串数：
+#      `Primitives.kt` 的注释里就写着那串数（讲历史），按数认会把注释当成违规。
+# ⚠ 定义那一格必须带 `\b`：`cnt` 是固定串前缀匹配，把令牌改名成 `busRowPaddingRenamed` 它照样数得出 1，
+#   负控跑出来就是"exit 0 ⇒ 这条判据等于没判据"（与 D-170 的 `^class ReminderTracker` 同一形）。
+UHG_DEF=$(grep -cE '^val busRowPadding\b' "$PRIM")
+UHG_USE=$(grep -rn '\.padding(busRowPadding)' "$M/ui" --include=*.kt | wc -l | tr -d ' ')
+UHG_RAW=$(grep -rn '\.padding(horizontal = 14\.dp, vertical = 13\.dp)' "$M" --include=*.kt | wc -l | tr -d ' ')
+
 echo "UH-a BusIconTap 定义/页面使用       = $UHA_DEF/$UHA_USE （目标 1/≥7）"
 echo "UH-b 页面小图标裸 clickable        = $UHB （目标 0；反证 core/ui defaultMinSize=$UHB_PROOF，目标 ≥10）"
 echo "UH-c 懒列表带 key / 全部调用点      = $UHC_KEYED/$UHC_ALL （目标 两者相等 且 总数 ≥10）"
 echo "UH-d 入场 rememberSaveable / 旧形状  = $UHD_SAVE/$UHD_OLD （目标 1/0）"
 echo "UH-e 项内就地收流 / 顶层收集器总数   = $UHE_INLINE/$UHE_TOP （目标 0/≥20）"
 echo "UH-f 选点页 onDestroy / BusMap 同款  = $UFF_PICK/$UFF_BUS （目标 1/≥1）"
+echo "UH-g 行内边距 定义/消费/裸字面量     = $UHG_DEF/$UHG_USE/$UHG_RAW （目标 1/3/0）"
 
 fail=0
 [ "$UHA_DEF" = 1 ] || { echo "× UH-a 图标热区原语不唯一或缺席（现 $UHA_DEF）：各屏又会各画一个点不中的小图标"; fail=1; }
@@ -100,6 +113,9 @@ fail=0
 [ "$UHE_TOP" -ge 20 ] || { echo "× UH-e 反证掉了（全工程顶层收集器=$UHE_TOP）：那个 0 可能是收集器整套没了"; fail=1; }
 [ "$UFF_PICK" = 1 ] || { echo "× UH-f 选点页不再 onDestroy 那张 MapView（现 $UFF_PICK）：高德的 SurfaceView 每开一次漏一份"; fail=1; }
 [ "$UFF_BUS" -ge 1 ] || { echo "× UH-f 反证掉了（BusMap 的释放=$UFF_BUS）：上面那个 1 可能只是文件写错了名"; fail=1; }
+[ "$UHG_DEF" = 1 ] || { echo "× UH-g 列表行内边距不是恰好一份定义（现 $UHG_DEF）：两处定义就会长成两套呼吸位"; fail=1; }
+[ "$UHG_USE" = 3 ] || { echo "× UH-g 读这份内边距的行不是三处（现 $UHG_USE：司机「我的」/用户「我的」/驾驶模式）：少一处就是某一屏又自己留边或不留边"; fail=1; }
+[ "$UHG_RAW" = 0 ] || { echo "× UH-g 有 $UHG_RAW 处把这份内边距抄回了裸字面量：抄的那一处不会跟着令牌动，同一张卡里就会有一行顶到圆边上"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "界面性能与触控形状判据通过"; else echo "界面性能与触控形状判据失败"; fi
 exit "$fail"

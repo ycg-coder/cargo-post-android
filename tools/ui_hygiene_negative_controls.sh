@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 界面性能与触控形状判据（UH-a…UH-f）的负控制：逐条破口 → 确认 exit 1 且报的就是这一条。
+# 界面性能与触控形状判据（UH-a…UH-g）的负控制：逐条破口 → 确认 exit 1 且报的就是这一条。
 # 只在临时目录副本上动手，工程真身不受影响（纯文本判据，不需要编译 ⇒ 可与其他脚本并行）。
 # 用法：bash tools/ui_hygiene_negative_controls.sh
 set -u
@@ -19,7 +19,8 @@ PICK="$A/ui/user/MapPointPickerScreen.kt"
 WB="$A/ui/driver/WorkbenchScreen.kt"
 GOODS="$A/ui/user/GoodsScreen.kt"
 MINE="$A/ui/user/MinePages.kt"
-for f in "$PRIM" "$PICK" "$WB" "$GOODS" "$MINE"; do
+DBITS="$A/ui/driver/DriverBits.kt"
+for f in "$PRIM" "$PICK" "$WB" "$GOODS" "$MINE" "$DBITS"; do
     [ -f "$f" ] || { echo "✘ 副本缺 $f，下面每一条都会假绿"; exit 2; }
 done
 CLEAN=/tmp/uh_neg_clean.$$; cp -r "$SC" "$CLEAN"
@@ -121,5 +122,13 @@ ctl UH-e "报告卡那一格自己收流：滚动一次多挂一批收集器"
 # 7 选点页不再释放 MapView → UH-f
 swap "$PICK" '            owned?.onDestroy()' '            owned?.toString()'
 ctl UH-f "MapView 只创建不销毁：高德那块 SurfaceView 每开一次漏一份"
+
+# 8 驾驶模式那一行不再读这份内边距（抄回裸字面量）→ UH-g 两个读数一起动（消费 3→2、裸抄 0→1）
+swap "$DBITS" '.padding(busRowPadding)' '.padding(horizontal = 14.dp, vertical = 13.dp)'
+ctl UH-g "有一行把内边距抄回裸字面量：它不会跟着令牌动，同一张卡里就会有一行顶到卡的圆边上（D-172 真机那一形）"
+
+# 9 令牌本体被改名（三处消费一起断）→ UH-g 的"恰好一份定义"该红
+swapall "$PRIM" 'val busRowPadding' 'val busRowPaddingRenamed'
+ctl UH-g "行内边距的单一真源没了：定义数与消费数同时落 0，那一格等于回到各写各的"
 
 echo "[恢复后] $(BUSPOST_ANDROID="$SC" bash "$PR" | tail -1)"
