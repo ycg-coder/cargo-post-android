@@ -823,7 +823,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`CONTRACT_MISMATCH`（P0，用户可感知的假信息）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/data/model/Models.kt`、`ui/user/BusScreen.kt`、`ui/user/HomeScreen.kt`
-- **类 / 函数**：`BusVehicle.etaMinutes`(`:536` `multiNum(...).toInt()`，null→0)、`nearestStationEtaMinutes`(`:550`)；渲染 `BusScreen.kt:377`(`stubValue = "${v.etaMinutes}"`)、`:369`(`if (v.etaMinutes <= 5) t.danger`)、`:427`(进度 `1 - eta/40`)、`HomeScreen.kt:1163`("分钟到车")、`:751`("X分")、`HomeScreen.kt:191`(`arriving = filter { etaMinutes in 1..45 }`)
+- **类 / 函数**：`BusVehicle.etaMinutes`(`:536` `multiNum(...).toInt()`，null→0)、`nearestStationEtaMinutes`(`:550`)；渲染 `BusScreen.kt:377`(`stubValue = "${v.etaMinutes}"`)、`:369`(`if (v.etaMinutes <= 5) t.danger`)、`:427`(进度 `1 - eta/40`)、`HomeScreen.kt:1167`("分钟到车")、`:751`("X分")、`HomeScreen.kt:191`(`arriving = filter { etaMinutes in 1..45 }`)
 - **当前行为**：`etaMinutes`/`etaToNextStationMinutes` 是 `Integer/Double`，后端**故意留 null** 表示"算不出来"，Android 用 `multiNum` 归 0，UI 于是显示"0"并按 ≤5 分钟染成危险色。
 - **小程序行为**：`bus/index.js` 对 null ETA 显示"—"（不是 0）。
 - **问题**：`0 分钟` + 红色 = "车已经到站了"，这正是硬规则反对的"把没有说成有"。连带影响：`HomeScreen.kt:178` 的 `in 1..45` 过滤把 0 排除，所以首页"到车提醒"少一辆，而公交页那辆显示"0 分" —— 两个页面自相矛盾；`BusScreen.kt:329` 的 `sortedBy { etaMinutes }` 会把所有 null 的车排在最前（"最快到站"其实是"不知道"）；`:427` 进度条恒为满格。
@@ -1263,7 +1263,7 @@ grep -rniE "euclidean|haversine|straight|mock|fake|demo stepping" . \
 # 被过滤掉的 4 类命中各有正当理由，不要为了"绿"而扩大白名单：
 #   · RouteSource.kt：EUCLIDEAN/STRAIGHT/MOCK 是**拒用枚举 + 别名映射表**，出现是为了拒绝，不是使用；
 #   · NavIcon.STRAIGHT（Models.kt:1881/140 等 6 处）：**转向图标"直行"**，与几何直线无关，禁止因关键字顺手改名或删除；
-#   · 天气 mock 链（Models.kt:209-245、Repo.kt:255/261/266（⑥ 后行号，原 :240-251）、WeatherCard.kt:37/144/151）：mock=true 且界面显示"网络异常，展示本地天气"，属允许显式标注的兜底；
+#   · 天气 mock 链（Models.kt:209-245、Repo.kt:255/261/266（⑥ 后行号，原 :240-251）、WeatherCard.kt:39/144/151）：mock=true 且界面显示"网络异常，展示本地天气"，属允许显式标注的兜底；
 #   · Api.kt:105 注释提到 MockWebServer（测试注入点）；MapCanvas.kt:136 的 isFakeBoldText 是字体加粗。
 # 反过来说：**不要把 `demo` 单独加进 pattern**。`Payload.demo` / `Api.demoAllowed` / `DEMO_ALLOWED` 是贯穿全工程的
 # 诚实性开关，加进来实测产生 242 条正当命中，自检立刻失去意义。演示面要用引用点查：

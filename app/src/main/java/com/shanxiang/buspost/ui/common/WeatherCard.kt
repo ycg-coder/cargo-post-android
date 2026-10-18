@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,7 @@ import com.shanxiang.buspost.core.ui.BusIcons
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
+import com.shanxiang.buspost.core.ui.LocalBusTouch
 import com.shanxiang.buspost.data.model.WeatherInfo
 
 /**
@@ -46,6 +48,7 @@ fun WeatherPill(
 ) {
     val t = LocalBusTokens.current
     val scale = LocalBusFontScale.current
+    val touch = LocalBusTouch.current
     // 三档来源都没给结论：这行只报"未取到"，不铺一个 0°C 的假读数，也不挂"4日预报"的假可点态
     val unavailable = weather.text.isEmpty() && weather.forecast.isEmpty()
     Row(
@@ -60,6 +63,11 @@ fun WeatherPill(
                 RoundedCornerShape(BusRadius.pill),
             )
             .then(if (unavailable) Modifier else Modifier.clickable(onClick = onToggle))
+            // 真机 v163 量到这颗胶囊的命中框只有 91px=33dp（13sp 字 + 上下 7dp 留白），
+            // 而它写着"4日预报"是在承诺可点 —— 抬到令牌下限（普通 48dp / 驾驶 56dp），字与留白的排布不动。
+            // ⚠ 先写过 defaultMinSize，真机 v173 复量只到 105px=38dp（没到下限）；换成 heightIn 是把 min
+            //   **压进子节点的测量约束**而不是量完再补。改后的实际像素以 UB-k 的归档 dump 为准。
+            .heightIn(min = touch.min)
             .padding(horizontal = 11.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
