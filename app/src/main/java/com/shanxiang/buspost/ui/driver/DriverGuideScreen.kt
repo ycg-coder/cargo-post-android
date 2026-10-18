@@ -46,13 +46,9 @@ import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.map.RouteCheck
 import com.shanxiang.buspost.core.navigation.NavigationEngines
-import com.shanxiang.buspost.core.navigation.NavigationGuidance
 import com.shanxiang.buspost.core.navigation.NavigationSession
 import com.shanxiang.buspost.core.navigation.engineRecalcTextOf
-import com.shanxiang.buspost.core.navigation.guidanceSwitchOffText
-import com.shanxiang.buspost.core.navigation.laneDisplayTextOf
 import com.shanxiang.buspost.core.navigation.navPlanOfStops
-import com.shanxiang.buspost.core.navigation.turnIconSpeechOf
 import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusButtonVariant
@@ -91,7 +87,11 @@ import com.shanxiang.buspost.ui.common.markerOptionsOf
  *   不从工作台搬折线过来 —— 搬过来的折线绕过了 `RealRoadRouteValidator` 那道真实道路闸门。
  * - 没有目的地 / 没有定位 / 引擎未就绪 / 算路被拒：**逐条给出真实原因**，不铺一张空白地图充数。
  * - 高德视图在本机装不起来（缺 key / 缺原生库 / 设备 ABI 不支持）时如实说明，并给出「交给外部地图」的出路。
- * - 自绘信息条（顶部）只显示引擎**已经回过**的数据：没回就说"高德没给"，不用本机时钟造剩余里程。
+ * - **引导信息只有一份来源**（D-169，用户口径④「导航页面就用高德自带的信息，不要再画蛇添足」）：
+ *   转向动作、下一段路名、剩余里程/耗时、车道放大图一律由高德自带面板（`isLayoutVisible = true`）画，
+ *   本页顶条只留高德**没有**的那三行：品牌 + 目的地 + 这一趟覆盖几站（外加偏航/重算那一句）。
+ *   曾经关掉自带面板、把这四样自绘一遍（D-158 的"沉浸式"），代价是同一屏两套答案：
+ *   自绘那一套按 `NavigationGuidance` 的帧走，面板那一套按 SDK 内部状态走，两者不同时司机看到两个数。
  */
 @Composable
 fun DriverGuideScreen() {
@@ -127,7 +127,8 @@ fun DriverGuideScreen() {
     }
     val readiness by engine.readiness.collectAsStateWithLifecycle()
     val frame by engine.guidance.collectAsStateWithLifecycle()
-    val laneFrame by engine.lane.collectAsStateWithLifecycle()
+    // 车道帧这一轮不再在本页收集（D-169）：车道放大图是高德自己画的（`isLaneInfoShow`），
+    // 我们那一行文字是它的第二套答案。引擎侧的 Flow 保留 —— 工作台那张卡还在读它。
     val recalc by engine.recalc.collectAsStateWithLifecycle()
     val arrivedWayIndex by engine.arrivedWayPointIndex.collectAsStateWithLifecycle()
 
@@ -289,18 +290,25 @@ fun DriverGuideScreen() {
     val density = androidx.compose.ui.platform.LocalDensity.current
     var topPx by remember { mutableIntStateOf(0) }
     var bottomPx by remember { mutableIntStateOf(0) }
-    val topReserve = if (topPx == 0) 170.dp else with(density) { topPx.toDp() }
+    // 120dp 是"首帧还没量到"时的保守值：顶条从五行（品牌/目的地/本段 k 站/转向+剩余/车道）
+    // 收成三行（D-169 去重）之后它比原来矮一半，170 那个数是按旧的五行给的，留着的代价是
+    // 地图白让出 50dp，而高德面板的转向卡会跟着我们的条子一起往下挪。
+    val topReserve = if (topPx == 0) 120.dp else with(density) { topPx.toDp() }
     // 底部原来那条通栏按钮条撤了（功能按钮搬进悬浮胶囊，胶囊是浮在地图上的、不占地图高度），
-    // 所以这一格只剩"到站那一格"的高度；它没出现时就是 0，不许留一条 96dp 的空白把地图压矮。
+    // 所以这一格只剩"到站那一格"的高度 + 胶囊那一格。
     //
     // ⚠ 但它不是唯一浮在地图下沿的东西：**全局悬浮胶囊也画在同一格底部**（本页登记了播报 / 看整段 / 退出导航）。
     // 2026-10-17 自查发现到站那一格右下的「回工作台作业」整枚按钮被胶囊盖在下面 —— 看着还剩半截，
     // 点下去走的是胶囊那一格。修法是让到站格**浮在胶囊之上**（下面那句 `padding(bottom = capsuleReserve())`），
     // 而地图让出的高度要一并把胶囊那一格算进去，否则路口放大图又换成被到站格压住。
+    //
+    // ⚠ D-169 起连"没有到站格"那一支也要让高（旧写法给 0.dp）：高德自带面板重新打开后，
+    // 它的"剩余里程 / 耗时"那条就画在**地图视图自己的**下沿，而地图是铺到底的 —— 让 0 就是让胶囊压住它。
+    // 撤掉面板那四行自绘换回来的东西不能转头又被自己的胶囊盖住，那只是把遮挡从一处搬到另一处。
     val bottomReserve = when {
         bottomPx > 0 -> with(density) { bottomPx.toDp() } + capsuleReserve() + 8.dp
         arrivedStop != null -> 84.dp + capsuleReserve()
-        else -> 0.dp
+        else -> capsuleReserve()
     }
 
     /**
@@ -335,23 +343,22 @@ fun DriverGuideScreen() {
                 carUp = carUp,
                 overview = overview,
                 markers = navMarkers,
+                onExit = exit,
             )
-            // ---- 自绘信息条（顶部）：品牌 + 下一动作 + 剩余里程/时间 + 车道 ----
+            // ---- 顶部自绘条：只留高德面板**没有**的那三行（D-169 去重）----
             GuideTopStrip(
                 modifier = Modifier.align(Alignment.TopCenter).onSizeChanged { topPx = it.height },
                 destination = destName,
                 // 全段模式说"本段 k 站（终点是最后一站）"；逐站模式不编这句话。
-                // 剩余里程那一个大数字在高德那里是**整条导航路径**的剩余，全段模式下它就是到终点的剩余，
-                // 所以这一行是把那个数的口径写明白，不让司机把它读成"到最近一站还有这么多"。
+                // 剩余里程那一个大数字现在由高德面板画（D-169），而它是**整条导航路径**的剩余，
+                // 全段模式下它就是到终点的剩余，所以这一行是把那个数的口径写明白，
+                // 不让司机把它读成"到最近一站还有这么多"。
                 stopLine = when {
                     plan == null -> ""
                     plan.legByLeg -> plan.note
                     plan.stops.size > 1 -> "本段共 ${plan.stops.size} 站 · 途经点 ${plan.wayPoints.size} 个（按调度顺序）"
                     else -> "本段只剩这一站"
                 },
-                frame = frame,
-                laneText = if (!Prefs.laneGuidance) guidanceSwitchOffText("车道级指引", "已关闭")
-                else laneDisplayTextOf(laneFrame),
                 recalcText = engineRecalcTextOf(recalc),
             )
             // ---- 底部：只剩"到站那一格"（高德说的）。语音 / 结束两格搬进悬浮胶囊，不再占通栏 ----
@@ -468,8 +475,12 @@ private fun AmapNaviSurface(
     carUp: Boolean,
     overview: Boolean,
     markers: List<MapMarker>,
+    onExit: () -> Unit,
 ) {
     var failed by remember { mutableStateOf<String?>(null) }
+    // 位图 marker 要按屏幕密度画，而 `AndroidView` 的 factory 那一层拿到的 `ctx` 在 `LaunchedEffect`
+    // 里看不见 —— 所以在函数体这一层取一次同一个 context，两处共用它。
+    val hostContext = LocalContext.current
     if (BuildConfig.AMAP_KEY.isBlank()) {
         failed = "地图服务未配置，导航视图无法启动"
     }
@@ -488,8 +499,13 @@ private fun AmapNaviSurface(
                         v.setAMapNaviViewListener(object : AMapNaviViewListener {
                             override fun onNaviSetting() = Unit
                             override fun onNaviCancel() = Unit
-                            // true = "退出由我自己处理"，高德就不再弹它自己的退出确认框
-                            override fun onNaviBackClick(): Boolean = true
+                            // true = "退出由我自己处理"，高德就不再弹它自己的退出确认框。
+                            // D-169 起这一格**必须真做事**：自带面板重新打开 ⇒ 那颗返回键就在屏幕上，
+                            // 只回 true 不退出等于一颗点不动的按钮（界面不许承诺做不到的动作）。
+                            override fun onNaviBackClick(): Boolean {
+                                onExit()
+                                return true
+                            }
                             override fun onNaviMapMode(mode: Int) = Unit
                             override fun onNaviTurnClick() = Unit
                             override fun onNextRoadClick() = Unit
@@ -527,9 +543,23 @@ private fun AmapNaviSurface(
             runCatching {
                 placed.forEach { it.remove() }
                 val aMap = view.map
-                placed = if (aMap == null) emptyList() else markers.mapNotNull { m ->
-                    markerOptionsOf(m)?.let { aMap.addMarker(it) }
+                val options = markers.mapNotNull { m -> markerOptionsOf(m, hostContext) }
+                placed = if (aMap == null) {
+                    android.util.Log.w(
+                        "BUS_MAP",
+                        "导航面任务点标记没贴：AMap 句柄为 null（这一趟要贴 ${markers.size} 个）",
+                    )
+                    emptyList()
+                } else {
+                    options.mapNotNull { aMap.addMarker(it) }
                 }
+                // 三个数分开念：真机 v151 那张导航图上数不出我们自己的标记，而这一格过去两种失败
+                // 都是静默的（句柄 null 直接给空列表、坐标 0/0 被 mapNotNull 吃掉）——
+                // 没有这一行就只能靠截图猜"是没贴上，还是被高德的图层盖住了"。
+                android.util.Log.i(
+                    "BUS_MAP",
+                    "导航面任务点标记：要贴 ${markers.size} 个 / 换算出 ${options.size} 个 / 贴上 ${placed.size} 个",
+                )
             }.onFailure {
                 placed = emptyList()
                 android.util.Log.w("BUS_MAP", "任务点标记没贴上导航面（底图句柄为 null 或 SDK 抛了）", it)
@@ -617,11 +647,13 @@ private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, c
     o.isScreenAlwaysBright = true          // 导航中屏幕常亮：不该出现"屏黑了要再点一下"
     o.isNaviNight = night
     o.setCompassEnabled(true)              // 指南针（同为装箱 Boolean）
-    // 高德自带的那套面板（顶部的转向卡 + 底部的"退出 / 全程 / 还有多远"条）**关掉**：
-    // 用户口径是"导航沉浸式、本页功能按钮进悬浮胶囊"，而真机截图里"退出"出现了两次、
-    // 高德底栏的到达时间被我们自己的按钮条压掉半截。关的是它的面板，不是引导信息 ——
-    // 转向、剩余里程/耗时、车道、路口放大图全部由本页自绘条与胶囊给（数据同源：引擎回调）。
-    o.isLayoutVisible = false
+    // 高德自带的那套面板（顶部转向卡 + 底部"还有多远 / 多久到"条）**打开**（D-169，
+    // 用户口径④「app 导航页面就用高德自带的信息，我们不要再画蛇添足了」）。
+    // 上一轮为了"沉浸式"把它关掉，代价是本页自绘了同一批数据的**第二套答案**
+    // （转向动作 / 剩余里程 / 剩余耗时 / 车道四行），而两套答案的更新时机不同：
+    // 面板按 SDK 内部状态走，自绘按 `NavigationGuidance` 的帧走，司机一眼看到两个数。
+    // 顶条因此只留高德没有的那三行：品牌、目的地、这一趟覆盖几站（外加偏航/重算那一句）。
+    o.isLayoutVisible = true
     v.viewOptions = o
     v.setNaviMode(if (carUp) AMapNaviView.CAR_UP_MODE else AMapNaviView.NORTH_UP_MODE)
     // 全览 = 把这一整段的任务点都框进画面（胶囊上那一格给的就是这个）；否则跟着车标走
@@ -632,19 +664,21 @@ private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, c
 }
 
 /**
- * 顶部自绘信息条（用户指定的"自绘信息条"那一半）。
+ * 顶部自绘条：只留**高德面板没有**的那几行（D-169 去重，用户口径④）。
  *
- * 为什么自绘而不是全靠高德自带面板：品牌口径（乡邮智联 / 站牌色）要跟全站一致，
- * 退出这一屏的按钮也要在**固定位置** —— 司机不必在别人的 UI 里找出口。
- * 数据一律取引擎回调（[NavigationGuidance] / 车道帧），本机不造：没回就写"高德没给"。
+ * 留下的每一行都问得出"为什么不是高德给"：
+ * · 品牌行 —— 乡邮智联的口径要跟全站一致，高德面板上不会写我们；
+ * · 目的地 —— 高德面板只说"距终点还有多远"，不说这一趟去的是哪一站；
+ * · 本段覆盖几站 —— 全段模式的范围只有后端调度知道，高德只知道它自己那几个途经点；
+ * · 偏航 / 拥堵重算那一句 —— 只有高德那两条广播说过，而它不会把这件事打在面板上。
+ * 撤掉的四行（转向动作 / 下一段路名 / 剩余里程与耗时 / 车道）全部由高德自带面板画，
+ * 本页不再抄第二套 —— 两套的更新时机不同，司机一眼看到两个数。
  */
 @Composable
 private fun GuideTopStrip(
     modifier: Modifier = Modifier,
     destination: String,
     stopLine: String,
-    frame: NavigationGuidance?,
-    laneText: String,
     recalcText: String,
 ) {
     val t = LocalBusTokens.current
@@ -689,66 +723,6 @@ private fun GuideTopStrip(
             }
             // 这一格原来是一颗白底"退出"药丸。2026-10-17 撤掉：本页的功能按钮统一进**全局悬浮胶囊**
             // （播报 / 看整段 / 退出导航），顶条只负责信息 —— 真机截图里"退出"同时出现两次的样子不像导航，像调试页。
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    // 转向动作只查 javap 核对过的 IconType 映射表；表外的码如实说"不在这张表里"
-                    // （与 DriverSdkNavCard 同一口径：`turnIconSpeechOf` 返回 null 不等于"没有帧"）
-                    frame?.let { turnIconSpeechOf(it.iconType) ?: "暂不支持此转向类型" }
-                        ?: "等待导航数据",
-                    color = Color.White,
-                    fontSize = (22 * scale).sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (frame != null) {
-                    Text(
-                        listOfNotNull(
-                            frame.currentRoad.ifEmpty { null },
-                            frame.nextRoad.ifEmpty { null }?.let { "下一段 $it" },
-                        ).joinToString(" · "),
-                        color = Color.White,
-                        fontSize = (12.5 * scale).sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    // 剩余里程：来源没给就写"高德没给"，不用直线距离或经验值补（硬规则）
-                    frame?.let { if (it.hasRemainDistance) fmtMeters(it.remainMeters) else "高德没给" } ?: "—",
-                    color = Color.White,
-                    fontSize = (20 * scale).sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    frame?.let { if (it.remainSeconds > 0) "${it.remainSeconds / 60} 分钟" else "高德没给" } ?: "—",
-                    color = Color.White,
-                    fontSize = (13 * scale).sp,
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                BusIcons.laneSign,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size((14 * scale).dp),
-            )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                laneText,
-                color = Color.White,
-                fontSize = (12 * scale).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
         }
         // 偏航 / 拥堵重算只有高德那两条广播能说；没说过就不占行（不留一个"一切正常"的假结论）
         if (recalcText.isNotEmpty() && !recalcText.contains("没")) {
@@ -841,9 +815,3 @@ private fun GuideArrivedCard(arrived: ArrivedStop, onGoWorkbench: () -> Unit) {
     }
 }
 
-
-private fun fmtMeters(meters: Int): String = when {
-    meters <= 0 -> "0 米"
-    meters < 1000 -> "$meters 米"
-    else -> "%.1f 公里".format(meters / 1000.0)
-}

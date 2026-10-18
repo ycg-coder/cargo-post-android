@@ -6,6 +6,7 @@ import com.shanxiang.buspost.core.ui.TimelineStop
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.model.MissionStop
 import com.shanxiang.buspost.data.model.RouteGuide
+import com.shanxiang.buspost.data.model.TaskItemStatus
 import com.shanxiang.buspost.ui.common.Map3DVisual
 import com.shanxiang.buspost.ui.common.MapMarker
 import com.shanxiang.buspost.ui.common.MapPath
@@ -20,6 +21,9 @@ import com.shanxiang.buspost.ui.common.MarkerVisual
  */
 object MissionMarkers {
 
+    /** `actionType` 里的"经停"那一格（`TaskItemStatus.ACTION_NAMES` 的 6）：只停、不办业务 */
+    const val ACTION_TYPE_PASS_THROUGH = 6
+
     /**
      * 唯一的顺序来源：后端 `visitSequence`（硬规则 3「调度决定去哪里」），客户端不重排、不按距离排。
      * 标记、列表、时间线共用这一个入口，避免三处各排各的。
@@ -31,6 +35,9 @@ object MissionMarkers {
      *
      * `focusStopId` 是**导航焦点**（本机在看哪一站），只用来决定"当前/下一任务"这两格的高亮，
      * 而且优先级低于后端状态：后端说哪站在办，哪站就是当前任务。它不推进任何业务状态。
+     *
+     * [badgeOf] / [stationLikeOf] 两格是 D-169 加的：同一批点在地图上要先分得出**站点**与**任务点**
+     * 两种身份，任务点还要带一个动作字 —— 高德自己画的"途经 N"只说序号，不说这一格要干什么活。
      */
     fun stopMarkers(stops: List<MissionStop>, focusStopId: Long = 0L): List<MapMarker> {
         val visible = ordered(stops).filter { it.hasGeo }
@@ -43,9 +50,24 @@ object MissionMarkers {
                 detail = stop.markerDetail(),
                 kind = taskKind(stop),
                 visual = MarkerVisual(emphasis = emphasis[i]),
+                badge = badgeOf(stop.actionType),
+                stationLike = stationLikeOf(stop.actionType),
             )
         }
     }
+
+    /**
+     * 圆心那个动作字。表在 `TaskItemStatus.ACTION_GLYPHS`（与 `ACTION_NAMES` 同一批码，
+     * 契约测试钉住"字在动作名里 + 两表只差 6 经停"），表外拿不到字就留空 —— 不替调度编一个动作。
+     */
+    fun badgeOf(actionType: Int): String = TaskItemStatus.ACTION_GLYPHS[actionType] ?: ""
+
+    /**
+     * 6 = 经停：这一格是线路上的**站点**（每站必停拉客），不带具体业务动作，画圆环不画带字钉。
+     * 只有后端明说"经停"才算 —— `actionType` 缺键（-1）时保持任务点形状，
+     * 因为"不知道干什么"与"这里只停不办事"是两件事。
+     */
+    fun stationLikeOf(actionType: Int): Boolean = actionType == ACTION_TYPE_PASS_THROUGH
 
     /**
      * 当前任务 = 后端 `isActive` 那一站，没有才退回导航焦点；

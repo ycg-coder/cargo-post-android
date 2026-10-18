@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.ui.common
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -42,6 +43,18 @@ data class MapMarker(
      * 所以任何调用点忘记传它时，画出来的是普通 marker —— 而不是靠一个编造的朝向。
      */
     val visual: MarkerVisual = MarkerVisual(),
+    /**
+     * 任务标记的字（D-169）：一个汉字，画在标记圆心（表见 `TaskItemStatus.ACTION_GLYPHS`）。
+     * 空串 = **不画字**，两种来路共用这一格：① 这一格是线路上的经停站点（[stationLike]）；
+     * ② 后端没给 `actionType` 或给的码不在这张表里 —— 表外不编字。
+     */
+    val badge: String = "",
+    /**
+     * true = 线路上的**站点**（每站必停拉客的经停格），不是带业务动作的任务点：
+     * 画空心圆环而不是带字钉。司机要的就是这一眼差别 —— 圆环只管"车会在这里停"，
+     * 字钉管的是"到了这一格要干什么活"。
+     */
+    val stationLike: Boolean = false,
 ) {
     companion object {
         const val KIND_START = 0
@@ -242,7 +255,7 @@ fun BusMap(
                     )
                 }
 
-                if (markersChanged) markers.forEach { m -> markerOptionsOf(m)?.let { aMap.addMarker(it) } }
+                if (markersChanged) markers.forEach { m -> markerOptionsOf(m, context)?.let { aMap.addMarker(it) } }
 
                 // 视口自适应：点集包围盒 + 留白（小程序 include-points 等价能力）
                 val all = markers.map { it.geo } + paths.flatMap { it.validated().orEmpty() }
@@ -292,15 +305,25 @@ fun BusMap(
  * 坐标 (0,0) 回 null = 这一个点不画：任务点没坐标时后端给的是 0/0，画上去就是几内亚湾外一个标记，
  * 司机看到的是一个**存在但不存在**的站（与 `hasGeo` 那条同一口径）。
  */
-internal fun markerOptionsOf(m: MapMarker): MarkerOptions? {
+internal fun markerOptionsOf(m: MapMarker, context: Context): MarkerOptions? {
     if (m.geo.lat == 0.0 && m.geo.lng == 0.0) return null
     val v3d = Map3DVisual.marker3DOf(m.kind, m.visual)
+    val hue = markerHue(m.kind)
+    // 形状三种只有一个来源（D-169）：站点圆环 / 带字任务钉 / 其余一律高德默认钉。
+    // 后一支不许顺手并进来 —— 公交线、车辆、"我"这些格子本轮没被要求改形状，
+    // 把它们换进位图就是拿没在真机上读过的画法覆盖既有画面。
+    val custom = m.stationLike || m.badge.isNotEmpty()
+    // 钉的锚点在钉尖（位图高 56dp、尖在 53dp），圆环的锚点在圆心；默认 marker 保持原样 0.5/0.5
+    val anchorY = if (m.badge.isNotEmpty()) MarkerBadgeDraw.TASK_ANCHOR_Y else 0.5f
     var options = MarkerOptions()
         .position(LatLng(m.geo.lat, m.geo.lng))
         .title(m.title)
         .snippet(m.detail)
-        .icon(BitmapDescriptorFactory.defaultMarker(markerHue(m.kind)))
-        .anchor(0.5f, 0.5f)
+        .icon(
+            if (custom) MarkerBadgeDraw.of(context, m.badge, hue, m.stationLike)
+            else BitmapDescriptorFactory.defaultMarker(hue),
+        )
+        .anchor(0.5f, anchorY)
         .setFlat(v3d.flat)
         .perspective(v3d.perspective)
         .zIndex(v3d.zIndex)

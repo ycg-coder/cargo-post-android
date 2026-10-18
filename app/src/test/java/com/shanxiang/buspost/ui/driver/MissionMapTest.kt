@@ -260,4 +260,58 @@ class MissionMapTest {
         assertFalse("内部话术不许出现在界面上：$none", none.contains("接口"))
         assertFalse("没有数值时不能出现数字：$none", none.any { it.isDigit() })
     }
+
+    // ── D-169「加强区别站点和任务点，任务点加上具体任务标记」────────────────────
+    // 形状这一格是**身份**，颜色那一格是**后端状态**，两件事必须各走各的来源：
+    // 把 6 经停画成圆环不代表它完成了什么，把 1 接客画成带"客"字的钉也不代表调度改过顺序。
+
+    private fun stopAt(seq: Int, actionType: Int, status: Int = 0): MissionStop = MissionStop.parse(
+        JSONObject(
+            """{"stationId":${100 + seq},"stationName":"站$seq","longitude":106.9,"latitude":30.9,""" +
+                """"visitSequence":$seq,"actionType":$actionType,"status":$status}"""
+        )
+    )
+
+    @Test
+    fun `经停站点画圆环且不带动作字`() {
+        val marker = MissionMarkers.stopMarkers(listOf(stopAt(1, 6))).first()
+        assertTrue("6 经停必须是站点形状", marker.stationLike)
+        assertEquals("站点靠形状说话，不再塞一个字", "", marker.badge)
+    }
+
+    @Test
+    fun `任务点带的是后端那个动作的字`() {
+        val markers = MissionMarkers.stopMarkers(
+            listOf(stopAt(1, 1), stopAt(2, 3), stopAt(3, 4))
+        )
+        assertEquals(listOf("客", "派", "揽"), markers.map { it.badge })
+        // 反证：形状不许串到任务点那一侧
+        assertTrue(markers.none { it.stationLike })
+    }
+
+    /**
+     * 后端没给 `actionType`（-1）与给了表外码：既不是圆环也没有字 —— 保持今天那枚默认钉。
+     * 这一条守的是"不替调度编一个动作"：拿"项"或"站"顶上去，屏幕上就多一个后端没说过的身份。
+     */
+    @Test
+    fun `动作码不在表里时不编形状也不编字`() {
+        listOf(-1, 99).forEach { code ->
+            val marker = MissionMarkers.stopMarkers(listOf(stopAt(1, code))).first()
+            assertFalse("表外码 $code 不许被画成站点", marker.stationLike)
+            assertEquals("表外码 $code 不许被编出一个字", "", marker.badge)
+        }
+    }
+
+    /**
+     * 形状换了，颜色那一格不许跟着换：站点那一格后端说完成才是绿，说失败仍然是红。
+     * （`taskKind` 与 `stationLikeOf` 各读各的字段，这条钉住它们不互相顶替。）
+     */
+    @Test
+    fun `站点形状不改变后端状态的颜色`() {
+        val done = MissionMarkers.stopMarkers(listOf(stopAt(1, 6, status = 7))).first()
+        val failed = MissionMarkers.stopMarkers(listOf(stopAt(2, 6, status = 8))).first()
+        assertTrue(done.stationLike && failed.stationLike)
+        assertEquals(MapMarker.KIND_TASK_DONE, done.kind)
+        assertEquals(MapMarker.KIND_TASK_FAILED, failed.kind)
+    }
 }

@@ -20,6 +20,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -254,6 +255,29 @@ class StatusMappingContractTest {
         assertFalse(TaskItemStatus.PENDING.isActive)
         assertFalse(TaskItemStatus.FAILED.isActive)
         assertFalse(TaskItemStatus.FAILED.isDone)
+    }
+
+    /**
+     * D-169 地图标记那个字与动作名的**同一张表**契约。
+     *
+     * 两张表各写各的就会分叉：列表念"揽收"而地图上钉一个"收"，或者反过来有人改了名字没改字。
+     * 这里不重复抄一份期望值，钉的是**关系**：字必须出现在对应动作名里，且两表只差 6 经停
+     * （那一格是站点，它的标记是圆环那个形状，不是再塞一个字）。
+     */
+    @Test
+    fun `动作字表与动作名表只差经停`() {
+        assertEquals(
+            TaskItemStatus.ACTION_NAMES.keys - 6,
+            TaskItemStatus.ACTION_GLYPHS.keys,
+        )
+        TaskItemStatus.ACTION_GLYPHS.forEach { (code, glyph) ->
+            val name = TaskItemStatus.ACTION_NAMES[code]
+            assertTrue("码 $code 没有动作名，字 \"$glyph\" 无从核对", name != null)
+            assertTrue("字 \"$glyph\" 不在动作名 \"$name\" 里", name!!.contains(glyph))
+            assertEquals("一个标记只放一个字", 1, glyph.length)
+        }
+        assertNull("6 经停不给字", TaskItemStatus.ACTION_GLYPHS[6])
+        assertNull("后端没给动作码时没有字", TaskItemStatus.ACTION_GLYPHS[-1])
     }
 
     @Test
