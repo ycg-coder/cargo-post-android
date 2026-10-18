@@ -412,6 +412,7 @@ private fun NavHud(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(BusRadius.l))
+            // 硬编码色：HUD 浅色档的深墨底（深色档已走 t.ink，这一支是仿车载 HUD 的固定墨色，阳光下可读）
             .background(if (t.isDark) t.ink.copy(alpha = 0.55f) else Color(0xFF16232E))
             .padding(horizontal = 16.dp, vertical = 15.dp),
     ) {

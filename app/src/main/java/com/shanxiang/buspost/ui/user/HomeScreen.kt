@@ -1336,6 +1336,7 @@ private fun FeatureTile(
                 // 金色底上白字只有 2.25:1 —— 对齐小程序 MP-08 修正：图标用深棕 #5A4310
                 Icon(
                     icon, null,
+                    // 硬编码色：金色渐变 tile 上的深棕图标色，与 FeatureBg.GOLD 那块固定渐变成对（换主题也不动）
                     tint = if (bg == FeatureBg.GOLD) Color(0xFF5A4310) else Color.White,
                     modifier = Modifier.size((25 * scale).dp),
                 )

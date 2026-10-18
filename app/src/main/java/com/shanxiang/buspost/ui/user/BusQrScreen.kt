@@ -83,6 +83,7 @@ fun BusQrScreen() {
                         Modifier
                             .size(40.dp)
                             .clip(CircleShape)
+                            // 硬编码色：支付宝品牌蓝 1677FF —— 品牌方规定的入口色，不随本 App 四套配色变
                             .background(Color(0xFF1677FF)),
                         contentAlignment = Alignment.Center,
                     ) {
