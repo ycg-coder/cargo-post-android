@@ -193,7 +193,7 @@ mv "$SC/docs/device-evidence/20261018-sweep" "$SC/docs/sweep_hidden" 2>/dev/null
 [ -d "$SC/docs/sweep_hidden" ] && ctl UB-l "全量热区的证据目录不见了 ⇒ 必须红，不许当'扫过且干净'"
 rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 # UB-l 覆盖面：把"滚动后"与"弹层"两类证据删掉 —— 份数还够 10 份，但覆盖面塌回了 12 张首屏
-rm -f "$SC"/docs/device-evidence/20261018-sweep/*scroll*.xml "$SC"/docs/device-evidence/20261018-sweep/*sheet*.xml "$SC"/docs/device-evidence/20261018-sweep/*dialog*.xml
+rm -f "$SC"/docs/device-evidence/20261018-sweep/*scroll*.xml "$SC"/docs/device-evidence/20261018-sweep/*sheet*.xml "$SC"/docs/device-evidence/20261018-sweep/*dialog*.xml "$SC"/docs/device-evidence/20261018-sweep/*form*.xml
 ls "$SC/docs/device-evidence/20261018-sweep"/*scroll*.xml >/dev/null 2>&1 || ctl UB-l "删掉滚动后/弹层证据（份数仍 ≥10）⇒ 覆盖下限必须咬，不能只看总数"
 rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 
