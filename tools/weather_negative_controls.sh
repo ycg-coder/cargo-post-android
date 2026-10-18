@@ -16,17 +16,18 @@ cd "$ROOT" || exit 2
 REPO=app/src/main/java/com/shanxiang/buspost/data/repo/Repo.kt
 WB=app/src/main/java/com/shanxiang/buspost/ui/driver/WorkbenchScreen.kt
 WC=app/src/main/java/com/shanxiang/buspost/ui/common/WeatherCard.kt
+HOME=app/src/main/java/com/shanxiang/buspost/ui/user/HomeScreen.kt
 PROBE=tools/check_weather_probes.sh
 BAK=/tmp/weather_negctl.bak.$$
 
-for f in "$REPO" "$WB" "$WC"; do
+for f in "$REPO" "$WB" "$WC" "$HOME"; do
   [ -f "$f" ] || { echo "✘ 缺 $f，本书作废"; exit 2; }
 done
 [ -f "$PROBE" ] || { echo "✘ 缺 $PROBE，本书作废"; exit 2; }
 
-cp "$REPO" "$BAK.repo"; cp "$WB" "$BAK.wb"; cp "$WC" "$BAK.wc"
-restore() { cp "$BAK.repo" "$REPO"; cp "$BAK.wb" "$WB"; cp "$BAK.wc" "$WC"; }
-trap 'restore; rm -f "$BAK.repo" "$BAK.wb" "$BAK.wc"; negctl_release' EXIT
+cp "$REPO" "$BAK.repo"; cp "$WB" "$BAK.wb"; cp "$WC" "$BAK.wc"; cp "$HOME" "$BAK.home"
+restore() { cp "$BAK.repo" "$REPO"; cp "$BAK.wb" "$WB"; cp "$BAK.wc" "$WC"; cp "$BAK.home" "$HOME"; }
+trap 'restore; rm -f "$BAK.repo" "$BAK.wb" "$BAK.wc" "$BAK.home"; negctl_release' EXIT
 
 # 预检：判据簿起跑必须绿，否则下面每一条"红"都分不清是破口还是基线本身坏了
 bash "$PROBE" >/dev/null 2>&1 || { echo "✘ 预检：$PROBE 起跑就不绿，基线不成立，不注入破口"; exit 5; }
@@ -121,9 +122,43 @@ check WS-7 "× W-h" "$WC" \
   '                        weather.driverTips,'
 
 restore
+# W-k（D-173 限流当天的来源可见性）三条
+check WK-1 "× W-k" "$REPO" \
+  'return null to amapWeatherFailureOf(live)' \
+  'return null'
+check WK-2 "× W-k" "$REPO" \
+  'internal fun amapWeatherFailureOf(live: JSONObject): String =' \
+  'internal fun amapWeatherFailureOfRenamed(live: JSONObject): String ='
+check WK-3 "× W-k" "$WC" \
+  'if (weather.source.isEmpty()) null else "来源 ${weather.source}",' \
+  'if (false) null else "",'
+
+# W-l（D-173 第二格：逆地理为什么没给区域码）四条
+# WL-1 高德逆地理限流那一支退回裸 EMPTY：原因在 return 那一刻被丢掉 → L2/L3
+check WL-1 "× W-l" "$REPO" \
+  '                return ReverseGeo.EMPTY.copy(failure = amapInfocodeText("高德逆地理", root.optString("infocode")))' \
+  '                return ReverseGeo.EMPTY'
+# WL-2 同一个 infocode 出现第二份说法 → L1
+check WL-2 "× W-l" "$REPO" \
+  '    internal fun amapInfocodeText(service: String, code: String): String = when (code) {' \
+  '    internal fun amapInfocodeTextAlt(service: String, code: String): String = "$service $code"
+
+    internal fun amapInfocodeText(service: String, code: String): String = when (code) {'
+# WL-3 首页那一个天气调用点不再透传原因 → L4
+check WL-3 "× W-l" "$HOME" \
+  'val w = Repo.weather(g, rg.adcode, rg.failure)' \
+  'val w = Repo.weather(g, rg.adcode)'
+# WL-4 "空区域码的两种成因"分话被绕过，服务商的原因直接顶掉中性那句 → L5
+check WL-4 "× W-l" "$REPO" \
+  'amapWeather(adcode, noAdcodeReasonOf(noAdcodeReason))' \
+  'amapWeather(adcode, noAdcodeReason)'
+
+# ⚠ 复查前必须先 restore：check() 是在**开头**还原的，最后一条注入会一直留在工作树里，
+#   不先还原就判"源码未回到原样"——那是本书自己的假失败（D-173 加第三条负控当天撞上）。
+restore
 bash "$PROBE" >/dev/null 2>&1 && echo "[恢复] 判据簿重新通过" || { echo "✘ [恢复] 判据簿仍红，源码未回到原样"; bad=$((bad + 1)); }
-cmp -s "$BAK.repo" "$REPO" && cmp -s "$BAK.wb" "$WB" && cmp -s "$BAK.wc" "$WC" \
-  && echo "[恢复] 三份文件与原样一致" || { echo "✘ [恢复] 与原样不一致"; bad=$((bad + 1)); }
+cmp -s "$BAK.repo" "$REPO" && cmp -s "$BAK.wb" "$WB" && cmp -s "$BAK.wc" "$WC" && cmp -s "$BAK.home" "$HOME" \
+  && echo "[恢复] 四份文件与原样一致" || { echo "✘ [恢复] 与原样不一致"; bad=$((bad + 1)); }
 
 echo "天气结构负控：通过 $ok / 失败 $bad"
-[ "$bad" = 0 ] && [ "$ok" = 7 ]
+[ "$bad" = 0 ] && [ "$ok" = 14 ]

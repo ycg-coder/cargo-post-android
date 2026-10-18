@@ -79,5 +79,54 @@ fail=0
 [ "$WJ" = 2 ] || { echo "× W-j 天气生产者不是 2（现 $WJ）：多了=第三处就地编天气，少了=某一来源不再出提示"; fail=1; }
 [ "$WJR" = 3 ] || { echo "× W-j 读这张表的总数不是 3（现 $WJR：两处生产者 + 推送）：多一处就是有人又起了第二张天气→建议表"; fail=1; }
 
+# W-k 限流当天的"这组数是谁给的"（D-173）。三格合起来反的是一件事：
+#     高德天气被限流时，旧写法 `status != "1" → return null` **把错误码丢掉**，open-meteo 顶上，
+#     而 `WeatherCard` 的 meta 那行优先显示"更新于 HH:mm"、把 `source` 整行盖掉
+#     ⇒ 屏上没有任何一处说得出"这组数来自 open-meteo、高德为什么没给"。
+#     ⚠ `Repo.kt` 里那句旧注释"界面已经明写来源高德天气"当场是假的（K5 钉它不许回来）。
+# ⚠ K1 的锚点必须带上参数表：只写 `internal fun amapWeatherFailureOf` 时，把它改名成
+#   `amapWeatherFailureOfRenamed` 仍然是"恰好 1"（负控 WK-2 第一轮实测就是这么绿的）——
+#   改名等于把翻译器摘掉，但 grep 的形状没变。带上 `(live: JSONObject)` 之后改名念 0。
+K1=$(grep -c "internal fun amapWeatherFailureOf(live: JSONObject)" "$REPO")
+K2=$(grep -c "null to " "$REPO")
+K3=$(sed -n '/private suspend fun amapWeather/,/^    private suspend fun openMeteoWeather/p' "$REPO" \
+  | grep -E "return null" | grep -vc "null to")
+K4S=$(grep -c "weather.source" "$WC")
+K4P=$(grep -c "primaryFailure" "$WC")
+K4OLD=$(grep -c "updateTime.isNotEmpty() -> updateTime" "$WC")
+K5=$(grep -c "界面已经明写来源" "$REPO")
+K5P=$(grep -c "D-173" "$REPO")
+printf 'W-k 失败码翻译器/带因返回/裸 null/来源露出/主因露出/旧盖法/旧假注释 : %s/%s/%s/%s/%s/%s/%s（目标 1/≥5/0/≥1/≥2/0/0）\n' \
+  "$K1" "$K2" "$K3" "$K4S" "$K4P" "$K4OLD" "$K5"
+[ "$K1" = 1 ] || { echo "× W-k 高德失败码翻译器不是恰好一份（现 $K1）：两份映射表迟早对同一个码说两句不同的话"; fail=1; }
+[ "$K2" -ge 5 ] || { echo "× W-k 只有 $K2/5 处失败带上了原因（应 5：没区域码/没配 key/状态非 1/没给 lives/抛异常）：漏一处就是又回到静默 null"; fail=1; }
+[ "$K3" = 0 ] || { echo "× W-k amapWeather 里还有 $K3 处裸 return null：错误码在那一刻被丢掉，屏上再怎么改也说不清是谁没给"; fail=1; }
+[ "$K4S" -ge 1 ] || { echo "× W-k 天气卡不再显示 source：限流当天没人知道这组数来自哪一路"; fail=1; }
+[ "$K4P" -ge 2 ] || { echo "× W-k 天气卡没把 primaryFailure 露出来（现 $K4P，要 ≥2：兜底态与降级态各一处）：换源这件事又变回静默"; fail=1; }
+[ "$K4OLD" = 0 ] || { echo "× W-k 旧写法回来了（updateTime 一非空就顶掉整行 meta）：来源永远显示不出来"; fail=1; }
+[ "$K5" = 0 ] || { echo "× W-k 那句假注释「界面已经明写来源」又回到 Repo.kt：注释承诺了一件屏上没有的事，比没注释更坏"; fail=1; }
+[ "$K5P" -ge 1 ] || { echo "× W-k Repo.kt 里没有 D-173 的更正说明：K5 那个 0 就成了『谁都没碰过这段』而不是『改过且不许回退』"; fail=1; }
+
+# W-l 逆地理那一路的"为什么没拿到区域码"（D-173 第二格，与 W-k 同一族）。
+#     `reverseGeo` 旧写法五种失败全回同一个 `EMPTY`：限流、没配 key、报文缺字段、抛异常在调用方眼里一模一样，
+#     于是天气卡只能说"还没拿到区域码，没去问高德天气"—— 那是本机压根没定位到时才成立的话。
+#     高德逆地理被限流当天，这句话把服务商的配额问题写成了本机的定位问题。
+L1=$(grep -c "internal fun amapInfocodeText" "$REPO")
+# ⚠ 只数 `EMPTY.copy(` 不数 `EMPTY.copy(failure =`：那两处"报文缺字段"的分支写成了换行形式，
+#   按后者数会念 3 而真实是 5 —— 判据读到的数必须与它声称在数的那五件事一一对应（§八 ㉗ 同族）。
+L2=$(sed -n '/suspend fun reverseGeo/,/suspend fun walkRoute/p' "$REPO" | grep -c "ReverseGeo.EMPTY.copy(")
+L3=$(sed -n '/suspend fun reverseGeo/,/suspend fun walkRoute/p' "$REPO" \
+  | grep -E "return ReverseGeo.EMPTY" | grep -vc "copy")
+L4=$(grep -rn "${KT[@]}" "rg.failure" . | wc -l | tr -d ' ')
+# 注释行里也会出现这个词（KDoc 指着它），不滤掉就把"写在说明里"读成"接在线上"——与 W-d 同一个坑。
+L5=$(grep -n "noAdcodeReasonOf" "$REPO" | grep -vE '^[0-9]+: *(//|\*)' | wc -l | tr -d ' ')
+printf 'W-l 共用码表/逆地理带因/裸 EMPTY/调用点透传/两成因分话 : %s/%s/%s/%s/%s（目标 1/≥5/0/≥3/2）\n' \
+  "$L1" "$L2" "$L3" "$L4" "$L5"
+[ "$L1" = 1 ] || { echo "× W-l 高德失败码表不是恰好一份（现 $L1）：天气与逆地理迟早对同一个 infocode 说两句不同的话"; fail=1; }
+[ "$L2" -ge 5 ] || { echo "× W-l 逆地理只有 $L2/5 处失败带上了原因（应 5：没配 key/状态非 1/没给 regeocode/没给 addressComponent/抛异常）：漏一处天气那一格就在替限流说假话"; fail=1; }
+[ "$L3" = 0 ] || { echo "× W-l reverseGeo 里还有 $L3 处裸 return EMPTY：失败原因在那一刻被丢掉"; fail=1; }
+[ "$L4" -ge 3 ] || { echo "× W-l 只有 $L4 个天气调用点把逆地理的原因传了下去（首页/工作台/推送三处）：漏一处那一屏还是说『还没拿到区域码』"; fail=1; }
+[ "$L5" = 2 ] || { echo "× W-l 空区域码的两种成因分话不是『一处定义 + weather 一处调用』（现 $L5）：两份话或没人用，都是回到一句话说尽两种成因"; fail=1; }
+
 if [ "$fail" = 0 ]; then echo "天气分角色判据通过"; else echo "天气分角色判据失败"; fi
 exit "$fail"

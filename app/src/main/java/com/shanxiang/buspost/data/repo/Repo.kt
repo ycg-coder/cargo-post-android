@@ -296,19 +296,31 @@ object Repo {
      * 逆地理编码（高德 regeo，Web 服务 key）：坐标 → adcode / 区县 / 乡镇。
      * 天气按 adcode 查区县级更准（中国气象局数据），首页定位文案也用它。
      * 失败返回 EMPTY，调用方回落到无 adcode 的坐标级天气（open-meteo）。
+     *
+     * ⚠ "失败返回 EMPTY"这一句以前只说了一半：EMPTY 里说不清**为什么**没拿到，
+     * 于是限流当天天气格只能说"还没拿到区域码"，把高德的配额问题写成了本机定位问题。
+     * 现在每一条不让过的支路都带一句 `failure`，由 [weather] 透传到界面上。
      */
     suspend fun reverseGeo(geo: Geo): ReverseGeo {
         val key = com.shanxiang.buspost.BuildConfig.AMAP_WEB_KEY
-        if (key.isEmpty()) return ReverseGeo.EMPTY
+        if (key.isEmpty()) return ReverseGeo.EMPTY.copy(failure = "本机没配高德 Web 服务 key，没去问逆地理")
         return try {
             val text = Api.rawGet(
                 "https://restapi.amap.com/v3/geocode/regeo?key=$key" +
                     "&location=${geo.lng},${geo.lat}&extensions=base"
             )
             val root = JSONObject(text)
-            if (root.optString("status") != "1") return ReverseGeo.EMPTY
-            val rc = root.optJSONObject("regeocode") ?: return ReverseGeo.EMPTY
-            val ac = rc.optJSONObject("addressComponent") ?: return ReverseGeo.EMPTY
+            if (root.optString("status") != "1") {
+                return ReverseGeo.EMPTY.copy(failure = amapInfocodeText("高德逆地理", root.optString("infocode")))
+            }
+            val rc = root.optJSONObject("regeocode")
+                ?: return ReverseGeo.EMPTY.copy(
+                    failure = "高德逆地理说成功但没给 regeocode（infocode=${root.optString("infocode")}）",
+                )
+            val ac = rc.optJSONObject("addressComponent")
+                ?: return ReverseGeo.EMPTY.copy(
+                    failure = "高德逆地理没给 addressComponent（infocode=${root.optString("infocode")}）",
+                )
             ReverseGeo(
                 adcode = ac.multiStr("adcode"),
                 province = ac.multiStr("province"),
@@ -321,7 +333,7 @@ object Repo {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ReverseGeo.EMPTY
+            ReverseGeo.EMPTY.copy(failure = "问高德逆地理时出错：${e.javaClass.simpleName}")
         }
     }
 
@@ -407,31 +419,73 @@ object Repo {
      *   2) open-meteo（国际模式，坐标级，无 key）
      *   3) 两路都没给 → 空态（mock=true），页面只说"未取到"，不再编一组温度与 4 日预报
      * 高德 key 若为「微信小程序」类型会返回 10009 平台不匹配，此处静默降级，不阻塞页面。
+     *
+     * ⚠ "静默"只到**取数层**为止：为什么没用上主源必须一路带到界面上（[WeatherInfo.primaryFailure]），
+     * 否则限流当天司机看到的数换了来源而页面一个字不改。`noAdcodeReason` 是逆地理那一路的话，
+     * 区域码拿不到有两种成因（本机没定位到 / 高德逆地理没给），以前只有一种说法。
      */
-    suspend fun weather(geo: Geo, adcode: String = ""): WeatherInfo {
-        amapWeather(adcode)?.let { return it }
-        openMeteoWeather(geo)?.let { return it }
+    suspend fun weather(geo: Geo, adcode: String = "", noAdcodeReason: String = ""): WeatherInfo {
+        val (fromAmap, amapWhy) = amapWeather(adcode, noAdcodeReasonOf(noAdcodeReason))
+        fromAmap?.let { return it }
+        openMeteoWeather(geo)?.let { return it.copy(primaryFailure = amapWhy) }
         // 旧兜底发的是「多云 22°、湿度 68%、4 日预报」——一个数都没来自后端/服务商，纯本机编的，
         // 挂在首屏就是拿假天气给司机和用户做装车决策。现在只回结构空值 + mock=true，
         // 页面据此出「天气未取到」；温度/湿度/预报一律不渲染（§14 没有值不许有业务语义）。
+        // source 这一格说清了"两路都没给"，primaryFailure 说清"高德那一路是怎么没的"（限流/失效/没答）。
         return WeatherInfo(
             text = "", temperature = 0, feel = 0, wind = "",
             source = "未取到", icon = "", humidity = "", tips = "",
-            forecast = emptyList(), mock = true,
+            forecast = emptyList(), mock = true, primaryFailure = amapWhy,
         )
     }
 
-    private suspend fun amapWeather(adcode: String): WeatherInfo? {
-        if (adcode.isEmpty()) return null
+    /**
+     * 高德 REST 的失败码 → 一句人话（D-173：限流当天要能在屏上说清是谁没给）。
+     * 只翻高德文档里那几个码；认不得的一律带上原 infocode，不猜成"网络不好"。
+     *
+     * 码表放在这一格里、接口名由调用方传：天气与逆地理撞的是**同一批**码，
+     * 两处各写一套说法就是"同一个问题两个答案"（§八 ㉗）。
+     */
+    internal fun amapInfocodeText(service: String, code: String): String = when (code) {
+        // ⚠ `${service}` 必须带花括号：Kotlin 的标识符允许中日韩字母，`"$service今日…"` 会被
+        //   读成一个名叫 `service今日配额已用完` 的引用（compileDebugKotlin 实测 Unresolved reference）。
+        "10003", "10004", "10005" -> "${service}今日配额已用完（infocode=$code）"
+        "10009" -> "$service key 与接口平台不匹配（infocode=10009，REST 要用「Web 服务」key）"
+        "10001", "10002" -> "$service key 无效或已失效（infocode=$code）"
+        "" -> "${service}没返回可用数据"
+        else -> "${service}返回 infocode=$code"
+    }
+
+    internal fun amapWeatherFailureOf(live: JSONObject): String =
+        amapInfocodeText("高德天气", live.optString("infocode"))
+
+    /**
+     * 区域码那一格为什么是空的（D-173）：两种成因不能共用一句话。
+     *
+     * 调用方传空串 = 本机压根没定位到（这没有谁可怪，中性那句就是全部）；
+     * 传了话 = 高德逆地理答过但没给（限流 / key 不对 / 报文缺字段），要照它说。
+     * 旧写法只有中性那一句，于是限流当天屏上写着"没拿到区域码"，把服务商的事写成了本机的事。
+     */
+    internal fun noAdcodeReasonOf(fromReverseGeo: String): String =
+        if (fromReverseGeo.isEmpty()) "还没拿到区域码，没去问高德天气" else fromReverseGeo
+
+    /**
+     * 返回 (天气, 主源为什么没用上)：两者不会同时非空，也不会同时为空着说话。
+     *
+     * `noAdcodeReason` 是逆地理那一路的话，由 [weather] 过 [noAdcodeReasonOf] 再传进来，两处不各写一份。
+     */
+    private suspend fun amapWeather(adcode: String, noAdcodeReason: String): Pair<WeatherInfo?, String> {
+        if (adcode.isEmpty()) return null to noAdcodeReason
         // 天气走「Web 服务」key（REST 接口），与地图 SDK 的「Android 平台」key 是两个不同的 key；
         // 实测用平台受限 key 请求 REST 会返回 10009 USERKEY_PLAT_NOMATCH。
         val key = com.shanxiang.buspost.BuildConfig.AMAP_WEB_KEY
-        if (key.isEmpty()) return null
+        if (key.isEmpty()) return null to "本机没配高德 Web 服务 key，没去问天气"
         return try {
             val base = "https://restapi.amap.com/v3/weather/weatherInfo?key=$key&city=$adcode"
             val live = JSONObject(Api.rawGet("$base&extensions=base"))
-            if (live.optString("status") != "1") return null
-            val l = live.optJSONArray("lives")?.optJSONObject(0) ?: return null
+            if (live.optString("status") != "1") return null to amapWeatherFailureOf(live)
+            val l = live.optJSONArray("lives")?.optJSONObject(0)
+                ?: return null to "高德天气说成功但没给 lives（infocode=${live.optString("infocode")}）"
             val forecast = safeApiCall {
                 val all = JSONObject(Api.rawGet("$base&extensions=all"))
                 all.optJSONArray("forecasts")?.optJSONObject(0)?.optJSONArray("casts")?.let { casts ->
@@ -446,8 +500,9 @@ object Repo {
                         )
                     }
                 }.orEmpty()
-            // F-2 第 8 步迁点（形状归一，语义未变）：预报是高德的**可选装饰**，取不到就是没有这七天，
-            // 界面已经明写来源"高德天气"，所以这里保持 orEmpty()，不新开一条错误通路。
+            // F-2 第 8 步迁点（形状归一，语义未变）：预报是高德的**可选装饰**，取不到就是没有这七天。
+            // ⚠ 这里的旧注释曾承诺界面上会把来源写出来——那是假的：`WeatherCard` 的 meta 那行
+            //   优先显示"更新于 HH:mm"，来源被它整个盖掉（D-173 真机限流当天抓的）。现在两边都显示。
             }.getOrNull().orEmpty()
             val temp = l.optString("temperature").toIntOrNull() ?: 0
             val (userTip, driverTip) = weatherTipsFor(l.optString("weather"), temp)
@@ -462,11 +517,11 @@ object Repo {
                 tips = userTip,
                 driverTips = driverTip,
                 forecast = forecast,
-            )
+            ) to ""
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            null
+            null to "问高德天气时出错：${e.javaClass.simpleName}"
         }
     }
 

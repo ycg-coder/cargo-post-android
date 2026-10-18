@@ -157,11 +157,17 @@ fun WeatherDetailCard(
                             if (weather.wind.isNotEmpty()) WeatherTag(weather.wind)
                         }
                         // 更新状态：加载中 / 三档来源都没给（现在不再兜一组本地数，所以只说没取到）
+                        // ⚠ 时间与来源**都要露出来**：旧写法是 `updateTime` 一非空就把来源整行盖掉，
+                        //   于是高德天气限流那天，屏上完全看不出这组数其实来自 open-meteo（D-173 真机抓的）。
                         val meta = when {
                             loading -> "更新中…"
-                            weather.mock -> "天气未取到（高德与 open-meteo 都没返回）"
-                            updateTime.isNotEmpty() -> updateTime
-                            else -> weather.source
+                            weather.mock -> "天气未取到（高德与 open-meteo 都没返回）" +
+                                if (weather.primaryFailure.isEmpty()) "" else "；${weather.primaryFailure}"
+                            else -> listOfNotNull(
+                                updateTime.ifEmpty { null },
+                                if (weather.source.isEmpty()) null else "来源 ${weather.source}",
+                                weather.primaryFailure.ifEmpty { null }?.let { "主源没用上：$it" },
+                            ).joinToString(" · ")
                         }
                         if (meta.isNotEmpty()) {
                             Text(

@@ -201,7 +201,7 @@ class HomeViewModel : ScreenViewModel() {
                     Triple(null, null, "")
                 } else {
                     val rg = Repo.reverseGeo(g)
-                    val w = Repo.weather(g, rg.adcode)
+                    val w = Repo.weather(g, rg.adcode, rg.failure)
                     val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(java.util.Date())
                     Triple(rg, w, time)
                 }

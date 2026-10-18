@@ -86,10 +86,33 @@ open(p, 'w', encoding='utf-8').write('\n'.join(L))
 PY
   ctl DA-d "在册表被删一条 ⇒ 仍可复现的可疑锚点被判成新增（闸门不许被抄近路）"
 # 反向：锚点从台账里消失（行号被改成没有行号的形式），在册条目悄悄不见也必须响
-# ⚠ 这条原先用 `sed -i` 打到 V2.1 核对表上，而 `Models.kt:497` 的**在册条目在 CONTEXT_LOCK.md:2043**
-#   （aid 是按 文档+锚点原文 算的，核对表里那一处是另一个 aid，本来就不在册）⇒ sed 空转，
-#   消失检测从来没响过。换成 subst()：锚点不在就 OLD-MISS 当场报错，不再允许一把空刀混在 ✔ 里。
-subst "$CL" 'Models.kt:497' 'Models 那一段'
+# ⚠ 这条原先硬写 `Models.kt:497`，两轮都撞上同一件事：**被点名的那条锚点被人真修好了**，
+#   aid 就不再在册，抹掉它当然不会"消失" ⇒ 负控静默失效（2026-10-15 是 sed 空转，本轮 D-173 是修好致空）。
+#   所以这里**不再点名**：从在册表里现挑一条 CONTEXT_LOCK.md 的可疑锚点来抹，
+#   挑不到就当场 STOP —— 宁可不跑，也不要一把永远绿的空刀。
+VICTIM=$(python - "$PINF" "$CL" <<'PY'
+import sys, re
+pin, target = sys.argv[1], sys.argv[2].replace("\\", "/").split("/")[-1]
+hit = ""
+for ln in open(pin, encoding="utf-8"):
+    if ln.startswith("#"):
+        continue
+    f = ln.rstrip("\n").split("\t")
+    if len(f) < 4:
+        continue
+    doc_line = f[3]
+    if doc_line.rsplit(":", 1)[0].split("/")[-1] != target:
+        continue
+    m = re.search(r"\b[A-Za-z0-9_]+\.kt:\d+(?:-\d+)?\b", f[2])
+    if m:
+        hit = m.group(0)
+        break
+print(hit)
+PY
+)
+[ -n "$VICTIM" ] || { echo "STOP 在册表里没有 CONTEXT_LOCK.md 的可疑锚点，这条负控没有靶子（要么全修好了，要么在册表被清空）"; exit 6; }
+echo "  靶子（本轮在册的一条）: $VICTIM"
+subst "$CL" "$VICTIM" '被负控抹掉的锚点'
   ctl DA-d "在册锚点本次不再可疑（锚点被抹掉而不是被修好）"
 # 扫描面塌掉：文档里的 `.kt:` 全被写坏成扫不到 ⇒ 锚点总数掉下来，闸门看不到任何一条
 # 扫描面塌掉：**七本台账一起**把 `.kt:` 写坏成扫不到 ⇒ 锚点总数掉下来，DA-a 才响。
