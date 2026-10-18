@@ -252,5 +252,31 @@ printf 'UB-k 量出来：公告条命中框 %s px（须恰好 132 —— 这条�
 [ "$ub_k_after_n" -ge 1 ] || { echo "× UB-k 没有改后的真机 dump（*after*.xml）：这一格是**屏幕复验**判据，没证据就是没做，不许靠源码接线自证"; ok=0; }
 [ -n "$ub_k_after_min" ] && [ "$ub_k_after_min" -ge 132 ] || { echo "× UB-k 改后命中框最小 $ub_k_after_min px < 132（48dp@2.75）：抬没生效，或被滚动视口裁到了（取证要让目标完整可见，见 D-164 的测量法坑）"; ok=0; }
 
+# UB-l 归档 dump 的**全量**通栏热区扫（D-165；探针 tools/hot_zone_sweep.py）
+#     UB-k 管的是"我量过的那一格别再退回去"，这一格管的是"别处再长出一颗 33dp 的必须咬"。
+#     口径两条都是从真机踩出来的：通栏（宽≥400）才算"点这一整条"的承诺；贴滚动容器底的是被视口裁的半截，不算病。
+SDIR=docs/device-evidence/20261018-sweep
+if [ ! -d "$SDIR" ]; then
+  echo "× UB-l 全量热区证据目录不在（$SDIR）：没证据就是没扫，不许读成 0"; ok=0
+  ul_files=0; ul_short=-1
+else
+  ul_files=$(ls -1 "$SDIR"/*.xml 2>/dev/null | wc -l | tr -d ' ')
+  ul_out=$("$PY" tools/hot_zone_sweep.py "$SDIR" 2>&1)
+  ul_short=$(printf '%s\n' "$ul_out" | sed -n 's/^TOTAL .* short=\([0-9-]*\).*/\1/p' | head -1)
+fi
+ul_floor=$(grep -c "floor, min_w, clip_tol = argv\[0\], 132, 400, 8" tools/hot_zone_sweep.py)
+ul_bad=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_bad 2>&1 | sed -n 's/^TOTAL .* short=\([0-9-]*\).*/\1/p' | head -1)
+ul_bad_named=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_bad 2>&1 | grep -c '^DEFECT .* 904x91 ')
+ul_good=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_ok 2>&1 | sed -n 's/^TOTAL .* short=\([0-9-]*\).*/\1/p' | head -1)
+printf 'UB-l 归档 dump 份数/下限 132 在册      : %s / %s （目标 ≥10 且恰好 1）\n' "$ul_files" "$ul_floor"
+printf 'UB-l 全量扫：通栏矮格 %s（目标 0）；反证件 %s→须恰好 1 且点名 904x91（现 %s/%s）；正件 %s（目标 0）\n' \
+  "$ul_short" "$ul_bad" "$ul_bad" "$ul_bad_named" "$ul_good"
+[ "$ul_floor" = 1 ] || { echo "× UB-l 扫描器的下限/宽度默认值被改（现 $ul_floor）：把 132 调小或把 400 调大，都能让全量扫'零缺陷'——那是把尺子锯短"; ok=0; }
+[ "$ul_files" -ge 10 ] || { echo "× UB-l 归档 dump 只有 $ul_files 份（下限 10）：两端各 4 个主 tab + 详情格，少一份就是有一片屏没人量过"; ok=0; }
+[ "$ul_short" = 0 ] || { echo "× UB-l 全量扫出 $ul_short 颗通栏矮格：写的是'点这一整条'，量出来却够不到 48dp（点名见 tools/hot_zone_sweep.py 的 DEFECT 行）"; printf '%s\n' "$ul_out" | grep '^DEFECT' | head -5; ok=0; }
+[ "$ul_bad" = 1 ] || { echo "× UB-l 反证件没数出恰好 1（现 '$ul_bad'）：扫描器瞎了，上面那个 0 就是假的"; ok=0; }
+[ "$ul_bad_named" = 1 ] || { echo "× UB-l 反证件没点名那颗 904x91（现 $ul_bad_named）：只报个数不报是哪一格，等于不判据"; ok=0; }
+[ "$ul_good" = 0 ] || { echo "× UB-l 正件被误报 $ul_good 颗：同一把尺子在合规几何上不该响"; ok=0; }
+
 [ "$ok" = 1 ] || exit 1
-echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处）"
+echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处；归档 $ul_files 份真机 dump 全量热区扫 通栏矮格 $ul_short 颗，胶囊命中框改后 ≥132px）"
