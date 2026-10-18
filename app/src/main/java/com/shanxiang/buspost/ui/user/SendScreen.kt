@@ -284,9 +284,11 @@ class SendViewModel : ScreenViewModel() {
             return@work
         }
         formError = ""
-        val result = Repo.forwardGeo(address)
+        val attempt = Repo.forwardGeo(address)
+        val result = attempt.result
         if (result == null) {
-            formError = "未找到该地址，请检查输入是否正确"
+            // 没问到 ≠ 地址写错了：前者要重试、后者才该改写法，两句不许共用（D-173 第三格）
+            formError = attempt.failure.ifEmpty { "未找到该地址，请检查输入是否正确" }
             return@work
         }
         val geo = result.geo
