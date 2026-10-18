@@ -147,5 +147,13 @@ expect_red "NC-17 返回键没接出口" "× CN-f 高德那颗返回键没接回
 sub "$GD" 'private fun GuideTopStrip(' 'private fun GuideTopStripX('
 expect_red "NC-18 顶条正对照失效" "× CN-f 顶条的定义+调用不再是 2"
 
+# NC-19 有人在导航那一屏的胶囊里又放一颗「退出导航」（高德面板上已经有一颗真做事的）→ CN-d 该红
+ins "$GD" '                key = "voice",' '                key = "exit",'
+expect_red "NC-19 重复的退出键回来" "× CN-d 导航那一屏的胶囊又长出"
+
+# NC-20 播报那一格被撤（它是这一屏唯一没有高德等价物的动作）→ CN-d 该红
+sub "$GD" '                key = "voice",' '                key = "voiceMute",'
+expect_red "NC-20 播报格被撤" "× CN-d 导航那一屏的播报格不是一格"
+
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1
