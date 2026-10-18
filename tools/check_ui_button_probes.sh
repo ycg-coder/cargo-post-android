@@ -268,7 +268,14 @@ ul_floor=$(grep -c "floor, min_w, clip_tol = argv\[0\], 132, 400, 8" tools/hot_z
 ul_bad=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_bad 2>&1 | sed -n 's/^TOTAL .* short=\([0-9-]*\).*/\1/p' | head -1)
 ul_bad_named=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_bad 2>&1 | grep -c '^DEFECT .* 904x91 ')
 ul_good=$("$PY" tools/hot_zone_sweep.py tools/fixtures/hot_sweep_ok 2>&1 | sed -n 's/^TOTAL .* short=\([0-9-]*\).*/\1/p' | head -1)
+# 覆盖下限：光"份数够"不算覆盖 —— 12 张首屏也能凑出 17 份。D-166 把两类曾经没扫的面（滚动区下方、弹层）
+# 钉成**必须有的命名**，谁把它们从归档里删掉，这一格就红，而不是退回到"看起来扫过了"。
+ul_scroll=$(printf '%s\n' "$ul_out" | grep -c 'SWEEP [^ ]*scroll[^ ]*\.xml ')
+ul_layer=$(printf '%s\n' "$ul_out" | grep -cE 'SWEEP [^ ]*(sheet|dialog)[^ ]*\.xml ')
+ul_user=$(printf '%s\n' "$ul_out" | grep -c 'SWEEP [^ ]*user-')
+ul_drv=$(printf '%s\n' "$ul_out" | grep -c 'SWEEP [^ ]*driver-')
 printf 'UB-l 归档 dump 份数/下限 132 在册      : %s / %s （目标 ≥10 且恰好 1）\n' "$ul_files" "$ul_floor"
+printf 'UB-l 覆盖面：滚动后 %s 弹层 %s 用户端 %s 司机端 %s （目标 ≥2/≥2/≥4/≥4）\n' "$ul_scroll" "$ul_layer" "$ul_user" "$ul_drv"
 printf 'UB-l 全量扫：通栏矮格 %s（目标 0）；反证件 %s→须恰好 1 且点名 904x91（现 %s/%s）；正件 %s（目标 0）\n' \
   "$ul_short" "$ul_bad" "$ul_bad" "$ul_bad_named" "$ul_good"
 [ "$ul_floor" = 1 ] || { echo "× UB-l 扫描器的下限/宽度默认值被改（现 $ul_floor）：把 132 调小或把 400 调大，都能让全量扫'零缺陷'——那是把尺子锯短"; ok=0; }
@@ -277,6 +284,10 @@ printf 'UB-l 全量扫：通栏矮格 %s（目标 0）；反证件 %s→须恰�
 [ "$ul_bad" = 1 ] || { echo "× UB-l 反证件没数出恰好 1（现 '$ul_bad'）：扫描器瞎了，上面那个 0 就是假的"; ok=0; }
 [ "$ul_bad_named" = 1 ] || { echo "× UB-l 反证件没点名那颗 904x91（现 $ul_bad_named）：只报个数不报是哪一格，等于不判据"; ok=0; }
 [ "$ul_good" = 0 ] || { echo "× UB-l 正件被误报 $ul_good 颗：同一把尺子在合规几何上不该响"; ok=0; }
+[ "$ul_scroll" -ge 2 ] || { echo "× UB-l 归档里滚动后的证据只有 $ul_scroll 份（下限 2）：首屏干净不代表折叠在下面的格子也干净——D-164 那颗 33dp 胶囊就在首屏，而屏底的按钮要滚上来才量得准"; ok=0; }
+[ "$ul_layer" -ge 2 ] || { echo "× UB-l 归档里弹层/对话框证据只有 $ul_layer 份（下限 2）：弹层是手搓按钮最容易长回来的地方，没证据就是没扫"; ok=0; }
+[ "$ul_user" -ge 4 ] || { echo "× UB-l 用户端证据 $ul_user 份（下限 4）"; ok=0; }
+[ "$ul_drv" -ge 4 ] || { echo "× UB-l 司机端证据 $ul_drv 份（下限 4）：两端的热区下限不同（驾驶模式 56dp），只扫一端不算扫过全工程"; ok=0; }
 
 [ "$ok" = 1 ] || exit 1
 echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处；归档 $ul_files 份真机 dump 全量热区扫 通栏矮格 $ul_short 颗，胶囊命中框改后 ≥132px）"
