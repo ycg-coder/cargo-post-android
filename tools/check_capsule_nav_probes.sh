@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 全局悬浮胶囊导航栏的结构判据（配 tools/capsule_nav_negative_controls.sh）。
 #
-# 管七件事：
+# 管九件事：
 #   CN-a 胶囊只有一份实现、只在根上画一处；
 #   CN-b 登记点恰好四屏（两个壳 + 实时公交 + 车道级导航），多一屏少一屏都要同轮改本行；
 #   CN-c 旧的那条通栏底部 tab 已经撤干净（BusTabBar / TabItem / bottomBar 三个名字都不许再出现在**代码**里）；
@@ -10,6 +10,8 @@
 #   CN-f 车道级导航那一屏：高德自带面板关掉、重复的"退出"药丸与通栏底部按钮条撤掉；
 #   CN-g 契约用例条数（下限等于现读）；
 #   CN-h 格子等宽下限（观感那一半）：一份定义、一处使用、不低于 76dp、且不许有第二处在别处定宽度。
+#   CN-i 离底间距（用户口径②「不要离底部太近」）：一份定义，**画的时候抬一次、内容让高读同一次**，
+#        旧的"只在让高里加 14dp、画时不抬"不许回来（真机量过：那样整枚胶囊距物理屏底只有 5.1dp）。
 #
 # ⚠ 本簿每一条 `grep -r` 都要过"去注释"这一道（D-156 第一轮就被自己的注释顶红四次：
 #   注释里写一句 `CapsuleActions(...)` 就被数成一个登记点）。判据认的是代码形状，不是散文。
@@ -76,6 +78,15 @@ CH_USE=$(one_count 'minWidth = CAPSULE_CELL_MIN_WIDTH_DP.dp' "$CN")
 CH_NUM=$(grep -oE 'CAPSULE_CELL_MIN_WIDTH_DP = [0-9]+' "$CN" | grep -oE '[0-9]+$' | head -1)
 CH_OUT=$(grep -rn 'CAPSULE_CELL_MIN_WIDTH_DP' "$M" --include=*.kt | grep -v 'CapsuleNav.kt' | wc -l | tr -d ' ')
 
+# CN-i 离底间距（用户口径②「不要离底部太近」）：一份定义、画的那一侧与让高的那一侧**都**读它，
+#     且旧的 `capsulePillHeight() + 14.dp`（只喂给让高、画的时候根本没抬）不许回来。
+CI_DEF=$(one_count '^fun capsuleBottomGap\(' "$CN")
+CI_DRAW=$(one_count 'padding\(bottom = capsuleBottomGap\(\)\)' "$CN")
+CI_RES=$(one_count 'fun capsuleReserve\(\): Dp = capsulePillHeight\(\) \+ capsuleBottomGap\(\)' "$CN")
+CI_OLD=$(one_count 'capsulePillHeight\(\) \+ 14\.dp' "$CN")
+CI_NUM=$(grep -oE 'fun capsuleBottomGap\(\): Dp = [0-9]+' "$CN" | grep -oE '[0-9]+$' | head -1)
+CI_OUT=$(grep -rn 'capsuleBottomGap' "$M" --include=*.kt | grep -v 'CapsuleNav.kt' | wc -l | tr -d ' ')
+
 CG=$(grep -c '^    @Test' "$CT")
 
 fail=0
@@ -98,6 +109,10 @@ fail=0
 [ "${CH_NUM:-0}" -ge 76 ] || { echo "× CN-h 格子下限被压到 $CH_NUM dp（要 ≥76）：低于这个数，短文案那一格就跟着内容缩，整枚胶囊歪"; fail=1; }
 [ "$CH_OUT" = 0 ] || { echo "× CN-h 有 $CH_OUT 处在 CapsuleNav 之外引用格子宽度：一屏自己改宽度就没有统一观感了"; fail=1; }
 [ "$CG" = 7 ] || { echo "× CN-g 契约用例不是 7 条（现 $CG）：下限等于现读，改了要连同本行一起改"; fail=1; }
+{ [ "$CI_DEF" = 1 ] && [ "$CI_DRAW" = 1 ] && [ "$CI_RES" = 1 ]; } || { echo "× CN-i 离底间距不是『一份定义 + 画时抬一次 + 让高读同一次』（现 $CI_DEF/$CI_DRAW/$CI_RES）：只加在画那一侧内容会被压住，只加在让高那一侧就是白留一段没人点的空槽"; fail=1; }
+[ "$CI_OLD" = 0 ] || { echo "× CN-i 旧的『让高里塞 14dp、画的时候不抬』又回来了（现 $CI_OUT/$CI_OLD）：那正是用户说的『离底部太近』——真机量到整枚胶囊距物理屏底只有 5.1dp"; fail=1; }
+[ "${CI_NUM:-0}" -ge 12 ] || { echo "× CN-i 离底间距被压到 $CI_NUM dp（要 ≥12）：低于这个数就又贴回屏幕下沿"; fail=1; }
+[ "$CI_OUT" = 0 ] || { echo "× CN-i 有 $CI_OUT 处在 CapsuleNav 之外引用离底间距：一屏自己调一次，两屏之间就不成一套了"; fail=1; }
 
-if [ "$fail" = 0 ]; then echo "悬浮胶囊判据通过（实现 $CA_DEF / 画它 $CA_USE / 登记 $CB_REG 屏 / 旧通栏 $CC_TABBAR / 反证 $CC_PROOF / 用例 $CG）"; else echo "悬浮胶囊判据失败"; fi
+if [ "$fail" = 0 ]; then echo "悬浮胶囊判据通过（实现 $CA_DEF / 画它 $CA_USE / 登记 $CB_REG 屏 / 旧通栏 $CC_TABBAR / 反证 $CC_PROOF / 用例 $CG / 离底 $CI_DEF/$CI_DRAW/$CI_RES/$CI_OLD=${CI_NUM}dp）"; else echo "悬浮胶囊判据失败"; fi
 exit "$fail"

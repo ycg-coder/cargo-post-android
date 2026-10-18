@@ -11089,3 +11089,52 @@ meta 那一行**原文**（`docs/device-evidence/20261018-quota/02-v189-weather-
 `reanchor_by_diff.py` 这一轮也修了自己一条错守卫：原先写"`lo == lo0`（文档里的数与 HEAD 相同）就不是本轮弄坏的"——
 **错**：`reanchor_ledgers.py` 搬不动的那些正是"数没动、代码动了"（`unreadCount` 从 1094 走到 1107，文档还写 1094）。
 删掉那条守卫之后目的地验证才真的上岗。
+
+## D-171 · 底部胶囊"离底部太近"这一条，量出来是 App 自己一格都没留（2026-10-18）
+
+> 编号说明：D-169 / D-170 / D-172 是同一批用户指令里排在前面的三格（任务 #122 / #123 / #125），
+> 还没做所以还没写；本轮先做 #124 是因为它有一条**已经量出来的数**在手，改完就能回症状复验。
+
+### 一、用户口径与量出来的数
+
+> 底部导航栏不要离底部太近，不好看
+
+这条以前我只能凭感觉改。这次有数：v189 的 release 产物装在 1f71ee9b（1080x2400@440dpi，1dp=2.75px），
+首页 tab 那一排与司机导航那一排，**最下沿可点格都停在 `bottom=2386`** ⇒ 距物理屏底 `2400-2386 = 14px = 5.1dp`。
+而这 14px 全是系统手势条自己的 inset —— 也就是说 App 侧**一格没留**，整枚胶囊贴在屏幕下沿。
+
+### 二、根因：那个数一直存在，但只喂给了"内容让高"，没喂给"画的时候"
+
+`CapsuleNav.kt` 里原本是这样：
+
+```kotlin
+fun capsuleReserve(): Dp = capsulePillHeight() + 14.dp        // 内容让高：加了 14dp
+Column(modifier.navigationBarsPadding(), …)                    // 画它：只避手势条，没抬
+```
+
+⇒ 内容下方白留 14dp 空槽（没人点得到），而胶囊本身一动不动 —— **两处读的不是同一个意图**。
+这类"一个数只喂了一半"的写法，比两处都写成字面量更难发现：判据看哪一处都像有间距。
+
+### 三、改了什么
+
+- 新增具名令牌 `capsuleBottomGap()`（16dp，注释里带着上面那组实测数与出处目录）；
+- 画的那一侧：`modifier.navigationBarsPadding().padding(bottom = capsuleBottomGap())`；
+- 让高那一侧：`capsuleReserve() = capsulePillHeight() + capsuleBottomGap() + 8.dp`
+  （三段各有各的名字：本体 / 离底 / 与内容之间的呼吸位，不再是一个说不清来历的 `+ 14.dp`）。
+- 内容侧三个消费者（`BusScaffold` / `BusRouteBody` / 车道级导航的到站格）本来就都读 `capsuleReserve()`
+  ⇒ 一处改全生效，没有第二处口径。
+
+### 四、判据与负控
+
+新格 **CN-i**：`一份定义 / 画时抬一次 / 让高读同一次 / 旧的 +14dp 不许回来 / 数值 ≥12dp / 页面不许自己引用`，
+读数 `1/1/1/0=16dp`，`check_capsule_nav_probes.sh` 通过。
+负控多四条（NC-10 画时不抬、NC-11 让高改回写死、NC-12 间距被压到 4dp、NC-13 页面自己抄一次）
+⇒ `RESULT ok=13 bad=0 miss=0`，全部会红且红因点名 CN-i。
+
+### 五、凭证
+
+- `PRODUCT classes=78 tests=800 failures=0 errors=0 skipped=0`（`GRADLE_RC=0`，含编译）
+- 悬浮胶囊簿 `通过`；全量判据簿见下条收尾读数
+- ⚠ **观感那一半还没归我说了算**：16dp 是不是"好看"，要等 release 落地后在真机上**看图**判，
+  不许拿"判据绿 + 数值 ≥12"当成用户验收过。改前那张 `docs/device-evidence/20261018-quota/02-…png`
+  就是对照底片，复验时同机同屏同状态拍一张并排看。

@@ -153,9 +153,26 @@ val LocalCapsuleHost = staticCompositionLocalOf { CapsuleHost() }
 @Composable
 fun capsulePillHeight(): Dp = LocalBusTouch.current.min + 12.dp
 
-/** 内容底部要给胶囊让出来的高度（含与手势条之间的那一段） */
+/**
+ * 胶囊与手势条之间留的那一格（用户 2026-10-18 口径②：「底部导航栏不要离底部太近，不好看」）。
+ *
+ * 改前真机实测（v189，1080x2400@440dpi，归档 `docs/device-evidence/20261018-quota/`）：
+ * 首页 tab 与司机导航胶囊的最下沿可点格都停在 `bottom=2386` ⇒ 距物理屏底 **14px = 5.1dp**，
+ * 而那 14px 全是系统手势条自己的 inset —— 也就是说 App 自己**一格都没留**，整枚胶囊贴在屏幕下沿。
+ *
+ * ⚠ 这个数必须同时被 [CapsuleNavOverlay]（画的时候抬起来）与 [capsuleReserve]（内容让高）读到：
+ *   只加在画的那一侧，内容就会压在胶囊底下；只加在让高那一侧，就白留一段没人点的空槽。
+ *   与 D-164「后画的兄弟吃掉热区」是同一族，所以判据 CN-i 钉的是"两处读同一个源"。
+ */
 @Composable
-fun capsuleReserve(): Dp = capsulePillHeight() + 14.dp
+fun capsuleBottomGap(): Dp = 16.dp
+
+/**
+ * 内容底部要给胶囊让出来的高度：本体 + 离底那一格 + 与内容之间 8dp 的呼吸位。
+ * 三段各有各的出处，不许再写成一个没人解释得清的 `+ 14.dp`。
+ */
+@Composable
+fun capsuleReserve(): Dp = capsulePillHeight() + capsuleBottomGap() + 8.dp
 
 /**
  * 一屏把自己的功能按钮交给全局悬浮胶囊；**离开这一屏就收回**（`onDispose`）。
@@ -193,7 +210,9 @@ fun CapsuleNavOverlay(modifier: Modifier = Modifier) {
     val touch = LocalBusTouch.current
     val dropped = host.dropped
     Column(
-        modifier.navigationBarsPadding(),
+        // 手势条那一格之外再抬 capsuleBottomGap()：这一枚是浮在内容之上的，
+        // 离底间距只在这里加一次，内容侧的让高由 [capsuleReserve] 读同一个源。
+        modifier.navigationBarsPadding().padding(bottom = capsuleBottomGap()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (dropped > 0) {
