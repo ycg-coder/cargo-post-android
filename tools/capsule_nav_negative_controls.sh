@@ -109,5 +109,21 @@ expect_red "NC-8 格子宽度下限被压小" "× CN-h 格子下限被压到"
 ins "$BS" 'private const val LINE_CARDS_MAX = 8' 'private val cellMin = CAPSULE_CELL_MIN_WIDTH_DP.dp'
 expect_red "NC-9 页面自己抄格子宽度" "× CN-h 有"
 
+# NC-10 画的时候不抬（回到"只在让高里加数、屏幕上一格没留"那一版）→ CN-i 该红
+sub "$CN" 'modifier.navigationBarsPadding().padding(bottom = capsuleBottomGap()),' 'modifier.navigationBarsPadding(),'
+expect_red "NC-10 胶囊不再离底" "× CN-i 离底间距不是"
+
+# NC-11 让高那一侧改回写死的 14dp（两处不再读同一个源）→ CN-i 该红
+sub "$CN" 'fun capsuleReserve(): Dp = capsulePillHeight() + capsuleBottomGap() + 8.dp' 'fun capsuleReserve(): Dp = capsulePillHeight() + 14.dp'
+expect_red "NC-11 让高与画脱钩" "× CN-i "
+
+# NC-12 离底间距被压小（贴回屏幕下沿）→ CN-i 该红
+sub "$CN" 'fun capsuleBottomGap(): Dp = 16.dp' 'fun capsuleBottomGap(): Dp = 4.dp'
+expect_red "NC-12 间距被压回贴底" "× CN-i 离底间距被压到"
+
+# NC-13 有人在页面自己引用一次离底间距（第二套口径）→ CN-i 该红
+ins "$BS" 'private const val LINE_CARDS_MAX = 8' 'private val gapCopy = capsuleBottomGap()'
+expect_red "NC-13 页面自己抄离底间距" "× CN-i 有"
+
 echo "RESULT ok=$ok bad=$bad miss=$MISS"
 [ "$bad" = 0 ] && [ "$MISS" = 0 ] || exit 1
