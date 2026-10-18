@@ -48,6 +48,7 @@ import com.shanxiang.buspost.core.ui.InfoRow
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.data.model.Geo
+import com.shanxiang.buspost.data.model.MissionStop
 import com.shanxiang.buspost.data.model.RouteGuide
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.ui.common.RouteMap
@@ -72,6 +73,12 @@ fun DriverSdkNavCard(
     vehicleGeo: Geo?,
     onToast: (String) -> Unit,
     onOpenLaneGuide: () -> Unit = {},
+    /**
+     * 到车持续提醒那一格判出来的站（D-170）。**由调用方算一次传进来**：
+     * 工作台底部那一行与这里的出声必须读同一个判断，两处各调 `ApproachReminder.stopOf` 就会有一处漂移。
+     * null = 这一刻不该提醒（不在近处，或后端已经说这一站办完了）。
+     */
+    reminderStop: MissionStop? = null,
 ) {
     val context = LocalContext.current
     val t = LocalBusTokens.current
@@ -106,11 +113,17 @@ fun DriverSdkNavCard(
     // 高德剩余里程属于"我正在导的这个点"，只在算路成功时记下目的地；
     // 没记着就不把它配给后端的下一任务点（串站是到近播报最坏的错法）。
     var navigatingStopId by remember { mutableStateOf<Long?>(null) }
+    // 重复出声的账本（D-170）。**这里没有 delay、没有定时器**：N-h 那条"页面不许用本机节奏刷引擎状态"
+    // 的红线不分场合，而这件事本来也不需要定时器 —— 每一帧问一次纯层"够不够一个间隔"，
+    // 节奏由纯层拿单调时钟自己算（`ApproachReminderContractTest` 逐条钉住）。
+    // 第一拍只记时刻不出声：那一句"快到了 / 可确认到达"归 [ApproachTracker] 说，两本同时开口就是同一秒两句话。
+    val reminder = remember { ReminderTracker() }
     // 每一帧只推给判据层一次：这里不测距、不设阈值、不造话术（L-1 的分工）
     LaunchedEffect(guide, navigatingStopId, sdkFrame) {
         val frame = sdkFrame
         val engineMeters = frame?.remainMeters?.takeIf { frame.hasRemainDistance }
         announcer.onFrame(ApproachFeed.of(guide, navigatingStopId, engineMeters))
+        reminder.next(reminderStop, android.os.SystemClock.elapsedRealtime())?.let { announcer.remind(it) }
     }
 
     val nextStop = nextNavigableStop(guide)

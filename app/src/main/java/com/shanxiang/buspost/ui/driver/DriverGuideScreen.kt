@@ -60,6 +60,7 @@ import com.shanxiang.buspost.core.ui.LocalBusDriving
 import com.shanxiang.buspost.core.ui.LocalBusFontScale
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import com.shanxiang.buspost.data.model.Geo
+import com.shanxiang.buspost.data.model.MissionStop
 import com.shanxiang.buspost.data.store.Prefs
 import com.shanxiang.buspost.driver.Running
 import com.shanxiang.buspost.ui.common.CapsuleAction
@@ -158,14 +159,29 @@ fun DriverGuideScreen() {
         announcer.ensureTts()
         onDispose { announcer.shutdown() }
     }
+    // 到车持续提醒那一格判出来的站（null = 这一刻不该提醒）。由下面那条喂帧的 effect 写，
+    // 顶条与出声循环都读这一格 —— 「要不要提醒」这件事在一屏里只许有一份。
+    var reminderStop by remember { mutableStateOf<MissionStop?>(null) }
     val engineTargetStop = plan?.let { p ->
         val k = (arrivedWayIndex ?: -1) + 1
         p.wayPoints.getOrNull(k) ?: p.destination.takeIf { k >= p.wayPoints.size }
     }
+    // 重复出声的账本（节奏全在纯层）。**这里没有 delay、没有定时器**：N-h 那条"页面不许用本机节奏
+    // 刷引擎状态"的红线不分场合，而这件事本来也不需要定时器 —— 高德每来一帧转向信息就跑一次判点，
+    // 纯层自己拿单调时钟算"够不够一个间隔"。帧一停（退出导航 / 高德不再回执），也就不再重复。
+    val reminder = remember { ReminderTracker() }
     LaunchedEffect(plan, arrivedWayIndex, frame) {
         val stops = plan?.stops ?: return@LaunchedEffect
         val meters = frame?.takeIf { it.hasRemainDistance }?.remainMeters
-        announcer.onFrame(ApproachFeed.fromStops(stops, engineTargetStop, meters))
+        val feed = ApproachFeed.fromStops(stops, engineTargetStop, meters)
+        announcer.onFrame(feed)
+        // 到车持续提醒（D-170）：这一屏的口径是引擎那一路（高德正在导到的那一站 + 它的剩余里程），
+        // "要不要提醒"这件事仍然只在 `ApproachReminder.stopOf` 判一次，与工作台那一屏共用同一个判点。
+        val near = ApproachReminder.stopOf(feed)
+        reminderStop = near
+        // 每一帧问一次纯层"够不够一个间隔"：第一次看到这一站只记时刻不出声（那一句归 ApproachTracker），
+        // 之后每过一个间隔回一句、最多几遍，响满就闭嘴。
+        reminder.next(near, android.os.SystemClock.elapsedRealtime())?.let { announcer.remind(it) }
     }
 
     var phase by remember { mutableStateOf<GuidePhase>(GuidePhase.Waiting) }
@@ -347,6 +363,8 @@ fun DriverGuideScreen() {
                     plan.stops.size > 1 -> "本段共 ${plan.stops.size} 站 · 途经点 ${plan.wayPoints.size} 个（按调度顺序）"
                     else -> "本段只剩这一站"
                 },
+                // 到车持续提醒那一行（D-170）：这一站还没办完就一直在，办完之后后端回读 ⇒ 自己消失
+                reminderText = reminderStop?.let { "这一站还没办完：" + ApproachReminder.cardText(it) },
                 recalcText = engineRecalcTextOf(recalc),
             )
             // ---- 底部：只剩"到站那一格"（高德说的）。语音 / 结束两格搬进悬浮胶囊，不再占通栏 ----
@@ -663,6 +681,7 @@ private fun GuideTopStrip(
     modifier: Modifier = Modifier,
     destination: String,
     stopLine: String,
+    reminderText: String?,
     recalcText: String,
 ) {
     val t = LocalBusTokens.current
@@ -705,8 +724,20 @@ private fun GuideTopStrip(
                     )
                 }
             }
-            // 这一格原来是一颗白底"退出"药丸。2026-10-17 撤掉：本页的功能按钮统一进**全局悬浮胶囊**
-            // （播报 / 看整段 / 退出导航），顶条只负责信息 —— 真机截图里"退出"同时出现两次的样子不像导航，像调试页。
+            // 到车持续提醒（D-170，用户口径⑤）：车在近处、后端又说这一站没办完 ⇒ 这一行一直在。
+            // 它是**非模态**的：不挡地图手势、不挡高德的转向卡，也不要求谁点它一下才肯走 ——
+            // "持续"与"不影响驾驶"这两条要求同时满足的写法只有这一种，模态弹窗满足前者就会犯后者。
+            reminderText?.let {
+                Text(
+                    it,
+                    color = Color.White,
+                    fontSize = (13.5 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
         // 偏航 / 拥堵重算只有高德那两条广播能说；没说过就不占行（不留一个"一切正常"的假结论）
         if (recalcText.isNotEmpty() && !recalcText.contains("没")) {

@@ -10,9 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
-/** 一句话实际走了哪个声道；屏上要说清楚，不能"以为出声了" */
-enum class AnnounceChannel { TTS, NOTIFICATION, TEXT_ONLY }
-
 /**
  * 到近播报的**出口**：把 [ApproachFeed] 的一帧交给 [ApproachTracker]，再把判出来的那句话发出去。
  *
@@ -77,6 +74,20 @@ class ApproachAnnouncer(private val context: Context) {
         _last.value = text
         deliver(text)
         return text
+    }
+
+    /**
+     * 到车**持续**提醒那一格的"再说一遍"（D-170）：句子由 [ReminderTracker] 判好递进来，
+     * 这里只负责出声 —— 走的是同一个 [deliver]，不另起一条出声路，
+     * 否则"系统语音起不来时转通知栏"那套降级就要维护两份。
+     *
+     * 与 [onFrame] 的分工：那一格是"档位变了，说一句新的"；这一格是"同一站还没办完，过一阵重复"。
+     * 两格都受同一条开关约束（`Prefs.approachVoice`），关掉就是只留屏幕上那一行。
+     */
+    fun remind(text: String) {
+        if (!Prefs.approachVoice) return
+        _last.value = text
+        deliver(text)
     }
 
     private fun deliver(text: String) {

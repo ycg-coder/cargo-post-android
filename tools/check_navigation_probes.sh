@@ -492,6 +492,38 @@ NAC10=$(grep -n '车道引导' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
 # NAC11 播报 label 回到静态词：`"播报" + (...)` 那一写法归零
 NAC11=$(grep -c '"播报" +' "$UI")
 
+# ── N-rm 到车**持续**提醒（D-170，用户口径⑤「持续提醒司机该做什么直到司机完成，但是不能影响驾驶」）──
+# 这一族钉的是结构，句子的对错由 ApproachReminderContractTest 钉：
+# ① "要不要提醒"只有一个判点（`stopOf`），两个面各自判一次就会一个在提醒一个说没到；
+# ② 重复的节奏（间隔与上限）只有纯层那两个常数，出口层不许自己算时间；
+# ③ 重复出声必须走 `ApproachAnnouncer` 那一个出口（语音→通知→只剩字 的降级只有一份）：
+#    `deliver` 只许「一份定义 + 两处调用」（多一处 = 有人另开了条不出通知的路），
+#    出口层也不许自己拿 `REPEAT_INTERVAL` 算时间；
+# ④ 提醒是**非模态**的一行：它不许变成 Dialog —— 那正是"影响驾驶"的那一半要求。
+RM="$SRC/ui/driver/ApproachReminder.kt"
+WB="$SRC/ui/driver/WorkbenchScreen.kt"
+AA="$SRC/ui/driver/ApproachAnnouncer.kt"
+NRMA=$(grep -c '^    fun stopOf(' "$RM")
+NRMA2=$(grep -rn 'ApproachReminder\.stopOf(' "$SRC" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
+NRMB=$(grep -cE '^class ReminderTracker\b' "$RM")
+NRMB2=$(grep -rn 'ReminderTracker()' "$SRC" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
+NRMC=$(grep -c 'const val REPEAT_INTERVAL_MS' "$RM")
+NRMC2=$(grep -c 'const val MAX_REPEATS' "$RM")
+# 出口层不许碰时间与账本：它只负责"把这句发出去"
+NRMD=$(grep -nE 'ReminderTracker|REPEAT_INTERVAL|elapsedRealtime' "$AA" | grep -vE "$NC" | wc -l | tr -d ' ')
+NRME=$(grep -rn 'announcer\.remind(' "$SRC" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
+NRME2=$(grep -c 'fun remind(' "$AA")
+NRME3=$(grep -c 'deliver(' "$AA")
+# 非模态：整个 ui/driver 里出现 Dialog 形状的新弹层来承载提醒 = 红（在册的扫码/公告/签名弹窗不读这一格，
+# 它们不是"到车提醒"。认的是"提醒"这个词与 Dialog 出现在**同一行**）。
+# ⚠ 这里原来写的是 `Dialog[^\n]*(提醒|reminder)`：grep 的字符类里 `\n` 不是换行，是"反斜杠和字母 n"，
+# 于是任何带 n 的中间文本都把匹配切断 —— 负控注入那行 `val reminderDialog = AlertDialog(...) { Text("到车提醒") }`
+# 里 `onDismissRequest` 的 n 正好把它掐死，判据当场不咬（2026-10-19 负控跑出来的 ✘）。grep 本来就按行匹配，
+# 要"同一行"用 `.*` 就是同一行，不需要也不许再套一个假装的排除类。
+NRMF=$(grep -rnE 'Dialog.*(提醒|[Rr]eminder)' "$SRC" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
+# 正对照：工作台那一行确实换了话（否则上面那个"只有一个判点"的两个读数可能是扫描瞎了）
+NRMG=$(grep -c 'reminder ?: distanceText' "$WB")
+
 echo "N-a 判据层用例条数                  = $NA （目标 ≥55）"
 echo "N-b 引擎内定时器/假步进（主线程桥接 post 已在册排除）= $NB （目标 0）"
 echo "N-c 引擎内二次坐标换算              = $NCNT （目标 0）"
@@ -549,6 +581,11 @@ echo "N-ac 旧越界字面/出口体内替高德说话                   = $NAC5
 echo "N-ac 四行各自出口/两条开关各自点名「我的」那一行       = $NAC7/$NAC8/$NAC9 （目标 4/1/1）"
 echo "N-ac 车道那格指旧调试屏的开关名/播报 label 动态拼接    = $NAC10/$NAC11 （目标 0/0）"
 echo "N-ac 到近作业播报：卡片那一行点名/「我的」那一行的字面  = $NAC12/$NAC13 （目标 1/1）"
+echo "N-rm 提醒判点 定义/页面调用                      = $NRMA/$NRMA2 （目标 1/2）"
+echo "N-rm 重复账本 类/页面挂载                          = $NRMB/$NRMB2 （目标 1/2）"
+echo "N-rm 间隔与上限常数                                = $NRMC/$NRMC2 （目标 1/1）"
+echo "N-rm 出口层自己算时间/出声出口/重复调用/remind/deliver = $NRMD/$NRME/$NRME2/$NRME3 （目标 0/2/1/3）"
+echo "N-rm 提醒被做成弹窗/工作台那一行确实换话（正对照）   = $NRMF/$NRMG （目标 0/1）"
 
 fail=0
 [ "$NA" -ge 55 ] || { echo "× N-a 判据层用例少于 55 条：假步进/二次换算/闸门旁路/入口两个答案/§九 路线绑定/⑨ 转向码表/⑩ 车道表/⑪ 重算五格/⑯ 开关句口径没人钉"; fail=1; }
@@ -707,6 +744,16 @@ fail=0
 [ "$NAC11" = 0 ] || { echo "× N-ac 播报的 label 又被动态拼接（现 $NAC11）：这一屏的标签全是静态词，把高德的类型码塞进 label 会让标签宽窄随回执变"; fail=1; }
 [ "$NAC12" = 1 ] || { echo "× N-ac 到近作业那一格不再点名「我的」里的「到近作业播报」（现 $NAC12）：卡片只说「开关是关的」，司机不知道去关的是哪一条"; fail=1; }
 [ "$NAC13" = 1 ] || { echo "× N-ac「我的」里「到近作业播报」那一行的字面变了而卡片没跟着改（现 $NAC13）：两边名字逐字相等才算点名，改一边就指错地方"; fail=1; }
+[ "$NRMA" = 1 ] || { echo "× N-rm 「要不要提醒」的判点不再是恰好一份（现 $NRMA）：两份判点就会一个在提醒、另一个说没到"; fail=1; }
+[ "$NRMA2" = 2 ] || { echo "× N-rm 读这个判点的页面不是两处（现 $NRMA2：工作台 + 全屏导航）：少一处就是那一屏永远不提醒"; fail=1; }
+[ "$NRMB" = 1 ] || { echo "× N-rm 重复出声的账本不是恰好一份（现 $NRMB）：两本账就会各响各的，响几遍没人说得清"; fail=1; }
+[ "$NRMB2" = 2 ] || { echo "× N-rm 挂账本的页面不是两处（现 $NRMB2）：少一处就是那一屏只说不响"; fail=1; }
+{ [ "$NRMC" = 1 ] && [ "$NRMC2" = 1 ]; } || { echo "× N-rm 间隔/上限常数不是各一份（现 $NRMC/$NRMC2）：节奏写进页面就会有两套"; fail=1; }
+[ "$NRMD" = 0 ] || { echo "× N-rm 出声出口开始自己算时间/记账（现 $NRMD）：出口只管发出去，节奏归纯层——否则「响几遍」就有两个答案"; fail=1; }
+{ [ "$NRME" = 2 ] && [ "$NRME2" = 1 ]; } || { echo "× N-rm 重复出声的调用/出口不是 2/1（现 $NRME/$NRME2）"; fail=1; }
+[ "$NRME3" = 3 ] || { echo "× N-rm 出声降级出口不再是「一处定义 + 两处调用」（现 $NRME3）：多一处就是有人另开了一条不出通知的路"; fail=1; }
+[ "$NRMF" = 0 ] || { echo "× N-rm 提醒被做成了弹窗（现 $NRMF）：用户同一句里要求「不能影响驾驶」，模态弹窗吃掉地图手势与返回键"; fail=1; }
+[ "$NRMG" = 1 ] || { echo "× N-rm 工作台那一行不再读提醒（现 $NRMG）：上面那两个读数就不采信，扫描得先证明它看得见这一屏"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "第 8 步导航引擎判据通过"; else echo "第 8 步导航引擎判据失败"; fi
 exit "$fail"

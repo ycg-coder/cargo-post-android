@@ -742,6 +742,21 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
         com.shanxiang.buspost.data.model.DriverTaskSegment.group(vm.tasks)
     }
 
+    /**
+     * 到车**持续**提醒（D-170，用户口径⑤"车辆要到了会持续弹窗提醒司机该做什么直到司机完成，但是不能影响驾驶"）。
+     *
+     * 落成底部那一行而不是弹窗：同一句要求里还有"不能影响驾驶"，模态弹窗会吃掉拇指区那颗「确认到达」
+     * 与地图手势。"持续"落在两处 —— 不办完不下线（就是这一行），以及没办完会再说一遍（出声，
+     * 由 `DriverSdkNavCard` 里那本 `ReminderTracker` 记账：60 秒一遍、最多三遍）。
+     *
+     * ⚠ 口径走**后端那一次取数**（`ApproachFeed.of(guide, null, null)`：`nextStopName` 与
+     * `nextStopRoadDistanceMeters` 出自同一轮循环）。本机自己挑"下一个没做完的点"去配后端那段里程
+     * 就是串站 —— 那是 `ApproachFeed` 文件头写明的禁止项。
+     */
+    val reminderStop = remember(vm.guide) {
+        ApproachReminder.stopOf(vm.guide?.let { ApproachFeed.of(it, null, null) })
+    }
+
     // 固定底部操作栏：司机唯一必须做的那个动作（发车/到站/停靠完成）钉在拇指区，
     // 不再被"任务地图 + 十余行实时回执"压在几屏之下（设备实测旧版要划到第四屏才够得着）。
     StickyBarScaffold(
@@ -750,7 +765,10 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                 hasShift = shift != null,
                 viewState = viewState,
                 busy = vm.busy,
-                hint = workbenchBarHint(shift, viewState, vm.distanceText()),
+                hint = workbenchBarHint(
+                    shift, viewState, vm.distanceText(),
+                    reminderStop?.let { "这一站还没办完：" + ApproachReminder.cardText(it) },
+                ),
                 onDepart = { vm.depart() },
                 onArrive = { vm.arrive(vm.targetStationId()) },
                 onContinue = { vm.continueToNextStation() },
@@ -877,6 +895,7 @@ fun WorkbenchScreen(vm: WorkbenchViewModel = viewModel()) {
                             vehicleGeo = serviceGeo,
                             onToast = { vm.showReceipt(it) },
                             onOpenLaneGuide = { nav.navigate(Routes.DRIVER_GUIDE) },
+                            reminderStop = reminderStop,
                         )
                     }
                 }
@@ -1318,12 +1337,22 @@ private fun WorkbenchActionBar(
 /**
  * 底部栏上面那行提示：只放"当前这一步该干什么 / 还差多少路"，不放第二份状态。
  * 没有班次时返回 null（不占行高）—— 空字符串会让栏里凭空多出一条空白带。
+ *
+ * `reminder` 非空时它**顶掉**那句距离（D-170）：一行只许说一件事，而"这一站还没办完"比"还差几公里"
+ * 更接近用户要的那句"该做什么"。距离本身没丢 —— 导航卡与任务地图上都还在。
+ * 停靠作业那一档（STOPPED）不换话：那时候要做的动作已经由「停靠完成」那颗键点名了，
+ * 再叠一句"该做什么"就是把同一件事说两遍。
  */
-private fun workbenchBarHint(shift: ShiftTask?, viewState: ShiftState?, distanceText: String): String? {
+private fun workbenchBarHint(
+    shift: ShiftTask?,
+    viewState: ShiftState?,
+    distanceText: String,
+    reminder: String?,
+): String? {
     if (shift == null) return null
     return when (viewState) {
         ShiftState.WAITING -> "待发车，确认后开始推送"
-        ShiftState.RUNNING -> distanceText
+        ShiftState.RUNNING -> reminder ?: distanceText
         ShiftState.STOPPED -> "已到站停靠，卸完货点「停靠完成」继续"
         ShiftState.FINISHED -> "本班已收班"
         null -> null

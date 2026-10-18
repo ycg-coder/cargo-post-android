@@ -839,6 +839,43 @@ ctl "N-ac 到近作业那一格不再点名「我的」里的「到近作业播�
 sub "$MP" 'SettingRow("到近作业播报"' 'SettingRow("到近提醒"'
 ctl "N-ac「我的」里「到近作业播报」那一行的字面变了而卡片没跟着改" "卡片指过去的那条开关在「我的」里不存在（NAC13 1→0）"
 
+# ── N-rm 到车持续提醒（D-170）：六条各拆一格，外加一条"正对照必须也红" ──────────────
+AR="$A/ui/driver/ApproachReminder.kt"
+AAC="$A/ui/driver/ApproachAnnouncer.kt"
+GD2="$A/ui/driver/DriverGuideScreen.kt"
+for f in "$AR" "$AAC" "$GD2"; do
+  [ -f "$f" ] || { echo "✘ 沙盒缺 $f：N-rm 这一族的注入没有落点，本批不采信"; exit 2; }
+done
+
+# ⚠ `ctl` 的第一个参数是**判据红行的前缀**（它拿 `^× $1` 去核"红的是不是这一格"），第二个才是给人看的说明。
+#   第一轮我把两者写反了：八条里六条 exit 1、报的也正是这一格，却因为前缀对不上被判成 △「被别的判据误抓」。
+#   △ 不是通过 —— 这一族的计数只有 ✔ 才算证过。
+sub "$AR" '    fun stopOf(' '    fun stopOfRenamed('
+ctl "N-rm 「要不要提醒」的判点不再是恰好一份" "判点被改名（没有判点，或有人另起一份）"
+
+sub "$GD2" 'val near = ApproachReminder.stopOf(feed)' ''
+ctl "N-rm 读这个判点的页面不是两处" "全屏导航那一屏不再读判点"
+
+sub "$AR" 'class ReminderTracker {' 'class ReminderTrackerX {'
+ctl "N-rm 重复出声的账本不是恰好一份" "账本被改名（类名与调用点会各留一份）"
+
+sub "$AR" 'const val MAX_REPEATS = 3' ''
+ctl "N-rm 间隔/上限常数不是各一份" "上限常数被摘掉（节奏回到页面里写死）"
+
+ins "$AAC" "private fun deliver" '    private val nextAtMs = lastAtMs + REPEAT_INTERVAL_MS'
+ctl "N-rm 出声出口开始自己算时间/记账" "出口层偷算时间"
+
+sub "$AAC" 'fun remind(text: String)' 'fun remindX(text: String)'
+ctl "N-rm 重复出声的调用/出口不是 2/1" "重复出声的出口被改名"
+
+ins "$WB" '    val reminderStop = remember(vm.guide) {' '    val reminderDialog = AlertDialog(onDismissRequest = {}) { Text("到车提醒") }'
+ctl "N-rm 提醒被做成了弹窗" "模态弹窗吃掉地图手势与返回键"
+
+# 最后这条是**反证**：把工作台那一行改回只念距离，正对照格必须红 ——
+# 否则上面那两个"恰好 2"可能是扫描根本看不见这一屏（D-082 那批空转闸门的同族）。
+sub "$WB" 'reminder ?: distanceText' 'distanceText'
+ctl "N-rm 工作台那一行不再读提醒" "正对照失效：扫描看不见这一屏时上面那些读数不采信"
+
 echo "---"
 echo "负控制跑完：上面每行都必须是 ✔（△ 说明这条破口被别的判据误抓，✘ 说明这条判据根本不判）"
 # ⚠ 退出码补登记（D-082）：这一本原来 ✘=13 仍然 exit 0 —— "批跑完了"与"闸门全是摆设"在退出码上分不出来，
