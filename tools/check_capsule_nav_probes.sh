@@ -59,7 +59,11 @@ CC_PROOF=$(code_count 'CapsuleAction\(' "$M")
 
 # CN-d 两屏各补上一格看得见的出口
 CD_BACK=$(one_count 'CapsuleAction\("back", "返回"' "$BS")
-CD_EXIT=$(one_count 'key = "exit"' "$GD")
+# 导航那一屏的出口（D-169 续，v204 真机改判）：胶囊里**不再放**「退出导航」与「看整段」——
+# 高德自带面板上就有「退出」与「全览」两颗键，实测点面板那颗「退出」直接回司机工作台。
+# 出口这一格因此改由 CN-f 的 CF_BACKCALL 钉（那颗键必须真调 onExit），这里钉的是"不许有第二颗"。
+CD_EXIT=$(one_count 'key = "exit"|key = "overview"' "$GD")
+CD_VOICE=$(one_count 'key = "voice"' "$GD")
 
 # CN-e 三条规则只有这一份实现
 CE_MAX=$(one_count 'const val CAPSULE_MAX' "$CN")
@@ -110,7 +114,8 @@ fail=0
 [ "$CC_BOTTOM" = 0 ] || { echo "× CN-c bottomBar 还在代码里（现 $CC_BOTTOM）：BusScaffold 的底部槽位已撤，留着就是有人往 Scaffold 里塞第二条栏"; fail=1; }
 [ "$CC_PROOF" -ge 13 ] || { echo "× CN-c 反证失效：同一套扫描只数出 $CC_PROOF 处 CapsuleAction(，上面那两个 0 不采信"; fail=1; }
 [ "$CD_BACK" = 1 ] || { echo "× CN-d 实时公交那一格「返回」不见了（现 $CD_BACK）：这一屏以前靠底部 tab 豁免，现在 tab 撤了"; fail=1; }
-[ "$CD_EXIT" = 1 ] || { echo "× CN-d 导航那一格「退出导航」不见了（现 $CD_EXIT）：全屏导航里没出口 = 司机被困住"; fail=1; }
+[ "$CD_EXIT" = 0 ] || { echo "× CN-d 导航那一屏的胶囊又长出「退出」或「看整段」（现 $CD_EXIT）：v204 真机上高德面板那两颗键都在且真做事，同一动作两颗键就是用户说的画蛇添足"; fail=1; }
+[ "$CD_VOICE" = 1 ] || { echo "× CN-d 导航那一屏的播报格不是一格（现 $CD_VOICE）：播报是高德面板上没有的那一格，撤掉它司机在行车中就没法静音（出口由 CN-f 的 CF_BACKCALL 钉在高德那颗键上）"; fail=1; }
 { [ "$CE_MAX" = 1 ] && [ "$CE_RULE" = 1 ]; } || { echo "× CN-e 收口规则不唯一（上限 $CE_MAX / 规则函数 $CE_RULE）"; fail=1; }
 [ "$CE_ELSE" = 0 ] || { echo "× CN-e 有页面自己抄了上限判断（现 $CE_ELSE 处引用 CAPSULE_MAX）：截断口径会长第二套"; fail=1; }
 [ "$CF_LAYOUT" = 1 ] || { echo "× CN-f 高德自带面板没开着（现 $CF_LAYOUT）：D-169 起引导信息只许有一份，那份是高德的"; fail=1; }

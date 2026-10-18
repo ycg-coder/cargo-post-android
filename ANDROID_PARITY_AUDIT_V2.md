@@ -180,7 +180,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 |---|---|---|---|---|
 | 商品列表/分页/详情 | `api.js:220/225/230` | `Repo.kt:356/372/379` | `/product/list`、`/product/page`、`/product/get` | `REAL_COMPLETE` |
 | 下单 | `api.js:237` | `Repo.kt:384-401` | `POST /product-order/create` | `REAL_COMPLETE` |
-| 我的订单分页（含 status） | `orders.js:104-107` 传 `status` | `Repo.kt:744-745` 传 `status` | `AppProductOrderController.java:48` 支持 status | `REAL_COMPLETE` |
+| 我的订单分页（含 status） | `orders.js:104-107` 传 `status` | `Repo.kt:749-750` 传 `status` | `AppProductOrderController.java:48` 支持 status | `REAL_COMPLETE` |
 | 取消商城订单 | `api.js:247` `?id=` query | `Repo.kt:413-414`（`Api.put(path, body, query)`，id 在 query） | `AppProductOrderController.java:58-61 @RequestParam("id")` | `REAL_COMPLETE` |
 | 订单溯源 | `api.js:213` | `Repo.kt:416-417` | `GET /product-order/trace?id=` | `REAL_COMPLETE` |
 | 状态文案 | 优先后端 `statusName`（`parcel.js:617`） | `Models.kt:860` 优先 `statusName`，兜底 `productStatusLabel`：1→"配送中" | `ProductOrderStatusEnum:14-20`：1 = **已发货** | `REAL_PARTIAL`（兜底文案漂移）→§33 |
@@ -419,7 +419,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`CONTRACT_MISMATCH`（P0，静默失效，最难发现的一类）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/core/net/Api.kt`、`data/repo/Repo.kt`
-- **类 / 函数**：`Api.toPayload`(`:356-360`，`else -> Payload(JSONObject().put("v", data), null, demo)`)；受害调用点 `Repo.unreadCount`(`:690-691` `obj?.multiNum("count","unreadCount")`)、`Repo.uploadPhoto`(`:1020-1022` `obj?.multiStr("url","fileUrl","data")`)、`Repo.saveAddress`(`:715` 同类读法，无害但同根)、`Repo.kt:1632`（司机未读，见 §23）
+- **类 / 函数**：`Api.toPayload`(`:356-360`，`else -> Payload(JSONObject().put("v", data), null, demo)`)；受害调用点 `Repo.unreadCount`(`:690-691` `obj?.multiNum("count","unreadCount")`)、`Repo.uploadPhoto`(`:1020-1022` `obj?.multiStr("url","fileUrl","data")`)、`Repo.saveAddress`(`:715` 同类读法，无害但同根)、`Repo.kt:1637`（司机未读，见 §23）
 - **当前行为**：OkHttp 拿到 `{"code":0,"data":12}` 时，`root.opt("data")` 是一个 **JSON number/boolean/String**（不是对象也不是数组），`toPayload` 把它塞进 `{"v":12}`。而 `Payload.str/multiStr/multiNum` 只认业务键名，不认 `v` → 一律返回默认值。
 - **后端真实行为**：`AppNotificationController.java:44-48` 是 `CommonResult<Long> unreadCount()`（裸数字）；`AppFileController.java:34-38` 是 `CommonResult<String> uploadFile(...)`（**裸 URL 字符串**）；`AppDriverController.java:239-243` 是 `CommonResult<Long> messagesUnreadCount`。这些都是 yudao `CommonResult<T>` 的正常形态。
 - **小程序行为**：`api.js:417`/`api.js:486-492` 直接把 `res` 当数字 / 当 URL 字符串用（小程序封装里 `resolve(res.data)` 不做对象假设），所以它一直是对的。
@@ -476,7 +476,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **测试方案**：MockWebServer `data:3` → 断言 3；`data:0` → 断言 0 且**不是错误态**；driverId=0 → 断言不请求或请求后显示未绑定态。
 
 - **本轮状态（P2-1，2026-09-29，DONE）**：
-  - 标量出口随 §22 一起落地：`Repo.driverUnreadCount(): Long?` 走 `Payload.longOf("count","unreadCount")`，与用户侧同一通道（`Repo.kt:1090`）。
+  - 标量出口随 §22 一起落地：`Repo.driverUnreadCount(): Long?` 走 `Payload.longOf("count","unreadCount")`，与用户侧同一通道（`Repo.kt:1095`）。
   - **未绑定不请求**：`driverIdParam()` 在 `driverId <= 0` 时抛 `DriverUnboundException`，`runCatching` 吞掉后返回 null，请求根本不上网络。测试实测 `server.requestCount == 0`（`ScalarEnvelopeContractTest.司机未绑定角标时一个请求都不发`）；判定条件是"请求数"这种外部行为，不是"返回 null"这种自说自话。
   - 绑定后带后端授予的 driverId：`/driver/messages/unread-count?driverId=61` 断言在 URL 上，值 61 来自 `/driver/profile` 而不是本机猜测。
   - "显示未绑定而不是 0"这一条：角标侧不虚构（null → 保持上一个值，未绑定态初值 0 ⇒ tab 无红点，等于"没有可信提醒"而不是"后端说没有提醒"）；数据侧 `WorkbenchScreen.kt:292` 的 `error = listOfNotNull(p.error, s.error, k.error, t.error, g.error).firstOrNull()` 里 `driverTasks()`/`routeGuide()` 未绑定时返回 `DRIVER_UNBOUND`，首页仍显示"未绑定司机档案：后端没有该账号的 driverId，请联系站点核对工号"。**没做**：`/driver/profile` 与 `/driver/shifts` 按后端契约是登录态识别、不受守卫，所以未绑定时首页确实能拿到 profile 的 0 件数据 —— 这是后端口径，不是客户端缺陷。
@@ -649,7 +649,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **文件**：`app/src/main/java/com/shanxiang/buspost/ui/user/OrderDetailScreen.kt`
 - **类 / 函数**：`OrderDetailViewModel.cancel`(`:76-85`)、渲染处(`:101-103`)
 - **当前行为**：`Repo.cancelProductOrder(id)` → 成功后重新 `productOrders(pageSize=50)` 与 `productOrderTrace(id)` **回读后端**，然后 `cancelled = true`；UI 只要 `cancelled` 就固定显示"已在演示模式下取消，真实环境需后端确认。"
-- **后端真实行为**：`AppProductOrderController.java:58-61` `@PutMapping("/cancel") @RequestParam("id")`，Android 走 `Api.put(path, emptyMap(), mapOf("id" to id))`(`Repo.kt:754`) 参数位置正确；取消后订单 `status=3` (`ProductOrderStatusEnum.CANCELLED`)。
+- **后端真实行为**：`AppProductOrderController.java:58-61` `@PutMapping("/cancel") @RequestParam("id")`，Android 走 `Api.put(path, emptyMap(), mapOf("id" to id))`(`Repo.kt:759`) 参数位置正确；取消后订单 `status=3` (`ProductOrderStatusEnum.CANCELLED`)。
 - **小程序行为**：`api.js:247 cancelProductOrder(id)` 同样 query；`orders.js:80-110` 取消后重载列表。
 - **问题**：写路径本身是**合规**的（以后端回读为唯一真值），但提示语在真实构建里谎称"演示模式"，用户会以为这次取消没生效、去重复取消或打电话问站点。属于文案与 `ack.demo` 脱钩的诚实性缺陷——与 §24 相反的另一种失真：把真的说成假的。
 - **修改方案**：`cancelled` 改为携带演示位：`var cancelDemo by mutableStateOf(false)`，`cancel()` 里 `cancelDemo = 回读到的那条 order?.status == 3` 且 `demo` 标志；文案分三支：真实且已取消 →"已取消（后端确认）"；真实但状态未变 →"后端未受理取消：${order?.statusLabel}"；演示 → 现有文案。判断一律基于**回读状态**，不基于请求是否抛错。
@@ -680,7 +680,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   两者都没有就写"接口未给"，**文案里不出现任何数字**。
 - ② 门槛：`canArrive()`、`ARRIVE_RADIUS_METERS` 常量、VM 里那个从未被写入也从未被读的 `canArrive` 状态位**全部删除**。
   实测：`grep -rn "canArrive\|ARRIVE_RADIUS_METERS" app/src/main/java` → **0 命中**（这条判据已进 §56 与常驻自检，防止有人为了"体验"把 50 米门槛加回来）。
-  「确认到达」现在 `enabled = !busy`，与后端语义一致：`Repo.arrive`(`Repo.kt:983`) 的 body 只有 `driverId/shiftId/stationId`，
+  「确认到达」现在 `enabled = !busy`，与后端语义一致：`Repo.arrive`(`Repo.kt:988`) 的 body 只有 `driverId/shiftId/stationId`，
   **不含坐标**，到站是司机声明而不是 GPS 判定。
 - ③ 工程里不存在"GPS 自动到站提醒"，所以常量直接删除而不是降级成提醒 —— 若将来加提醒，只能产生提示，**不得改变按钮可用性**。
 - **与小程序有意分歧**：`workbench.js:21/759/762/775` 的 50 m 门槛本身是被禁止的方向（§16 已列为参考实现违规、§48 定为不复刻项）。
@@ -808,7 +808,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 判定：`REAL_PARTIAL`（P1）
 
 - **文件**：`app/src/main/java/com/shanxiang/buspost/ui/BusPostRoot.kt`、`ui/user/BusScreen.kt`、`ui/user/HomeScreen.kt`、`widget/NextBusWidgetProvider.kt`
-- **类 / 函数**：三处调用 `Repo.nearbyBuses(...)` 都没传第三参 `district`(`BusScreen.kt:252`、`HomeScreen.kt:192`、`NextBusWidgetProvider.kt:48`)；声明在 `Repo.kt:1046`(`district: String = ""`)。第四处原本是闪屏那一笔，#78 第二格撤的是"取了不用"，与本条的缺参问题无关
+- **类 / 函数**：三处调用 `Repo.nearbyBuses(...)` 都没传第三参 `district`(`BusScreen.kt:252`、`HomeScreen.kt:192`、`NextBusWidgetProvider.kt:48`)；声明在 `Repo.kt:1051`(`district: String = ""`)。第四处原本是闪屏那一笔，#78 第二格撤的是"取了不用"，与本条的缺参问题无关
 - **当前行为**：无定位时传 `geo = null`，`district` 空串 → 请求只有 `radius`；后端三个可选入参都为空。
 - **后端真实行为**：`AppBusController.java:56-65` `nearby(latitude, longitude, radius, district)`；`AppBusServiceImpl.java:257` `locationLevel = located ? PRECISE : (district 非空 ? DISTRICT : UNKNOWN)`；`:312-319` 明确实现了"无精确坐标时按 district 模糊匹配自建站点的名称/地址"这条兜底路径；`AppBusNearbyRespVO.located/locationLevel` 就是给前端做诚实标注用的。
 - **小程序行为**：`pages/bus/index.js:220` `const district = hasCoords ? '' : ((loc && loc.district) || '')`，`:226` 把它传给 `api.getNearbyRealtimeBuses`（`api.js:398-399` 四参），`:254` 用 `district ? '根据${district}展示' : '定位不可用'` 标注来源。
@@ -852,7 +852,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
   ④ **未采纳**"用 `etaToNextStationMinutes` 取整顶上去"：`AppBusRespVO:49-50` 那个键在 nearby 端点根本没有（`NearbyBus` 20 个字段里没有它），
   而语义是"车→它的下一站"，不是"车→用户在等的那站"；拿它填 `etaMinutes` 等于换个方向再编一次。
   现在 `SCHEDULE` 如实标成"按班次计划时长估算"（`providerText`），`EUCLIDEAN` 标成"来源未识别"，都不说成真实路网。
-  **范围**：本轮只做**公交**ETA 族。`SendOrder`(`Models.kt:878`)、`TransportLeg`(`:968`)、`ParcelTrace`(`Repo.kt:756`/`:950`)
+  **范围**：本轮只做**公交**ETA 族。`SendOrder`(`Models.kt:878`)、`TransportLeg`(`:968`)、`ParcelTrace`(`Repo.kt:761`/`:950`)
   仍是 `etaMinutes: Int` + `multiNum`，页面侧还有 6 处 `etaMinutes > 0`（`TraceView:64/65/186`、`DriverNavScreen:424`、`RoutesScreen:301`、`ParcelScreen:431`），
   已作为**残留**打印在 `tools/check_eta_probes.sh` 的输出里（判据 T-e 只覆盖 notify/widget/data，故意不把货运侧的旧口径混进来充数）。
   **新增判据**：`tools/check_eta_probes.sh` T-a…T-q 共 25 条，负控制 `tools/eta_negative_controls.sh` 25 条全部 exit 1 且报对本条
@@ -874,7 +874,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **后端真实行为**：`AppSendController.java:127-129` 是 `@PostMapping("/confirm-station-action")` + `@RequestParam("orderId") Long orderId` —— **只吃 query/form 参数**，JSON body 不会被绑定，缺参 → `MissingServletRequestParameterException`(400)。`AppDriverLegActionReqVO.java:14-16` 是 `@NotNull Long legId`，Jackson 无法把 `"shift-12"` 转 Long → 反序列化失败 400。段级动作要求真实 `legId`（来自 `/driver/legs`）。
 - **小程序行为**：`api.js:300` 的站点交接用 `?orderId=`（query，正确）；`handover.js` 用 `leg.id` 真值。
 - **问题**：① "客户确认已送到指定站点"这个闭环动作在 App 里**永远失败**，`待客户操作(7)` 的订单卡在这一步无法进入 `待入池(8)`，用户只能去小程序操作；`ParcelScreen.confirmStation`(`:89-92`) 抛错后 `load()` 不执行，页面只显示错误条；② "收班"永远失败，`docked`/`Running.shiftId` 因为在 `ack` 之后赋值而不会置位（这反而是对的），结果是**位置上报服务无法停止**，司机的前台通知一直挂着"位置上报中"，电池与隐私观感都差。
-- **修改方案**：① `confirmStationAction` 改 `Api.post(path, emptyMap(), mapOf("orderId" to orderId))`（`Api` 已支持 query 重载，`Repo.kt:457` 就是范例）；② `finish()` 改用真实 `legId`：从 `Repo.currentLeg()`（`/driver/current-leg`，`Repo.kt:869-871` 已有）拿 `legId`，拿不到就退化为"收班不调段接口，只停上报 + 提示由调度端收班"，**绝不拼假 id**；③ 加一条编译期/测试期守卫：`Repo.legAction` 参数类型从 `String` 改为 `Long`，让 `"shift-$id"` 无法通过编译（这类"字符串假装 id"的 bug 一次性根除）；④ 收班与停服务解耦：`finish()` 里先 `Running.shiftId = 0`/停 `DriverLocationService`（这是本机行为，不需要后端同意），再尝试段动作。
+- **修改方案**：① `confirmStationAction` 改 `Api.post(path, emptyMap(), mapOf("orderId" to orderId))`（`Api` 已支持 query 重载，`Repo.kt:457` 就是范例）；② `finish()` 改用真实 `legId`：从 `Repo.currentLeg()`（`/driver/current-leg`，`Repo.kt:874-876` 已有）拿 `legId`，拿不到就退化为"收班不调段接口，只停上报 + 提示由调度端收班"，**绝不拼假 id**；③ 加一条编译期/测试期守卫：`Repo.legAction` 参数类型从 `String` 改为 `Long`，让 `"shift-$id"` 无法通过编译（这类"字符串假装 id"的 bug 一次性根除）；④ 收班与停服务解耦：`finish()` 里先 `Running.shiftId = 0`/停 `DriverLocationService`（这是本机行为，不需要后端同意），再尝试段动作。
 - **测试方案**：MockWebServer 断言 `/send/confirm-station-action?orderId=123`（query 中存在 orderId、body 为空）；断言 `/driver/leg/complete` body 的 `legId` 是数字且等于 `/driver/current-leg` 回读的 id；类型改 `Long` 后编译期即失败（保留这条作为回归证据）；Robolectric：点收班后断言 `DriverLocationService` 被 stop、`Prefs.driverShiftId == 0`。
 - **本轮状态（⑧ 段状态机收口，2026-09-29）**：两个必 400 的写路径都已改掉，且 **② 按后端真实语义改，没有采纳本条原建议**。
   ① `Api.post` 加 query 重载（`core/net/Api.kt`：`post(path, body = emptyMap(), query = emptyMap())`），`Repo.confirmStationAction`(`:551-552`) 改为
@@ -979,7 +979,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
 - **类 / 函数**：`reportOnce`(`:85-123`)、`observe`(`:61-69`)、`heartbeat`(`:71-78`)；`Repo.reportLocation`(`:966-978`)
 - **当前行为**：`observe` 每 5 秒更新内存里的 `last`；`heartbeat` 按 `Prefs.reportIntervalSec`(3..60 s) 上报一次，失败按 `base * 2^min(streak,3)` 退避、上限 `MAX_INTERVAL_MS`，并把失败次数写进前台通知（这部分做得对）。但**待发点只存内存单槽位** `last`：一次失败后新定位覆盖旧值，退避期间产生的所有点直接丢弃；进程被杀也不补报。
 - **后端真实行为**：`/driver/location`(`AppDriverController.java:128-132`)；`AppDriverLocationReqVO` 收 `driverId/shiftId/longitude/latitude/speedKmh`。
-  ~~`shiftId` 必带——`Repo.kt:999-1000` 注释已写明~~ → **该注释是陈旧的**：`shiftId` 已无 `@NotNull`，服务层按当前活跃段兜底（见"本轮状态"最后一节）。
+  ~~`shiftId` 必带——`Repo.kt:1004-1005` 注释已写明~~ → **该注释是陈旧的**：`shiftId` 已无 `@NotNull`，服务层按当前活跃段兜底（见"本轮状态"最后一节）。
   服务端把它当"当前/最新位置"用于监控与走廊匹配（`MonitoringServiceImpl`、`RouteCorridorService`），**没有补报历史点的语义**，所以丢点在服务端是不可恢复的轨迹缺口。
 - **小程序行为**：`workbench.js:592` 有 `REAL/模拟` 来源区分，失败同样不入队。
 - **问题**：① 隧道/山区无信号 20 分钟后恢复，管理端轨迹上是一段直线跳跃（前端画图会连两点，看起来像"抄近路"），这正是"宁可没有，不许看起来像"的反例——虽然这条线是管理端画的，但缺口源于客户端；② 上报的坐标还是 WGS-84（§17），与折线不同系，走廊匹配偏差被放大；③ `speedKmh` 只在有 fix 时带，退避期间上报节奏与定位节奏脱钩。
@@ -1009,7 +1009,7 @@ BD-09 往返缺陷修好、折线渲染层新增 GCJ-02 出口。§45 的"待发
     与原方案相比少了一个能力（续报），多了一个保证（不制造虚假实时性）。这个取舍记在 D-019，不写成"队列已完成"。
   - **顺带修掉本条第 ② 点**：上报的坐标现在已是 GCJ-02（§17），队列里"存了两套系的点"这个风险不复存在 ——
     因为不存队列，每个 `TrackFix` 出厂即 GCJ-02（`Locator.trackFixes` → `fixOf` → `gcjOf`）。
-  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1521-1522` 注释已写明"，
+  - **`shiftId` 硬阻塞已解除（本条"后端真实行为"段的旧结论作废）**：原文写"`shiftId` 必带——`Repo.kt:1526-1527` 注释已写明"，
     那条**注释是陈旧的**：后端已把 `shiftId` 改为可选（`AppDriverLocationReqVO` 无 `@NotNull`，
     服务层 `currentLegShiftId()` 按当前活跃段兜底）。Android 侧原来 `Running.shiftId <= 0` 就一句不发，
     实际后果是**运输段模式（无班次）的司机永远不上报**，监控上看是车凭空消失。
@@ -1861,7 +1861,7 @@ bash tools/check_eta_probes.sh
 
 判定：`CONTRACT_MISMATCH`（P0，**已修**）→ 附带两条方法论问题（`UI_ONLY` 判据太弱 / 台账建议与源码冲突）
 
-- **文件**：`data/model/Models.kt`（`Reachability`）、`data/repo/Repo.kt:542`、`data/repo/DemoData.kt:490`、`ui/user/SendScreen.kt`
+- **文件**：`data/model/Models.kt`（`Reachability`）、`data/repo/Repo.kt:547`、`data/repo/DemoData.kt:490`、`ui/user/SendScreen.kt`
 - **修前行为**：读 `reachable|ok`、`nearestStation|stationName`、`distance|distanceMeters`、`walkMinutes|minutes`；
   界面拿布尔 `reachable` 分支、把 `distanceMeters/1000.0` 当公里显示（后端本来就是**公里**，于是差 1000 倍），
   `originalAddress` 提交 `reach?.nearestStation.orEmpty()`（恒空），`pickupServiceMode` 写死 `"STATION"`。
@@ -1960,7 +1960,7 @@ bash tools/check_eta_probes.sh
   而 `AppBusNearbyRespVO` 的 `NearbyLine` 内部类只有 `routeName/startStation/endStation/dataSource` 四个键 ——
   **连首页"线路"列表也没有 id**。
 - **口径冲突的额外一步**：行 VO 的 `routeId` 是 `Long`，`BusLine.parse`（`Models.kt:868`）用
-  `multiStr("routeId","lineId","id")` 读成字符串，`/bus/line-polyline` 又按 `routeId` 字符串查询（`Repo.kt:1069`），
+  `multiStr("routeId","lineId","id")` 读成字符串，`/bus/line-polyline` 又按 `routeId` 字符串查询（`Repo.kt:1074`），
   数值→字符串这条转换只有一处，留在 `BusLine` 里是对的，不要在页面再转一次。
 - **本轮处置**：
   - 车辆卡按名字回查行 id：`ui/user/BusScreen.kt` 的 `lineIdOf(v)` =
@@ -2228,7 +2228,7 @@ T-ah 0（位置报文不许渲染成"在途"）。**T-c 8 → 9**（BusVehicle �
 测试 XML 逐份加总仍是 **`suites=21 tests=233 skipped=0 failures=0 errors=0`**（21 份 mtime 17:58:22），APK **57,941,278 B**。
 
 **未收口的同族尾巴（不冒充已修）**：① ETA 候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt:702/929/1048/1608`、
-`Repo.kt:579/947`）—— 其中 `Repo.kt:1351` 的 `RouteGuide` 读的是**导航引擎自己的报文**，不是 app VO，
+`Repo.kt:579/947`）—— 其中 `Repo.kt:1356` 的 `RouteGuide` 读的是**导航引擎自己的报文**，不是 app VO，
 改之前必须先核那份契约（这正是 §71 里 `T-s` 排除 `durationMinutes` 的同一理由：别把两段契约并进一条判据）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 0.0，
 `distanceFee > 0` 才显示"里程费"—— 同病不同族（金额不是 ETA）；③ `TransportLeg` 的

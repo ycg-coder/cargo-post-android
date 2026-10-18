@@ -41,7 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amap.api.navi.AMapNaviView
 import com.amap.api.navi.AMapNaviViewListener
 import com.amap.api.navi.AMapNaviViewOptions
-import com.amap.api.navi.enums.AMapNaviViewShowMode
 import com.shanxiang.buspost.BuildConfig
 import com.shanxiang.buspost.core.AppState
 import com.shanxiang.buspost.core.map.RouteCheck
@@ -235,15 +234,20 @@ fun DriverGuideScreen() {
     }
 
     /**
-     * 全览：把这一整段（含全部任务点标记）框进画面。默认关 —— 行车中要的是"跟着车走"，
-     * 停下来找人/看下一站时才按它。它只改高德的显示模式，不改算路、不改顺序。
+     * 全览这一格**不再由本页持有**（D-169 续，v204 真机）：高德自带面板右下角那颗「全览 / 退出全览」
+     * 做的就是同一件事（点完它，我们这一格原来会跟着改标签，说明两者驱动的是同一个 SDK 显示模式）。
+     * 上一版在页面里留一个 `overview` 本地布尔，于是"现在是不是全览"有两个答案：
+     * 司机按高德的键，我们的布尔不知道；司机按我们的键，高德的面板标签反过来又自己变。
+     * 现在镜头模式整个交给高德，本页一次都不再调 `setShowMode`。
      */
-    var overview by remember { mutableStateOf(false) }
 
-    // 本页的功能按钮交给**全局悬浮胶囊**（用户口径："点进去具体界面的悬浮导航栏就是具体界面的功能按钮"）。
-    // 原来那条通栏底部按钮条（播报 / 结束导航）就此撤掉：高德自带面板已经关掉，屏幕下方整块还给地图。
+    // 本页的悬浮胶囊只剩**播报**一格（D-169 续，v204 真机量过）：
+    // 「看整段」与「退出导航」以前是这一屏的三格之二，但高德自带面板上就有「全览」与「退出」两颗键，
+    // 而且都真做事（v204 实测：点面板左下的「退出」直接回到司机工作台）。
+    // 用户口径④「用高德自带的信息，不要再画蛇添足」+ 更早那条"退出出现两次像调试页"，
+    // 两条合起来指向同一件事：**同一个动作只许有一颗键**，这一屏留高德的那两颗，胶囊只留高德没有的播报。
     // 播报开关改完必须重起一次导航才生效（高德内置播报是进程单例上的开关）—— 这里如实重起，
-    // 而不是只翻本地标签让司机以为已经静音了（这一句原先挂在 GuideBottomBar 的 onClick 里，随按钮搬过来）。
+    // 而不是只翻本地标签让司机以为已经静音了。
     val voiceOn = Prefs.voiceGuidance
     CapsuleActions(
         listOf(
@@ -256,21 +260,6 @@ fun DriverGuideScreen() {
                     engine.stopNavi()
                     session = engine.startGpsNavi(!voiceOn)
                 },
-            ),
-            CapsuleAction(
-                key = "overview",
-                label = if (overview) "回到跟随" else "看整段",
-                icon = BusIcons.layers,
-                selected = overview,
-                enabled = phase is GuidePhase.Ready,
-                disabledReason = "还没算出路，没有整段可看",
-                onClick = { overview = !overview },
-            ),
-            CapsuleAction(
-                key = "exit",
-                label = "退出导航",
-                icon = BusIcons.back,
-                onClick = exit,
             ),
         ),
     )
@@ -341,7 +330,6 @@ fun DriverGuideScreen() {
                 night = nightUi || driving,
                 laneOn = Prefs.laneGuidance,
                 carUp = carUp,
-                overview = overview,
                 markers = navMarkers,
                 onExit = exit,
             )
@@ -473,7 +461,6 @@ private fun AmapNaviSurface(
     night: Boolean,
     laneOn: Boolean,
     carUp: Boolean,
-    overview: Boolean,
     markers: List<MapMarker>,
     onExit: () -> Unit,
 ) {
@@ -515,7 +502,7 @@ private fun AmapNaviSurface(
                             override fun onMapTypeChanged(type: Int) = Unit
                             override fun onNaviViewShowMode(mode: Int) = Unit
                         })
-                        applyNaviOptions(v, night = night, laneOn = laneOn, carUp = carUp, overview = overview)
+                        applyNaviOptions(v, night = night, laneOn = laneOn, carUp = carUp)
                         v.onResume()
                         viewRef = v
                     }
@@ -529,7 +516,7 @@ private fun AmapNaviSurface(
                 // 夜间 / 车道 / 视角都是"运行中也要跟着改"的：update 里重设一次，
                 // 免得司机关掉车道开关后导航页还画着车道放大图、切了视角标签却不跟着转。
                 runCatching {
-                    (v as? AMapNaviView)?.let { applyNaviOptions(it, night = night, laneOn = laneOn, carUp = carUp, overview = overview) }
+                    (v as? AMapNaviView)?.let { applyNaviOptions(it, night = night, laneOn = laneOn, carUp = carUp) }
                 }
             },
         )
@@ -629,10 +616,12 @@ private fun AmapNaviSurface(
  * 把"车道级"相关开关一次设好。方法名全部来自 `javap` 实测的 `AMapNaviViewOptions` 方法表
  * （`setLaneInfoShow` / `setRealCrossDisplayShow` / `setModeCrossDisplayShow` /
  * `setTrafficBarEnabled` / `setTrafficLayerEnabled` / `setAutoLockCar` / `setScreenAlwaysBright` /
- * `setNaviNight` / `setCompassEnabled`），视角走 `AMapNaviView.setNaviMode` +
- * `setShowMode`（常量 `CAR_UP_MODE=0` / `NORTH_UP_MODE=1` / `SHOW_MODE_LOCK_CAR=1`，同样是 javap 取的值）。
+ * `setNaviNight` / `setCompassEnabled`），视角走 `AMapNaviView.setNaviMode`
+ * （常量 `CAR_UP_MODE=0` / `NORTH_UP_MODE=1`，同样是 javap 取的值）。
+ * ⚠ 这里**不调** `setShowMode`：跟随 / 全览那一档整个交给高德面板自己的「全览」键（D-169 续，
+ * v204 真机：本页每次重设一遍 `SHOW_MODE_LOCK_CAR`，司机按高德的键进全览就会被我们拽回来）。
  */
-private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, carUp: Boolean, overview: Boolean) {
+private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, carUp: Boolean) {
     val o: AMapNaviViewOptions = v.viewOptions ?: AMapNaviViewOptions()
     o.isLaneInfoShow = laneOn              // 车道放大图 —— "车道级"三个字在本页的落点
     o.isRealCrossDisplayShow = true        // 路口放大图（真实投影）
@@ -656,11 +645,6 @@ private fun applyNaviOptions(v: AMapNaviView, night: Boolean, laneOn: Boolean, c
     o.isLayoutVisible = true
     v.viewOptions = o
     v.setNaviMode(if (carUp) AMapNaviView.CAR_UP_MODE else AMapNaviView.NORTH_UP_MODE)
-    // 全览 = 把这一整段的任务点都框进画面（胶囊上那一格给的就是这个）；否则跟着车标走
-    v.setShowMode(
-        if (overview) AMapNaviViewShowMode.SHOW_MODE_DISPLAY_OVERVIEW
-        else AMapNaviViewShowMode.SHOW_MODE_LOCK_CAR,
-    )
 }
 
 /**

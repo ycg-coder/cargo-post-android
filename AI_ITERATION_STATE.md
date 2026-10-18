@@ -20,8 +20,20 @@
 返回键真接出口 1 / 重复出口药丸 0）+ 负控 13→18 条（含 NC-18"把顶条改名"这条反证）；
 OC-e 让高处 3→4（面板打开后高德那条剩余里程画在地图下沿，`else -> 0.dp` 会把胶囊压上去）+ 新负控 NC-10；
 MR-r import 反证 10→11（装配层多读一个业务类型）；用例 802→807。
-⚠ **上屏复验未做**：这一屏要真机跑一次导航才看得见（标记是否显示、面板与胶囊是否互压、地址三态那句文案），
-与 D-173 那半格同一趟 release 取 —— 见 DECISION_LOG D-169 第五节。
+**v204 真机已复验**（release 产物装在 1f71ee9b，冷启动直接进导航页）：高德面板在画「145米 进入 无名道路」
+与「26.6公里 57分钟 / 明天凌晨00:35到达」；顶条只剩那三行；logcat `导航面任务点标记：要贴 6 个 / 换算出 6 个 / 贴上 6 个`
+且全览截图上数得出带字圆钉「揽」「派」「出」⇒ **v151 数不出不是"被盖住"，是镜头跟着车、其余站在画面外**；
+点面板那颗「退出」直接回司机工作台 ⇒ 那颗键不是摆设。同一趟还读出**本轮自己引进的两处毛病**并当场改掉：
+① 同一个动作三颗键（面板「退出」+ 胶囊「退出导航」、面板「全览」+ 胶囊「看整段」）⇒ 导航这一屏的胶囊
+只留播报一格，CN-d 的锚点从「`key = "exit"` 恰好 1」翻成「exit/overview 两形恰好 0 + voice 恰好 1」并补 NC-19/NC-20；
+② 页面攥着本地 `overview` 布尔每次重设 `setShowMode`，会把司机从高德那颗「全览」里拽回来 ⇒ 布尔与 `setShowMode` 整个删掉。
+同一趟顺手把 D-173 第四格做掉：地址查公交真机读出两条不同结局（真实路名 →「地址解析成功 · 辽宁省葫芦岛市…区域码 211481」；
+乱码 →「高德地理编码返回 infocode=30001」），后者那句不成人话 ⇒ 码表按官方"300**＝服务响应失败"补四条例子，
+段内没点名的码（30099）仍只报码，用例把这条边界钉住。⚠ 三态里那格 `askedButMissed` **今天没取到屏上读数**
+（adb 只能输 ASCII，中文地址输不进去）⇒ 只有用例与 WM-2 作证，不许写成已验。
+⚠ 另一条环境事实：23:52 服务时段一过这个班次被后端收成「已完成」（站点仍是「待执行」，全程没人点过确认到达）
+⇒ D-170（到车持续提醒）那一屏的真机验收要等新班次开始之后。凭证：`docs/device-evidence/20261018-navmarkers/`、
+`20261018-quota/05·06`。详见 DECISION_LOG D-169 第五·七节与 D-173 第九节。
 
 上一轮：2026-10-18（**D-171** · 底部胶囊"离底部太近"量出来是 App 自己一格都没留）：
 用户口径②「底部导航栏不要离底部太近，不好看」。这次有数：v189 release 装在 1f71ee9b（1080x2400@440dpi），
@@ -357,7 +369,7 @@ failures=1，并同时断言旧退路在 `BusScreen` 里残留 0 处）；全量
 第二格补的是**段卡认不出自己属于哪张单**：两张卡角标都念"1"是段序按**每张单**发号（#43 口径），
 新增 `DriverExceptionReport.kt:117` 的 `legMetaLine` 把第二行收成与选段行、异常回执**共用 `legOrderTag`** 的唯一措辞，
 `RoutesScreen` 不再自造写法；只补身份不发明排序（#49）。
-凭证：`CurrentLegContractTest.kt:27` 5 例（**未绑定那条是脚手架反证** —— `Repo.kt:1207` 的 `driverIdParam()` 在未绑定时直接抛、请求根本不发，
+凭证：`CurrentLegContractTest.kt:27` 5 例（**未绑定那条是脚手架反证** —— `Repo.kt:1212` 的 `driverIdParam()` 在未绑定时直接抛、请求根本不发，
 不钉它则两条 null 断言是"空集上的真"；另带正对照）、`DriverExceptionReportTest` 16 例（+2）、
 负控摘掉单号标识 ⇒ `RC=1 / failures=2`，还原 ⇒ `RC=0 / failures=0`；全量产物 **75 类 / 771 例 / 0 失败 0 错误 0 跳过**
 （XML timestamp 全 2026-10-17，`SU-c` 同轮独立念 `@Test 注解行 771`）；v109 已 `pm install -r -d`（13:51:55）并复拍两屏。
@@ -501,7 +513,7 @@ NEXT：用户端「实时公交 + 公交卡片」复查（用户点的名，司�
     （鉴权过滤器在路由映射之前短路），所以**不能拿接口判"路由存不存在"**；第一次我拿 200 当"已部署"其实是 nginx 的 SPA fallback。
   · **#100 换入口做完了**：真机今天这个班次**两段都已是"异常（不可再报）"**、工作台没有可报入口（`上报` 匹配 0 个）
     ⇒ App 那张回执现在拿不到。于是用 **App 自己的登录口**（`/app-api/member/auth/login`）拿 token，
-    打 **App 真正在用的上传口**（`Repo.kt:1657` → `/app-api/infra/file/upload`，字段 `file`）：
+    打 **App 真正在用的上传口**（`Repo.kt:1662` → `/app-api/infra/file/upload`，字段 `file`）：
     `code:0` 返回 URL，**回取该 URL 200、69 字节与原文件逐字节相同** ⇒ **传输层在已部署的云上是好的**，
     D-142 那次失败更可能是当时版本/配置或 App 那一层。
     ⚠ 云上文件库因此留了个 **69 字节**测试文件（`…/infra/file/4/get/20261017/probe.png`），删除要后台权限，等顺手清。
@@ -885,7 +897,7 @@ NEXT：等 #47 口径 / 等图标选型 → 两件都在等的时候，转去做
 最后更新：2026-10-13（上午，D-088 · **#39 收藏线路首页入口做完，用例先红抓住的是我自己纯层里的洞**）：
 契约三件事：收藏是**纯本机**（`Prefs.kt:233-259` 逗号分隔 id 存 DataStore；`yudao-module-transport` 的 app 端点包、`yudao-module-member`、
 transport 建表 SQL 三处 **0 命中** ⇒ 界面没资格说"已同步/换机恢复"；⚠ `ruoyi-vue-pro.sql:2667` 那条"收藏"是上游自带的后台菜单种子，**不是接口证据**）；
-线路**名字只在** `GET /app-api/transport/bus/lines`（`Repo.kt:888-893`）里、本地只有 id ⇒ 首页那一格不显名字也不显计数（显名字要为它多取一跳，会撞 MockWebServer 按序队列那几本计数类）；
+线路**名字只在** `GET /app-api/transport/bus/lines`（`Repo.kt:893-898`）里、本地只有 id ⇒ 首页那一格不显名字也不显计数（显名字要为它多取一跳，会撞 MockWebServer 按序队列那几本计数类）；
 `BusScreen.kt:730-732` 旧闸门是 `favLines.isNotEmpty()` ⇒ 列表取失败时整栏消失，**"没取到"被界面念成"没有收藏"**（D-079/D-080/#42 同族）。
 落地：纯层 `ui/user/FavoriteLines.kt`（三句文案唯一出处 + `favoriteRowVisible`/**整栏闸门改成"本机记着几条"**/`favoriteUnresolvedText` 两支）；
 首页那一格用现成 `FeatureTile` 且**不设登录闸门**（读的是本机文件），并把与"个人中心"同做 `onSelectTab(3)` 的重复格"更多功能"换掉（宫格总数仍 8，不加第九格）；
@@ -969,7 +981,7 @@ sha256 `59086c9e…`（对上一包 +32,768 B 登记为增量未归因）。
 NEXT：③ `earliestPickupTime` 取件时间窗 → ④ #39 收藏首页入口 → ⑤ #47 分组 hub → ⑥ #43 图标（我出 3 个候选）
 → 之后是 web 后台管理平台。
 <!-- 上一条 D-085（#55 票面）及更早的「最后更新」段落保留为历史，不覆盖 -->
-最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:1011`，
+最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:1016`，
 `GET /app-api/transport/send/topology`）此前全仓 0 消费者 ⇒ 补的是读它的那一页（判定全在纯层 `ui/user/ParcelTicket.kt`，
 页面 `ParcelTicketScreen.kt` 只渲染，入口是追踪页那一行「看联运票面」、全工程恰好一个导航调用点）。
 逐字段读生产者读出**三处真接口下永远念空/念错**：交接的车牌与时刻认的是自造键（后端发 `fromPlateNo`/`toPlateNo`/
@@ -1012,8 +1024,8 @@ NEXT：① 钱包/交易记录（必须标"模拟模式"）② `earliestPickupTi
 那本在册红仍**等用户定**（#51 三条路）；本地已提交**未 push**（用户口径：全部任务完成后一起推，推前给看 diff）。
 完整记录在 `DECISION_LOG.md` **D-084**、判据教训 `CONTEXT_LOCK.md` §八 **㊽**。
 <!-- 上一条 D-081（#54 乘车安排）及更早的「最后更新」段落保留为历史，不覆盖 -->
-最后更新：2026-10-12（晚第三轮，D-081 · #54 用户端「我的乘车安排」：`Repo.myArrangements()`（`Repo.kt:869`，`GET /send/arrangements`）**通路一直是活的、全仓零消费者** ⇒ 补的是读它的那一页，不新造第二套来源。先逐字段核生产者（`AppSendController.arrangements()` 只 set 十一个键）再动手，定下三条硬口径：① **这一页不显示任何分钟数**（该端点没有 `etaMinutes` 键，§68；到车提醒走 `/send/page` 的 `carrierEtaMinutes`，且须标「直线估算」）；② **`planStatus` 是 Integer 不是文案** —— 旧 `multiStr` 会把码念成「调度方案：2」，改成 `planStatusCode: Int?` + 照抄后端 `DispatchPlanStatusEnum` 六值的映射（未知码原样带出、**null 不许塌成 0**；顺带记下 VO 的 @Schema 只写了 0..3 而枚举实际有六个值）；③ 站点/车牌没给就念「后端没给」（站点被删时后端那两格是 null，不兜站名、不留空白行）。判定在纯层 `ui/user/ArrangementRows.kt`（四格 `Failed/Loading/Empty/Shown`，**「没取到」绝不念成「还没有乘车安排」** —— 与 D-080/#38/#42 同族），页面 `ArrangementsScreen.kt` 只渲染，`Routes.ARRANGEMENTS` 走 `BusRouteBody`、「我的」里恰好一个入口。新簿 `tools/check_arrangement_probes.sh`（AR-a…AR-i）绿 + 新负控 `tools/arrangement_negative_controls.sh` **12/12**。两处判据自纠值得记：AR-e 的反证原先拿模型里的 `val etaMinutes: Int?` 数，实测该串在 Models 有 **6 处**（删掉 Arrangement 那一处照样 `-ge 1` 通过）⇒ 改成**同文件正对照**（「承运车辆」那一行必须数得出恰好 1，它证明的是过滤器真的在看这个文件）；结构簿第一版 `nc_all()` 对 `grep -rn` 的输出套了 `^[0-9]+:` 形状的注释过滤器 ⇒ 一条都不命中、报出「真调用数=0」的假红，改成先用 `sed` 剥掉 `文件:行:` 两段再套过滤器（两种输出形状对应两种过滤器，簿里有注释）。**判据当场咬住一处真重复（不是误报）**：`PL-g` 立刻红 —— 我在新页空态里顺手重抄了「不提供网上预约乘车」这条硬规则，同一句两份文字迟早各自漂移 ⇒ 删掉这一页的重复、那句只留在 `AppPolicies`，并把用例从「要求这一页也写着它」改成**「要求这一页不许再抄一份」**（第一次改完仍红：注释里还留着原话）。台账随动：SU-b 64→**65**（唯一增量 `ArrangementRowsContractTest.kt`，产物 tests=13，SU-a 同轮 63/**0**）。读数：新用例 **13 例**、`BusEtaContractTest` 仍 13 例绿；全量 `:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` = **BUILD SUCCESSFUL / 45 tasks executed**，**63 类 / 637 例 / 0 失败 / 0 错误**（63 份 XML timestamp 全为 2026-10-12T11:13）；判据全批 29 本 = **28 绿 / 1 红**（红的仍是台账锚点那本 #51）。后端实测（本机 local）`GET /app-api/transport/send/arrangements` 未带登录态 = `{"code":401,"msg":"账号未登录"}` ⇒ 路由在、要登录；**「看到 n 条真安排」这一格仍未被演示**（需要一个带 orderType=1 且 status∈{2,3,4} 的登录用户，本机没验到）。CURRENT：本轮全部 `NOT VERIFIED ON DEVICE`；负控整批（现 33 本，实测 `ls tools/*_negative_controls.sh | wc -l`）与真机复拍仍在册；V029 待队友在云上库执行；CI `set -o pipefail` 仍压在 #50；#48 只有代码侧（push 后才谈得上「用户能更新」）。仍欠一格已登记：debug 演示面的 `/send/arrangements` 写的是自造键（没有后端真给的上下车站与 `planStatus`）⇒ 演示包里这一页会有几行念「后端没给」，把演示面改成与契约同键是独立收尾。NEXT：用户端 `/send/topology` 死代码补查件票面 → 钱包/交易记录（须标「模拟模式」）→ `earliestPickupTime` 取件时间窗 → #39 收藏首页入口 → #47 分组 hub 设计 → #43 等图标稿。）
-最后更新：2026-10-12（晚第二轮，D-079 + D-080：App 侧补齐两格"看着有、其实是空的"——**① 服务协议/隐私政策正文页**（D-079）：此前登录页只有一个勾选框、点它只翻 `agreed` 而**没有任何正文可看**，现在 `core/about/AppPolicies.kt` 是 16 组分条正文的唯一出处（`UPDATED_ON` 单点），`ui/user/PolicyScreen.kt` 只渲染，`Routes.PRIVACY/TERMS` 两条注册都走 `BusRouteBody`，登录页两个可点链接把"勾"与"看"分开、关于页两行入口，且这两页**不设角色/登录闸门**（同意之前就得读得到）；新判据簿 `tools/check_policy_probes.sh`（PL-a…PL-j）绿 + 新负控 `tools/policy_negative_controls.sh` **11/11**，其中 P-7b 第一轮是**绿的**（`PLH_PROOF ≥20` 这种下限反证删一句正文读 24 照样过 ⇒ 那个"页面 0 命中"没人能证明不是空跑），改成钉**恰好 25** 才第一次被破口咬住 —— **下限型反证只能证"机制数得动"，当不了逐条改动的 tripwire**；内容契约那本第一版还把自己的诚实否定句（"不提供网上预约乘车""没有接入任何广告 SDK"）打红两条，改成 bannedPromises/notEnabled/**mustState**（禁肯定式 + 要求否定句在场）才对。**② 司机端平台公告栏**（D-080）：后端 `/notice/list` 与用户端首页通路本来就活着，司机端一条都不显示 ⇒ 接现成的、不造第二套来源；判定全在纯函数 `ui/driver/DriverNotices.kt`（`noticeBanner(RemoteState)`），**"这一轮没取到"与"后端确实没有公告"必须是两格**（前者占格给重试、后者整栏不出现），初值写 `loading=true` 而不是空列表；取数挂在 `syncFromServer(withNotices)`，只有进入/下拉刷新/失败重试那一轮取，作业动作后的回读不取。⚠ 本轮最贵的实测打回：第一版挂在**每轮**回读上，全量跑出 **12 例红**且红因分两种——`DriverActionHonestyContractTest` 报 `expected:<5> but was:<6>`（条数），另两类 7 条报 `TimeoutCancellationException: Timed out waiting for 5000 ms`（`MockWebServer` 按序回填，第 6 跳没有响应 ⇒ 挂在超时而不是差一，只看红因会误诊成协程问题）。修法不动判据强度：加 `withNotices` 闸门 + 三个类计数同轮逐条重登（5→6、11→12、6→7，早退支仍 1 条），并登记口径**"改会被 `server.requestCount` 钉住的取数点，先跑那三个类再看判据簿"**——结构判据只看文本，能证明"接线在"，永远证明不了"没多跳"。随动重登：SU-b 63→**64**（唯一增量 `DriverNoticesContractTest.kt`，产物 tests=9，SU-a 同轮 62/**0**）、`check_idempotency_probes.sh` 的 H-h 逐字锚点 `11,`→`12,`（仍 3 条）。后端实测（本机 local，只读）`GET /app-api/transport/notice/list` = `{"code":0,"msg":"","data":[]}` ⇒ 通路真、库里 0 条 ⇒ 这一格现在正确地不出现，"司机真看到公告"连演示都没有，登记为未验。读数：新簿 `check_driver_notice_probes.sh`（DN-a…DN-i）绿 + 新负控 `driver_notice_negative_controls.sh` **13/13**；全量 `--rerun-tasks` = **62 类 / 624 例 / 0 失败 / 0 错误**（62 份 XML timestamp 全为 2026-10-12T10:34）；判据全批 28 本 = **27 绿 / 1 红**。CURRENT/仍欠：红的仍是 `check_doc_anchor_probes.sh`（#51，三条路线待用户定）；两格全部 `NOT VERIFIED ON DEVICE`；CI 的 `set -o pipefail` 还压在 #50；#48 只有代码侧（要 push + Actions 出 Release 才谈得上"用户能更新"，本轮按用户口径**只本地 commit、push 前给看 diff**）；负控整批（现 31 本）与真机复拍仍在册；V029 待队友在云上库执行。NEXT：用户端"我的乘车安排"接回 `Repo.kt:723 /send/arrangements` 死通路（同一条纪律：先跑被它钉住的计数类）→ #39 收藏首页入口 → #47 分组 hub → #43 等图标稿。）
+最后更新：2026-10-12（晚第三轮，D-081 · #54 用户端「我的乘车安排」：`Repo.myArrangements()`（`Repo.kt:874`，`GET /send/arrangements`）**通路一直是活的、全仓零消费者** ⇒ 补的是读它的那一页，不新造第二套来源。先逐字段核生产者（`AppSendController.arrangements()` 只 set 十一个键）再动手，定下三条硬口径：① **这一页不显示任何分钟数**（该端点没有 `etaMinutes` 键，§68；到车提醒走 `/send/page` 的 `carrierEtaMinutes`，且须标「直线估算」）；② **`planStatus` 是 Integer 不是文案** —— 旧 `multiStr` 会把码念成「调度方案：2」，改成 `planStatusCode: Int?` + 照抄后端 `DispatchPlanStatusEnum` 六值的映射（未知码原样带出、**null 不许塌成 0**；顺带记下 VO 的 @Schema 只写了 0..3 而枚举实际有六个值）；③ 站点/车牌没给就念「后端没给」（站点被删时后端那两格是 null，不兜站名、不留空白行）。判定在纯层 `ui/user/ArrangementRows.kt`（四格 `Failed/Loading/Empty/Shown`，**「没取到」绝不念成「还没有乘车安排」** —— 与 D-080/#38/#42 同族），页面 `ArrangementsScreen.kt` 只渲染，`Routes.ARRANGEMENTS` 走 `BusRouteBody`、「我的」里恰好一个入口。新簿 `tools/check_arrangement_probes.sh`（AR-a…AR-i）绿 + 新负控 `tools/arrangement_negative_controls.sh` **12/12**。两处判据自纠值得记：AR-e 的反证原先拿模型里的 `val etaMinutes: Int?` 数，实测该串在 Models 有 **6 处**（删掉 Arrangement 那一处照样 `-ge 1` 通过）⇒ 改成**同文件正对照**（「承运车辆」那一行必须数得出恰好 1，它证明的是过滤器真的在看这个文件）；结构簿第一版 `nc_all()` 对 `grep -rn` 的输出套了 `^[0-9]+:` 形状的注释过滤器 ⇒ 一条都不命中、报出「真调用数=0」的假红，改成先用 `sed` 剥掉 `文件:行:` 两段再套过滤器（两种输出形状对应两种过滤器，簿里有注释）。**判据当场咬住一处真重复（不是误报）**：`PL-g` 立刻红 —— 我在新页空态里顺手重抄了「不提供网上预约乘车」这条硬规则，同一句两份文字迟早各自漂移 ⇒ 删掉这一页的重复、那句只留在 `AppPolicies`，并把用例从「要求这一页也写着它」改成**「要求这一页不许再抄一份」**（第一次改完仍红：注释里还留着原话）。台账随动：SU-b 64→**65**（唯一增量 `ArrangementRowsContractTest.kt`，产物 tests=13，SU-a 同轮 63/**0**）。读数：新用例 **13 例**、`BusEtaContractTest` 仍 13 例绿；全量 `:app:testDebugUnitTest :app:assembleDebug --rerun-tasks` = **BUILD SUCCESSFUL / 45 tasks executed**，**63 类 / 637 例 / 0 失败 / 0 错误**（63 份 XML timestamp 全为 2026-10-12T11:13）；判据全批 29 本 = **28 绿 / 1 红**（红的仍是台账锚点那本 #51）。后端实测（本机 local）`GET /app-api/transport/send/arrangements` 未带登录态 = `{"code":401,"msg":"账号未登录"}` ⇒ 路由在、要登录；**「看到 n 条真安排」这一格仍未被演示**（需要一个带 orderType=1 且 status∈{2,3,4} 的登录用户，本机没验到）。CURRENT：本轮全部 `NOT VERIFIED ON DEVICE`；负控整批（现 33 本，实测 `ls tools/*_negative_controls.sh | wc -l`）与真机复拍仍在册；V029 待队友在云上库执行；CI `set -o pipefail` 仍压在 #50；#48 只有代码侧（push 后才谈得上「用户能更新」）。仍欠一格已登记：debug 演示面的 `/send/arrangements` 写的是自造键（没有后端真给的上下车站与 `planStatus`）⇒ 演示包里这一页会有几行念「后端没给」，把演示面改成与契约同键是独立收尾。NEXT：用户端 `/send/topology` 死代码补查件票面 → 钱包/交易记录（须标「模拟模式」）→ `earliestPickupTime` 取件时间窗 → #39 收藏首页入口 → #47 分组 hub 设计 → #43 等图标稿。）
+最后更新：2026-10-12（晚第二轮，D-079 + D-080：App 侧补齐两格"看着有、其实是空的"——**① 服务协议/隐私政策正文页**（D-079）：此前登录页只有一个勾选框、点它只翻 `agreed` 而**没有任何正文可看**，现在 `core/about/AppPolicies.kt` 是 16 组分条正文的唯一出处（`UPDATED_ON` 单点），`ui/user/PolicyScreen.kt` 只渲染，`Routes.PRIVACY/TERMS` 两条注册都走 `BusRouteBody`，登录页两个可点链接把"勾"与"看"分开、关于页两行入口，且这两页**不设角色/登录闸门**（同意之前就得读得到）；新判据簿 `tools/check_policy_probes.sh`（PL-a…PL-j）绿 + 新负控 `tools/policy_negative_controls.sh` **11/11**，其中 P-7b 第一轮是**绿的**（`PLH_PROOF ≥20` 这种下限反证删一句正文读 24 照样过 ⇒ 那个"页面 0 命中"没人能证明不是空跑），改成钉**恰好 25** 才第一次被破口咬住 —— **下限型反证只能证"机制数得动"，当不了逐条改动的 tripwire**；内容契约那本第一版还把自己的诚实否定句（"不提供网上预约乘车""没有接入任何广告 SDK"）打红两条，改成 bannedPromises/notEnabled/**mustState**（禁肯定式 + 要求否定句在场）才对。**② 司机端平台公告栏**（D-080）：后端 `/notice/list` 与用户端首页通路本来就活着，司机端一条都不显示 ⇒ 接现成的、不造第二套来源；判定全在纯函数 `ui/driver/DriverNotices.kt`（`noticeBanner(RemoteState)`），**"这一轮没取到"与"后端确实没有公告"必须是两格**（前者占格给重试、后者整栏不出现），初值写 `loading=true` 而不是空列表；取数挂在 `syncFromServer(withNotices)`，只有进入/下拉刷新/失败重试那一轮取，作业动作后的回读不取。⚠ 本轮最贵的实测打回：第一版挂在**每轮**回读上，全量跑出 **12 例红**且红因分两种——`DriverActionHonestyContractTest` 报 `expected:<5> but was:<6>`（条数），另两类 7 条报 `TimeoutCancellationException: Timed out waiting for 5000 ms`（`MockWebServer` 按序回填，第 6 跳没有响应 ⇒ 挂在超时而不是差一，只看红因会误诊成协程问题）。修法不动判据强度：加 `withNotices` 闸门 + 三个类计数同轮逐条重登（5→6、11→12、6→7，早退支仍 1 条），并登记口径**"改会被 `server.requestCount` 钉住的取数点，先跑那三个类再看判据簿"**——结构判据只看文本，能证明"接线在"，永远证明不了"没多跳"。随动重登：SU-b 63→**64**（唯一增量 `DriverNoticesContractTest.kt`，产物 tests=9，SU-a 同轮 62/**0**）、`check_idempotency_probes.sh` 的 H-h 逐字锚点 `11,`→`12,`（仍 3 条）。后端实测（本机 local，只读）`GET /app-api/transport/notice/list` = `{"code":0,"msg":"","data":[]}` ⇒ 通路真、库里 0 条 ⇒ 这一格现在正确地不出现，"司机真看到公告"连演示都没有，登记为未验。读数：新簿 `check_driver_notice_probes.sh`（DN-a…DN-i）绿 + 新负控 `driver_notice_negative_controls.sh` **13/13**；全量 `--rerun-tasks` = **62 类 / 624 例 / 0 失败 / 0 错误**（62 份 XML timestamp 全为 2026-10-12T10:34）；判据全批 28 本 = **27 绿 / 1 红**。CURRENT/仍欠：红的仍是 `check_doc_anchor_probes.sh`（#51，三条路线待用户定）；两格全部 `NOT VERIFIED ON DEVICE`；CI 的 `set -o pipefail` 还压在 #50；#48 只有代码侧（要 push + Actions 出 Release 才谈得上"用户能更新"，本轮按用户口径**只本地 commit、push 前给看 diff**）；负控整批（现 31 本）与真机复拍仍在册；V029 待队友在云上库执行。NEXT：用户端"我的乘车安排"接回 `Repo.kt:728 /send/arrangements` 死通路（同一条纪律：先跑被它钉住的计数类）→ #39 收藏首页入口 → #47 分组 hub → #43 等图标稿。）
 最后更新：2026-10-12（D-076 续二～续六：App 这批用户报的 8 条已收口 7 条 —— 验证码 4..6 位契约、登录态静默续期、实时公交首屏状态位、首页失败态、地图"我的位置"两层开关、头像更换入口、通知锁屏隐私，以及本轮 **#42 天气按角色分文案**：`WeatherInfo` 加 `driverTips`，`farmTips`（六条清一色货运口径）换成顶层纯函数 `weatherTipsFor(condition,temp)` 出两份说法（霾并入低能见度档），两个天气生产者同时填两份；新簿 `ui/driver/DriverWeatherTip.kt` 管 15 分钟闸门与"没取到就不出这一栏"；司机工作台 `item(key = "weather")` 接在 `syncFromServer()` **尾部**（不另开 `work()`，因为 `ScreenViewModel.kt:38` 进门清 error ⇒ 会把本班真失败原因抹掉，与 #38 同形病）。后端天气接口**有意不加**（App 直连高德 Web key REST/open-meteo，绕进后端只会抹平来源标签，同 #41 那条理由）。读数：`DriverWeatherContractTest` 8 例，全量 `--rerun-tasks` = **59 类 / 596 例 / 0 失败**（59 份 XML timestamp 全为 06:41，无上一遍残留）；新判据簿 `tools/check_weather_probes.sh` 14 项绿 + 新负控簿 `tools/weather_negative_controls.sh` **7/7 红且原因对得上**（负控全批因此 28→29 本，仍欠整批）。两条判据自纠：W-d 原来 `grep -c` 不过滤注释行 ⇒ 把那一栏整行注释掉判据仍绿；注释过滤器第一版写成 `:[0-9]+:`（那是 `-rn` 的形状，单文件 `-n` 只有一处冒号）⇒ 改 `^[0-9]+:` 才咬住。CURRENT：#43 图标等用户给设计稿；本轮末全批 26 本 = **25 绿 / 1 红**（新增 check_update_probes），红的仍是台账锚点那本；**#48 已做完代码侧（D-078，只走 GitHub Releases，用户口径）**：`core/update/AppUpdate.kt`（四分支判定，`NoReleaseYet` 与 `UpToDate` 分开）+ `AppUpdater.kt`（FileProvider/缓存目录/按 size 核对/授权缺失跳系统页）+ 关于页 `UpdateCheckRow()` + gradle versionCode 从 `GITHUB_RUN_NUMBER` 派生 + CI 只给 release job `contents: write` 并"创建 Release 后再回读 `releases/latest` 取证"；新判据簿 `check_update_probes.sh`（15 项）+ 负控 `update_negative_controls.sh` **14/14**。→ NEXT：**push 前给用户看 diff**（选定的提交方式），推完再手工触发一次 release 才能真验"用户能更新"；然后 #39 首页收藏入口 → #47 分组 hub 设计 → #43 等图标稿。仍欠：**判据红账只剩 1 本**（全批 25 本复测 = **24 绿 / 1 红**，见 D-076 续七与续七 补二：清了 reachability/throwable/eta/navigation/safe_call/mission_route/runcatching 七本，并修掉三处真回归 —— `BusScreen.kt:279` 的 `loadMyShippingOrders()` 外层 runCatching 吞取消、`BusScreen.kt` 主路径上折线四态说明整块消失、`TraceScreen.kt` 段里程/段时长 `dist > 0` 才 append 让"没下发"与"真 0 公里"同形；红的仍是台账锚点那本，**已否掉"按候选表批量重锚"这条路**（三条反例证明它会把对的锚点改错，见 `docs/android/ANCHOR_REVIEW_2026-10-12.md`），装 CI 的 `set -o pipefail` 因此还压在 #50，且要先定"比率闸门 / 逐条人工重锚 / 83 条进在册表"三条路）；**真机复拍**（本轮全部 `NOT VERIFIED ON DEVICE`，含"15 分钟内不发第二次 REST"）、`tools/check_*.sh` 全批与 29 本负控整批、V029 由队友在云上库执行。）
 <!-- 上一条 D-076（①②③ 那批）及更早的「最后更新」段落保留为历史，不覆盖 -->
 
@@ -2458,7 +2470,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                   形态 字符串 38 / 数值布尔 25（严格非可空 19）/ 数组 2；文件分布 `Repo.kt` 31 / `Models.kt` 27 / `SendScreen.kt` 7）。
                   本轮收口的是**六族**（商品 `Product` / 司机档案 `DriverProfile` / 揽件 `PickupOrder.checked` / 交接 `HandoverTask.needPhoto` /
                   候选方案 `Candidate` / `steps`·车道族），改法只有两种：**三方核到真键的改成只读那一个真键**
-                  （`Models.kt:808-814 plate = o.multiStr("plateNo")`、`:1402 multiNumOrNull("cargoCapacityKg")`、`:1407 multiNumOrNull("cargoCapacity")`、`Repo.kt:1168 multiNumOrNull("recommendedLane")`），
+                  （`Models.kt:808-814 plate = o.multiStr("plateNo")`、`:1402 multiNumOrNull("cargoCapacityKg")`、`:1407 multiNumOrNull("cargoCapacity")`、`Repo.kt:1173 multiNumOrNull("recommendedLane")`），
                   **三面 0 生产者的改成可空 + "未给"态**（`Models.kt:1819 needPhoto: Boolean? = null`、`:1479 checked`、`:1178 recommended`、`:1179 legs`、`:313 stock`、`:310 originPrice`、`:315 sales`、`:1349/:1351/:1353/:1355`）。
                   ⚠ **没有把任何别名换成另一个猜的键名、没有删字段**；`usedKg`/`verified` 是**直接撤掉读法**而不是改名
                   （`AppDriverProfileRespVO.java:11-23` 全文 7 个键，"已装重量/认证状态"在重量口径上三方都没有生产者）。
@@ -2524,7 +2536,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                   （② 剩下的"真待收口 23"不并进 ③：字符串族 11 处的难点是**端点归属**不是默认值 ⇒ 随 ⑥⑦ 收；
                   `Models.kt:240 role` 恒走 `fallbackRole` = `D-②-2`，它的收口方式就是 ③，本轮刻意没动）→
                   ④⑫ 导航入口 readiness 闸门 → ⑤ 线路页折线三态 → ⑥ USER 闭环 → ⑦⑨ DRIVER 闭环 + 任务点 mapper →
-                  ⑧ 任务地图无路线态 → ⑬⑭⑯⑰ 引擎契约/路线绑定/缓存指纹（含 `D-②-4` census 补列、里程别名 5、`steps` 族 5、`Repo.kt:1154` crs）→
+                  ⑧ 任务地图无路线态 → ⑬⑭⑯⑰ 引擎契约/路线绑定/缓存指纹（含 `D-②-4` census 补列、里程别名 5、`steps` 族 5、`Repo.kt:1159` crs）→
                   ⑱⑳ 10 本测试类 + 全量 + 四份台账。
                 ⚠ **"32 处"这个数在本文件下面的历史行里还有 6 处**（`:239`、`:726`、`:757`、`:768`、`:789`、`:1509`、`:1634`、`:1780`），
                   按 `D-②-4` 一律改读为：**重建基数 C=65 / 数值布尔非可空 19（形态 字符串 38 · 数组 2）/ E 31 · D 11 · 真待收口 23**；
@@ -2548,7 +2560,7 @@ CURRENT_ANDROID_STATUS:  F-3 ⑩⑪⑮ 收工（2026-10-01 13:5x–14:55，三�
                   **命令原文已写进 D-045 第 2 节**——上一轮那串 `6e263735675020c1…`（146 文件）的算法没记在案，**跨轮不可比对，别再拿这两个数互相引用**。
                   判据面：`tools/check_*.sh` 20 本全 `rc=0 / ✘=0`；`DV-k=132`（只许降，本轮未升）；
                   census `rows=474 / B=400 / C=74`（D-044 是 472/398/74 ⇒ **+2 行全落 B、C 集合一条没动**，
-                  新增读点 `Repo.kt:1330/728/741/747` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
+                  新增读点 `Repo.kt:1335/728/741/747` 都有真实生产者）；真实性计数 窄 9 / 宽 46 / `GeoMath` 27 / **假步进 0**；
                   负控 20 本 18 本 `rc=0`，`notify_result`/`oss_credits` 两本先 `rc=2`（自家预检：TEST XML 不在就不许交差）、
                   接力全量跑完单独复跑 `RESULT=PASS`；⚠ `eta` 本 `rc=0` 但 `✘=2` ⇒ **D-⑰⑱-1 本轮复现，未修**。
                 **release / device / git（各自单算，不许顶替上面那两态）**：
@@ -3066,7 +3078,7 @@ T-a 0 · T-b **30** · T-c **9** · T-k **12** · T-m 4 · T-n 3 · T-p 3 · T-r
 T-v 5 · T-v2 0 · T-x 9 · T-y 3 · T-z **10** · **T-aa 1 · T-ab 1 · T-ac 0 · T-ad1 6 · T-ad2 2 · T-ae 0 · T-af 4 · T-ag 1 · T-ah 0**。
 ⑫ 留在尾部的两条残留：`TransportLeg` 的 `distanceKm/durationMinutes` **由"打印"升格成判红（T-ad2=2）**，
 `Arrangement` 的 ui/notify import 消费点本轮复跑是 **0**（纯兼容字段，没人读）；
-尾部现在打印的是**新的残留：候选名里的自造别名 `"eta"` 6 处**（`Models.kt` 四处 + `Repo.kt:623/947`，其中 `Repo.kt:939`
+尾部现在打印的是**新的残留：候选名里的自造别名 `"eta"` 6 处**（`Models.kt` 四处 + `Repo.kt:628/947`，其中 `Repo.kt:939`
 读的是导航引擎自己的报文，**改之前必须先核那份契约**，不许顺手"兼容"掉）。
 常驻自检三行：宽口径 **42 → 44**（新增 2 行都是本轮写的**口径标注**：`Models.kt` 的 `distanceCaliberText` 与
 `SendScreen.kt` 它上方的来源注释）、窄口径 **9 不变**、`GeoMath` **27 不变**（本轮没有新算一次直线）、
@@ -3842,9 +3854,9 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
 | 异常即放 | `Idempotent.java:61` `deleteKeyWhenException() default true` | 业务异常/网络异常后**立刻放闸**（用例第 4 条：失败后第二次真出网）——否则用户 10 秒下不了单，而后端随时收 |
 | 另两个 create | `AppAddressController.java:32`、`AppFeedbackController.java:28` **零** `@Idempotent` | **刻意不走闸**，只由 **U-j** 登记为"4 处 create 里 2 处无闸"；单方面拦就是替后端发明规则（且它们不产生"两张单"那种脏数据） |
 
-**落点**（生产源 **3** 个文件）：`Repo.kt:508` 第二把 `ActionGate` 实例 `userCreateGate`、`:475-493` 键（`digest.update(path)` / `update(Prefs.mobile)` / `body.entries.sortedBy` 三个维度，null 与空串用 `update(1)`/`update(2)` 分开，**只存摘要**——键表是进程级的，收货人姓名/手机号/地址进明文就是个人信息留存）、`:501` 唯一出口 `gatedUserCreate`、`:529/:532` 商城下单、`:573/:576` 寄货下单；`GoodsDetailScreen.kt:115`、`SendScreen.kt:530` 两处 `if (ack.notSent) { … return@work }`，**位置在"回读列表"之前**（继续往下走就会把上一次点击的单号张冠李戴给这一次）。
+**落点**（生产源 **3** 个文件）：`Repo.kt:513` 第二把 `ActionGate` 实例 `userCreateGate`、`:475-493` 键（`digest.update(path)` / `update(Prefs.mobile)` / `body.entries.sortedBy` 三个维度，null 与空串用 `update(1)`/`update(2)` 分开，**只存摘要**——键表是进程级的，收货人姓名/手机号/地址进明文就是个人信息留存）、`:501` 唯一出口 `gatedUserCreate`、`:529/:532` 商城下单、`:573/:576` 寄货下单；`GoodsDetailScreen.kt:115`、`SendScreen.kt:530` 两处 `if (ack.notSent) { … return@work }`，**位置在"回读列表"之前**（继续往下走就会把上一次点击的单号张冠李戴给这一次）。
 
-**司机域一字未动**：`actionGate`（`Repo.kt:1330`）、`gatedAction`（`:1162`）、十个走闸出口、`I-*` 十条读数全部保持原值。分域不是排版：`UserCreateIdempotencyTest` 第 8 条用反射数 `Repo` 上 `ActionGate` 类型的字段 ⇒ 恰好 `["actionGate","userCreateGate"]`，**并成一把就红**。
+**司机域一字未动**：`actionGate`（`Repo.kt:1335`）、`gatedAction`（`:1162`）、十个走闸出口、`I-*` 十条读数全部保持原值。分域不是排版：`UserCreateIdempotencyTest` 第 8 条用反射数 `Repo` 上 `ActionGate` 类型的字段 ⇒ 恰好 `["actionGate","userCreateGate"]`，**并成一把就红**。
 
 **实测**（`NOT VERIFIED ON DEVICE`：真机连点、900 的实际渲染证不到）：
 
@@ -4015,7 +4027,7 @@ worker 那份 **148,548 B**（`GradleWorkerMain` 命中 **72** 次）与"用例�
   且那一遍**真的拦下过一次** `flags=1`（我自己把"全量用例"那行写成三条物理行）。两遍都在册，后一遍是收口凭证。
 - **没做（在册尾巴）**：其余 `Minutes` 家族第二候选名 **5 处**（`Models.kt` 479 / 729 / 1110 / 1328 / 1802）**一处没动** ——
   逐端点重核契约是下一轮队首，**不许把 E-1 的结论抄过去**；`QuoteResult` 的"缺键折成 `0.0`"同类形状仍在；
-  `Repo.optBoolean(…, true)` 两处仍在（`Repo.kt:716 inService` / `:689 located`）；**设备侧一字未验**；
+  `Repo.optBoolean(…, true)` 两处仍在（`Repo.kt:721 inService` / `:689 located`）；**设备侧一字未验**；
   `release` 产物仍 `BLOCKED`；git checkpoint 仍 `ENVIRONMENT_BLOCKED`。
 
 ### #51 旧 `DriverNavScreen` 降级为 DEBUG ONLY + §24 假步进 6 → 0（D-003 执行 / 审计 §78 / D-032 / 判据 §八 ⑲，本轮完成 · 2026-09-30）
@@ -4594,8 +4606,8 @@ key/凭证**字面量**0（⚠ 按裸 token `grep -rn "AMAP_KEY" app/src/main` �
 需要无歧义就 `--rerun-tasks` 逼它真跑（本轮 `:app:lintDebug --rerun` 已实测：生命周期任务 executed、分析任务仍 UP-TO-DATE，
 `--rerun` 只作用于命名到的那个任务，不会带着依赖一起重跑 —— 想真重跑要 `--rerun-tasks`）。
 
-**尾巴（登记不冒充已修）**：① ETA/里程候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt` 四处 + `Repo.kt:623/947`，
-其中 `Repo.kt:1351` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
+**尾巴（登记不冒充已修）**：① ETA/里程候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt` 四处 + `Repo.kt:628/947`，
+其中 `Repo.kt:1356` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 **0.0**，
 `distanceFee > 0` 才显示"里程费" ⇒ 同病不同族（金额不是 ETA），并入下一轮；
 ③ `TransportLeg` 的 `navigationPolyline/fromGeo/toGeo` 后端**不下发**（⑫ 实测），段卡"在途进度"仍是状态驱动的示意，
@@ -4754,8 +4766,8 @@ T-l 锚点是已被替换掉的 `Text(v.etaCaptionText`、T-o2 的 `sed` 只替�
 - 货运侧 4 处 `multiNum("etaMinutes").toInt()`（`Models.kt:810-820`、`Models.kt:957`、`Repo.kt:582`、`Repo.kt:942`）+ 页面 6 处
   `etaMinutes > 0` 仍是 null→0 塌缩，⑪ 的 T-a 口径只覆盖公交链路，所以它们现在是**打印残留**、⑫ 判红；
 - `Arrangement.etaMinutes` 保留可空类型但真后端下恒 null（§68），到站提醒仍未迁数据源；
-- `Repo.kt:714/687` 的 `inService`/`located` 用 `optBoolean(…, true)` —— 缺键时**替后端默认"在服务/已定位"**，与 §14 同一类，登记未修；
-- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:1065` 已按真实优先读，能兼容但不成形）；
+- `Repo.kt:719/687` 的 `inService`/`located` 用 `optBoolean(…, true)` —— 缺键时**替后端默认"在服务/已定位"**，与 §14 同一类，登记未修；
+- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:1070` 已按真实优先读，能兼容但不成形）；
 - ~~演示面那条 `/bus/realtime` 分支全工程**没有任何调用点**（死端点，留着会误导后来人以为有这条接口）~~ **已收口（2026-10-15 D-120）**：分支删掉，并把这条规矩立成判据 `tools/check_demo_path_reachability_probes.sh`（DP-a…DP-d：孤儿必须 0，有理由留的进 `tools/fixtures/demo_path_exempt.txt` 点名）；端点本身**不接** —— `/nearby` 就是拿同一个 `getRealtimeBuses(mapData)` 算出来的，`AppBusRespVO` 是 `NearbyBus` 的字段子集且没有 radius 过滤（每次刷新多一条更大的 REST 换三个字段，不值）。
 - `AppBusNearbyRespVO:128-129` 的 `@Schema` 与实现不一致（说 AMAP/EUCLIDEAN，实现发 SCHEDULE），只在 Android 侧按实现记账。
 
@@ -5114,7 +5126,7 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
 
 - **§32 已修**：`canArrive()` / `ARRIVE_RADIUS_METERS` / VM 里那个从未被读写过的 `canArrive` 状态位全部删除
   → `grep -rn "canArrive\|ARRIVE_RADIUS_METERS" app/src/main/java` **0 命中**；「确认到达」`enabled = !busy`。
-  依据是后端事实：`AppDriverArriveReqVO` 只收 `shiftId + stationId`，`Repo.arrive`(`Repo.kt:983`) 的 body 只有
+  依据是后端事实：`AppDriverArriveReqVO` 只收 `shiftId + stationId`，`Repo.arrive`(`Repo.kt:988`) 的 body 只有
   `driverId/shiftId/stationId`，**不含坐标**。这是"禁止 GPS 自动完成业务"的镜像面 —— 也不许用 GPS 自动**放行**。
 - **与小程序有意分歧并记录**：`workbench.js` 的 50 米门槛属 §16/§48 定性的"参考实现自身违规"，本轮**不对齐**（D-017）。
 - **距离文案只有一个出口**：`MissionMarkers.nextStopDistanceText(roadMeters, straightMeters, targetName)` —
