@@ -11,7 +11,6 @@
 02df974a	ID-MISS	Models.kt:997	ANDROID_PARITY_AUDIT_V2.md:3356	goodsName/cargoName/itemCount/count
 040533be	ID-MISS	BusScreen.kt:249	DECISION_LOG.md:3028	ANDROID_PARITY_AUDIT_V2
 06970c0c	ID-MISS	Models.kt:758-760	ANDROID_PARITY_AUDIT_V2.md:570	handover/accept/navigate/arrive
-06ecab9a	ID-MISS	HomeScreen.kt:1163	ANDROID_PARITY_AUDIT_V2.md:826	etaMinutes/danger
 0763e795	ID-MISS	Repo.kt:387-394	DECISION_LOG.md:5837	d8b819
 084c23e3	ID-MISS	Api.kt:239	AI_ITERATION_STATE.md:3742	withContext/Dispatchers/execute/ActionGateTest
 08c1ec40	ID-MISS	Repo.kt:95	DECISION_LOG.md:6904	bindDriver/notSent
@@ -182,6 +181,7 @@ c25e1774	ID-MISS	DriverAppServiceImpl.java:1498	ANDROID_PARITY_AUDIT_V2.md:921	A
 c290b266	ID-MISS	WorkbenchScreen.kt:525	AI_ITERATION_STATE.md:945	ErrorState/DRIVER_UNBOUND
 c4b937c9	ID-MISS	ShellDecision.kt:36	CONTEXT_LOCK.md:2053	CACHE/check_X_probes
 c5a41dac	ID-MISS	ShellRoutingContractTest.kt:109	DECISION_LOG.md:1887	AssertionError/Metaspace
+c5ee3aab	ID-MISS	HomeScreen.kt:1167	ANDROID_PARITY_AUDIT_V2.md:826	etaMinutes/danger
 c6c6bd6c	ID-MISS	Models.kt:758	DECISION_LOG.md:648	status
 c7c057d7	ID-MISS	Models.kt:497	CONTEXT_LOCK.md:2043	Models/BusVehicle/SendOrder/TransportLeg
 c8049047	ID-MISS	Models.kt:2048-2050	CONTEXT_LOCK.md:1356	distanceMeters

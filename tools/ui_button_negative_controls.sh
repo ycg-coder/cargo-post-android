@@ -13,6 +13,9 @@ rm -rf "$SC"; mkdir -p "$SC"
 cp -r "$SRC/app" "$SC/app"
 cp -r "$SRC/tools" "$SC/tools"
 cp "$SRC"/*.md "$SC/" 2>/dev/null
+# UB-k 是"量归档真机 dump 的像素"那一格：证据目录不跟进沙盒，基线就会因为"没证据"红，
+# 那是环境红不是判据咬 ⇒ 负控结果全不采信（本仓踩过：负控批的自毁产物）。
+mkdir -p "$SC/docs" && cp -r "$SRC/docs/device-evidence" "$SC/docs/" 2>/dev/null
 [ -f "$SC/tools/check_ui_button_probes.sh" ] || { echo "✘ 沙盒缺判据簿本身，注入等于没注入"; exit 2; }
 CLEAN=/tmp/ui_btn_clean.$$; cp -r "$SC" "$CLEAN"
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
@@ -147,6 +150,34 @@ import com.shanxiang.buspost.core.ui.BusButtonVariant
         BusButton(text = "主要", onClick = {})
     }
 }'   && ctl UB-j "同排出现实心 + 描边 ⇒ 用户说的那句不搭配又回来了"
+
+# UB-k：天气胶囊命中框的接线与证据（D-164 真机量到 91px=33dp 那一格）
+WC="$PROBE/ui/common/WeatherCard.kt"
+# k-① heightIn 那行被摘掉 ⇒ 33dp 原样回来
+sed -i 's/\.heightIn(min = touch\.min)/.removedMinHeight(touch.min)/' "$WC"
+grep -q "removedMinHeight" "$WC" && ctl UB-k "胶囊的 heightIn 被摘 ⇒ 量出来的命中框会退回 33dp"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# k-② 顺序反了：heightIn 排到垂直留白之后 ⇒ 撑大的那块不归可点节点（看着抬了，量出来没抬）
+sed -i '/\.heightIn(min = touch\.min)/d' "$WC"
+sed -i 's/\.padding(horizontal = 11\.dp, vertical = 7\.dp)/.padding(horizontal = 11.dp, vertical = 7.dp)\n            .heightIn(min = touch.min)/' "$WC"
+grep -A2 'vertical = 7.dp)' "$WC" | grep -q heightIn && ctl UB-k "heightIn 排到了垂直留白**之后** ⇒ 顺序判据要咬"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# k-②b 换回 defaultMinSize（真机 v173 实测只到 38dp 的那个写法）⇒ s3 必须咬，且要单独咬得出来
+sed -i 's/\.heightIn(min = touch\.min)/.heightIn(min = touch.min)\n            .defaultMinSize(minHeight = touch.min)/' "$WC"
+grep -q "defaultMinSize(minHeight = touch.min)" "$WC" && ctl UB-k "胶囊里又长出 defaultMinSize 那一写法 ⇒ 被实测否掉的写法必须点名"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# k-③ 可点节点整行被删 ⇒ click_first 读不到（撑得再高也点不着）
+sed -i 's/Modifier\.clickable(onClick = onToggle)/Modifier.semantics { }/' "$WC"
+grep -q "semantics { }" "$WC" && ctl UB-k "胶囊的可点节点没了 ⇒ clickable 必须在 heightIn 之前这一条要咬"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# k-④ 证据目录被摘走：不许把"没证据"读成"没破口"
+mv "$SC/docs/device-evidence/20261018-hotzone" "$SC/docs/hz_hidden" 2>/dev/null
+[ -d "$SC/docs/hz_hidden" ] && ctl UB-k "归档热区证据目录不见了 ⇒ 必须红，不许当 0"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# k-⑤ 证据被换成正读数（把改前那份的 pill 高度改成 132）：钉值要咬
+sed -i 's/bounds="\[88,499\]\[992,590\]"/bounds="[88,499][992,631]"/' "$SC/docs/device-evidence/20261018-hotzone/01-v163-home-before.xml"
+ctl UB-k "改前凭证的 91px 被改成别的数 ⇒ 锚点/凭证被动过，钉值这一条要咬"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 
 # 正控制：改一颗按钮的文案与 onClick 内容 —— 规格没动，不该红
 injected ui/NegctlProbePos.kt 'package com.shanxiang.buspost.ui

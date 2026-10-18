@@ -111,7 +111,7 @@ core/navigation 同级，都是 core 层引 `core.net.attempt`，没有新的跨
 | ui/driver/DriverNavScreen.kt:715 | A | 否 | 否 | 保持 | `remember(context) { }` 的计算块是 `() -> T`，非 suspend |
 | ui/driver/DriverNavScreen.kt:730 | A | 否 | 否 | 保持 | `private fun speak(engine, text)`，块内 `engine.speak(...)` |
 | ui/driver/WorkbenchScreen.kt:1290 | A | 否 | 否 | 保持 | `private fun callDriver(context, mobile)` |
-| ui/user/HomeScreen.kt:260 | A | 否 | 否 | 保持 | `onOpenSettings: () -> Unit`（HomeScreen.kt:622 的形参声明） |
+| ui/user/HomeScreen.kt:260 | A | 否 | 否 | 保持 | `onOpenSettings: () -> Unit`（HomeScreen.kt:626 的形参声明） |
 | ui/user/MinePages.kt:901 | A | 否 | 否 | 保持 | `onClick = { }`，`() -> Unit` |
 | ui/user/SendScreen.kt:200 | A | 否 | 否 | 保持 | `SendViewModel.private fun restore()`，块内 `JSONObject(raw)` |
 | core/navigation/AmapNavigationEngine.kt:382 | E | 否 | 否 | 保持 | `fun prepare()` 的 released 出口：`runCatching { navi.removeAMapNaviListener(l) }`，包围点是非 suspend 成员函数 |

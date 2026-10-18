@@ -423,6 +423,10 @@ fun HomeScreen(
             }
             // 公告轮播融入站牌底部：不再单独占一整行，作为 Signpost 内的一条小滚动条
             if (vm.notices.isNotEmpty()) {
+                // 12dp 不是审美间距，是让开命中框：真机 v174 量到天气胶囊抬到 48dp 后要往下多占 27px，
+                // 正好压在公告条自己的 132px 可点带上（两条都写"点我"）⇒ 后画的公告条吃掉那 27px，
+                // 胶囊被裁回 105px=38dp。隔开 12dp 之后两块各自完整。
+                Spacer(Modifier.height(12.dp))
                 NoticeCarouselStrip(vm.notices) { readingNotice = it }
             }
         }

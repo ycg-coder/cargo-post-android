@@ -4,8 +4,10 @@
 # 本轮的实测起点（有凭证，不是编的）：改动前裸 Material 按钮 34 处、同 Row 混用 2 处；
 # 现在都是 0。"目标 0" 的每一格都由 tools/ui_button_negative_controls.sh 反证过它会咬。
 #
-# 为什么不钉像素/字号/行距：本机无设备，那一半只能记 NOT VERIFIED ON DEVICE（见 CONTEXT_LOCK §八 ㊵ 的旧决定）。
-# 这里全部钉的是**写法层**——写法层能静态判，且正是"分叉"发生的地方。
+# 为什么不钉像素/字号/行距：那些是"分叉"发生的地方之外的东西，写法层能静态判。
+# ⚠ 2026-10-18 更正：**热区的像素这一半现在钉得住**，但不是从源码判 —— 是从归档的真机 dump 量（UB-k）。
+#   起因正是这条旧理由让我把"28dp 视口"当成了热区欠账记在 D-UI-1 上：真机量出来那条的可点框是 132px=48dp，
+#   而同一屏**源码里根本没有 `.height()`** 的天气胶囊只有 91px=33dp。写法层看不见这件事，像素才看得见。
 set -u
 SELF="$(cd "$(dirname "$0")/.." && pwd)"
 # 负控沙盒靠这个变量把扫描面指到副本上；不接的话沙盒里量的还是真身，
@@ -137,7 +139,7 @@ PY
 )
 ub_g=$(head -1 <<<"$ub_gh"); ub_h=$(sed -n '2p' <<<"$ub_gh")
 printf 'UB-g 低于 48dp 的手搓按钮状块      : %s （目标 0；本轮改动前实测 1 处 + 同类文字块 3 处）\n' "$ub_g"
-printf 'UB-h 低于 48dp 的轮播视口          : %s （在册恰好 1 = D-UI-1 剩下那一条，抬它要真机复核排版）\n' "$ub_h"
+printf 'UB-h 低于 48dp 的轮播视口          : %s （在册恰好 1 = 首页公告条的 28dp **视口**；⚠ 它是排版不是热区病，见下面 UB-k）\n' "$ub_h"
 
 [ "$ub_a" = 0 ] || { echo "× UB-a 有裸 Material 按钮 ⇒ 同一行必然出现两种高度/字重/命中区"; ok=0; }
 [ "$ub_b" = 0 ] || { echo "× UB-b 有同一 Row 内按钮混用：这就是「一排按钮一大一小」的形状"; ok=0; }
@@ -146,7 +148,7 @@ printf 'UB-h 低于 48dp 的轮播视口          : %s （在册恰好 1 = D-UI-
 [ "$ub_e_ok" = 1 ] || { echo "× UB-e 对话框动作出口没了或被重复定义（重复定义=同一问题两个答案）"; ok=0; }
 [ "$ub_f" -ge 120 ] || { echo "× UB-f Bus 按钮调用点掉到 120 以下 ⇒ 扫描面或组件被拆，UB-a 的 0 不再有意义"; ok=0; }
 [ "$ub_g" = 0 ] || { echo "× UB-g 有低于 48dp 的手搓按钮状块：驾驶模式 56dp 下限对它完全不生效"; ok=0; }
-[ "$ub_h" = 1 ] || { echo "× UB-h 轮播视口数不是恰好 1（现 $ub_h）：多了=新增长在这种视口里的可点块；少了=那一条被抬到 48dp（那要连 D-UI-1 一起销账，不许顺手改闸）。⚠ 2026-10-15 由 2 降到 1 不是抬高：第二条是首页那个**零调用点**的旧轮播渲染件（42dp 视口从来没上过屏，D-UI-1 当时把它记成了真欠账），随 D-120 一起删掉 ⇒ 在册残留只剩活的那一条 HomeScreen.kt 的 28dp 视口"; ok=0; }
+[ "$ub_h" = 1 ] || { echo "× UB-h 轮播视口数不是恰好 1（现 $ub_h）：多了=新增长在这种视口里的可点块；少了=那条视口被抬高了（那要连排版决定一起说清，不许顺手改闸）。⚠ 2026-10-15 由 2 降到 1 不是抬高：第二条是首页那个**零调用点**的旧轮播渲染件（42dp 视口从来没上过屏），随 D-120 一起删掉。⚠ 2026-10-18 更正记账：剩下这一条（HomeScreen 公告条 28dp 视口）**不是热区欠账** —— 真机 v163 dump 量到它的可点框是 132px=48dp（D-UI-1 当年把它记成欠账是把"视口矮"当成了"点不着"）；UB-k 钉的就是量出来的像素"; ok=0; }
 
 # UB-i 一排里的"第二颗"必须吃 TONAL（真机 2026-10-18 用户："工作台的确认发车和扫码作业和这个界面不太搭配"）
 #     实心 PRIMARY 旁边挂一颗只剩描边的 OUTLINE ⇒ 两颗差一个视觉重量档，看着像"一颗按钮 + 一个没画完的框"
@@ -215,6 +217,40 @@ ub_j_bad=$(printf '%s\n' "$ub_j" | grep -c '^MIX' | tr -d ' ')
 ub_j_n=$(printf '%s\n' "$ub_j" | tail -1)
 printf 'UB-j 同排"实心+描边"混档          : %s （目标 0；豁免=DEBUG-only 那一处，现点名 %s 条）\n' "$ub_j_n" "$ub_j_bad"
 [ "$ub_j_bad" = 0 ] || { echo "× UB-j 有 $ub_j_bad 排把实心主色板和描边档并排放：这就是用户说的那句不搭配（第二颗该吃 TONAL）"; printf '%s\n' "$ub_j" | grep '^MIX' | head -5; ok=0; }
+
+# UB-k 通栏可点格**量出来的**命中框（探针 tools/hot_zone_probe.py，只认像素不认写法）
+#     为什么要新增这一格：UB-g/UB-h 都在源码形状上找"矮"，而真机 2026-10-18 打脸 ——
+#     形状矮的那条（公告条 28dp 视口）命中框实际 132px=48dp，形状上什么都看不出的天气胶囊实际 91px=33dp。
+#     写法层看不见这件事，像素看得见 ⇒ 把像素钉进判据，用归档 dump 当凭证。
+KDIR=docs/device-evidence/20261018-hotzone
+if [ ! -d "$KDIR" ]; then
+  echo "× UB-k 归档热区证据目录不在（$KDIR）：判据不许因为没证据就把读数当 0"; ok=0
+  ub_kd=""
+else
+  ub_kd=$("$PY" tools/hot_zone_probe.py --dump "$KDIR" 2>&1)
+fi
+ub_ks=$("$PY" tools/hot_zone_probe.py --source 2>&1 | head -1)
+ub_k_s1=$(printf '%s' "$ub_ks" | sed -n 's/.*s1=\([0-9]*\).*/\1/p')
+ub_k_s2=$(printf '%s' "$ub_ks" | sed -n 's/.* s2=\([0-9]*\).*/\1/p')
+ub_k_s3=$(printf '%s' "$ub_ks" | sed -n 's/.* s3=\([0-9]*\).*/\1/p')
+ub_k_order=$(printf '%s' "$ub_ks" | sed -n 's/.*order=\([0-9]*\).*/\1/p')
+ub_k_click=$(printf '%s' "$ub_ks" | sed -n 's/.*click_first=\([0-9]*\).*/\1/p')
+ub_k_pill_b=$(printf '%s\n' "$ub_kd" | grep before | grep 'pill h=' | sed -n 's/.*h=\([0-9]*\).*/\1/p' | head -1)
+ub_k_caro_b=$(printf '%s\n' "$ub_kd" | grep before | grep 'carousel h=' | sed -n 's/.*h=\([0-9]*\).*/\1/p' | head -1)
+ub_k_after_n=$(printf '%s\n' "$ub_kd" | grep after | grep -c 'pill h=')
+ub_k_after_min=$(printf '%s\n' "$ub_kd" | grep after | grep 'pill h=' | sed 's/.*h=\([0-9]*\).*/\1/' | sort -n | head -1)
+printf 'UB-k 胶囊接线 touch/heightIn/未回潮/顺序/可点在前 : %s/%s/%s/%s/%s （目标 1/1/0/1/1）\n' "$ub_k_s1" "$ub_k_s2" "$ub_k_s3" "$ub_k_order" "$ub_k_click"
+printf 'UB-k 量出来：改前胶囊 %s px、改后最小 %s px（改前须恰好 91=33dp，改后须有 ≥1 份且 ≥132px）\n' "$ub_k_pill_b" "$ub_k_after_min"
+printf 'UB-k 量出来：公告条命中框 %s px（须恰好 132 —— 这条是"视口矮≠点不着"的凭证，防它再被记成欠账）\n' "$ub_k_caro_b"
+[ "$ub_k_s1" = 1 ] || { echo "× UB-k 胶囊没读 BusTouch 令牌（现 $ub_k_s1）：驾驶模式的 56dp 下限对它不生效"; ok=0; }
+[ "$ub_k_s2" = 1 ] || { echo "× UB-k 胶囊没有 heightIn(min = touch.min) 那一行（现 $ub_k_s2）：33dp 的命中框会原样回来"; ok=0; }
+[ "$ub_k_s3" = 0 ] || { echo "× UB-k 胶囊换回了 defaultMinSize（现 $ub_k_s3）：真机 v173 用 defaultMinSize 只量到 105px=38dp，没到下限 —— 这条是被实测否掉的写法，不许再回来"; ok=0; }
+[ "$ub_k_order" = 1 ] || { echo "× UB-k heightIn 排在了垂直留白**之后**：撑大的那块不在可点节点上，看着抬了量出来没抬"; ok=0; }
+[ "$ub_k_click" = 1 ] || { echo "× UB-k clickable 排在了 heightIn 之后：撑出来的高度归不了可点节点"; ok=0; }
+[ "$ub_k_pill_b" = 91 ] || { echo "× UB-k 改前凭证读数不是恰好 91（现 '$ub_k_pill_b'）：归档 dump 被动过，或探针的锚点定位失效了（锚点=文字「4日预报」）"; ok=0; }
+[ "$ub_k_caro_b" = 132 ] || { echo "× UB-k 公告条凭证读数不是恰好 132（现 '$ub_k_caro_b'）：锚点（前导两个空格的那行字）失效或那条排版被改；若是排版被改，要连 UB-h 一起说清"; ok=0; }
+[ "$ub_k_after_n" -ge 1 ] || { echo "× UB-k 没有改后的真机 dump（*after*.xml）：这一格是**屏幕复验**判据，没证据就是没做，不许靠源码接线自证"; ok=0; }
+[ -n "$ub_k_after_min" ] && [ "$ub_k_after_min" -ge 132 ] || { echo "× UB-k 改后命中框最小 $ub_k_after_min px < 132（48dp@2.75）：抬没生效，或被滚动视口裁到了（取证要让目标完整可见，见 D-164 的测量法坑）"; ok=0; }
 
 [ "$ok" = 1 ] || exit 1
 echo "UI 控件规格判据通过（裸 Material 按钮 $ub_a、同行混用 $ub_b、自传 shape $ub_c、写死下限 $ub_d、低热区手搓块 $ub_g，Bus 按钮调用点 $ub_f 处）"

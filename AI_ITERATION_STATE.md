@@ -3,7 +3,17 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
-最后更新：2026-10-18（**D-163** · #31 那半格：硬编码色从"11 个待拍板"变成"9 处、每处有名字有理由"）：
+最后更新：2026-10-18（**D-164** · 热区取证：真机把 D-UI-1 的前提证伪了，真缺陷在隔壁那一格）：
+台账挂着"公告轮播 28dp 视口 ⇒ 热区不足"，真机 dump 量到那条的**可点节点是 132px=48dp**（本来就达标，28dp 只是排版）；
+同一屏**没有任何 `.height()`** 的天气胶囊实测只有 **91px=33dp** —— 那才是病。已修（`heightIn(min = touch.min)` + 公告条前 12dp 让位）。
+两个读数陷阱写进判据与记忆：① 被滚动视口裁到的节点念小（屏底 116px，滚上来 132px）；
+② min-height 撑出的框会被后画的兄弟吃掉（v173/v174 都念 105px，隔开 12dp 后各自 132px）——不是写法之争，是重叠。
+新格 **UB-k**（第 27 本里）只认量出来的像素：接线 5 条（含"`defaultMinSize` 不许回潮"这条被实测否掉的写法）
++ 像素 3 条（改前恰好 91 / 公告条恰好 132 / 改后须有 after 证据且 ≥132）；负控 6 条 + 正控制 `RESULT=PASS`。
+⚠ 本轮我自己的操作事故：`--pin-write` 用了凭记忆的 doc 列表并漏 `--strict-id` ⇒ **242 行在册表被覆盖成 3 行**，
+靠"改前改后各数一次 `wc -l`"抓出来、`git checkout --` 恢复。读数：`pass=49 fail=0`、`tests=793 failures=0 errors=0`、`ID-MISS 266`（未涨）。
+
+上一轮：2026-10-18（**D-163** · #31 那半格：硬编码色从"11 个待拍板"变成"9 处、每处有名字有理由"）：
 里面混着一处**不是审美问题的真缺陷** —— `UpdateDialog` 六处字面量色，容器 `BusCard` 跟主题、文字不跟 ⇒
 开「深色站牌」后深底配 `0xFF374151` 深灰字，**升级弹窗基本读不出字**。已映射回既有令牌
 （`t.textSecondary`/`t.ink`/`t.danger`/`t.track`/`t.primary`，不新增令牌）。
@@ -1457,7 +1467,7 @@ BUILD_STATUS:   **F-2 ⑦（2026-10-01 00:0x）读数**：`./gradlew -Dorg.gradl
                 lint **0 error / 46 Warning / 32 Information = 78**、**10 个类别**（`lint-results-debug.xml` **98,753 B** / mtime **19:27**，
                 html 258,534 B / txt 31,452 B 同批）⇒ **与 F-1 逐项相同，本轮 7 个生产文件的改动没有引入新的 lint 类别**；
                 ⚠ 但**本轮改动的文件在 lint 里被点名 8 处**（用 ElementTree 逐 `location/@file` 数，不是 `grep -c` 的 9 —— 那个 9 里有一条重复位置）：
-                `AutoboxingStateCreation` 3（`SendScreen.kt:132/:421`、`HomeScreen.kt:129`）+ `DefaultLocale` 5（`SendScreen.kt:496/:580/:669/:873`、`HomeScreen.kt:1003`），
+                `AutoboxingStateCreation` 3（`SendScreen.kt:132/:421`、`HomeScreen.kt:129`）+ `DefaultLocale` 5（`SendScreen.kt:496/:580/:669/:873`、`HomeScreen.kt:1007`），
                 **两类都是既有类别**（`Models.kt` / `Repo.kt` / `DemoData.kt` / `EarningsScreen.kt` / `BusScreen.kt` 本轮 0 点名）——
                 抄成"本轮文件 0 点名"就是假话，抄成"新增类别"也是假话，**8 处 / 2 类**才是实测。
                 依赖坐标实测仍 **20** 条（`sed -n '/^dependencies/,/^}/p' app/build.gradle.kts | grep -c '"[^"]*:[^"]*:[^"]*"'` → 20），
