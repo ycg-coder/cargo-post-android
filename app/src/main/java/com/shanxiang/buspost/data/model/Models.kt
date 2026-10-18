@@ -160,6 +160,12 @@ data class ReverseGeo(
     val district: String,
     val township: String,
     val formatted: String,
+    /**
+     * **为什么没拿到区域码**（D-173）。以前 `reverseGeo` 任何一种失败都回同一个 `EMPTY`，
+     * 于是高德逆地理被限流时，天气那一格只能说"还没拿到区域码"——那是在替限流撒谎：
+     * 真实原因是配额用完，不是没定位到。空串 = 拿到了（或压根没试）。
+     */
+    val failure: String = "",
 ) {
     /** 展示用定位名：优先「区县 + 乡镇」，退化为区县、市、省 */
     val displayName: String
@@ -290,6 +296,12 @@ data class WeatherInfo(    val text: String,
      * 空串 = 这一路天气没拿到 ⇒ 页面不许编一句安全提示。
      */
     val driverTips: String = "",
+    /**
+     * **为什么用的不是主源**（D-173）。高德天气被限流时，本屏的数据其实来自 open-meteo，
+     * 而界面此前只报"更新于 16:00"、把来源那一行盖掉了 —— 司机以为看的是高德。
+     * 空串 = 主源正常（或压根没试主源）；非空 = 一句人话，带高德返回的 infocode。
+     */
+    val primaryFailure: String = "",
     val forecast: List<WeatherDay> = emptyList(),
     val mock: Boolean = false,
 ) {

@@ -163,7 +163,7 @@ object AlertEngine {
             if (geo != null) {
                 try {
                     val rg = Repo.reverseGeo(geo)
-                    val w = Repo.weather(geo, rg.adcode)
+                    val w = Repo.weather(geo, rg.adcode, rg.failure)
                     if (!w.mock) {
                         val severity = weatherSeverity(w.text, w.temperature)
                         if (severity != null) {

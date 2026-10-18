@@ -320,7 +320,7 @@ class WorkbenchViewModel : ScreenViewModel() {
         if (wxGeo != null && DriverWeatherTip.shouldFetch(weatherAtElapsed, nowMs)) {
             // 与用户端同一优先级：先逆地理拿 adcode（高德天气是区县级），adcode 空时 Repo 自己退到坐标级。
             val rg = Repo.reverseGeo(wxGeo)
-            driverWeather = Repo.weather(wxGeo, rg.adcode)
+            driverWeather = Repo.weather(wxGeo, rg.adcode, rg.failure)
             weatherAtElapsed = nowMs
         }
         // 平台公告：跟着这一轮回读走（撤档早退支到不了这里，那条支路上页面正被送回村民壳）。
