@@ -1499,7 +1499,7 @@ rc=0（**43 actionable tasks: 43 executed**，本轮是**全量重跑**不是增
 main 源码里 `catch (e: Throwable)` 生效 **6** 处、`catch (e: Exception | Throwable)` 共 **69** 处（F-1-a 的分类读数量）。
 按"里面到底挂不挂起"分完之后的**当前**读数：`catch (e: Throwable)` 生效 **2**（都在白名单，见第 3 点）、
 `catch (e: Exception)` **49** 处，其中 try 首段含挂起点 **48** 处（已全部先穿透取消）、不含挂起点 **1** 处
-（`DriverSdkNavCard.kt:471` 唤起外部地图，`startActivity` 不可能被取消）。
+（`DriverSdkNavCard.kt:484` 唤起外部地图，`startActivity` 不可能被取消）。
 
 **决策与执行**：
 
@@ -1578,7 +1578,7 @@ TH-j 1/1/0 · TH-k 1/1 · TH-l 2/2/0）；负控十三本**全批复跑** rc 全
    （清单见 `THIRD_PARTY_NOTICES.md` §6 F-1 段、状态板 DONE「F-1」的"改动面清点"、审计 §80 七）。
 
 尾巴（在册，不当已通过）：`apiCall` 生产调用点仍 **0**（只登记不谎称已用）；`runCatching` 在 main 仍剩 **34** 处
-（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1082` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
+（本轮只收"try 首段有挂起点"的那批，`WorkbenchScreen.kt:1101` 的 `callDriver` 这类纯同步形状**没有挂起通路**、
 记为"未收"而不是"已判无害"）；§二十 的 Worker 重试语义（真失败回 `retry` 而不是 `success`）**没做**；
 §三十三 的四类失败分型仍只是台账口径，**没落进代码**；设备侧一律 `NOT VERIFIED ON DEVICE`
 （真实取消来自手指划走页面 / Worker 被系统停止 / 进程被杀，JVM 只能造 `cancelAndJoin` 与 `withTimeoutOrNull` 两种）；
@@ -2852,7 +2852,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 - **生产码 3**（`core/navigation/NavigationEngine.kt`、`core/navigation/AmapNavigationEngine.kt`、`ui/driver/DriverSdkNavCard.kt`）
   + **测试 1**（`app/src/test/.../core/navigation/NavigationContractTest.kt`）
   + **判据 3**（`tools/check_navigation_probes.sh`、`tools/navigation_negative_controls.sh`、`tools/navigation_test_negative_controls.sh`）
-  + **文档 1**（`docs/android/ANDROID_V2.1_CHECKLIST.md`：V21-25 那条锚点 `DriverSdkNavCard.kt:282` → `:299`，**同一物理行内改**，不裂表）。
+  + **文档 1**（`docs/android/ANDROID_V2.1_CHECKLIST.md`：V21-25 那条锚点 `DriverSdkNavCard.kt:295` → `:299`，**同一物理行内改**，不裂表）。
 - **零新增文件**（树指纹 `files=156` 与 D-047 同数）⇒ `THIRD_PARTY_NOTICES.md` 本轮**无需新增条目**；把这句写出来是为了让下一轮看得见"我核过，不是漏了"。
 - ⚠ **本轮改掉了一处没核过的引用**：`NavigationGateCode` 的 KDoc 原来写"这五个名字是 **F-3 指令 ④⑫ 点名的**"。实测证伪：
   全 `docs/` grep `NOT_INSTALLED` **0 命中**，v2.1 第八节（`docs/android/ANDROID_COMMAND_V2.1.md:495`）只有"重新设计 AMap Navigation 生命周期"这一句、**没有状态名清单**
@@ -5286,7 +5286,7 @@ GET …/nearby?latitude=39.90&longitude=116.40&radius=15000              → nea
 | 红的那一本 | 实测成因 | 收法（**没有一处放宽断言**） |
 |---|---|---|
 | `check_location_probes.sh` `L-f=5` | **判据不精确**：它按裸类名 `AMapLocationClient` 数"第二定位源"，而 5 处命中全在 `AmapCompliance.kt` 的**静态隐私开关**（`javap` 已逐签名核对，那两个类我们用的只有 static）——它一个坐标都不产生 | 判据改成数真破口形状（构造器 / `startLoc` / `Option`），并**新收紧一条**：`L-f2` 钉 `com.amap.api.location` 只许出现在合规那一本。两条反证 `LF-a`/`LF-b` 已写进 `navigation_negative_controls.sh`（实测 `exit 1` 且红的正是对应格） |
-| `check_default_value_probes.sh` `DV-t2=1` | **判据假阳性**：命中的是 `WorkbenchScreen.kt:822  item(key = "finished")`——LazyColumn 的列表键，不是报文键 | 收成"同一行既有别名键、又有读法出口 `multi*(`"。闭包性质没丢：本工程报文读取只有 `multiArr/multiBool/multiBoolOrNull/multiNum/multiNumOrNull/multiStr` 六个出口（`grep -rn 'fun JSONObject\.'` 实测就这六个）。反证两半都跑了：**红**＝`multiStr("lane")` 注入（`exit 1`）；**绿**＝真身里那句 `item(key = "finished")` 在场时 DV-t2 读 0 |
+| `check_default_value_probes.sh` `DV-t2=1` | **判据假阳性**：命中的是 `WorkbenchScreen.kt:840  item(key = "finished")`——LazyColumn 的列表键，不是报文键 | 收成"同一行既有别名键、又有读法出口 `multi*(`"。闭包性质没丢：本工程报文读取只有 `multiArr/multiBool/multiBoolOrNull/multiNum/multiNumOrNull/multiStr` 六个出口（`grep -rn 'fun JSONObject\.'` 实测就这六个）。反证两半都跑了：**红**＝`multiStr("lane")` 注入（`exit 1`）；**绿**＝真身里那句 `item(key = "finished")` 在场时 DV-t2 读 0 |
 | `check_mission_route_probes.sh` `MR-e/MR-i×4/MR-l` | **锚点漂移**：平板 `BusRouteBody` 壳把 WorkbenchScreen 整块右移 8~24 空格，按 `^ {16}…$` 写的字面锚当场全瞎；逐行读码确认两支语义（有路线支条件式、失败支 `else if`、`RouteUnavailableState`、唯一出口、重试入口）**一支都没少** | 这一族锚点一律改成**不钉缩进**（`^[[:space:]]*`），目标值仍是"恰好 1" ⇒ 右移放过、多一处照样数到 2。失败支窗口由 `s+10` 抬到 `s+12`（现读那一支 15 个物理行，`onReplan` 在 `s+11`，下一支从 `s+16` 才开始）。三条会红注入实测 `exit 1`（含"删掉失败支那一条 `onReplan`"——第一次我删错了对象、删成有路线支那条，判据正确地没响，**是我的注入打偏不是判据失效**，重打后红） |
 | `check_oss_credits_probes.sh` `OS-b` 注册格读 0 | 同上：注册行变成 `composable(Routes.OSS_LICENSES) { BusRouteBody { OssLicensesScreen() } }`，旧字面整行匹配读不到 | 改成按内容判（同一行既有路由注册又有屏调用点）。**顺带抓到一条假注入**：`oss_credits_negative_controls.sh` 第 3 条用 `swap` 换那整行字面量 ⇒ 早就 ANCHOR-MISS 空跑，改成 `drop_line` 后实测红 |
 | `check_runcatching_probes.sh` `RC-a` 四格 | **在册面真的少记了 6 处**：`AmapNavigationEngine.kt` 的 `prepare()` released 出口摘监听、`loadOnce()` 预加载 `.so`，加新一屏 `DriverGuideScreen.kt` 的 `factory`/`update`/`onDispose` 两步 | 先补 `docs/android/RUNCATCHING_AUDIT.md` 的逐点分类表（6 行，包围点逐条写明），再把 8 行 Amap 旧行号按现读复位（这张表**不在**锚点闸门名单里，漂了没人响，是它自己文档里写明的手工义务），最后才抬数：`32/16/49/23 → 38/17/56/24`、`RC-e 36 → 42`。增量逐条可归因：+6 生效 = 6 新点，+7 出现 = 6 + 类注释点名那 1 行，+1 文件 = `DriverGuideScreen.kt` |
@@ -6216,7 +6216,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 5. `mission_route_negative_controls.sh` + `check_mission_route_probes.sh`：MR-c 五条整族重锚（那五句全被 8387929 改短）；
    新增 `MR_C6`＝`这次没问到：$failure`（目标 1）——括号里那半句免责有 `MR_C3` 钉，而**括号前**那半句被换成
    "后端没有可用路线"时 `MR_C3`/`MR_CT` 都不动；MR-e 两处按新缩进重锚；MR-i 重试入口改成**按窗口定位**——
-   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:845` 有路线支 / `:855` 失败支），
+   树里现在有两处一模一样的 `onReplan = { vm.load() },`（`WorkbenchScreen.kt:863` 有路线支 / `:855` 失败支），
    按"第一处"删会删错支，而 `MRI_RETRY` 只数失败支那 12 行 ⇒ 那是一条**注入了但打错地方**的破口（`red` 的字节比对挡不住）。
 6. `mission_route_test_negative_controls.sh` MT-2、`navigation_test_negative_controls.sh` 的 M14/M24/M25/M27/M28/M29/M30/M31
    重锚（全是话术字面被顶掉）。⚠ 这两本都是"第一条落空就 exit 2"，所以**报错那条之后的破口连跑都没跑过**
@@ -8070,8 +8070,8 @@ EX-a 的用例下限随实测 7→10 同轮抬。负控 +3 把：24✔ / ✘0 / 
 两条一起改才成立：**键换成"有没有定位"**（`me == null`）+ **删掉那道守卫**（重启就重算一遍）。
 起点取启动这一轮的那一帧，中途不跟车移动重算 —— 重算本来由高德的偏航通道负责（`recalc` 那一族）。
 
-排查时顺手看了同族的另外两处 `LaunchedEffect`：`DriverGuideScreen.kt:167` 是每帧推给播报器的
-（没有状态机，重启无害），`DriverSdkNavCard.kt:149` 只是往 logcat 打一行诊断 —— 两处都不是同一形病，
+排查时顺手看了同族的另外两处 `LaunchedEffect`：`DriverGuideScreen.kt:175` 是每帧推给播报器的
+（没有状态机，重启无害），`DriverSdkNavCard.kt:162` 只是往 logcat 打一行诊断 —— 两处都不是同一形病，
 登记以免下轮误当成同款去"修"。
 
 判据：`check_safe_call_probes.sh` 加 **SA-g** 四条（新键=1 / 旧键=0 / 守卫=0 / 相位写入=1 作反证），
@@ -10981,7 +10981,7 @@ UB-l 从"份数 ≥10 + 全量 0 颗"扩成"份数 + **覆盖面 ≥2/≥2/≥4/
   它没有冒充成功，所以不是同一条红线，但要改得把 `GeoResult?` 换成带原因的返回并动三个调用点
   （`AddressSearchScreen.kt:66`、`SendAddressPickerScreen.kt:97`、`SendScreen.kt:287`）。
   用户口径是"其他应该是正常的"，本轮不擅自铺开，留在 #126 里。
-- **司机端那一栏：合格，未改。** `WorkbenchScreen.kt:1719` 的 `source` 标签一直照实给
+- **司机端那一栏：合格，未改。** `WorkbenchScreen.kt:1748` 的 `source` 标签一直照实给
   （高德天气 / open-meteo / 未取到），换源在那一屏**不是静默的**，只是没说"为什么换"；
   与用户端不同格：那里 meta 整行被"更新于"盖掉才是缺陷。本轮只补真的那一条，没顺手把司机卡也堆满。
 - **底图（地图 SDK 那一格）**：走的是 SDK 内置联网，不落 `Repo` 这几个 REST 通路，本机没有可断言的失败面；
@@ -11334,3 +11334,85 @@ product-order cancel 716/703→754（两处）、写路径段 1433-1455→1521-1
 后端把这个班次收成了「已完成」（站点仍是「待执行」——全程没人点过「确认到达」，我只点了退出/全览/返回）。
 ⇒ 今天这台机器上**没有在途班次可跑了**，到车持续提醒（D-170）那一屏的真机验收要等新班次开始之后，
 不许拿"编译过 + 用例过"当它验过。
+
+---
+
+## D-170 · "持续弹窗提醒"与"不能影响驾驶"是互相顶的两句，落成非模态一行 + 到点重复出声（2026-10-19）
+
+> 用户口径⑤原文（2026-10-17 那批参考图指令里的第五条）：
+> "车辆要到了会持续弹窗提醒司机该做什么直到司机完成，但是不能影响驾驶"
+
+### 一、这一句里两半互相顶，必须先决定牺牲哪一半
+
+"持续弹窗"要的是**不办完不走**；"不能影响驾驶"要的是**别抢操作**。模态弹窗满足前者就一定犯后者：
+它会吃掉拇指区那颗「确认到达」、吃掉地图手势、吃掉返回键，还会把高德的转向卡压在下面
+（2026-10-10 真机就为"自绘条压住路口放大图 50%"红过一次，见 D-158 那条遮挡账）。
+
+本轮的取舍（可以被推翻，推翻时改的就是这两处）：
+- **常驻非模态的一行**：工作台底部动作栏上面那行提示、导航页顶条下面那一行，
+  近 + 后端没说办完 ⇒ 一直在；办完之后后端回读 `isDone` ⇒ 自己消失。清账的是后端，不是"司机点了一下"。
+- **到点重复出声**：同一站每 60 秒再说一遍，最多三遍；响满就闭嘴，靠那一行继续说话。
+  第一遍**不响** —— 那一句"快到了 / 可确认到达"是 `ApproachTracker` 的活，两本同时开口就是同一秒两句话。
+
+### 二、改之前先查了一遍现状（结论：这一格以前根本不存在）
+
+不是"提醒做得不够响"，是**没有任何一处会重复**：
+- `ApproachTracker`（`MissionApproach.kt`）按 `(站, 档)` 去重，一个站最多三句、每档一句，
+  它的注释写着理由："否则司机在阈值线上堵会儿车就要被同一句话轰炸" —— 所以"重复"不能塞进这一本；
+- `AlertEngine` 四种告警全是水位线一次性的（`Notifier.push` 连 `setAutoCancel(true)`，没有重发、没有排期）；
+- 那一族"到车提醒"（`Prefs.arrivalAlertEnabled`）是**给等车的人**的（正文原话"请提前到站点等候"），
+  司机侧从来没有对应物；
+- 全工程找不到任何"直到完成"的机制：`ApproachTracker` 不读 `isDone`，`Prefs` 里也没有按站的确认位。
+
+### 三、改了什么
+
+- 新纯层 `ui/driver/ApproachReminder.kt`：`isNear` / `shouldShow` / `cardText` / `stopOf` 四个纯函数 +
+  一本 `ReminderTracker`（间隔与上限是它唯一的两个常数）。不 import Android、不 import SDK、不读时钟
+  —— 时间由调用方递进来，所以"响第几遍、什么时候闭嘴"在 JVM 里逐条可断言。
+- `ApproachAnnouncer` 多一个 `remind(text)`：句子由纯层判好递进来，它仍然只负责"用什么出声"
+  （走同一个 `deliver`，语音→通知→只剩字 那条降级链只有一份）。
+  顺手删掉 `enum class AnnounceChannel` —— 全工程零引用的死码（屏上那句"已读出来（系统语音）"
+  是自由文本，没人读这个枚举）。
+- 两个面各挂一本账：工作台 `DriverSdkNavCard`（后端口径那一站由调用方算好传进来，
+  两处各判一次就会出现"卡片在提醒、底部说没到"）、全屏导航 `DriverGuideScreen`（引擎口径那一站）。
+- **没有引入任何定时器**：第一版写的是 `LaunchedEffect + delay(60s)` 循环，跑判据时 N-h
+  （"页面不许用本机节奏刷引擎状态"）把它报了 —— 这条红线不分场合，而这件事本来也不需要定时器：
+  每一帧问一次纯层"够不够一个间隔"，纯层拿单调时钟自己算。改完 N-h 回到 0，一行代码没动那条判据。
+
+### 四、判据
+
+`check_navigation_probes.sh` 新增一族 **N-rm**（八格读数）：判点定义 1 / 页面读它 2 / 账本类 1 / 挂载 2 /
+两个常数各 1 / 出口层自己算时间 0 / `remind` 出口 1 + 页面调用 2 / 出声降级出口「一份定义 + 两处调用」/ 提醒被做成弹窗 0 /
+工作台那一行确实换话 1（**最后这格是前面那些 0 的正对照**）。
+负控八条进 `navigation_negative_controls.sh`（判点改名、摘掉一屏的调用、账本改名、常数被摘、
+出口层偷算时间、`remind` 改名、塞一个 AlertDialog、把正对照那格改回只念距离）。
+用例新文件 `ApproachReminderContractTest`：四档各一态 / 完成与失败都不提醒 / 第一次不出声 /
+60 秒一遍最多三遍（**测试里写的是字面量**，改常数要同轮改这里）/ 没到间隔不响 / 换站重新武装 /
+那一行只念后端给过的字段 / 提醒与播报读同一个距离口径。
+
+### 五、凭证（2026-10-19 本轮实测）
+
+- 用例：`PRODUCT classes=79 tests=816 failures=0 errors=0 skipped=0`（`GRADLE_RC=0`，含编译）。
+  第一轮是 `failures=1`，红在我自己写的期望上：`cardText` 对表外动作码交回的是「某站 · 3 项」，
+  我却断成「某站」并写了句"不补一个『项』"—— 量词只有 `MissionMarkers.quantityText()` 一张表，
+  它的 else 分支就是「项」，提醒这一行不许再造第二套兜底（同一站地图上那枚钉与屏上那一行得同一种量词）。
+  **改的是期望，不是判据**，并把"站名与动作都没有 ⇒ 仍念得出『任务点#5 · 3 项』"这条一起钉上。
+- 49 本静态判据：`RESULT pass=49 fail=0`。
+- 负控：`navigation_negative_controls.sh` 全簿 136 条，第一轮 **✘=2**，两条都是这一族自己的判据在空转，当场改掉：
+  ① `NRMF` 写的是 `Dialog[^\n]*(提醒|reminder)` —— grep 的方括号里 `\n` **不是换行**，是"反斜杠和字母 n"，
+     注入那行 `AlertDialog(onDismissRequest = {}) { Text("到车提醒") }` 里 `onDismissRequest` 的那个 `n`
+     正好把匹配切断 ⇒ 模态弹窗这条红线根本不咬（exit 0）。grep 本来就按行匹配，"同一行"写 `.*` 就是同一行。
+  ② `NRMB` 写的是 `^class ReminderTracker`（**前缀**匹配）—— 把类改成 `ReminderTrackerX` 仍然数得出 1 份 ⇒ 也不咬。
+     改成 `^class ReminderTracker\b`，改名后 `\b` 断不开、读数落 0。
+  这两条是"认形状不认语义"的同族（判据空转那一簿的第 N 种根因），不是这一格难写。
+  ③ 另有六条被判成 △「被别的判据误抓」：`ctl` 的第一个参数是**红行前缀**（它拿 `^× $1` 核红因），
+     我把给人看的说明写进了第一个参数 —— 红因其实对得上却核不出来。参数次序纠正，脚本里写明哪个位置是什么。
+  复跑这一族八条：`✔` 八条、`[聚合] 本簿 ✘ 条数 = 0`。
+  ⚠ 复跑用的是**只含这一族的切片**（全簿一轮约二十分钟，而改的只有这一族的两个读数）；
+  全簿复跑排在下一轮收尾一起做，届时读数一并登记。
+- ⚠ **真机屏上读数未取**（这一格只有 JVM 与静态作证）：要的是"车在近处 + 这一站后端还没办完"，
+  而 2026-10-18 23:52 服务时段一过，那个班次被后端收成「已完成」（站点仍是「待执行」，全程没人点过写口）；
+  要再造在途班次得点「确认发车」—— 那颗键在 `tools/ui_deny_list.txt` 的"绝不点"清单上（为了取证去点它，
+  等于用一次真写换一张截图）。⇒ 屏上那一行与"60 秒把同一句再说一遍"记为 **NOT VERIFIED**，
+  等一次司机自己发车的在途班次再取；届时要读的是三件事：近处那一行在不在、后端回读办完之后它有没有自己消失、
+  响的第二遍是不是同一句。
