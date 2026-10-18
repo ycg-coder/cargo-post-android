@@ -13,9 +13,13 @@ rm -rf "$SC"; mkdir -p "$SC"
 cp -r "$SRC/app" "$SC/app"
 cp -r "$SRC/tools" "$SC/tools"
 cp "$SRC"/*.md "$SC/" 2>/dev/null
-# UB-k 是"量归档真机 dump 的像素"那一格：证据目录不跟进沙盒，基线就会因为"没证据"红，
+# UB-k/UB-l 读的是归档 dump 的像素：证据不跟进沙盒，基线就会因为"没证据"红，
 # 那是环境红不是判据咬 ⇒ 负控结果全不采信（本仓踩过：负控批的自毁产物）。
-mkdir -p "$SC/docs" && cp -r "$SRC/docs/device-evidence" "$SC/docs/" 2>/dev/null
+# ⚠ 只拷这两本要读的目录，不要拷整棵 docs/device-evidence：那里有几百 MB 的历史 logcat/截图，
+#   每跑一条负控都要整树还原一次，一轮 14 分钟全花在拷文件上（2026-10-18 实测）。
+mkdir -p "$SC/docs/device-evidence"
+cp -r "$SRC/docs/device-evidence/20261018-hotzone" "$SC/docs/device-evidence/" 2>/dev/null
+cp -r "$SRC/docs/device-evidence/20261018-sweep" "$SC/docs/device-evidence/" 2>/dev/null
 [ -f "$SC/tools/check_ui_button_probes.sh" ] || { echo "✘ 沙盒缺判据簿本身，注入等于没注入"; exit 2; }
 CLEAN=/tmp/ui_btn_clean.$$; cp -r "$SC" "$CLEAN"
 trap 'rm -rf "$SC" "$CLEAN"; negctl_release' EXIT
@@ -177,6 +181,16 @@ rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 # k-⑤ 证据被换成正读数（把改前那份的 pill 高度改成 132）：钉值要咬
 sed -i 's/bounds="\[88,499\]\[992,590\]"/bounds="[88,499][992,631]"/' "$SC/docs/device-evidence/20261018-hotzone/01-v163-home-before.xml"
 ctl UB-k "改前凭证的 91px 被改成别的数 ⇒ 锚点/凭证被动过，钉值这一条要咬"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+# UB-l：全量热区扫（D-165）。三条：混进一颗矮格 / 把尺子锯短 / 证据目录不见了
+cp "$SC/tools/fixtures/hot_sweep_bad/wide-short-strip.xml" "$SC/docs/device-evidence/20261018-sweep/" 2>/dev/null
+[ -f "$SC/docs/device-evidence/20261018-sweep/wide-short-strip.xml" ] && ctl UB-l "归档里混进一颗 904x91 的通栏矮格 ⇒ 全量扫必须点名"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+sed -i 's/argv\[0\], 132, 400, 8/argv[0], 60, 400, 8/' "$SC/tools/hot_zone_sweep.py"
+grep -q "argv\[0\], 60," "$SC/tools/hot_zone_sweep.py" && ctl UB-l "扫描器的下限从 132 被锯到 60 ⇒ 那是把尺子锯短，不许读成'零缺陷'"
+rm -rf "$SC"; cp -r "$CLEAN" "$SC"
+mv "$SC/docs/device-evidence/20261018-sweep" "$SC/docs/sweep_hidden" 2>/dev/null
+[ -d "$SC/docs/sweep_hidden" ] && ctl UB-l "全量热区的证据目录不见了 ⇒ 必须红，不许当'扫过且干净'"
 rm -rf "$SC"; cp -r "$CLEAN" "$SC"
 
 # 正控制：改一颗按钮的文案与 onClick 内容 —— 规格没动，不该红
