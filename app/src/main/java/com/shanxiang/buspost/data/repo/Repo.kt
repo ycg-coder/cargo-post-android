@@ -449,9 +449,22 @@ object Repo {
     internal fun amapInfocodeText(service: String, code: String): String = when (code) {
         // ⚠ `${service}` 必须带花括号：Kotlin 的标识符允许中日韩字母，`"$service今日…"` 会被
         //   读成一个名叫 `service今日配额已用完` 的引用（compileDebugKotlin 实测 Unresolved reference）。
-        "10003", "10004", "10005" -> "${service}今日配额已用完（infocode=$code）"
+        //
+        // 这一张表按高德官方错误码文档逐条写（D-173 补：真机限流当天报的是 10044，
+        // 而我第一版把 10003/10004/10005 三个**不同性质**的码并成一句"今日配额已用完"——
+        // 10004 下一分钟就自愈、10005 是 IP 白名单没放行，跟"今天没量了"完全不是一回事，
+        // 写成一句就是让人白等到明天、或者去查根本不存在的配额）。
+        // 日级：今天不会自愈
+        "10003" -> "${service}日访问量超限，明天 0 点自动恢复（infocode=$code）"
+        "10044" -> "${service}账号维度的日调用量已用完（今天这个接口没量了，infocode=$code）"
+        // 分钟级 / 瞬时：等一等或重试就会好，不许写成"今天没量"
+        "10004" -> "${service}一分钟内请求过密，下一分钟自动解封（不是当天没量，infocode=$code）"
+        "10014", "10019", "10020", "10021" -> "${service}瞬时请求太频繁被限流，稍后重试即可（infocode=$code）"
+        // 配置类：与量无关，重试一万次也不会好，必须点出是谁的配置不对
+        "10001" -> "${service} key 不正确或已过期（infocode=$code）"
+        "10002" -> "${service}接口不可用：key 没有该服务权限，或请求路径拼错（infocode=$code）"
+        "10005" -> "${service}请求方 IP 不在 key 的白名单内（infocode=$code）"
         "10009" -> "$service key 与接口平台不匹配（infocode=10009，REST 要用「Web 服务」key）"
-        "10001", "10002" -> "$service key 无效或已失效（infocode=$code）"
         "" -> "${service}没返回可用数据"
         else -> "${service}返回 infocode=$code"
     }

@@ -152,8 +152,9 @@ def pick_targets(tab):
         hm = head_occ[idx]
         lo0 = int(hm.group(2))
         hi0 = int(hm.group(3)) if hm.group(3) else lo0
-        if lo == lo0:
-            continue  # 与 HEAD 同一个数，说明这条不是被我搬坏的（是内容漂移）
+        # 注意：**不能**用"文档里这个数与 HEAD 相同"来排除本轮 —— `reanchor_ledgers.py` 搬不动的那批
+        # 正是"数没动、代码动了"（本轮实测：`unreadCount` 从 1094 走到 1106，文档还写 1094）。
+        # 真正的排除条件是下面两条：HEAD 那版这一窗念得出标识符（否则是旧账）、目的地那一窗念得出（否则不是纯位移）。
         if fname not in kt_cache:
             rel = os.path.relpath(fp, REPO).replace("\\", "/")
             s = head_text(rel)

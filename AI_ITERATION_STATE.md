@@ -29,8 +29,14 @@
 ID-MISS **266 → 261**（本轮顺手带走 5 条旧账），在册表 242→**237** 用同一套 flags 重生成。
 ⚠ 负控自己也被"修好"咬过一次：DA-d 那条抹锚点的注入硬点名 `Models.kt` 第 497 行那条，而 CONTEXT_LOCK.md:2043 本轮真被搬好了
 ⇒ aid 不再在册，抹掉它不会"消失"，负控**静默失效**。改成从在册表现挑靶子、挑不到就 STOP（`RESULT=PASS`，靶子 BusScreen.kt:269）。
-本轮改了 App 源码 ⇒ 随下一次 release 上线；**限流文案上屏这件事本轮还没证**（设备是 release 签名 v186，
-本机 debug 包签名不同装不上，卸重装会丢登录与定位权限），与深色弹窗、release 产物的胶囊热区一起等 ≥187。
+**上屏复验（v189 真机 18:03，release 产物）**：天气卡 meta 原文 =
+`18:03 · 来源 open-meteo · 主源没用上：高德天气返回 infocode=10044` ⇒ 三件都在，换源不再静默 ✓。
+同一趟把 D-163/D-168 欠的两张也取掉：夜间（驾驶模式）下的升级弹窗是**深色卡浅字**（按钮 330x132=48dp）、
+首页天气胶囊在 R8 之后的发布包上复量 904x132=**48dp**；三份归档在 `docs/device-evidence/20261018-quota/`。
+⚠ **这次读数反过来证伪了我自己 30 分钟前写的码表**：真机报的是 **10044**（表里没有 ⇒ 落通用支），
+而第一版把 10003/10004/10005 并成一句"今日配额已用完"是**三格并错**（10004 下一分钟自愈、10005 是 IP 白名单、
+10002 是权限/路径不是 key 过期）。按官方文档重写后用例配成对着断：
+日级必须含"明天"、分钟级必须**不**含"明天"。⇒ 新表的上屏原文还要等 ≥190 复验，本轮不写成"已验"。
 
 上一轮：2026-10-18（**D-168** · 升级弹窗画在 `BusAppTheme` 外面 ⇒ D-163 那次"回令牌"是空转的）：
 去收 D-163 那格 NOT VERIFIED，release 出到 v183、设备 v176，冷启动弹窗来了 —— 浅色那张是好的
@@ -303,14 +309,14 @@ failures=1，并同时断言旧退路在 `BusScreen` 里残留 0 处）；全量
 真机「我的路线」顶部念 `当前： → · 状态暂不可用`，同屏段卡却有名字 —— 顶部读 `Repo.currentLeg()`、段卡读 legs，
 两处不同源而前者从没被单独验过。病根在**把"没有段"读成"有一段但字段没给"**：先核契约才看清
 `Api.kt:486` 把缺失/null 的 data 归一成 `Payload(JSONObject())`（不是 null obj），旧写法的 `?: JSONObject()`
-于是 parse 出 `legId` 为空的幽灵段。改法判在身份上（`Repo.kt:1291` 的 `takeIf { it.legId.isNotEmpty() }`）；
+于是 parse 出 `legId` 为空的幽灵段。改法判在身份上（`Repo.kt:1304` 的 `takeIf { it.legId.isNotEmpty() }`）；
 **修后顶部整行消失**这件事本身就是反证 —— `takeIf` 只认 `legId`，所以后端那一轮的报文里根本没有 legId，
 至于当时回的是 `null` 还是 `{}`（设备上取不到独立证据）改由两条用例各钉一种形状。三格分开：
 没段=null（整行不出现）/ 没取到=error（说"没读到"）/ 有一段但站名没给=`legPairText` 明说"站点名未给（第 N 段）"。
 第二格补的是**段卡认不出自己属于哪张单**：两张卡角标都念"1"是段序按**每张单**发号（#43 口径），
 新增 `DriverExceptionReport.kt:117` 的 `legMetaLine` 把第二行收成与选段行、异常回执**共用 `legOrderTag`** 的唯一措辞，
 `RoutesScreen` 不再自造写法；只补身份不发明排序（#49）。
-凭证：`CurrentLegContractTest.kt:27` 5 例（**未绑定那条是脚手架反证** —— `Repo.kt:1169` 的 `driverIdParam()` 在未绑定时直接抛、请求根本不发，
+凭证：`CurrentLegContractTest.kt:27` 5 例（**未绑定那条是脚手架反证** —— `Repo.kt:1182` 的 `driverIdParam()` 在未绑定时直接抛、请求根本不发，
 不钉它则两条 null 断言是"空集上的真"；另带正对照）、`DriverExceptionReportTest` 16 例（+2）、
 负控摘掉单号标识 ⇒ `RC=1 / failures=2`，还原 ⇒ `RC=0 / failures=0`；全量产物 **75 类 / 771 例 / 0 失败 0 错误 0 跳过**
 （XML timestamp 全 2026-10-17，`SU-c` 同轮独立念 `@Test 注解行 771`）；v109 已 `pm install -r -d`（13:51:55）并复拍两屏。
@@ -454,7 +460,7 @@ NEXT：用户端「实时公交 + 公交卡片」复查（用户点的名，司�
     （鉴权过滤器在路由映射之前短路），所以**不能拿接口判"路由存不存在"**；第一次我拿 200 当"已部署"其实是 nginx 的 SPA fallback。
   · **#100 换入口做完了**：真机今天这个班次**两段都已是"异常（不可再报）"**、工作台没有可报入口（`上报` 匹配 0 个）
     ⇒ App 那张回执现在拿不到。于是用 **App 自己的登录口**（`/app-api/member/auth/login`）拿 token，
-    打 **App 真正在用的上传口**（`Repo.kt:1619` → `/app-api/infra/file/upload`，字段 `file`）：
+    打 **App 真正在用的上传口**（`Repo.kt:1632` → `/app-api/infra/file/upload`，字段 `file`）：
     `code:0` 返回 URL，**回取该 URL 200、69 字节与原文件逐字节相同** ⇒ **传输层在已部署的云上是好的**，
     D-142 那次失败更可能是当时版本/配置或 App 那一层。
     ⚠ 云上文件库因此留了个 **69 字节**测试文件（`…/infra/file/4/get/20261017/probe.png`），删除要后台权限，等顺手清。
@@ -922,7 +928,7 @@ sha256 `59086c9e…`（对上一包 +32,768 B 登记为增量未归因）。
 NEXT：③ `earliestPickupTime` 取件时间窗 → ④ #39 收藏首页入口 → ⑤ #47 分组 hub → ⑥ #43 图标（我出 3 个候选）
 → 之后是 web 后台管理平台。
 <!-- 上一条 D-085（#55 票面）及更早的「最后更新」段落保留为历史，不覆盖 -->
-最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:973`，
+最后更新：2026-10-13（凌晨续，D-085 · **NEXT 首项做完：#55 查件票面**）：`Repo.parcelTopology()`（`Repo.kt:986`，
 `GET /app-api/transport/send/topology`）此前全仓 0 消费者 ⇒ 补的是读它的那一页（判定全在纯层 `ui/user/ParcelTicket.kt`，
 页面 `ParcelTicketScreen.kt` 只渲染，入口是追踪页那一行「看联运票面」、全工程恰好一个导航调用点）。
 逐字段读生产者读出**三处真接口下永远念空/念错**：交接的车牌与时刻认的是自造键（后端发 `fromPlateNo`/`toPlateNo`/
@@ -4548,7 +4554,7 @@ key/凭证**字面量**0（⚠ 按裸 token `grep -rn "AMAP_KEY" app/src/main` �
 `--rerun` 只作用于命名到的那个任务，不会带着依赖一起重跑 —— 想真重跑要 `--rerun-tasks`）。
 
 **尾巴（登记不冒充已修）**：① ETA/里程候选名里还剩 **6 处自造别名 `"eta"`**（`Models.kt` 四处 + `Repo.kt:623/947`，
-其中 `Repo.kt:1313` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
+其中 `Repo.kt:1326` 的 `RouteGuide` 读的是**导航引擎自己的报文**、不是 app VO，**改之前必须先核那份契约**）；
 ② `QuoteResult` 的三个金额字段（`amount/itemFee/distanceFee`）仍是 `multiNum` 非空读法，缺键塌成 **0.0**，
 `distanceFee > 0` 才显示"里程费" ⇒ 同病不同族（金额不是 ETA），并入下一轮；
 ③ `TransportLeg` 的 `navigationPolyline/fromGeo/toGeo` 后端**不下发**（⑫ 实测），段卡"在途进度"仍是状态驱动的示意，
@@ -4708,7 +4714,7 @@ T-l 锚点是已被替换掉的 `Text(v.etaCaptionText`、T-o2 的 `sed` 只替�
   `etaMinutes > 0` 仍是 null→0 塌缩，⑪ 的 T-a 口径只覆盖公交链路，所以它们现在是**打印残留**、⑫ 判红；
 - `Arrangement.etaMinutes` 保留可空类型但真后端下恒 null（§68），到站提醒仍未迁数据源；
 - `Repo.kt:714/687` 的 `inService`/`located` 用 `optBoolean(…, true)` —— 缺键时**替后端默认"在服务/已定位"**，与 §14 同一类，登记未修；
-- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:1027` 已按真实优先读，能兼容但不成形）；
+- 演示 nearby 仍发旧键 `stations`（`DemoData.kt:641`）而真实键是 `nearbyStations`（`Repo.kt:1040` 已按真实优先读，能兼容但不成形）；
 - ~~演示面那条 `/bus/realtime` 分支全工程**没有任何调用点**（死端点，留着会误导后来人以为有这条接口）~~ **已收口（2026-10-15 D-120）**：分支删掉，并把这条规矩立成判据 `tools/check_demo_path_reachability_probes.sh`（DP-a…DP-d：孤儿必须 0，有理由留的进 `tools/fixtures/demo_path_exempt.txt` 点名）；端点本身**不接** —— `/nearby` 就是拿同一个 `getRealtimeBuses(mapData)` 算出来的，`AppBusRespVO` 是 `NearbyBus` 的字段子集且没有 radius 过滤（每次刷新多一条更大的 REST 换三个字段，不值）。
 - `AppBusNearbyRespVO:128-129` 的 `@Schema` 与实现不一致（说 AMAP/EUCLIDEAN，实现发 SCHEDULE），只在 Android 侧按实现记账。
 
@@ -4743,7 +4749,7 @@ T-l 锚点是已被替换掉的 `Text(v.etaCaptionText`、T-o2 的 `sed` 只替�
   "**（直线估算，不是道路里程）**"、`AMAP_ROAD` 标"（道路距离）"、未知值原样写出来源（不冒充任何一种）。
   主构造器是**位置参数**（给 DemoData 和测试用），`parse` 走全命名参数 —— `unknown()` 刻意写成 `Reachability(false, "", 0, null, "")`，
   少一个参数就编译不过（防止造出"没有布尔来源的 UNKNOWN"）。
-- `data/repo/Repo.kt:794`：解析出口**只有 `Reachability.parse(p.obj ?: JSONObject())` 一处**，不再直接构造模型；
+- `data/repo/Repo.kt:807-815`：解析出口**只有 `Reachability.parse(p.obj ?: JSONObject())` 一处**，不再直接构造模型；
   请求体只带 `latitude/longitude`（对齐 `AppSendReachabilityReqVO:11-17` 的两个 `@NotNull`，不塞地址文本）。
 - `data/repo/DemoData.kt:495`：演示兜底改成**真实契约形状**（`reachable/reasonCode/serviceMode/distanceKm/walkMinutes/distanceProvider/recommendedStation{}`），
   `distanceProvider` 只给 `HAVERSINE` 并注释"演示态可以假距离，但不许冒充道路里程"，报文带 `（演示数据）` 标记。
@@ -4972,7 +4978,7 @@ age 单调钳非负、`LocFix` 四态与精度文案回归）；`DriverStateTest
 - **§29 ① 角色切换入口**：`MineScreen.kt:163` 的"切换为司机模式"改走 `MineViewModel.enterDriverMode`(`:85-97`) ——
   先 `Repo.bindDriver()`，后端没授予 `driverId` 就**不进司机域**，页面内显示"该账号未绑定司机档案…"。
   与 `LoginViewModel` 从此是同一条纪律（此前工程里存在"登录有校验、切换没有"两套标准）。
-- **§29 ② `Repo` 层结构守卫**：新增 `driverIdParam()`(`Repo.kt:1170`) + `DriverUnboundException`(`:65`) +
+- **§29 ② `Repo` 层结构守卫**：新增 `driverIdParam()`(`Repo.kt:1183`) + `DriverUnboundException`(`:65`) +
   `DRIVER_UNBOUND`(`:68`)，19 个司机调用点全部改走它。`mapOf("driverId" to driverId)` 字面量实测 **0** 处。
   守卫抛在**参数求值之前**，所以 `driverId=0` 的 URL 是"构造不出来"而不是"发了被拦"；
   四个身份引导接口（profile/shifts/pickups/earnings，按 token 识别）**不加守卫**，否则绑定永远不会发生。

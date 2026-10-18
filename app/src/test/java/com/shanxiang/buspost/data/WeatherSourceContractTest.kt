@@ -22,13 +22,41 @@ import org.junit.Test
  */
 class WeatherSourceContractTest {
 
+    /**
+     * 日级配额（10003 开发者日访问量 / 10044 账号维度日调用量）：今天不会自愈 ⇒ 必须说"明天恢复"这一类话。
+     *
+     * 真机 2026-10-18 18:03 报的是 **10044**（`USER_DAILY_QUERY_OVER_LIMIT`，账号维度日调用量超限），
+     * 第一版表里没有这一格，屏上落成通用的"高德天气返回 infocode=10044"——
+     * 那句话不算假（带了原码），但"翻成人话"这件事恰好在这次没做到。
+     */
     @Test
-    fun `配额类码翻成今日配额已用完并带上码值`() {
-        listOf("10003", "10004", "10005").forEach { code ->
-            val got = Repo.amapWeatherFailureOf(JSONObject("""{"status":"0","infocode":"$code"}"""))
-            assertTrue("$code 要说成配额：$got", got.contains("配额"))
+    fun `日级配额码要说清今天没量了并带上码值`() {
+        listOf("10003", "10044").forEach { code ->
+            val got = Repo.amapInfocodeText("高德天气", code)
+            assertTrue("$code 要说成日级用量超限：$got", got.contains("日访问量") || got.contains("日调用量"))
             assertTrue("要带上原码：$got", got.contains(code))
         }
+        assertTrue("10003 要说明何时自愈", Repo.amapInfocodeText("高德天气", "10003").contains("明天"))
+    }
+
+    /**
+     * 分钟级 / 瞬时限流**不许**写成"今天没量"（处置完全不同：等一分钟 vs 等到明天）。
+     * 这一对断言（日级含"明天"、分钟级不含）就是第一版并错三格时缺的那把尺子。
+     */
+    @Test
+    fun `分钟级与瞬时限流不许写成当天没量`() {
+        val min = Repo.amapInfocodeText("高德天气", "10004")
+        assertTrue("10004 要说下一分钟自愈：$min", min.contains("下一分钟"))
+        assertTrue("10004 不许说成当天没量：$min", !min.contains("明天"))
+
+        val qps = Repo.amapInfocodeText("高德天气", "10014")
+        assertTrue("QPS 类要说稍后重试：$qps", qps.contains("稍后重试"))
+        assertTrue("QPS 类不许说成当天没量：$qps", !qps.contains("明天"))
+
+        // 配置类与量无关：重试不会好，必须点出是谁的配置不对
+        assertTrue(Repo.amapInfocodeText("高德天气", "10005").contains("白名单"))
+        assertTrue(Repo.amapInfocodeText("高德逆地理", "10002").contains("权限"))
+        assertTrue(Repo.amapInfocodeText("高德天气", "10001").contains("过期"))
     }
 
     @Test
@@ -50,11 +78,13 @@ class WeatherSourceContractTest {
         val empty = com.shanxiang.buspost.data.model.WeatherInfo(
             text = "", temperature = 0, feel = 0, wind = "",
             source = "未取到", icon = "", humidity = "", tips = "",
-            forecast = emptyList(), mock = true, primaryFailure = "高德天气今日配额已用完（infocode=10004）",
+            forecast = emptyList(), mock = true,
+            primaryFailure = "高德天气账号维度的日调用量已用完（今天这个接口没量了，infocode=10044）",
         )
         assertTrue(empty.mock)
         assertEquals("未取到", empty.source)
-        assertTrue(empty.primaryFailure.contains("配额"))
+        // 用的是真机 2026-10-18 18:03 那一屏实际会拼出来的那句（第一版这里写的是旧译文）
+        assertTrue(empty.primaryFailure, empty.primaryFailure.contains("日调用量"))
         // 温度 0 在 mock 态**不许**被渲染成"0°C"：页面靠 mock 决定整行不画（§14 没有值不许有业务语义）
         assertEquals(0, empty.temperature)
     }
@@ -70,7 +100,7 @@ class WeatherSourceContractTest {
     fun `逆地理与天气共用同一张码表，只换接口名`() {
         val weather = Repo.amapInfocodeText("高德天气", "10003")
         val regeo = Repo.amapInfocodeText("高德逆地理", "10003")
-        assertTrue("逆地理限流也要说配额：$regeo", regeo.contains("配额"))
+        assertTrue("逆地理限流也要说成日访问量超限：$regeo", regeo.contains("日访问量"))
         assertTrue("要带上原码：$regeo", regeo.contains("10003"))
         assertEquals(
             "同一个码只能接口名不同",
