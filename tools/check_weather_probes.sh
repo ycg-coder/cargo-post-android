@@ -128,5 +128,28 @@ printf 'W-l 共用码表/逆地理带因/裸 EMPTY/调用点透传/两成因分�
 [ "$L4" -ge 3 ] || { echo "× W-l 只有 $L4 个天气调用点把逆地理的原因传了下去（首页/工作台/推送三处）：漏一处那一屏还是说『还没拿到区域码』"; fail=1; }
 [ "$L5" = 2 ] || { echo "× W-l 空区域码的两种成因分话不是『一处定义 + weather 一处调用』（现 $L5）：两份话或没人用，都是回到一句话说尽两种成因"; fail=1; }
 
+# W-m 正向地理编码那一格（D-173 第三格）。`forwardGeo` 旧写法六种失败全回 `null`，
+#     于是"高德答了但没这个地址"与"高德压根没答（限流/key/网络）"共用一句
+#     "未找到该地址，请检查输入是否正确"—— 那句话把原因**指到用户输入上**：
+#     配额用完那天村民会一遍遍改地址，而改多少遍都不会好。三态必须各说各的话。
+AS=com/shanxiang/buspost/ui/user/AddressSearchScreen.kt
+# 与 check_capsule_nav_probes.sh 同一口径：注释行里出现过的词不算"接在线上"
+one_count() { grep -nE "$1" "$2" 2>/dev/null | grep -vE '^[0-9]+: *(//|\*)' | wc -l | tr -d ' '; }
+M1=$(one_count 'data class GeoAttempt\(' "$REPO")
+M2=$(sed -n '/suspend fun forwardGeo/,/suspend fun weather/p' "$REPO" | grep -cE 'return null$|\) return null')
+M3=$(sed -n '/suspend fun forwardGeo/,/suspend fun weather/p' "$REPO" | grep -c 'GeoAttempt(failure =')
+M4=$(grep -rn "${KT[@]}" "attempt.failure" . | wc -l | tr -d ' ')
+M5=$(grep -rn "${KT[@]}" 'ifEmpty { "未找到该地址' . | wc -l | tr -d ' ')
+M6=$(one_count 'ErrorState\(vm.searchFailure' "$AS")
+M6B=$(one_count '高德答了，但里面没有这一条' "$AS")
+printf 'W-m 三态类型/裸 null/带因返回/调用点透传/两屏分话/没问到走错误态/没匹配措辞 : %s/%s/%s/%s/%s/%s/%s（目标 1/0/7/≥3/2/1/1）\n' \
+  "$M1" "$M2" "$M3" "$M4" "$M5" "$M6" "$M6B"
+[ "$M1" = 1 ] || { echo "× W-m 三态结局类型不是恰好一份（现 $M1）：两份 GeoAttempt 就会有两套『什么算没问到』"; fail=1; }
+[ "$M2" = 0 ] || { echo "× W-m forwardGeo 里还有 $M2 处裸 return null：原因在那一刻被丢掉，屏上再怎么改也说不清是谁的错"; fail=1; }
+[ "$M3" = 7 ] || { echo "× W-m 带因返回不是恰好 7 处（现 $M3；应 7：地址空/没配 key/状态非 1/没给 geocodes 数组/location 空/location 不成对/抛异常）：漏一处就又回到『请检查输入是否正确』"; fail=1; }
+[ "$M4" -ge 3 ] || { echo "× W-m 只有 $M4 个调用点读了 attempt.failure（地址查公交/寄件选址/寄货表单三处）：漏一处那一屏还是怪用户"; fail=1; }
+[ "$M5" = 2 ] || { echo "× W-m 『没问到 vs 没匹配』的分话不是恰好两处（现 $M5）：寄件那两屏少一处就还在说『请检查输入是否正确』"; fail=1; }
+{ [ "$M6" = 1 ] && [ "$M6B" = 1 ]; } || { echo "× W-m 地址查公交那一屏没把三态分开（错误态 $M6 / 没匹配措辞 $M6B）：限流当天它还得把服务商的事写成用户输入错"; fail=1; }
+
 if [ "$fail" = 0 ]; then echo "天气分角色判据通过"; else echo "天气分角色判据失败"; fi
 exit "$fail"

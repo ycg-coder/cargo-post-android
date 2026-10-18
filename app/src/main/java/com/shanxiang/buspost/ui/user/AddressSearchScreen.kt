@@ -58,15 +58,22 @@ class AddressSearchViewModel : ScreenViewModel() {
 
     // 区分"还没查过"与"查过但没解析出来"：后者必须有一句话，否则用户看到的是按钮没反应
     var searched by mutableStateOf(false)
+    /**
+     * 这一轮**压根没问到**的话（限流 / key 不对 / 网络断了）。空串 = 高德答过，只是没这个地址。
+     * 两者以前共用一句"这个地址没解析出来"——那是把服务商的事写成用户输入错了（D-173 第三格）。
+     */
+    var searchFailure by mutableStateOf("")
 
     fun search() = work {
         if (address.isBlank()) return@work
         searching = true
         try {
-            val result = Repo.forwardGeo(address)
-            searchResult = result
+            val attempt = Repo.forwardGeo(address)
+            searchResult = attempt.result
+            searchFailure = attempt.failure
             searched = true
-            if (result != null) {
+            if (attempt.matched) {
+                val result = attempt.result!!
                 locationName = result.formatted
                 val nb = Repo.nearbyBuses(result.geo)
                 nearby = nb.value
@@ -82,6 +89,7 @@ class AddressSearchViewModel : ScreenViewModel() {
     fun clear() {
         address = ""
         searchResult = null
+        searchFailure = ""
         nearby = null
         vehicles = emptyList()
         stations = emptyList()
@@ -172,11 +180,17 @@ fun AddressSearchScreen(
                 item { ErrorState(e, onRetry = { vm.search() }) }
             }
         }
-        if (!vm.searching && vm.error == null && vm.searched && vm.searchResult == null) {
+        // 三态分三口：没问到（可重试，不怪用户）/ 问到了没这条（才许让用户改写法）/ 没查过
+        if (!vm.searching && vm.error == null && vm.searched && vm.searchFailure.isNotEmpty()) {
+            item {
+                ErrorState(vm.searchFailure, onRetry = { vm.search() })
+            }
+        }
+        if (!vm.searching && vm.error == null && vm.searched && vm.searchResult == null && vm.searchFailure.isEmpty()) {
             item {
                 EmptyState(
                     title = "这个地址没解析出来",
-                    subtitle = "换一种写法再试，例如补上县/镇一级；也可以从首页定位那里选点",
+                    subtitle = "高德答了，但里面没有这一条：换一种写法再试，例如补上县/镇一级；也可以从首页定位那里选点",
                     icon = BusIcons.warning,
                 )
             }

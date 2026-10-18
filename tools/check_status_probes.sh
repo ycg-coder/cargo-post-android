@@ -84,7 +84,11 @@ sm_err=$(grep -c "ErrorState(" "$ASS")
 sm_empty=$(grep -c "EmptyState(" "$ASS")
 sm_load=$(grep -c "LoadingState(" "$ASS")
 sm_hand=$(grep -c "CircularProgressIndicator" "$ASS")
-echo "S-m  地址查公交页 ErrorState/EmptyState/LoadingState/手搓转圈 : $sm_err/$sm_empty/$sm_load/$sm_hand （预期恰好 1/4/1/0）"
+# D-173 第三格把"没问到"从"没解析出来"里分出来 ⇒ 错误出口从一处变两处，但两处各有各的因：
+# 一处是取数报错（vm.error），一处是高德压根没答（vm.searchFailure，带原因 + 可重试）。
+# 只数 ErrorState 的个数会被"随便再塞一句通用报错"糊过去，所以另钉"带原因的那一处"必须存在。
+sm_reason=$(grep -c "ErrorState(vm.searchFailure" "$ASS")
+echo "S-m  地址查公交页 ErrorState/EmptyState/LoadingState/手搓转圈/带原因那一处 : $sm_err/$sm_empty/$sm_load/$sm_hand/$sm_reason （预期恰好 2/4/1/0/1）"
 echo "--- 残留段状态机位置（供复核，不判红）---"
 grep -rnE "\.(status|orderStatus) (==|>=|<=|!) =? ?[0-9-]|[^a-zA-Z]status (==|>=|<=) [0-9-]" $UI_CORE | no_comment || true
 
@@ -108,7 +112,8 @@ ok=1
 [ "$ld" -ge 3 ] || { echo "× S-ld 司机页面退回本地状态判断（现读 3 个页面；原判定 ≥2 与话术 ≥3 不一致，本轮对齐成 3）"; ok=0; }
 [ "$le" = 3 ] || { echo "× S-le 段动作入口数量变了（核对是否漏了回读）"; ok=0; }
 [ -z "$ler" ] || { echo "× S-le2 这些页面写完不回读：$ler（本机自封状态 = 假闭环）"; ok=0; }
-[ "${sm_err:-0}" = 1 ] || { echo "× S-m 手动地址查公交页的错误出口不是恰好一处（现 $sm_err）：取数失败必须有一句话，不许整屏空白"; ok=0; }
+[ "${sm_err:-0}" = 2 ] || { echo "× S-m 手动地址查公交页的错误出口不是恰好两处（现 $sm_err）：取数失败与『高德没答』必须各有各的一句话，少一处就又回到整屏空白或两句共用"; ok=0; }
+[ "${sm_reason:-0}" = 1 ] || { echo "× S-m 『没问到』那一格没把原因带出来（现 $sm_reason）：数量对了但内容是笼统话，等于没分态（D-173 第三格）"; ok=0; }
 [ "${sm_empty:-0}" = 4 ] || { echo "× S-m 手动地址查公交页的空态不是恰好四处（现 $sm_empty）：还没查过 / 查了没解析出来 / 该地无公交 / 无揽收点，四格各一句，不许并成一格"; ok=0; }
 [ "${sm_hand:-0}" = 0 ] || { echo "× S-m 这一页又长出自己画的加载块（现 $sm_hand）：加载态只有 LoadingState 一个出口"; ok=0; }
 

@@ -1,5 +1,6 @@
 package com.shanxiang.buspost.data
 
+import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.repo.Repo
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -19,6 +20,11 @@ import org.junit.Test
  * 这一本钉三件事：① 认得的码翻成人话，认不得的**带上原 infocode**（不许塌成"网络不好"）；
  * ② 主源失败时 `primaryFailure` 非空、成功时为空（两侧都要有值可判，不能只测失败侧）；
  * ③ 两路都没给时，`source` 说的是"未取到"而不是留一个看起来像数的空壳。
+ *
+ * ⚠ 文件名还叫 WeatherSource，但下面 `GeoAttempt` 那两条属于**正向地理编码**那一格（D-173 第三格）：
+ * 它与天气撞的是同一件事（高德 REST 没答时，屏上把服务商的问题写成用户的错），
+ * 判据也同簿（`check_weather_probes.sh` 的 W-k/W-l/W-m）。另开一本测试文件只会让 SU-b 的
+ * 源集计数再涨一格，而这里没有新的机制要反证 —— 名字与内容不一致这件事记在这里，不假装没看见。
  */
 class WeatherSourceContractTest {
 
@@ -126,5 +132,43 @@ class WeatherSourceContractTest {
         assertEquals("高德逆地理今日配额已用完（infocode=10003）", limited)
         // 关键断言：服务商给过原因时，不许被中性那句覆写掉
         assertTrue(limited, !limited.contains("还没拿到区域码"))
+    }
+
+    /**
+     * 正向地理编码的三态（D-173 第三格）：成功 / 问到了但没这个地址 / 压根没问到。
+     * 三态互斥是硬要求 —— 旧写法三种共用一个 `null`，屏上就只剩一句"请检查输入是否正确"。
+     */
+    @Test
+    fun `地址解析三态互斥，没问到与没匹配不许共用一个结论`() {
+        val ok = Repo.GeoAttempt(Repo.GeoResult(Geo(29.5, 106.5), "重庆市南岸区", "500108"))
+        val missed = Repo.GeoAttempt()
+        val notAsked = Repo.GeoAttempt(failure = "高德地理编码账号维度的日调用量已用完（今天这个接口没量了，infocode=10044）")
+
+        assertTrue(ok.matched); assertTrue(!ok.notAnswered); assertTrue(!ok.askedButMissed)
+        assertTrue(missed.askedButMissed); assertTrue(!missed.notAnswered); assertTrue(!missed.matched)
+        assertTrue(notAsked.notAnswered); assertTrue(!notAsked.askedButMissed); assertTrue(!notAsked.matched)
+        // 三态里必须恰好有一态为真（多真或全假都说明类型在塌）
+        for (a in listOf(ok, missed, notAsked)) {
+            assertEquals(1, listOf(a.matched, a.askedButMissed, a.notAnswered).count { it })
+        }
+    }
+
+    /**
+     * 调用点选话的那条规则：`failure.ifEmpty { "未找到该地址，请检查输入是否正确" }`。
+     * 断言的是**归因方向**：没问到那天不许出现"请检查输入"（那是让用户背锅），
+     * 真没这条时才许让他改写法。
+     */
+    @Test
+    fun `没问到那天不许叫用户检查输入`() {
+        val checkInput = "未找到该地址，请检查输入是否正确"
+        val notAsked = Repo.GeoAttempt(failure = "高德地理编码今日没量了（infocode=10044）")
+        val shownNotAsked = notAsked.failure.ifEmpty { checkInput }
+        assertEquals(notAsked.failure, shownNotAsked)
+        assertTrue(shownNotAsked, !shownNotAsked.contains("检查输入"))
+        assertTrue(shownNotAsked, shownNotAsked.contains("infocode=10044"))
+
+        val missed = Repo.GeoAttempt()
+        val shownMissed = missed.failure.ifEmpty { checkInput }
+        assertEquals(checkInput, shownMissed)
     }
 }

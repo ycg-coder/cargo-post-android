@@ -376,14 +376,29 @@ object Repo {
     /**
      * 正向地理编码（高德 geo，Web 服务 key）：地址 → 坐标。
      * 用于"手动地址查公交"功能：用户输入地址，得到坐标后查附近公交。
-     * 失败返回 null。
+     * 结局三态见 [GeoAttempt]：成功 / 问到了但没这个地址 / 压根没问到（各说各的话）。
      */
     data class GeoResult(val geo: Geo, val formatted: String, val adcode: String)
 
-    suspend fun forwardGeo(address: String, city: String = ""): GeoResult? {
-        if (address.isBlank()) return null
+    /**
+     * 一次地址解析的三种结局（D-173 第三格）。旧写法三种都回 `null`，于是三种病根共用一句话：
+     * "未找到该地址，请检查输入是否正确" / "这个地址没解析出来"。
+     *
+     * ⚠ 那句话把原因**指到用户输入上**：配额用完那天，村民会一遍遍改地址，而改多少遍都不会好。
+     * 所以"高德答了、确实没这个地址"与"高德压根没答"必须分开说，`failure` 非空就是后者。
+     */
+    data class GeoAttempt(val result: GeoResult? = null, val failure: String = "") {
+        val matched: Boolean get() = result != null
+        /** 问到了报文、里面确实没有这个地址 —— 这时候才许让用户改写法 */
+        val askedButMissed: Boolean get() = result == null && failure.isEmpty()
+        /** 压根没问到（限流 / key / 网络 / 报文缺字段）—— 这时候怪不到用户头上 */
+        val notAnswered: Boolean get() = result == null && failure.isNotEmpty()
+    }
+
+    suspend fun forwardGeo(address: String, city: String = ""): GeoAttempt {
+        if (address.isBlank()) return GeoAttempt(failure = "地址是空的，没去问高德地理编码")
         val key = com.shanxiang.buspost.BuildConfig.AMAP_WEB_KEY
-        if (key.isEmpty()) return null
+        if (key.isEmpty()) return GeoAttempt(failure = "本机没配高德 Web 服务 key，没去问地理编码")
         return try {
             val cityParam = if (city.isNotEmpty()) "&city=$city" else ""
             val encoded = java.net.URLEncoder.encode(address, "UTF-8")
@@ -391,25 +406,35 @@ object Repo {
                 "https://restapi.amap.com/v3/geocode/geo?key=$key$cityParam&address=$encoded"
             )
             val root = JSONObject(text)
-            if (root.optString("status") != "1") return null
-            val geocodes = root.optJSONArray("geocodes") ?: return null
-            if (geocodes.length() == 0) return null
+            if (root.optString("status") != "1") {
+                return GeoAttempt(failure = amapInfocodeText("高德地理编码", root.optString("infocode")))
+            }
+            val geocodes = root.optJSONArray("geocodes")
+                ?: return GeoAttempt(failure = "高德地理编码说成功但没给 geocodes（infocode=${root.optString("infocode")}）")
+            // 报文里真没有这一条：这是"没匹配到"，不是"没问到"，只有这一格许让用户换写法
+            if (geocodes.length() == 0) return GeoAttempt()
             val first = geocodes.getJSONObject(0)
             val location = first.optString("location", "")
-            if (location.isEmpty() || !location.contains(",")) return null
+            if (location.isEmpty() || !location.contains(",")) {
+                return GeoAttempt(failure = "高德地理编码给了记录但 location 是空的（infocode=${root.optString("infocode")}）")
+            }
             val parts = location.split(",")
-            if (parts.size != 2) return null
-            val lng = parts[0].toDoubleOrNull() ?: return null
-            val lat = parts[1].toDoubleOrNull() ?: return null
-            GeoResult(
-                geo = Geo(lat, lng),
-                formatted = first.optString("formatted_address", address),
-                adcode = first.optString("adcode", ""),
+            val lng = parts.getOrNull(0)?.toDoubleOrNull()
+            val lat = parts.getOrNull(1)?.toDoubleOrNull()
+            if (lng == null || lat == null) {
+                return GeoAttempt(failure = "高德地理编码的 location 不成对：$location")
+            }
+            GeoAttempt(
+                GeoResult(
+                    geo = Geo(lat, lng),
+                    formatted = first.optString("formatted_address", address),
+                    adcode = first.optString("adcode", ""),
+                )
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            null
+            GeoAttempt(failure = "问高德地理编码时出错：${e.javaClass.simpleName}")
         }
     }
 
