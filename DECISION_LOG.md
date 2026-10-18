@@ -11134,7 +11134,19 @@ Column(modifier.navigationBarsPadding(), …)                    // 画它：只
 ### 五、凭证
 
 - `PRODUCT classes=78 tests=800 failures=0 errors=0 skipped=0`（`GRADLE_RC=0`，含编译）
-- 悬浮胶囊簿 `通过`；全量判据簿见下条收尾读数
-- ⚠ **观感那一半还没归我说了算**：16dp 是不是"好看"，要等 release 落地后在真机上**看图**判，
-  不许拿"判据绿 + 数值 ≥12"当成用户验收过。改前那张 `docs/device-evidence/20261018-quota/02-…png`
-  就是对照底片，复验时同机同屏同状态拍一张并排看。
+- 49 本静态判据 `RESULT pass=49 fail=0`；`capsule_nav_negative_controls.sh` → `RESULT ok=13 bad=0 miss=0`
+
+**改后真机复量（v197 release 产物，同一台 1f71ee9b，三屏都量）**：
+
+| 屏 | 最下沿可点格 bottom | 距物理屏底 | 改前 |
+| --- | --- | --- | --- |
+| 用户首页 tab | 2342 | 58px = **21.1dp** | 14px / 5.1dp |
+| 司机工作台 | 2342 | 58px = **21.1dp** | 同上 |
+| 车道级导航 | 2342 | 58px = **21.1dp**（格高 158px = 57.5dp，驾驶档 56dp 下限仍在） | 同上 |
+
+三屏同一个数 ⇒ 令牌确实是一处在管。21.1dp = 16dp 令牌 + 5.1dp 系统手势条 inset，与设计一致。
+归档 `docs/device-evidence/20261018-bottomgap/`（首页一张 png + 三屏 xml）。
+
+⚠ **"好不好看"这一半**：AI 看图判"留白成立、胶囊不再压在下沿"（对照底片
+`20261018-quota/02-v189-weather-card-open-meteo-with-reason.png`），但**这不等于用户验收过** ——
+数值要调只改 `capsuleBottomGap()` 一处，判据与三屏读数会一起跟着动。
