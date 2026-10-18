@@ -33,6 +33,7 @@ import com.shanxiang.buspost.core.net.attempt
 import com.shanxiang.buspost.core.ui.BusButton
 import com.shanxiang.buspost.core.ui.BusCard
 import com.shanxiang.buspost.core.ui.BusRadius
+import com.shanxiang.buspost.core.ui.LocalBusTokens
 import kotlinx.coroutines.launch
 
 /**
@@ -49,6 +50,7 @@ fun UpdateDialog(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val t = LocalBusTokens.current
     val scope = rememberCoroutineScope()
     var downloading by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -71,7 +73,7 @@ fun UpdateDialog(
                         else append("  ·  发布页没给安装包大小")
                     },
                     fontSize = 13.sp,
-                    color = Color(0xFF6B7280),
+                    color = t.textSecondary,
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -81,7 +83,7 @@ fun UpdateDialog(
                     // 这段文字是发布作者在 GitHub 上写的原文；空的就说空，不补一句"修复问题，提升稳定性"
                     if (release.body.isEmpty()) "发布页没写更新说明" else release.body.take(500),
                     fontSize = 13.sp,
-                    color = Color(0xFF374151),
+                    color = t.ink,
                     lineHeight = 18.sp,
                 )
                 Spacer(Modifier.height(16.dp))
@@ -91,7 +93,7 @@ fun UpdateDialog(
                         Text(
                             problem.orEmpty(),
                             fontSize = 13.sp,
-                            color = Color(0xFFB4231C),
+                            color = t.danger,
                             lineHeight = 18.sp,
                         )
                         Spacer(Modifier.height(10.dp))
@@ -112,12 +114,12 @@ fun UpdateDialog(
                                 .fillMaxWidth()
                                 .height(36.dp)
                                 .clip(RoundedCornerShape(BusRadius.s))
-                                .background(Color(0xFFE5E7EB)),
+                                .background(t.track),
                         ) {
                             LinearProgressIndicator(
                                 progress = { progress },
                                 modifier = Modifier.fillMaxWidth().height(36.dp),
-                                color = Color(0xFF3B82F6),
+                                color = t.primary,
                                 trackColor = Color.Transparent,
                             )
                         }
@@ -125,7 +127,7 @@ fun UpdateDialog(
                         Text(
                             "下载中 ${(progress * 100).toInt()}%",
                             fontSize = 12.sp,
-                            color = Color(0xFF6B7280),
+                            color = t.textSecondary,
                         )
                     }
                     else -> {

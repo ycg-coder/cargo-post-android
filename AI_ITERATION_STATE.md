@@ -3,6 +3,23 @@
 > 读法：`CURRENT` 是此刻正在做的事；`DONE` 已验证；`BLOCKED` 卡在环境/依赖/真机；`NEXT` 是既定顺序。
 > 每轮迭代结束必须更新本文件，禁止"做完了但没记录"。
 
+最后更新：2026-10-18（**D-163** · #31 那半格：硬编码色从"11 个待拍板"变成"9 处、每处有名字有理由"）：
+里面混着一处**不是审美问题的真缺陷** —— `UpdateDialog` 六处字面量色，容器 `BusCard` 跟主题、文字不跟 ⇒
+开「深色站牌」后深底配 `0xFF374151` 深灰字，**升级弹窗基本读不出字**。已映射回既有令牌
+（`t.textSecondary`/`t.ink`/`t.danger`/`t.track`/`t.primary`，不新增令牌）。
+其余 9 处不删，但逐处点名 + 逐处写理由（导航覆盖层 6 / HUD 墨色 1 / 支付宝品牌蓝 1 / 与 GOLD 渐变成对 1）。
+新簿 `check_hardcoded_color_probes.sh`（HC-a 总数恰好 9 且按文件点名、HC-b 弹窗 0 且正对照在导航屏数得出 6、
+HC-c "0 处字面量"不等于"走了令牌"所以分开钉、HC-d 每处字面量三行内要有 `// 硬编码色：<理由>` 标记）。
+⚠ **HC-d 第一版是假绿，我自己复查抓出来的**：原本认"文件里出现过『支付宝』『GOLD』就算有理由"，
+而 `BusQrScreen` 里"支付宝"出现 12 次、没有一次在解释那颗颜色 ⇒ 那条断言等于没断言，改成认紧贴字面量的标记注释。
+负控 `ok=5 bad=0 miss=0`，其中 NC-4 第一版用 `sub` 被 `SELF-MATCH` 挡下、**注入没发生却报绿**（`miss=1` 抓到）⇒ 换 `ins`；
+NC-4 现在的断言是"往令牌定义文件里加一处字面量 ⇒ 总数仍 9"（证明排除的是定义本身，不是整本没扫）。
+读数：`PRODUCT classes=77 tests=793 failures=0 errors=0`、判据簿 **49 本**全绿。
+⚠ 深色下这个弹窗长什么样**仍未屏幕复验**：要弹它得装比线上低的 versionCode，而 `pm install -r -d` 仍拒降级，
+唯一办法是卸载重装 ⇒ 会清掉登录与定位授权，为一个弹窗截图不划算。旁证只到"深色 `BusCard + t.ink` 这一对已在设置页复验过、
+弹窗现在用的正是同一对"，这不是弹窗本身的复验。
+详情见 `DECISION_LOG.md` D-163。
+
 最后更新：2026-10-18（**D-162** · 把 D-161 那句"不搭配"从一颗按钮提成一条通用形状，扫出全工程还有四排）：
 上一轮我只修了工作台那一处就收工，是**把症状当病根**。这轮写扫描：同一 `Row` 里既有实心 `PRIMARY` 又有描边 `OUTLINE/GHOST` ⇒
 命中 4 处，改了 3 处（`AddressSearchScreen` 查询/清除、`SendScreen` 重新填写/确认发布、`WorkbenchScreen` 卡片里 扫码装车/核验码 small 排，
@@ -2312,7 +2329,7 @@ CURRENT_ANDROID_STATUS:  F-3 ② 收工（2026-10-01 15:2x–18:10，三态分�
                   ⚠ **没有把任何别名换成另一个猜的键名、没有删字段**；`usedKg`/`verified` 是**直接撤掉读法**而不是改名
                   （`AppDriverProfileRespVO.java:11-23` 全文 7 个键，"已装重量/认证状态"在重量口径上三方都没有生产者）。
                   生产源码动 **8 个 main 文件**：`Models.kt`、`Repo.kt`、`DemoData.kt` + 消费侧 `WorkbenchScreen.kt:566-579`、`GoodsDetailScreen.kt:79/138/219/229`、
-                  `HandoverScreen.kt:260`、`CargoGauge.kt:45-90`、`DriverNavScreen.kt:480`（跨簿文案重锚）。
+                  `HandoverScreen.kt:260`、`CargoGauge.kt:45-90`、`DriverNavScreen.kt:481`（跨簿文案重锚）。
                   ⚠ **改动面按内容证据取（`F-3 ②` 注释标记 + 消费侧签名实测），不按 mtime**：本工程有几本负控簿是"就地改 `app/src` 真身 + 备份还原"的写法
                   （`shell_routing_test_negative_controls.sh` 末行就是 `cmp 三个源文件与备份一致`），mtime 会把那些还原动作也算成"本轮改过"。
                   新增 **1 本测试类**（`NoProducerKeyFamilyContractTest`，7 例 / 12,163 B，MockWebServer 真信封）、**2 个新节**

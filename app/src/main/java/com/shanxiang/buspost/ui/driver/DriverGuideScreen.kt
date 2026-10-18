@@ -379,6 +379,7 @@ fun DriverGuideScreen() {
                     modifier = Modifier
                         .align(Alignment.Center)
                         .clip(RoundedCornerShape(BusRadius.m))
+                        // 硬编码色：导航覆盖层的算路拒绝条 —— 这一屏永远画在深色地图上，浅色令牌会让条子消失
                         .background(Color(0xCC1B1B1B))
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
@@ -553,6 +554,7 @@ private fun AmapNaviSurface(
         val scale = LocalBusFontScale.current
         // 视图起不来时的实话 + 出路：这一屏不许变成一块黑屏
         Box(
+            // 硬编码色：地图起不来时那一屏的深色底（有意不跟主题，属 #31 待拍板）
             Modifier.fillMaxSize().background(Color(0xFF14181C)),
             contentAlignment = Alignment.Center,
         ) {
@@ -564,6 +566,7 @@ private fun AmapNaviSurface(
                 Icon(
                     BusIcons.warning,
                     contentDescription = null,
+                    // 硬编码色：警示图标用导航金，与上面那块深色底成对，换成主题金会糊
                     tint = Color(0xFFE8C271),
                     modifier = Modifier.size(34.dp),
                 )
@@ -572,9 +575,11 @@ private fun AmapNaviSurface(
                 //   **只有这一块不放大**，而它恰好是"地图起不来时司机唯一能读的一屏"。
                 // 深色底与配色保持原样（那是导航覆盖层的有意设计，属 #31 待拍板项，不擅自动）。
                 Text("车道级导航不可用", color = Color.White, fontSize = (17 * scale).sp, fontWeight = FontWeight.Bold)
+                // 硬编码色：深色底上的正文米白（同上，成对色）
                 Text(reason, color = Color(0xFFD6D0C2), fontSize = (12.5f * scale).sp)
                 Text(
                     "可以退回工作台，用「交给高德 / 交给百度」把目的地交给手机里装的导航 App。",
+                    // 硬编码色：深色底上的次要说明灰米（同上，成对色）
                     color = Color(0xFFB3AC9B),
                     fontSize = (12 * scale).sp,
                 )
@@ -674,6 +679,7 @@ private fun GuideTopStrip(
                     // 逐站模式（老调用点没有站表）时这一格是空串，一行都不占。
                     Text(
                         stopLine,
+                        // 硬编码色：顶栏"本段 k 站"那行的浅蓝，压在深色导航底上（成对色）
                         color = Color(0xFFBFD3EA),
                         fontSize = (11.5 * scale).sp,
                         maxLines = 2,

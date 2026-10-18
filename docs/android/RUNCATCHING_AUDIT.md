@@ -45,7 +45,7 @@ RC-d 的目标随之改成 **0 / 2**（`runBlocking` 仍是 0）。
 | 1 | `data/repo/Repo.kt:356 → 359` | B（`private suspend fun openMeteoWeather` 体内） | `val forecast = runCatching { …16 行 JSON 解析… }.getOrDefault(emptyList())` | `val forecast = attempt { … }.getOrDefault(emptyList())` | 外层是 suspend 函数，而 `runCatching` 是 inline ⇒ 块内**新增挂起调用是合法写法**。今天块里没有挂起点，所以还没有 bug，但那只是当前写法给的运气，不是结构保证 |
 | 2 | `core/navigation/AmapNavigationEngine.kt:152 → 155` | B+E（`override suspend fun calculateRoute` 体内） | `val accepted = runCatching { navi.calculateDriveRoute(…) }.getOrDefault(false)` | `val accepted = attempt { … }.getOrDefault(false)` | 同上。且这一处的失败分支已经在屏幕上说话："算路请求没有被导航引擎受理"——取消若被吞，就把"调用方已取消"报成"高德没受理"，是一条假故障归因 |
 | 3 | `ui/BusPostRoot.kt:84 → 85` | C（`LaunchedEffect(pending) {}` 体内，经 inline `let`） | `deepLinkTarget(route, Prefs.role)?.let { runCatching { nav.navigate(it) } }` | `deepLinkTarget(route, Prefs.role)?.let { attempt { nav.navigate(it) } }` | `LaunchedEffect` 的块是 `suspend CoroutineScope.() -> Unit`，`let` 内联 ⇒ 这段作用域可挂起；取消被吞等于"用户已经离开还要继续跳深链" |
-| 4 | `ui/driver/DriverNavScreen.kt:695 → 697` | C（`LaunchedEffect(ready.value) {}` 体内） | `if (ready.value) runCatching { engine?.setLanguage(Locale.CHINESE) }` | `if (ready.value) attempt { engine?.setLanguage(Locale.CHINESE) }` | 同上：这一屏只在 DEBUG 可达，但组合被取消时不该读成"语种设置失败" |
+| 4 | `ui/driver/DriverNavScreen.kt:696 → 697` | C（`LaunchedEffect(ready.value) {}` 体内） | `if (ready.value) runCatching { engine?.setLanguage(Locale.CHINESE) }` | `if (ready.value) attempt { engine?.setLanguage(Locale.CHINESE) }` | 同上：这一屏只在 DEBUG 可达，但组合被取消时不该读成"语种设置失败" |
 
 为什么用 `attempt` 而不是逐点手写 `try { … } catch (e: CancellationException) { throw e } catch (e: Exception) { … }`：
 `core/net/Attempt.kt:18` 就是这个形状的具名版本（`suspend fun <T> attempt(block: suspend () -> T): Result<T>`，
@@ -80,7 +80,7 @@ core/navigation 同级，都是 core 层引 `core.net.attempt`，没有新的跨
 | data/repo/Repo.kt:366 | B | 否 | 是（suspend fun 体内） | 已迁 attempt | 见第二节 #1 |
 | core/navigation/AmapNavigationEngine.kt:297 | B+E | 否 | 是（suspend fun 体内） | 已迁 attempt | 见第二节 #2 |
 | ui/BusPostRoot.kt:87 | C | 否 | 是（LaunchedEffect + inline let） | 已迁 attempt | 见第二节 #3 |
-| ui/driver/DriverNavScreen.kt:720 | C | 否 | 是（LaunchedEffect） | 已迁 attempt | 见第二节 #4 |
+| ui/driver/DriverNavScreen.kt:721 | C | 否 | 是（LaunchedEffect） | 已迁 attempt | 见第二节 #4 |
 <!-- RC-ROWS-BEGIN -->
 | MainActivity.kt:68 | A/D | 否 | 否 | 保持 | `private fun askNotificationOnce()`；块内是 `ActivityResultLauncher.launch` |
 | core/code/QrCode.kt:33 | A | 否 | 否 | 保持 | `fun bitmap(text, sizePx, darkColor)`，纯 Bitmap/Writer 生成 |
@@ -108,8 +108,8 @@ core/navigation 同级，都是 core 层引 `core.net.attempt`，没有新的跨
 | ui/common/BusMap.kt:137 | E（视图回调，原误记 C） | 否 | 否 | 保持 | `AndroidView(factory = { ctx -> })`，形参类型 `(Context) -> T`；早期按 C 类的登记是**错的**（见第四节） |
 | ui/common/BusMap.kt:142 | E（视图回调） | 否 | 否 | 保持 | `update = { view -> }`，形参类型 `(T) -> Unit` |
 | ui/common/BusMap.kt:145 | E（视图回调） | 否 | 否 | 保持 | 同 142（约 54 行的地图设置块，全非 suspend） |
-| ui/driver/DriverNavScreen.kt:714 | A | 否 | 否 | 保持 | `remember(context) { }` 的计算块是 `() -> T`，非 suspend |
-| ui/driver/DriverNavScreen.kt:729 | A | 否 | 否 | 保持 | `private fun speak(engine, text)`，块内 `engine.speak(...)` |
+| ui/driver/DriverNavScreen.kt:715 | A | 否 | 否 | 保持 | `remember(context) { }` 的计算块是 `() -> T`，非 suspend |
+| ui/driver/DriverNavScreen.kt:730 | A | 否 | 否 | 保持 | `private fun speak(engine, text)`，块内 `engine.speak(...)` |
 | ui/driver/WorkbenchScreen.kt:1290 | A | 否 | 否 | 保持 | `private fun callDriver(context, mobile)` |
 | ui/user/HomeScreen.kt:260 | A | 否 | 否 | 保持 | `onOpenSettings: () -> Unit`（HomeScreen.kt:622 的形参声明） |
 | ui/user/MinePages.kt:901 | A | 否 | 否 | 保持 | `onClick = { }`，`() -> Unit` |
@@ -136,7 +136,7 @@ RC-e 的计数口径：`<!-- RC-ROWS-BEGIN -->` 与 `END` 之间的物理行（3
 - **B suspend**：直接被包围在 `suspend fun` 体内 ⇒ 块内可挂起，是本轮必改的两处。
 - **C 协程构建器 / Flow**：`LaunchedEffect` / `launch` / `async` / `withContext` / `callbackFlow` 的 suspend 块内。
   ⚠ 只有**函数类型带 suspend** 的块才算。`AndroidView` 的 `factory`/`update`、`remember` 的计算块、
-  `onClick`/`onOpenSettings` 这类回调形参都不是——审计初稿把 `BusMap.kt` 三点与 `DriverNavScreen.kt:691`
+  `onClick`/`onOpenSettings` 这类回调形参都不是——审计初稿把 `BusMap.kt` 三点与 `DriverNavScreen.kt:692`
   记进了 C 类，那是**按所在 composable 的外观猜的**，词法链核对后改成 A/E。这族误分类如果被写进判据，
   下一轮就会因为"改了也不会红"而永远修不掉。
 - **D callback bridge**：SDK / 系统回调桥（zxing `launcher.launch`、`ActivityResultLauncher`）。

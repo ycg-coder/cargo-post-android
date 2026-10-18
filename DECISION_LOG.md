@@ -2230,7 +2230,7 @@ census 与 ⑧ 留档 `/tmp/f2_8_ledger_census.log` **逐行 diff**（`rows=118`
 
 ### 4 迁的 4 点与"行为一字未变"
 `Repo.kt:473-480`（openMeteoWeather 的 daily 预报解析段；当日记的是 356→359，㊻ 按现读改指函数头到 daily 取键）、`AmapNavigationEngine.kt:152→155`（算路是否被受理）、
-`BusPostRoot.kt:88→85`（深链跳转）、`DriverNavScreen.kt:695→697`（TTS 设语种）。四处都用既有的通用出口
+`BusPostRoot.kt:88→85`（深链跳转）、`DriverNavScreen.kt:696→697`（TTS 设语种）。四处都用既有的通用出口
 `core/net/Attempt.kt` 的 `attempt`，它与 `runCatching` 的唯一差别是**取消穿透**，两者都捕到 Throwable 级、都回 `Result`、
 下游仍 `.getOrDefault(...)` ⇒ 对外行为不变（这一点是本轮能只动 4 个文件、且不动任何用例断言的前提）。
 
@@ -2530,7 +2530,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
   `cmp 三个源文件与备份一致`），mtime 会把这些还原动作也算成"本轮改过"。带 `F-3 ②` 标记的 4 个文件 = `Models.kt`(5 处)、`DemoData.kt`(1)、
   `NoProducerKeyFamilyContractTest.kt`、`DistanceCaliberContractTest.kt`；另按消费侧签名实测确认的 4 个 UI = `WorkbenchScreen.kt:566-579`
   （`capacityKg`/`verified` 可空分支）、`GoodsDetailScreen.kt:79/138/219/229`（`stock`/`originPrice`/`sales`）、`HandoverScreen.kt:260`（`task.needPhoto == true`）、
-  `CargoGauge.kt:45-90`（三个入参改可空 + `:76` "未给"态）；`Repo.kt`（`:1176/:1177` 车道族改 `multiNumOrNull`）、`DriverNavScreen.kt:480`（跨簿文案重锚）。
+  `CargoGauge.kt:45-90`（三个入参改可空 + `:76` "未给"态）；`Repo.kt`（`:1176/:1177` 车道族改 `multiNumOrNull`）、`DriverNavScreen.kt:481`（跨簿文案重锚）。
 - **判据/负控簿改动（同轮，非新增）**：`tools/check_default_value_probes.sh`（DV-m…DV-r、GUARD2；键数口径 16→17、27→28）、
   `tools/default_value_negative_controls.sh`、`tools/check_eta_probes.sh`（T-p 拆 tp/tp2 + gate 两条）、`tools/eta_negative_controls.sh`（+`plateNo` 破口）、
   `tools/check_navigation_probes.sh:113`（`NO2` 锚点重锚为 `本页按名字猜的`）与 `tools/navigation_negative_controls.sh:169`。
@@ -6198,7 +6198,7 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
    `check_safe_call_probes.sh` 的 SA-d「全 main `attempt {`」与 `check_throwable_probes.sh` 的 TH-f 数的是**同一个扫描面**，
    两本都写 `-ge 11`，实测已经是 **14** ⇒ 顺手删一到三处都不红。两本同轮改成**恰好 14**，并把 14 处逐点列进 SA-d 注释
    （`BusPostApp.kt:43 / Locator.kt:214 / AmapNavigationEngine.kt:447 / Repo.kt:140 / Repo.kt:386 / NotifyWorker.kt:34 /
-   BusPostRoot.kt:97 / :111 / :112 / UpdateSection.kt:86 / DriverGuideScreen.kt:141 / DriverNavScreen.kt:718 /
+   BusPostRoot.kt:97 / :111 / :112 / UpdateSection.kt:86 / DriverGuideScreen.kt:141 / DriverNavScreen.kt:719 /
    DriverSdkNavCard.kt:266 / HandoverScreen.kt:160`）。
    ⚠ 归因诚实：11→14 的三处里只有**两处**指得到具名提交（`Repo.kt:140` 续期 `dd7d6093`、`UpdateSection.kt:86`
    装包申请权限 `3687211c`，都在 10-12），第三处落在本仓 git 起点（`d12b419`，10-10）之前 ⇒ **登记为增量未归因**，
@@ -10637,3 +10637,55 @@ D-159 收尾时写过"深色主题只做了值上的分档，没逐屏看"。本
 
 ⚠ 这只覆盖了三屏，其余带玻璃的面（顶栏 / 通栏条 / 到站格 / 选点面板）在深色下仍未逐屏看过 ——
 其中**到站格那一格本来就还没在真机出现过**（见 D-159 §六），两笔账不合并、不互相抵。
+## D-163 · #31 那半格：硬编码色从"11 个待拍板"变成"9 处、每处有名字有理由"（2026-10-18）
+
+#31 记的是"11 个硬编码色等设计拍板"。这句挂着像"等用户决定"，但里面**混着一处不是审美问题的真缺陷**，
+本轮把它挑出来修掉，其余的**逐处点名 + 逐处写理由**，让这笔账从"一堆数字"变成"可查的清单"。
+
+### 一、真缺陷：升级弹窗把四套配色与深色全绕过
+
+`core/update/UpdateDialog.kt` 六处字面量色（`0xFF6B7280` / `0xFF374151` / `0xFFB4231C` / `0xFFE5E7EB` / `0xFF3B82F6`）。
+它的容器是 `BusCard`（**跟主题**），而里面的文字色是写死的灰蓝（**不跟主题**）⇒
+打开「深色站牌」后：卡片变深底，正文还是 `0xFF374151` 那种深灰字 —— **深色下这个弹窗基本读不出字**。
+这不是"不够高级"，是"承诺了深色却在关键弹窗上没深色"。
+
+改法是把六个值映射回既有令牌：`t.textSecondary` / `t.ink` / `t.danger` / `t.track` / `t.primary`（不新增令牌）。
+
+### 二、剩下 9 处：不删，但每一处都要能回答"为什么不走令牌"
+
+| 处 | 位置 | 理由（已写进代码，紧贴字面量） |
+| --- | --- | --- |
+| 6 | `DriverGuideScreen.kt` 导航覆盖层 | 那一屏永远画在深色地图上，浅色令牌会让条子消失；属 #31 待拍板 |
+| 1 | `DriverNavScreen.kt:416` HUD 浅色档 | 仿车载 HUD 的固定墨色，深色档那支已经走 `t.ink` |
+| 1 | `BusQrScreen.kt:86` | 支付宝品牌蓝 `1677FF`，品牌方规定的入口色 |
+| 1 | `HomeScreen.kt:1339` | 与 `FeatureBg.GOLD` 那块固定渐变成对的深棕图标色 |
+
+### 三、判据 `check_hardcoded_color_probes.sh`（HC-a…HC-d），以及我自己写错的那版 HC-d
+
+- **HC-a** 全工程（除令牌定义）字面量色恰好 9，且按文件点名到个位；五个点名文件之和必须等于总数（有文件没被点名 ⇒ 那几处没人看着）。
+- **HC-b** 升级弹窗必须 0，**正对照**是同一条扫描在导航屏数得出 6 ⇒ 这个 0 是扫出来的，不是扫描瞎了给的。
+- **HC-c** 弹窗确实吃到那五个令牌（"0 处字面量"不等于"走了令牌"，所以分开钉）。
+- **HC-d 第一版是假绿，被我自己复查抓出来**：原本写的是"文件里出现『支付宝』『GOLD』这类词就算有理由"，
+  而 `BusQrScreen` 里"支付宝"出现 12 次，**没有一处是在解释那颗颜色为什么不走令牌** ⇒ 那条断言等于没断言。
+  改成认**紧贴字面量三行内的 `// 硬编码色：<理由>` 标记**，撤掉标记就红；探针单列成
+  `tools/hardcoded_color_reasons.py`（嵌在 bash 里的三层 heredoc 会把 `\n` 吃掉、判据自己先崩，这仓踩过）。
+- 负控 5 条全红/全绿符合预期：`NC-1` 弹窗回潮一处 → HC-b+HC-a 红；`NC-2` 换成 `Color.Black` → HC-c 红；
+  `NC-3` 删掉一条理由标记 → HC-d 红且点名行号；`NC-4` 往**令牌定义文件**里加一处字面量 → 仍绿且总数仍 9
+  （证明排除的是定义本身，不是整本没扫）；`NC-5` 探针脚本缺失 → 不许拿"跑不了"当 0。
+  ⚠ `NC-4` 第一版用 `sub` 注入被 `SELF-MATCH` 挡下、**注入根本没发生却报了绿**（`miss=1` 抓出来的）⇒ 换成 `ins`。
+
+### 四、读数
+
+- `PRODUCT classes=77 tests=793 failures=0 errors=0 skipped=0`、`GRADLE_RC=0`
+- 新簿 `check_hardcoded_color_probes.sh`：`总数 9 = 弹窗 0 + 导航 6 + HUD 1 + 乘车码 1 + 首页 1；弹窗走令牌 5/5；理由注释 9/9`
+- `hardcoded_color_negative_controls.sh` → `RESULT ok=5 bad=0 miss=0`
+- 判据簿由 48 本增至 **49 本**
+
+### 五、深色下这个弹窗到底长什么样：仍未屏幕复验（写清楚，不糊）
+
+想验它要装一个**比线上 release 低**的 versionCode 才会弹。本机装的是 v163（就是最新 release），
+`pm install -r -d` 仍报 `INSTALL_FAILED_VERSION_DOWNGRADE` ⇒ 唯一办法是先卸载再装，
+而那会清掉登录态与定位授权（这仓反复记过：掉授权后 `BUS_LOC` 一条不出、导航卡写"还没拿到当前位置"）。
+**为一个弹窗的截图去清一台在用设备的登录，不划算** ⇒ 这一格记 NOT VERIFIED。
+旁证只到这一步：深色下 `BusCard + t.ink` 这一对已经在设置页屏幕复验过（D-162 那三屏），
+而弹窗现在用的正是同一对；但**这不是弹窗本身的复验**。
