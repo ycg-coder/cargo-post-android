@@ -385,7 +385,7 @@ class WorkbenchViewModel : ScreenViewModel() {
         // `DRIVER_STATION_NOT_IN_ROUTE` 拒掉（`DriverAppServiceImpl:902`）——所以 0L 发出去只是一条必被拒的请求。
         // 班次里一个站都没给时按 [finish] 同一形状早退：宁可不提交，不造一个站点编号。
         if (sid <= 0L) {
-            receipt = "后端没给本站编号，到站提交不了——请回到工作台重新拉取班次"
+            receipt = "系统没给本站编号，到站提交不了——请回到工作台重新拉取班次"
             return
         }
         act("到站") {

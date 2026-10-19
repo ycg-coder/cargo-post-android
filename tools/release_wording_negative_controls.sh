@@ -22,7 +22,9 @@ UD=$M/core/update/UpdateDialog.kt
 US=$M/ui/common/UpdateSection.kt
 PICK=tools/release_notes_pick.py
 API=$M/core/net/Api.kt
-FILES=("$YML" "$AU" "$AUP" "$UD" "$US" "$PICK" "$API")
+AR=$M/ui/user/ArrangementRows.kt
+PS=$M/ui/user/ParcelTicketScreen.kt
+FILES=("$YML" "$AU" "$AUP" "$UD" "$US" "$PICK" "$API" "$AR" "$PS")
 PROBE=tools/check_release_wording_probes.sh
 BAK=/tmp/rw_negctl.bak.$$
 
@@ -146,6 +148,20 @@ check RW-12 "× RW-f" "$UD" \
                         .heightIn(max = 190.dp)' \
   '                        .heightIn(max = 190.dp)
                         .weight(1f, fill = false)'
+
+# ---------- RW-g 那一族：缺席措辞（D-178） ----------
+# 三条各咬一个方向：旧词回来 / 唯一出口没了（整套兜底被删）/ 票面又一行念两遍。
+check RW-13 "× RW-g 屏上还留着" "$AR" \
+  'internal const val NOT_GIVEN = "系统没给这一项"' \
+  'internal const val NOT_GIVEN = "后端没给"'
+
+check RW-14 "× RW-g 缺席措辞的唯一出口不是恰好一份" "$AR" \
+  'internal const val NOT_GIVEN = "系统没给这一项"' \
+  ''
+
+check RW-15 "× RW-g 票面又出现" "$PS" \
+  'TicketCard("分段", listOf("分段" to NOT_GIVEN))' \
+  'TicketCard("分段", listOf("后端没给" to NOT_GIVEN))'
 
 # 最后一条注入之后必须再还原一次：`check` 是在**注入前**还原的，收尾不还原就会把破口留在工作树里
 restore

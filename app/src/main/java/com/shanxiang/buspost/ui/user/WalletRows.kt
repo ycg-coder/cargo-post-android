@@ -25,7 +25,7 @@ internal fun walletMoney(v: Double?): String = v?.let { "¥" + String.format(jav
 
 /** 码→文案照抄建表注释 `V028:31`（`0=处理中 1=成功 2=失败`）；后端没有对应 enum 类，未知码原样带出不猜 */
 internal fun walletStatusText(code: Int?): String = when (code) {
-    null -> "后端没给"
+    null -> NOT_GIVEN
     0 -> "处理中"
     1 -> "成功"
     2 -> "失败"

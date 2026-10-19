@@ -119,25 +119,25 @@ fun ParcelTicketScreen(no: String, vm: ParcelTicketViewModel = viewModel()) {
                         }
                         TicketCard("整单", ticketHeaderRows(tr))
                         if (tr.legs.isEmpty()) {
-                            TicketCard("分段", listOf("后端没给" to NOT_GIVEN))
+                            TicketCard("分段", listOf("分段" to NOT_GIVEN))
                         } else {
                             tr.legs.forEachIndexed { i, l -> TicketCard("第 ${i + 1} 张段票", legTicketRows(l)) }
                         }
                         if (tr.handovers.isEmpty()) {
-                            TicketCard("换乘交接", listOf("后端没给" to NOT_GIVEN))
+                            TicketCard("换乘交接", listOf("交接" to NOT_GIVEN))
                         } else {
                             tr.handovers.forEachIndexed { i, h -> TicketCard("交接 ${i + 1}", handoverRows(h)) }
                         }
                         if (tr.plans.isEmpty()) {
                             // `candidates` 在后端 preview 抛异常时保持 null（ServiceImpl:172-174）⇒ 只能说"没给"
-                            TicketCard("方案对比", listOf("后端没给" to "方案对比没给，不表示这单只有一个方案"))
+                            TicketCard("方案对比", listOf("方案" to "方案对比没给，不表示这单只有一个方案"))
                         } else {
                             tr.plans.forEachIndexed { i, p -> TicketCard("方案 ${i + 1}", planRows(p)) }
                         }
                         TicketCard(
                             "事件时间线",
                             if (ticketEventsGiven(tr)) ticketEventRows(tr)
-                            else listOf("后端没给" to "这条链路这轮没发事件，不等于没发生过事"),
+                            else listOf("事件" to "这一单这轮没发事件回来，不等于没发生过事"),
                         )
                         BackToTraceRow { nav.navigate(Routes.trace(no)) }
                         Spacer(Modifier.height(6.dp))

@@ -105,13 +105,13 @@ fail=0
 [ "$WD_UNK_STATUS" = 1 ] || { echo "× W-d 未识别状态那一格没了（现 $WD_UNK_STATUS）：没见过的码会被就近并进成功/失败"; fail=1; }
 [ "$WD_UNK_TYPE" = 1 ] || { echo "× W-d 未识别类型那一格没了（现 $WD_UNK_TYPE）"; fail=1; }
 [ "$WD_BAD_STATUS" = 0 ] || { echo "× W-d 又用 multiStr 读状态码（$WD_BAD_STATUS 处）：屏幕上会把 1 念成状态"; fail=1; }
-[ "$WE_NULL" -ge 1 ] || { echo "× W-e 金额缺席不再念「后端没给」（现 $WE_NULL）：没给会显示成 ¥0.00"; fail=1; }
+[ "$WE_NULL" -ge 1 ] || { echo "× W-e 金额缺席不再念「系统没给这一项」（现 $WE_NULL）：没给会显示成 ¥0.00"; fail=1; }
 [ "$WE_NULL_BAD" = 0 ] || { echo "× W-e 缺席被直接塌成 ¥0.00（现 $WE_NULL_BAD）"; fail=1; }
 [ "$WE_MULTI" = 4 ] || { echo "× W-e 四个余额键的可空读法不齐（现 $WE_MULTI，目标 4）"; fail=1; }
 [ "$WE_MULTI_BAD" = 0 ] || { echo "× W-e 余额键又出现非空 multiNum 读法（现 $WE_MULTI_BAD）"; fail=1; }
 [ "$WF_LABEL" = 1 ] || { echo "× W-f 渠道那一格的标签变了（现 $WF_LABEL）：『照抄后端原词』这件事不再写在界面上"; fail=1; }
 { [ "$WF_LIE" = 0 ] && [ "$WF_LIE_ALL" = 0 ]; } || { echo "× W-f 页面开始替后端宣布扣款（本机 $WF_LIE / 全工程 $WF_LIE_ALL）：库里没有'是否模拟'那一列，这句话本机说不出"; fail=1; }
-[ "$WF_PROOF" = 6 ] || { echo "× W-f 同文件正对照掉了（同文件 NOT_GIVEN 用点=$WF_PROOF，目标恰好 6）：上面那两个 0 可能是没扫到这个文件"; fail=1; }
+[ "$WF_PROOF" = 7 ] || { echo "× W-f 同文件正对照掉了（同文件 NOT_GIVEN 用点=$WF_PROOF，目标恰好 7）：上面那两个 0 可能是没扫到这个文件"; fail=1; }
 [ "$WG_SCOPE" = 1 ] || { echo "× W-g 「本次返回 N 条」那句没了（现 $WG_SCOPE）：后端 total 就是 items.size()，念成整单条数是假话"; fail=1; }
 [ "$WG_SCOPE2" = 1 ] || { echo "× W-g 「未查全量」那半句没了（现 $WG_SCOPE2）"; fail=1; }
 [ "$WG_BAD" = 0 ] || { echo "× W-g 纯层出现整单条数念法（现 $WG_BAD）"; fail=1; }

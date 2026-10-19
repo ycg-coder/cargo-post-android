@@ -815,7 +815,7 @@ private fun GuideArrivedCard(arrived: ArrivedStop, onGoWorkbench: () -> Unit) {
                             arrived.stop!!.quantityText(),
                             arrived.stop!!.statusLabel.ifEmpty { null },
                         ).joinToString(" · ")
-                    }.ifEmpty { "这一站后端没给动作与件数" } + " · 到站状态回工作台确认后才写"
+                    }.ifEmpty { "这一站没给动作与件数" } + " · 到站状态回工作台确认后才写"
                 } else "下标对不上时不猜是哪一站：回工作台核对任务列表",
                 color = t.goldDeep,
                 fontSize = (11.5 * scale).sp,

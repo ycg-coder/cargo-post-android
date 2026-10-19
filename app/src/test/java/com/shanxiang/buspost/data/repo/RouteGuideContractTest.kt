@@ -278,7 +278,7 @@ class RouteGuideContractTest : ServerTest() {
      * F-3 ⑬⑭：这一屏里被撤掉的五个别名键各自顶替一个真实键 ——
      * roadDistanceMeters→routeDistanceMeters、durationSeconds→routeDurationSeconds、crs→coordinateSystem、
      * offRoute→deviated、steps 内的 meters→distanceMeters / lane→recommendedLane / seconds→etaSeconds。
-     * 全部只给别名时必须一件都不产生值：塌成 0 与"后端没给"在页面上是两种话，前者是一句肯定的假话。
+     * 全部只给别名时必须一件都不产生值：塌成 0 与"系统没给"在页面上是两种话，前者是一句肯定的假话。
      */
     @Test
     fun `五个别名键同时出现也不产生里程时长偏航与步骤量`() = runBlocking {

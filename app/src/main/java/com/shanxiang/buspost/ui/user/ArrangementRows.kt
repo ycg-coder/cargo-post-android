@@ -31,7 +31,7 @@ internal fun planStatusText(code: Int?): String = when (code) {
 }
 
 /** 后端没给就是"没给"：站点被删时 `stationNameMap.get(...)` 返回 null，不许渲染成空白行，也不许兜一个站名 */
-internal const val NOT_GIVEN = "后端没给"
+internal const val NOT_GIVEN = "系统没给这一项"
 
 /** 一条安排的所有行。顺序即页面顺序；新增一行要同时改用例（少一行就是把某一格静默删掉） */
 internal fun arrangementRows(a: Arrangement): List<Pair<String, String>> = listOf(

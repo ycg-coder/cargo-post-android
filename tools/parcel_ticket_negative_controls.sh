@@ -195,7 +195,7 @@ check PT-k4 "× PT-k 演示交接段的真键" sub "$DD" '"stationName" to "双�
 
 # ---------- PT-l 用例簿 ----------
 # ⚠ 改名不动 `@Test` 计数（PT-l 数的是注解行），所以这条必须把注解本身注释掉 —— 两行锚点才唯一。
-check PT-l1 "× PT-l 契约用例少于 15 条" sub "$CT" "$(printf '%s\n%s' '    @Test' '    fun `取失败那一格绝不念成后端没给内容`')" "$(printf '%s\n%s' '    // @Test 负控注释掉一条' '    fun `取失败那一格绝不念成后端没给内容`')"
+check PT-l1 "× PT-l 契约用例少于 15 条" sub "$CT" "$(printf '%s\n%s' '    @Test' '    fun `取失败那一格绝不念成系统没给内容`')" "$(printf '%s\n%s' '    // @Test 负控注释掉一条' '    fun `取失败那一格绝不念成系统没给内容`')"
 check PT-l2 "× PT-i 「回追踪页」出口不是恰好三处" delline "$PS" '                        BackToTraceRow { nav.navigate(Routes.trace(no)) }'
 
 echo "---"

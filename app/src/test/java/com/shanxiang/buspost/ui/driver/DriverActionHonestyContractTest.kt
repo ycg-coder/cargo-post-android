@@ -108,7 +108,7 @@ class DriverActionHonestyContractTest : ServerTest() {
         vm.arrive(0L)
 
         assertEquals("站点编号缺项时一条都不许出网，连动作后的回读都不发", 6, server.requestCount)
-        assertEquals("后端没给本站编号，到站提交不了——请回到工作台重新拉取班次", vm.receipt)
+        assertEquals("系统没给本站编号，到站提交不了——请回到工作台重新拉取班次", vm.receipt)
         assertFalse(vm.docked)
     }
 

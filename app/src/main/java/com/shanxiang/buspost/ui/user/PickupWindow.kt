@@ -35,7 +35,7 @@ internal const val PICKUP_DAY_COUNT = 3
 internal const val PICKUP_UNSET_TEXT = "随时可取（不限制最早取货时间）"
 
 /** 回读缺席那一格：没填与后端没回读在报文的同一个形状上，本机分不开就照实说分不开 */
-internal const val PICKUP_ABSENT_TEXT = "后端没给这一项（下单时没填也会这样，本机分不开）"
+internal const val PICKUP_ABSENT_TEXT = "系统没给这一项（下单时没填也会这样，本机分不开）"
 
 /** 后果披露：只说后端真做了的两件事，不承诺"今天能到"，也不替它算具体哪一班 */
 internal const val PICKUP_DISPATCH_NOTE =

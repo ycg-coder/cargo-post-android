@@ -102,7 +102,7 @@ class ParcelTicketContractTest {
     // ---------- ① 四格分开 ----------
 
     @Test
-    fun `取失败那一格绝不念成后端没给内容`() {
+    fun `取失败那一格绝不念成系统没给内容`() {
         val p = parcelTicketPage(failed)
         assertEquals(ParcelTicketKind.Failed, p.kind)
         // 失败格必须同时给"重试"与"回追踪页"两条出口，不能把人关在票面上
@@ -154,7 +154,7 @@ class ParcelTicketContractTest {
     }
 
     @Test
-    fun `后端没给的那几格逐行念 后端没给 而不是空白`() {
+    fun `后端没给的那几格逐行念 系统没给 而不是空白`() {
         val rows = ticketHeaderRows(trace(statusName = "", planningModeName = "", planNo = "",
             totalLegs = null, transferCount = null, totalDistanceKm = null, totalDurationMinutes = null,
             planReason = "", startStation = "", endStation = "")).toMap()
@@ -236,7 +236,7 @@ class ParcelTicketContractTest {
         assertTrue(rows["交接时间"].orEmpty().contains("11:05"))
         assertEquals("已交接", rows["交接状态"])
 
-        // 自造键不再续命：只发 fromPlate/handoverTime 时，票面应当念"后端没给"而不是把假键当真值读出来
+        // 自造键不再续命：只发 fromPlate/handoverTime 时，票面应当念"系统没给"而不是把假键当真值读出来
         val legacy = handoverRows(LegHandover.parse(obj("fromPlate" to "渝A·1", "handoverTime" to "11:05"))).toMap()
         assertEquals(NOT_GIVEN, legacy["交出"])
         assertEquals(NOT_GIVEN, legacy["交接时间"])

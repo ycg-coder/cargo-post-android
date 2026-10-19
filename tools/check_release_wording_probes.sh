@@ -17,6 +17,8 @@
 #        没写的版本必须退 1 并落"没写公告"的占位、`v21` 不许命中 `v214`（词边界）。
 #   RW-f 弹窗装得下：两处弹窗的公告框先吃剩余空间再封顶，否则横屏上"稍后再说/立即更新"
 #        会掉到屏幕外（真机量到过），那一屏就没有出口了。
+#   RW-g 缺席措辞：屏上不许再有「后端没给 / ××接口未给」这一族开发者词（D-178），
+#        同时钉"新词接上了"——只数旧词消失会把"兜底整个删掉"读成绿。
 #
 # 用法：bash tools/check_release_wording_probes.sh
 set -u
@@ -31,7 +33,7 @@ AUP=$M/core/update/AppUpdater.kt
 UD=$M/core/update/UpdateDialog.kt
 US=$M/ui/common/UpdateSection.kt
 
-for f in "$RN" "$PICK" "$YML" "$AU" "$AUP" "$UD" "$US"; do
+for f in "$RN" "$PICK" "$YML" "$AU" "$AUP" "$UD" "$US" "$M/ui/user/ArrangementRows.kt"; do
   [ -f "$f" ] || { echo "× 缺 $f：判据没有输入，本轮读数不采信"; exit 2; }
 done
 
@@ -169,6 +171,31 @@ printf 'RW-f 两处 weight/两处顺序(weight 在 heightIn 之前) : %s+%s/%s+%
   "$RF_W1" "$RF_W2" "$RF_ORDER1" "$RF_ORDER2"
 { [ "$RF_W1" = 1 ] && [ "$RF_W2" = 1 ]; } || { echo "× RW-f 有一处弹窗的公告框不再吃剩余空间（$RF_W1/$RF_W2）：横屏上那两颗按钮会掉到屏幕外"; fail=1; }
 { [ "$RF_ORDER1" = 1 ] && [ "$RF_ORDER2" = 1 ]; } || { echo "× RW-f weight 与 heightIn 顺序倒了（$RF_ORDER1/$RF_ORDER2）：封顶排在前面时 weight 就不生效，横屏照样溢出"; fail=1; }
+
+# ---------- RW-g（D-178）缺席措辞这一族：屏上不许再有「后端没给 / ××接口未给」 ----------
+# 「后端」「接口」是开发者的词，用户读不出"该找谁、还能做什么"；而这一族是全工程重复最多的一处
+# （钱包/票面/取货时间窗/安排行/公交详情/司机工作台/任务段……14 条字面量）。
+# 收成一条出口：`ArrangementRows.kt` 的 `NOT_GIVEN = "系统没给这一项"`，其余按场景各说一句人话。
+# ⚠ 两头都要钉：只数"旧词没了"会把"整套缺席兜底被删了"（空着不显示）也读成绿 ——
+#   所以同时钉新词的用点数与那个唯一出口常量还在。
+# ⚠ 计数前必须把**行尾注释**切掉：`capacityPercent: Double?, // …后端没给够…` 这种是参数说明，
+#   不上屏；只滤"整行是注释"的写法会把它读成一处 jargon（本轮实测就被它顶红过一次）。
+lit() { grep -rn -e "$1" "$ROOT/app/src/main" --include=*.kt 2>/dev/null | sed -E 's#//.*$##' | grep -e "$1" | grep -vE ':[0-9]+: *(\*|/\*)' | wc -l | tr -d ' '; }
+RG_OLD_BACKEND=$(lit '后端没给')
+RG_OLD_API=$(lit '接口未给')
+RG_OUTLET=$(cnt 'internal const val NOT_GIVEN = "系统没给这一项"' "$M/ui/user/ArrangementRows.kt")
+RG_NEW=$(lit '系统没给')
+RG_USE=$(lit 'NOT_GIVEN')
+RG_DUP=$(lit '"后端没给" to NOT_GIVEN')
+
+printf 'RW-g 旧「后端没给」/旧「接口未给」/唯一出口/新词/出口用点/票面重复 : %s/%s/%s/%s/%s/%s（目标 0/0/1/>=5/>=8/0）\n' \
+  "$RG_OLD_BACKEND" "$RG_OLD_API" "$RG_OUTLET" "$RG_NEW" "$RG_USE" "$RG_DUP"
+[ "$RG_OLD_BACKEND" = 0 ] || { echo "× RW-g 屏上还留着 $RG_OLD_BACKEND 处「后端没给」：那是开发者词，用户不知道找谁"; fail=1; }
+[ "$RG_OLD_API" = 0 ] || { echo "× RW-g 屏上还留着 $RG_OLD_API 处「××接口未给」：同上，接口这个词不出现在要发的包里"; fail=1; }
+[ "$RG_OUTLET" = 1 ] || { echo "× RW-g 缺席措辞的唯一出口不是恰好一份（现 $RG_OUTLET）：两份字面迟早对不上，改一处漏一处"; fail=1; }
+[ "$RG_NEW" -ge 5 ] || { echo "× RW-g 新词「系统没给」只剩 $RG_NEW 处（>=5）：旧词撤了而兜底话没接上 = 那一格变成空白，比 jargon 更糟"; fail=1; }
+[ "$RG_USE" -ge 8 ] || { echo "× RW-g 那个唯一出口的被引用处少于 8（现 $RG_USE）：上面那个 0 可能是整套缺席兜底被删了，不是改了措辞"; fail=1; }
+[ "$RG_DUP" = 0 ] || { echo "× RW-g 票面又出现「后端没给：后端没给」这种一行念两遍的写法（现 $RG_DUP）"; fail=1; }
 
 if [ "$fail" = 0 ]; then
   echo "更新公告与发布文案判据通过（$RA_SECT 节公告 / 两处弹窗同一出口 / 上屏几句零开发词 / 取公告真跑 $RD_HIT$RD_MISS$RD_NEAR / 网络咽喉 $RE_NETFAIL+$RE_APIFAIL 处走双出口 / 两处公告框先吃剩余空间 $RF_ORDER1$RF_ORDER2）"
