@@ -372,7 +372,10 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
                     recalcState.value = EngineRecalcDisplay.EngineInitiatedFailure(code)
                     return
                 }
-                slot.complete(CalcOutcome.Failed("高德算路失败（code=$code${desc.ifEmpty { "" }.let { "：$it" }}）"))
+                // ⚠ 屏上那句不许带 `code=`：这一句会原样进 `RouteCheck.Rejected.reason` 并显示给司机（D-177）。
+                //   结果码一个字没丢，改成打日志（`adb logcat -s BUS_NAV`）。高德的中文描述留着 —— 那是人能读的话。
+                android.util.Log.w("BUS_NAV", "calculate_route failed code=$code desc=$desc")
+                slot.complete(CalcOutcome.Failed("高德说这条路算不出来${desc.ifEmpty { "" }.let { "：$it" }}"))
             }
 
             override fun onArriveDestination() {
@@ -457,7 +460,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
             )
         }
         val navi = instance() ?: return RouteCheck.Rejected(
-            reason = "导航引擎实例不可用",
+            reason = "导航没能启动起来",
             detail = "AMapNavi.getInstance 未取得实例",
         )
         prepare()
@@ -466,7 +469,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         // 预热搬进后台线程之后，这个先后关系不再由"同一个函数里顺序执行"天然保证，必须显式等。
         if (!awaitWarmUp()) {
             return RouteCheck.Rejected(
-                reason = "导航引擎还在准备中",
+                reason = "导航还在准备中，这会儿点还点不了",
                 detail = "预热未完成（监听尚未注册，此刻发算路请求没人接回执）",
             )
         }
@@ -474,7 +477,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         // 宁可明说"上一次还在飞"，也不让两次请求互相顶掉。
         if (pending != null) {
             return RouteCheck.Rejected(
-                reason = "已有一次算路在等高德回执，请稍后重试",
+                reason = "上一次算路还没回来，稍等几秒再点",
                 detail = "pending!=null（同一引擎同一时刻只允许一次算路）",
             )
         }
@@ -499,12 +502,12 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
             // 请求交给高德了却没被受理：高德现在握着哪条路径，本机无从知道
             acceptedRoute = null
             return RouteCheck.Rejected(
-                reason = "算路请求没有被导航引擎受理",
+                reason = "这次算路没被导航接过去，稍后再试一次",
                 detail = "calculateDriveRoute=false",
             )
         }
         val outcome = withTimeoutOrNull(CALC_TIMEOUT_MS) { deferred.await() }
-            ?: CalcOutcome.Failed("导航引擎在 ${CALC_TIMEOUT_MS / 1000} 秒内没有回算路结果")
+            ?: CalcOutcome.Failed("导航在 ${CALC_TIMEOUT_MS / 1000} 秒内没回话，这一趟先按不导航走")
         pending = null
         if (outcome is CalcOutcome.Failed) {
             acceptedRoute = null
@@ -514,7 +517,7 @@ class AmapNavigationEngine(private val context: Context) : NavigationEngine {
         if (path == null) {
             acceptedRoute = null
             return RouteCheck.Rejected(
-                reason = "高德没有返回路径几何",
+                reason = "高德没给出这条路具体怎么走",
                 detail = "getNaviPath()=null",
             )
         }

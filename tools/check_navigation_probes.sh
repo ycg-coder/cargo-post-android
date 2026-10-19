@@ -187,7 +187,9 @@ NQ=$(grep -n 'BuildConfig' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
 NR=$(grep -n 'navigationGateOf(' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
 NR2=$(grep -c 'enabled = gate.canNavigate && !calculating' "$UI")
 NR3=$(grep -rn 'enabled = !blocked' "$DD" --include=*.kt | grep -vE "$NC" | wc -l | tr -d ' ')
-NR4=$(grep -c 'if (!gate.canNavigate)' "$UI")
+# D-177：这一格从"有没有那个 if"改成"那一行到底读的是哪一半"——
+# 只钉 `InfoRow("下一步该做什么", gate.hint)` 这个字面，才能钉住"不可点时说的是下一步，不是字段名"。
+NR4=$(grep -c 'InfoRow("下一步该做什么", gate.hint)' "$UI")
 
 # N-s 引擎层与入口层同闸：算路（calculateRoute）与开始导航（startGpsNavi）各一道 `!state.canNavigate`；
 # SDK 层不许再自己 `is EngineReadiness.Blocked` —— 只挡 Blocked 就是放行 Initializing。
@@ -754,6 +756,44 @@ fail=0
 [ "$NRME3" = 3 ] || { echo "× N-rm 出声降级出口不再是「一处定义 + 两处调用」（现 $NRME3）：多一处就是有人另开了一条不出通知的路"; fail=1; }
 [ "$NRMF" = 0 ] || { echo "× N-rm 提醒被做成了弹窗（现 $NRMF）：用户同一句里要求「不能影响驾驶」，模态弹窗吃掉地图手势与返回键"; fail=1; }
 [ "$NRMG" = 1 ] || { echo "× N-rm 工作台那一行不再读提醒（现 $NRMG）：上面那两个读数就不采信，扫描得先证明它看得见这一屏"; fail=1; }
+
+# ---------- N-wd（D-177）：司机导航卡那三族内部原文不许上屏 ----------
+# 用户口径（2026-10-19）："这个 release 版本不允许出现开发专业词汇"。前三处咽喉（更新/网络/天气）在 D-175 清了，
+# 第四处就在司机天天看的导航卡上：`gate.detail`（`hasOrigin=false` 那一类）、`RouteCheck.Rejected.detail`
+# （`road=…m straight=…m`、甚至 `origin.toString()`）、`SourceTag` 的 `else -> source`（认不出的枚举原样印出来）。
+# ⚠ 两头各一刀：只钉"屏上干净"会把"把 detail 整个删了"读成绿 —— 那是把证据跟着措辞一起扔（D-176 同一族）。
+#   所以"原文还在 detail / 还在日志"必须同时钉住。行为侧（每个不可点码都有 hint、屏上两句零内部词）
+#   由 NavigationContractTest 那两条新用例钉，这里钉结构。
+CMP="$SRC/core/ui/Components.kt"
+DGS="$SRC/ui/driver/DriverGuideScreen.kt"
+for f in "$CMP" "$DGS"; do
+    [ -f "$f" ] || { echo "× 判据文件缺失：$f（先确认工程根/副本建对，别把缺文件读成计数 0）"; exit 2; }
+done
+NWD1=$(grep -n 'hint = ' "$NENG" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD2=$(grep -n 'gate\.hint' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD3=$(grep -n 'InfoRow("差在哪一步", gate.detail)' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD4=$(grep -n 'gate\.detail' "$UI" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD5=$(grep -n 'Log\.w("BUS_NAV", "\(route_check\|guide route\) rejected' "$UI" "$DGS" | grep -vE "$NC" | wc -l | tr -d ' ')
+# 只数**生效代码**里把 detail 拼回屏上那一句的：日志行本身带 `${check.detail}` 是这一族正确的落点，必须排除
+NWD6=$(grep -n 'check\.detail}\|result\.detail}' "$UI" "$DGS" | grep -vE "$NC" | grep -v 'Log\.' | wc -l | tr -d ' ')
+NWD7=$(grep -n 'else -> source' "$CMP" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD8=$(grep -n 'sourceTagLabel' "$CMP" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD9=$(grep -n '"来源没认出来"' "$CMP" | grep -vE "$NC" | wc -l | tr -d ' ')
+NWD10=$(grep -n 'detail = "hasOrigin=false\|detail = "sdkPresent=false\|detail = "initResult=null' "$NENG" | grep -vE "$NC" | wc -l | tr -d ' ')
+
+printf 'N-wd hint 出口/屏上读 hint/旧那格残留/gate.detail 只在日志 : %s/%s/%s/%s（目标 8/1/0/1）\n' \
+  "$NWD1" "$NWD2" "$NWD3" "$NWD4"
+printf 'N-wd 拒收原文进日志/屏上拼原文/SourceTag 透原词/出口+兜底+原文 : %s/%s/%s/%s+%s+%s（目标 2/0/0/2+1+3）\n' \
+  "$NWD5" "$NWD6" "$NWD7" "$NWD8" "$NWD9" "$NWD10"
+[ "$NWD1" = 8 ] || { echo "× N-wd 引擎里「下一步该做什么」那一句不再是 8 处（现 $NWD1）：三处 Blocked + 五处入口结论，少一处就是某个不可点码没话可说"; fail=1; }
+[ "$NWD2" = 1 ] || { echo "× N-wd 卡片读 hint 的次数不是 1（现 $NWD2）：多一处就是有人另开了一格念同一件事"; fail=1; }
+[ "$NWD3" = 0 ] || { echo "× N-wd 「差在哪一步」又把诊断原文念回屏上了（现 $NWD3）：`hasOrigin=false` 这类字段名司机不该读到"; fail=1; }
+[ "$NWD4" = 1 ] || { echo "× N-wd 引擎原文的出口不再是日志那一处（现 $NWD4）：撤了措辞不能顺手撤证据（D-176 同一族）"; fail=1; }
+[ "$NWD5" = 2 ] || { echo "× N-wd 算路被拒的原文进日志不是两处（现 $NWD5）：卡片与引导页各有一处，少一处就是那一屏把证据扔了"; fail=1; }
+[ "$NWD6" = 0 ] || { echo "× N-wd 又有屏上那句把 detail 拼回去了（现 $NWD6）：detail 按这个类自己的注释就是面向日志的那一半"; fail=1; }
+[ "$NWD7" = 0 ] || { echo "× N-wd 来源标签退回把原词印上屏（现 $NWD7）：认不出来的枚举原样上屏就是这一族要修的病"; fail=1; }
+{ [ "$NWD8" = 2 ] && [ "$NWD9" = 1 ]; } || { echo "× N-wd 来源措辞出口不是「一处定义 + 一处调用」或兜底句没了（现 $NWD8/$NWD9）：两屏会各说一套，或认不出来时悄悄不给标签"; fail=1; }
+[ "$NWD10" = 3 ] || { echo "× N-wd 引擎原文被删了（现 $NWD10）：屏上撤词必须同轮把原文留在 detail 里，装机的人还要靠它查"; fail=1; }
 
 if [ "$fail" = 0 ]; then echo "第 8 步导航引擎判据通过"; else echo "第 8 步导航引擎判据失败"; fi
 exit "$fail"

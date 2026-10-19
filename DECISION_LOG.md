@@ -1499,7 +1499,7 @@ rc=0（**43 actionable tasks: 43 executed**，本轮是**全量重跑**不是增
 main 源码里 `catch (e: Throwable)` 生效 **6** 处、`catch (e: Exception | Throwable)` 共 **69** 处（F-1-a 的分类读数量）。
 按"里面到底挂不挂起"分完之后的**当前**读数：`catch (e: Throwable)` 生效 **2**（都在白名单，见第 3 点）、
 `catch (e: Exception)` **49** 处，其中 try 首段含挂起点 **48** 处（已全部先穿透取消）、不含挂起点 **1** 处
-（`DriverSdkNavCard.kt:484` 唤起外部地图，`startActivity` 不可能被取消）。
+（`DriverSdkNavCard.kt:495` 唤起外部地图，`startActivity` 不可能被取消）。
 
 **决策与执行**：
 
@@ -3496,7 +3496,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 |---|---|---|---|
 | §五 字段兼容规则：别名只能读**真实生产者**，不许替后端猜键名 | 解析层 10 处死别名撤读（`Repo.kt` 8 处：`multiBool Repo.kt:707`、`multiArr Repo.kt:1104`、`multiStr Repo.kt:1114`、`multiNum Repo.kt:1120`、`multiNum Repo.kt:1121`、`multiStr Repo.kt:1122`、`multiNum Repo.kt:1138`、`multiBool Repo.kt:1154`；`Models.kt` 2 处：`multiNumOrNull Models.kt:852`、`distanceMeters Models.kt:2018`） | DV-t5 / DV-t6（别名名单里每一键都要在三面之一有生产者） | `route_alias_test_negative_controls.sh` RA-1…RA-5（就地型，每一格红的是**具名用例**）+ `UserTrackingContractTest` 12→13 例 |
 | §七 状态诚实：没有来源的值写成缺失，不许沿用上一轮字面量 | 送达可达性那一支从"读两个死别名"改成显式 `distanceMeters Models.kt:2018`（赋 `null`，界面继续读后端的 `distanceText`） | DV-c = 0 | 同上 |
-| 红线"宁可暂时不能导航，不允许假导航"：绑定失败只能**拒**，不能补几何 | 会话凭证 `AcceptedRouteSession NavigationEngine.kt:197`、SDK 侧形状 `SdkPathShape NavigationEngine.kt:221`、结论体 `RouteBinding NavigationEngine.kt:224`（`Bound` 在 225、`Unbound` 在 227）、纯函数 `routeBindingOf NavigationEngine.kt:241`（三支成因在 245 / 250 / 257，收敛到 `Bound NavigationEngine.kt:262`）、SDK 层启动前重读 `currentPath AmapNavigationEngine.kt:357`、出口 `RouteBinding AmapNavigationEngine.kt:361`（`Unbound` 即 `NavigationSession.Refused`）；拒绝分支的旧引擎出口 `startGpsNavi NavigationEngine.kt:542` 保持只有 Refused 一条路 | N-u / N-v / N-w / N-x（四条新判据，各配注入） | `navigation_test_negative_controls.sh` ✔=17，其中 M12 红 1 例 / M13 红 2 例 / M14 红 1 例 / M15 红 3 例（用例基数 34） |
+| 红线"宁可暂时不能导航，不允许假导航"：绑定失败只能**拒**，不能补几何 | 会话凭证 `AcceptedRouteSession NavigationEngine.kt:210`、SDK 侧形状 `SdkPathShape NavigationEngine.kt:234`、结论体 `RouteBinding NavigationEngine.kt:237`（`Bound` 在 225、`Unbound` 在 227）、纯函数 `routeBindingOf NavigationEngine.kt:254`（三支成因在 245 / 250 / 257，收敛到 `Bound NavigationEngine.kt:275`）、SDK 层启动前重读 `currentPath AmapNavigationEngine.kt:357`、出口 `RouteBinding AmapNavigationEngine.kt:361`（`Unbound` 即 `NavigationSession.Refused`）；拒绝分支的旧引擎出口 `startGpsNavi NavigationEngine.kt:558` 保持只有 Refused 一条路 | N-u / N-v / N-w / N-x（四条新判据，各配注入） | `navigation_test_negative_controls.sh` ✔=17，其中 M12 红 1 例 / M13 红 2 例 / M14 红 1 例 / M15 红 3 例（用例基数 34） |
 | §100 第三方与许可证 | 本轮 **0** 新增第三方构件；4 件自写文件登记进 `THIRD_PARTY_NOTICES.md` 的 ⑬⑭⑯⑰ 段 | 无（登记项不是判据） | 无 |
 | §104 / §55 环境诚实性 | 树指纹 + `verify_device.sh` 单跑，设备证据落 `docs/device-evidence/20261003-134005/` | 状态板那七格常驻自检 | 无 |
 
@@ -3538,7 +3538,7 @@ APK 行重锚、`tools/run_all_negative_controls_batch.sh` 补聚合退出码（
 
 1. **"三面 0 生产者"从不可复现变成逐字可复现**（D-②-4 闭环）。以前那个"32 处 C 站点"是一次性 grep 的产物，谁都复现不了；现在 `default_value_census.py` 每行自带 `shape` / `numbool_nonnull` / `demo_keys`，聚合里有 `shape_tally` / `c_shape` / `c_no_producer`，而 `DV-u` 用**另一份独立实现**去交叉核对（同一份代码自证不算判据），`DV-w` 更把"grep 116 vs census 114"这个差解释到个位 —— **+2 是逐名列函数自己的两条声明，不是读法差异**。代价也记下来：`DV-k` 那格的 116 数值没变但**含义变了**，历史引用要带这个解释（§7）。
 2. **ID-MISS 第一次能当闸门而不是候选清单**（D-③-5 闭环）。锚点标识符改成按锚点分配、且 `aid` **不含行号**，于是"整篇台账行号位移"不再新增/消灭在册条目（`doc_anchor_negative_controls.sh` 里那条 POS 控制实测：顶部插一行让所有行号位移，判据仍绿）；同时"新增即红 / 消失即红 / 扫不到即红"三向都有破口（DA-a/b/c/d/e/f 六条注入全命中）。**但同一轮也暴露出新的无闸门面**：`docs/android/RUNCATCHING_AUDIT.md` 的逐点账锚点不在任何在册表里 —— 它漂了不会有东西响（§5 登记为 D-⑬⑭⑯⑰-1）。
-3. **导航会话与"当前这条真实路线"之间第一次有一个可判定的结论**。`routeBindingOf` 把"没有凭证 / SDK 没给出点集 / 起终点已经不是同一条"三支成因**分开说**，SDK 层在 `startGpsNavi` 之前重读一次 `navi.naviPath`（`currentPath AmapNavigationEngine.kt:513`），于是"上一轮的会话还在、路线早换了"这种状态不再被当成可导航；绑定失败走 `Refused`，**没有**新增任何补几何或降级路径。红线形状守住了，且这条形状由 N-u…N-x + M12…M15 双向钉住。
+3. **导航会话与"当前这条真实路线"之间第一次有一个可判定的结论**。`routeBindingOf` 把"没有凭证 / SDK 没给出点集 / 起终点已经不是同一条"三支成因**分开说**，SDK 层在 `startGpsNavi` 之前重读一次 `navi.naviPath`（`currentPath AmapNavigationEngine.kt:516`），于是"上一轮的会话还在、路线早换了"这种状态不再被当成可导航；绑定失败走 `Refused`，**没有**新增任何补几何或降级路径。红线形状守住了，且这条形状由 N-u…N-x + M12…M15 双向钉住。
 
 ### 4 新增文件 / 改动面 / 换行符 / 许可证义务
 
@@ -5777,7 +5777,7 @@ for f in tools/check_*.sh; do bash "$f" >log 2>&1; echo "$(basename $f) rc=$?"; 
    `SendScreen.kt:1127`「请手动选择取货站点；本单不声称车辆可上门」，判据还点着旧字面量「不代表车辆能到」⇒ 0 命中。
    判据跟着换点名对象并在簿头写清旧句→新句的对应，**不是放松**：那句再被删或换成万能提示照样红。
 2. `check_throwable_probes.sh` TH-e 豁免面（1→**2**，rc 1→**0**）。实测两处免检 `catch (e: Exception)`：
-   `DriverSdkNavCard.kt:468`（旧登记在册）+ `BusScreen.kt:866`（步行导航唤起高德、失败退网页版）。
+   `DriverSdkNavCard.kt:479`（旧登记在册）+ `BusScreen.kt:866`（步行导航唤起高德、失败退网页版）。
    逐处看过 try 段：**只有一句 `ctx.startActivity(...)`，一个挂起点都没有** ⇒ §三十一"suspend 不许吞取消"在这两处没有适用对象。
    数量继续钉死恰好 2（再加第三处就得当场改这一行并说为什么）。
 
@@ -6197,9 +6197,9 @@ D-082 写的是"破口注入成功、判据照样绿"。逐条对着今天的源
 2. **两处"下限低于实测"的空转闸门**（这条不在 D-082 的 20 格里，是归因 SA-d 时实测出来的同族）：
    `check_safe_call_probes.sh` 的 SA-d「全 main `attempt {`」与 `check_throwable_probes.sh` 的 TH-f 数的是**同一个扫描面**，
    两本都写 `-ge 11`，实测已经是 **14** ⇒ 顺手删一到三处都不红。两本同轮改成**恰好 14**，并把 14 处逐点列进 SA-d 注释
-   （`BusPostApp.kt:43 / Locator.kt:214 / AmapNavigationEngine.kt:447 / Repo.kt:140 / Repo.kt:386 / NotifyWorker.kt:34 /
+   （`BusPostApp.kt:43 / Locator.kt:214 / AmapNavigationEngine.kt:450 / Repo.kt:140 / Repo.kt:386 / NotifyWorker.kt:34 /
    BusPostRoot.kt:97 / :111 / :112 / UpdateSection.kt:94 / DriverGuideScreen.kt:141 / DriverNavScreen.kt:719 /
-   DriverSdkNavCard.kt:266 / HandoverScreen.kt:160`）。
+   DriverSdkNavCard.kt:268 / HandoverScreen.kt:160`）。
    ⚠ 归因诚实：11→14 的三处里只有**两处**指得到具名提交（`Repo.kt:140` 续期 `dd7d6093`、`UpdateSection.kt:94`
    装包申请权限 `3687211c`，都在 10-12），第三处落在本仓 git 起点（`d12b419`，10-10）之前 ⇒ **登记为增量未归因**，
    不写成"谁加的"。另：TH-f 那本自己的 echo 原写"目标 ≥7"、gate 写"-ge 11"——**同一本里两个数**，也是本轮对齐的。
@@ -7845,7 +7845,7 @@ idempotency / idempotency_test / mission_route / navigation_test / notify_result
 - navigation_test M6/M7：`guide.stops.filter{…}.minByOrNull{ it.visitSequence }` 被 #49 收进了
   `navigableStopsOf`。**M6 的第一版修法是空刀**：只把破口挪到"摘掉 `.sortedBy`"，而"下一站"那一行自己还写着
   `minByOrNull` ⇒ 上游排不排序它都挑得对，62 例照旧全绿 —— 是这本负控自己把它报成 ✘ 的，不是我看出来的。
-  真破口在 **`NavigationEngine.kt:495`** 那一行（改成直接吃数组顺序、两个出口都不走）。
+  真破口在 **`NavigationEngine.kt:511`** 那一行（改成直接吃数组顺序、两个出口都不走）。
   同本 M15 的指纹锚点也因 `wp=` 段从一行变三行 ⇒ 换三行原文。复跑 **rc=0 ✔=39 ✘=0**（1096s，比早退那轮多跑 18 把刀）。
 
 **② 幂等判据：一条是判据跑不动，六条是钉值落后于实测**（`check_idempotency_probes.sh` 改后 **rc=0**）：
@@ -10394,7 +10394,7 @@ D-153 里我把这一格登记成缺陷：`am force-stop` + 重新拉起后落�
 到站格右下一整枚 `BusButton("回工作台作业")` 就落在胶囊那一格里面 —— 按钮露着半截看得见，点下去走的是"退出导航 / 看整段"。
 这一格是本人在 D-156 铺胶囊时留下的，用户没说，但它正是"能悬浮的别挡"最直白的反例。
 
-修法（`DriverGuideScreen.kt:374` 那一处，不是改胶囊也不是撤到站格）：
+修法（`DriverGuideScreen.kt:377` 那一处，不是改胶囊也不是撤到站格）：
 - 到站格 `.padding(bottom = capsuleReserve())` ⇒ 它**浮在胶囊之上**，`onSizeChanged` 量到的是格本身、不含让出的那一格；
 - `bottomReserve` 两个分支各 `+ capsuleReserve()` ⇒ 高德路口放大图不再换成被到站格压住；
 - 没到站时 `bottomReserve` 仍是 0：地图那一大块不许为了一条不存在的格被压矮（D-156 的沉浸口径不动）。
@@ -11759,3 +11759,78 @@ D-175 那份"未验清单"里排第一的是**公告那一格屏上没验过**�
 - ⚠ **横屏那一格在 v226 自己身上读不到**：v226 就是线上最新一版 ⇒ 冷启动走 `UpToDate`，弹不出那个框。
   这条修正在发布件上的屏上读数要等 v227；现在的凭证是"同源码的本地 215 包，横竖两态成对"（§三）。
   下一次发版前若要再读一次 Available 分支，仍然只能拿一个 versionCode 低于线上的包。
+
+## D-177 · 司机导航卡上那三族内部原文撤下来：屏上说"下一步该做什么"，原文只进日志（2026-10-19）
+
+### 一、这一族是谁、为什么现在才动
+
+用户口径从 D-175 就写着「这个 release 版本不允许出现开发专业词汇」。前三处咽喉（更新通路 / 网络通路 / 天气那行）
+在 D-175 清了，第四处一直在**司机每天盯的那张卡**上。本轮先给分母（不再用"约 80 处"这种没出处的说法）：
+`tmp/jargon_scan.py` 剥掉注释与日志出口后实测 **40 个文件 / 201 处含开发词的字面量**，
+其中大头在数据层（DemoData 40 / Repo 39 / Models 30，多数不上屏），
+**确定会到眼前的**是三族，本轮把三族全接了：
+
+| 族 | 屏上位置 | 病 |
+| --- | --- | --- |
+| `gate.detail` | 导航卡「展开更多」那一格 | 直接把 `hasOrigin=false`、`initResult=null` 这类字段名念给司机 |
+| `RouteCheck.Rejected.detail` | 卡片与引导页那两行拒收说明 | 把 `road=…m straight=…m`、`getNaviPath()=null`、甚至异常 `toString()` 拼进给用户那句 |
+| `SourceTag` 的 `else -> source` | 线路/车辆卡那颗来源标签 | 认不出的枚举原样印上屏 |
+
+第二族最讽刺的地方是：这个类自己的注释一直写着「reason 面向用户，detail 面向日志与调试 HUD」——
+**注释是对的，屏幕没照做**。所以本轮没有新造口径，只是让屏幕真的遵守它。
+
+### 二、三族各怎么接
+
+1. **`gate.detail` 不再上屏，改念 `gate.hint`**。新增 `hint` 字段（`NavigationEngine.kt:125` 那一族），
+   六个不可点分支各有一句"那我现在该做什么"：缺组件 →「让站点重装带导航的那一版」；缺授权 →「找站点把导航配上，
+   先按站牌和班次表自己走」；启动失败 →「先按不导航走，退出重进一次，别在路口等它」；
+   加载中 / 正在启动 →「这一格自己会变，不用退出重进」；没定位 →「到窗边或开阔处站一下，或下拉刷新位置」；
+   调度没给点 →「先在工作台看这一趟还有哪些站没做」。
+   ⚠ 原文一个字没删：`gate.detail` 仍带 `hasOrigin=false` 那一类字段名，只是**只进 logcat**
+   （`BUS_UI` 那行原本就在打 `detail=`）。
+2. **拒收那两行只念 `reason`**，`detail` 改进 `Log.w("BUS_NAV", …)`。卡片那一处必须挂在
+   `LaunchedEffect(check)` 上——这一屏每帧刷新都会重组，直接写在组合体里等于每帧打一条日志。
+3. **来源标签收成纯函数 `sourceTagLabel`**（`Components.kt:903`）：认得出的四句人话原样保留
+   （这一格存在的目的是"别把推算当实测"，#41/#55 那条诚实线，不许顺手美化），
+   认不出来只有一句「来源没认出来」——**不透原词、也不悄悄不给标签**（后者等于把"我们看不懂这条标注"
+   演成"没有标注"）。
+4. 顺带把会**上屏**的几句 reason 里的机器词换掉：`导航引擎正在加载/初始化中` → `导航正在加载/正在启动`、
+   `导航能力未就绪：…` → 三句各说各的成因、`导航引擎实例不可用` → `导航没能启动起来`、
+   `已有一次算路在等高德回执` → `上一次算路还没回来`、`算路请求没有被导航引擎受理` → `这次算路没被导航接过去`、
+   `高德没有返回路径几何` → `高德没给出这条路具体怎么走`、`高德算路失败（code=…）` → 屏上那句不再带码，
+   结果码改打 `BUS_NAV` 日志。
+   ⚠ **没动的那一类**：`折线`、`坐标`、`直线距离`、`路网里程` 这些几何词留着 —— 它们是"这条路线长什么样"的描述词，
+   不是内部标识符，而且被 `RealRoadRouteValidatorTest` 逐条钉着；把它们一起换掉是措辞之争，不是清开发词。
+
+### 三、判据与用例
+
+- 静态闸：`check_navigation_probes.sh` 新增 **N-wd** 十格（实测钉值：8/1/0/1 与 2/0/0/2+1+3，
+  第一版按"应该有"写的目标数当场红给自己看，改的是目标不是代码）（`hint` 出口恰好 8 / 卡片读 hint 恰好 1 /
+  旧那格残留 0 / `gate.detail` 只剩日志那一处 / 拒收原文进日志恰好 2 / 屏上拼原文 0 / `else -> source` 0 /
+  来源出口 2 + 兜底句 1 / 引擎原文还在 detail 里恰好 3）。
+  ⚠ 两条踩过的坑都写进簿里：计数一律**先滤注释行**（我自己那句注释提到 `else -> source`，
+  不滤就把"写了注释"读成"病还在"）；`N-r` 那一格的老锚点 `if (!gate.canNavigate)` 因为新条件多了
+  "且 hint 非空"而失配，**退到前缀形式**继续钉同一件事（不可点这一支还在页面上说话），不是把闸门放宽。
+- 负控：`navigation_negative_controls.sh` 加 6 条（念回屏上 / 日志也没接住 / 把 detail 拼回那句 /
+  来源透原词 / 少一句 hint / 把原文删掉），方向配成对：**"屏上干净了"与"证据没了"各能单独咬住**。
+- 用例：`NavigationContractTest` 新增一条"屏上那两句不含内部词而诊断原文留在 detail"
+  （两头各一刀，并先数"这一族覆盖到 6 个不可点码"防止空跑），
+  另在"不可点的每个状态都说得出缺什么"那一格里加一条 `hint` 非空；
+  新增 `core/ui/SourceTagLabelTest.kt` 4 条。
+  随动改的期望值 7 处（`导航引擎初始化中` → `导航正在启动` 那一族），**改的是被钉的话，不是钉的方式**：
+  "三态用词不许混""缺组件优先于缺配置""NO_ROUTE 分清缺起点还是缺目标"三条意图原样保留。
+  SU-b 基数 81 → 82（唯一增量就是那本新用例）。
+- 收尾读数：`PRODUCT classes=80 tests=829 failures=0 errors=0 skipped=0`（823 + 本轮 6 条：
+  导航契约 1 条 + 来源标签 5 条；类数 79 → 80 的唯一增量就是那本新用例）、`RESULT pass=51 fail=0`。
+  ⚠ 中途有一遍是红的（`NavigationContractTest` 与 `SourceTagLabelTest` 各 1 条）：红因都是我自己
+  把"哪一半上屏"改了却没同步期望值 —— 一条钉的是旧 `detail` 里那句"不需要重进"（现在在 `hint`），
+  一条把 `REAL_XXX` 当成"认不出来"（它按 REAL 前缀读成「实时」是**故意的**，于是补一条用例把这一格
+  选择记下来，而不是把断言改成能过）。两遍红都改的是**被钉的那一句**，没有放宽任何一条断言。
+
+### 四、屏上那一格验到哪一层（不许读成"验过了"）
+
+- ⚠ **NOT VERIFIED ON DEVICE**：这几格都要"引擎/算路失败"才出现。这台机的高德是配好的、导航此刻是 Ready，
+  所以「下一步该做什么」那一行、拒收那两行、以及「来源没认出来」那颗标签，**本轮都只做到用例 + 静态闸级**，
+  没在真机上读到过。要拿到屏幕读数，得等一次能自然弹出这些状态的会话（或下一次发版后用低版本包读 Available 那一路，
+  与 D-176 §三 同一条通道）。
+- 已经真机验过的是同一条诚实线上的**上一格**：升级弹窗（D-176 三张底片）、天气那行（D-173 那轮）。

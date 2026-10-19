@@ -3152,7 +3152,7 @@ D-003 原文要求"在页面上显著标注"。落三处，判据 N-o 钉 ≥2/1
 1. `app/src/main` 里生效的 `catch (e: Throwable)` 共 **6** 处（F-1-a 分类读数），`catch (e: Exception | Throwable)` **69** 处。
 2. 分级之后真正会吞取消的是"try 首段里有挂起点"的那一批：`catch (e: Exception)` 全 main **49** 处
    （`grep -rn "catch (e: Exception) {"` 裸数与排除注释行数**相同** ⇒ 这一族没有被注释顶替的风险），
-   其中挂起形状 **48** 处、非挂起 **1** 处（`DriverSdkNavCard.kt:484` 唤起外部地图，`startActivity` 不可被取消）。
+   其中挂起形状 **48** 处、非挂起 **1** 处（`DriverSdkNavCard.kt:495` 唤起外部地图，`startActivity` 不可被取消）。
 3. §七 点名要建的那个"unified helper"形状，**工程里已经有了**：`apiCall`（`Api.kt:60`，`suspend inline`、
    先 `throw e` 穿透取消、五类 typed 分支，`ApiTest.kt:168` 有"只做分类不吞异常"一条用例）——
    但**生产调用点实测 0**。这条读数决定了本轮的命名与范围（见 D-034 第 2 点），也决定了它**不能**被写成"本轮建了 safeApiCall"。

@@ -251,8 +251,10 @@ fun DriverSdkNavCard(
 
             if (detailExpanded) {
                 BusDivider(Modifier.padding(vertical = 7.dp))
-                // 诊断原文回到这里：收起时主面只有一句人话原因，要查"到底差哪一步"再展开看
-                if (!gate.canNavigate) InfoRow("差在哪一步", gate.detail)
+                // ⚠ 这一格念的是 `gate.hint`（"那我现在该做什么"），**不是** `gate.detail`：
+                // 原文是 `hasOrigin=false` 那一类字段名，展开给人看的地方也不能出现（D-177，用户口径"这是要发的包"）。
+                // 原文一个字没丢，整条进 logcat（本函数开头那条 `BUS_UI` 的 LaunchedEffect 里 `detail=`）。
+                if (!gate.canNavigate && gate.hint.isNotEmpty()) InfoRow("下一步该做什么", gate.hint)
                 InfoRow(
                     "当前位置",
                     if (vehicleGeo != null) "%.5f, %.5f".format(vehicleGeo.lat, vehicleGeo.lng) else "暂无定位",
@@ -284,7 +286,7 @@ fun DriverSdkNavCard(
                                 // 引擎自己抛出来的一律如实回"没算成"，绝不回退到旧折线。
                                 // attempt 而非 runCatching：司机离开这一屏时取消要穿出，不能被收成"引擎异常"
                                 // 再往已经离场的 StateFlow 上写一次假回执（§七）。
-                                .getOrElse { RouteCheck.Rejected(reason = "导航引擎调用异常", detail = it.toString()) }
+                                .getOrElse { RouteCheck.Rejected(reason = "导航没答上来，这一趟先按不导航走", detail = it.toString()) }
                             routeCheck = result
                             // 只有高德真回了这条路的折线，"剩余里程 → 任务点"这个配对才成立；
                             // 失败/异常时清空，宁可让到近那一行退到后端口径或沉默。
@@ -302,12 +304,21 @@ fun DriverSdkNavCard(
 
                 routeCheck?.let { check ->
                     when (check) {
-                        is RouteCheck.Rejected -> Text(
-                            check.reason + if (check.detail.isEmpty()) "" else "（${check.detail}）",
-                            color = t.goldDeep,
-                            fontSize = (11.5 * scale).sp,
-                            modifier = Modifier.padding(top = 7.dp),
-                        )
+                        is RouteCheck.Rejected -> {
+                            // `detail` 按这个类自己的注释就是"面向日志"的那一半（`road=33230m straight=2014m`、
+                            // `getNaviPath()=null`、甚至 `origin.toString()`）——屏上只念 reason，原文进 logcat。
+                            // ⚠ 必须挂在 LaunchedEffect(check) 上：这一屏每帧刷新都会重组，
+                            //   直接写在组合体里等于每帧打一条日志。
+                            androidx.compose.runtime.LaunchedEffect(check) {
+                                android.util.Log.w("BUS_NAV", "route_check rejected: ${check.reason} | ${check.detail}")
+                            }
+                            Text(
+                                check.reason,
+                                color = t.goldDeep,
+                                fontSize = (11.5 * scale).sp,
+                                modifier = Modifier.padding(top = 7.dp),
+                            )
+                        }
 
                         is RouteCheck.Accepted -> Column(Modifier.padding(top = 9.dp)) {
                             val route = check.route

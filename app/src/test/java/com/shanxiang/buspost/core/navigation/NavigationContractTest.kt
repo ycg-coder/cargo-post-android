@@ -69,7 +69,7 @@ class NavigationContractTest {
         val initializing = readinessOf(sdkPresent = true, keyConfigured = true, initResult = null)
         assertEquals(EngineReadiness.Initializing, initializing)
         assertFalse("Initializing 绝不能 canNavigate", initializing.canNavigate)
-        assertEquals("导航引擎初始化中", initializing.userText)
+        assertEquals("导航正在启动", initializing.userText)
     }
 
     /**
@@ -81,15 +81,15 @@ class NavigationContractTest {
     fun `缺组件优先于缺配置，缺配置优先于等回调`() {
         val noSdk = readinessOf(sdkPresent = false, keyConfigured = false, initResult = null)
         assertTrue(noSdk is EngineReadiness.Blocked)
-        assertTrue((noSdk as EngineReadiness.Blocked).reason, noSdk.reason.contains("导航组件未随包发布"))
+        assertTrue((noSdk as EngineReadiness.Blocked).reason, noSdk.reason.contains("没装上导航组件"))
 
         val noKey = readinessOf(sdkPresent = true, keyConfigured = false, initResult = null)
         assertTrue(noKey is EngineReadiness.Blocked)
-        assertTrue((noKey as EngineReadiness.Blocked).reason, noKey.reason.contains("没有配置高德 key"))
+        assertTrue((noKey as EngineReadiness.Blocked).reason, noKey.reason.contains("没配上高德的授权"))
 
         val initFailed = readinessOf(sdkPresent = true, keyConfigured = true, initResult = false)
         assertTrue(initFailed is EngineReadiness.Blocked)
-        assertTrue((initFailed as EngineReadiness.Blocked).reason, initFailed.reason.contains("初始化失败"))
+        assertTrue((initFailed as EngineReadiness.Blocked).reason, initFailed.reason.contains("一启动就没成功"))
     }
 
     /** Blocked 必须带真实原因：空原因等于"不支持"三个字，用户不知道缺什么 */
@@ -114,14 +114,16 @@ class NavigationContractTest {
     @Test
     fun `原生库加载中是第四态，既不可点也不算引擎故障`() {
         assertFalse("加载中绝不能 canNavigate", EngineReadiness.Loading.canNavigate)
-        assertEquals("导航引擎正在加载", EngineReadiness.Loading.userText)
+        assertEquals("导航正在加载", EngineReadiness.Loading.userText)
 
         val gate = navigationGateOf(EngineReadiness.Loading, hasOrigin = true, hasNavigableDestination = true)
         assertEquals(NavigationGateCode.LOADING, gate.code)
         assertFalse(gate.canNavigate)
         assertFalse("加载中不等于引擎故障，不许染故障色", gate.engineBlocked)
         assertTrue("必须告诉司机这是暂时的", gate.userText.contains("正在加载"))
-        assertTrue("必须说明不需要重进", gate.detail.contains("不需要"))
+        // D-177：这句"不用退出重进"从 detail（诊断原文）搬进了 hint（给人看的那一句）——
+        // 原文那一半现在是 `readiness=Loading（…）`，只进日志；意图没变，变的是被读的那一半。
+        assertTrue("必须说明不需要重进", gate.hint.contains("不用退出重进"))
     }
 
     /**
@@ -217,7 +219,7 @@ class NavigationContractTest {
     @Test
     fun `没有可导路线时分清缺起点还是缺目标`() {
         val missingOrigin = navigationGateOf(EngineReadiness.Ready, hasOrigin = false, hasNavigableDestination = true)
-        assertTrue(missingOrigin.reason, missingOrigin.reason.contains("定位"))
+        assertTrue(missingOrigin.reason, missingOrigin.reason.contains("还没拿到你的位置"))
         assertFalse(missingOrigin.engineBlocked)
 
         val missingStop = navigationGateOf(EngineReadiness.Ready, hasOrigin = true, hasNavigableDestination = false)
@@ -248,8 +250,60 @@ class NavigationContractTest {
             assertTrue("${gate.code} 的 reason 为空", gate.reason.isNotBlank())
             assertTrue("${gate.code} 的措辞没走唯一出口", gate.userText.startsWith("导航暂不可用："))
             assertTrue("${gate.code} 缺 detail", gate.detail.isNotBlank())
+            // D-177：不可点必须**同时**给得出"下一步该做什么"，否则司机只读到一句"不行"
+            assertTrue("${gate.code} 缺 hint（下一步）", gate.hint.isNotBlank())
         }
         assertFalse(navigationGateOf(EngineReadiness.Ready, true, true).userText.startsWith("导航暂不可用"))
+    }
+
+    /**
+     * D-177 的正面判据：**能上屏的那两句（reason / hint）里不许有内部词，而诊断原文必须还在 detail**。
+     *
+     * 两条要一起钉，只钉一条都会骗人：
+     *  · 只钉"屏上干净" ⇒ 把 detail 一起删了也算绿（那是把证据跟着措辞一起扔了，D-176 同一族）；
+     *  · 只钉"detail 还在" ⇒ 屏上继续念 `hasOrigin=false` 也算绿。
+     * 所以这里两头各一刀：屏上两句逐词扫禁词，detail 逐码扫"必须看得见字段名"。
+     */
+    @Test
+    fun `屏上那两句不含内部词而诊断原文留在 detail`() {
+        val banned = listOf("=null", "=false", "true）", "code=", "引擎", "回执", "受理", "路径几何", "SDK", "AMapNavi")
+        val gates = listOf(
+            navigationGateOf(EngineReadiness.Ready, hasOrigin = false, hasNavigableDestination = true),
+            navigationGateOf(EngineReadiness.Ready, hasOrigin = true, hasNavigableDestination = false),
+            navigationGateOf(EngineReadiness.Initializing, hasOrigin = true, hasNavigableDestination = true),
+            navigationGateOf(EngineReadiness.Loading, hasOrigin = true, hasNavigableDestination = true),
+            navigationGateOf(
+                readinessOf(sdkPresent = false, keyConfigured = true, initResult = null),
+                hasOrigin = true,
+                hasNavigableDestination = true,
+            ),
+            navigationGateOf(
+                readinessOf(sdkPresent = true, keyConfigured = false, initResult = null),
+                hasOrigin = true,
+                hasNavigableDestination = true,
+            ),
+            navigationGateOf(
+                readinessOf(sdkPresent = true, keyConfigured = true, initResult = false),
+                hasOrigin = true,
+                hasNavigableDestination = true,
+            ),
+        )
+        assertEquals("这一族要覆盖到六个不可点码，少一个这一格就是空跑", 6, gates.map { it.code }.toSet().size)
+        gates.forEach { gate ->
+            for (word in banned) {
+                assertFalse("${gate.code} 的 reason 里还有 $word：${gate.reason}", gate.reason.contains(word))
+                assertFalse("${gate.code} 的 hint 里还有 $word：${gate.hint}", gate.hint.contains(word))
+            }
+        }
+        // 反方向：原文一个字没删，只是不再上屏
+        val noOrigin = navigationGateOf(EngineReadiness.Ready, hasOrigin = false, hasNavigableDestination = true)
+        assertTrue("detail 必须还带着字段名：${noOrigin.detail}", noOrigin.detail.contains("hasOrigin=false"))
+        val noSdk = navigationGateOf(
+            readinessOf(sdkPresent = false, keyConfigured = true, initResult = null),
+            hasOrigin = true,
+            hasNavigableDestination = true,
+        )
+        assertTrue("detail 必须还带着字段名：${noSdk.detail}", noSdk.detail.contains("sdkPresent=false"))
     }
 
     /** `Initializing` 不是故障：卡片底色按"引擎侧坏了没有"分，未就绪里只有三种算坏 */
@@ -257,7 +311,7 @@ class NavigationContractTest {
     fun `初始化中与缺组件在界面上不是一回事`() {
         val initializing = navigationGateOf(EngineReadiness.Initializing, hasOrigin = true, hasNavigableDestination = true)
         assertFalse("初始化中不许被念成引擎坏了", initializing.engineBlocked)
-        assertTrue(initializing.userText, initializing.userText.contains("初始化"))
+        assertTrue(initializing.userText, initializing.userText.contains("正在启动"))
 
         val broken = navigationGateOf(
             readinessOf(sdkPresent = false, keyConfigured = true, initResult = null),
