@@ -18,10 +18,11 @@ M=app/src/main/java/com/shanxiang/buspost
 YML=.github/workflows/build-and-release.yml
 AU=$M/core/update/AppUpdate.kt
 AUP=$M/core/update/AppUpdater.kt
+UD=$M/core/update/UpdateDialog.kt
 US=$M/ui/common/UpdateSection.kt
 PICK=tools/release_notes_pick.py
 API=$M/core/net/Api.kt
-FILES=("$YML" "$AU" "$AUP" "$US" "$PICK" "$API")
+FILES=("$YML" "$AU" "$AUP" "$UD" "$US" "$PICK" "$API")
 PROBE=tools/check_release_wording_probes.sh
 BAK=/tmp/rw_negctl.bak.$$
 
@@ -118,6 +119,33 @@ check RW-9 "× RW-e" "$API" \
         Log.w(TAG, "BUS_NET $detail")' \
   '    private fun netFail(userWords: String, detail: String): NetworkException {
         // 日志撤了'
+
+# ---------- RW-f 那一族：横屏上弹窗装不下，两颗按钮就摸不到（真机量到过） ----------
+# 这三条是**从症状倒过来**写的：不是"少了 weight 所以红"，而是"少了/放错了这一行，
+# 393dp 高的那一屏就会把「稍后再说」「立即更新」顶出去"。所以撤行与调序两条都要能红。
+
+# RW-10 冷启动弹窗的公告框退回写死高度 → RF_W1 0
+check RW-10 "× RW-f" "$UD" \
+  '                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .heightIn(max = 190.dp)' \
+  '                        .fillMaxWidth()
+                        .heightIn(max = 190.dp)'
+
+# RW-11 「设置 → 关于」那一处同样退回写死高度 → RF_W2 0（两处同一个病，只修一处等于没修）
+check RW-11 "× RW-f" "$US" \
+  '                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .heightIn(max = 200.dp)' \
+  '                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)'
+
+# RW-12 两行调个顺序（封顶排在吃剩余空间之前）：weight 拿到的上限已经是 190dp，等于没写 → RF_ORDER1 0
+check RW-12 "× RW-f" "$UD" \
+  '                        .weight(1f, fill = false)
+                        .heightIn(max = 190.dp)' \
+  '                        .heightIn(max = 190.dp)
+                        .weight(1f, fill = false)'
 
 # 最后一条注入之后必须再还原一次：`check` 是在**注入前**还原的，收尾不还原就会把破口留在工作树里
 restore

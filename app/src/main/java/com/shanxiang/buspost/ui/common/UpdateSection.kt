@@ -127,9 +127,13 @@ fun UpdateCheckRow() {
                     Spacer(Modifier.height(4.dp))
                     // 与冷启动那个弹窗同一个出口、同一条口径：公告原文不重写，
                     // 空与超长都由 announcementText 说实话，这里给可滚的高度而不是切一半。
+                    // ⚠ 先 `weight` 再 `heightIn`（与 UpdateDialog 同一写法）：横屏时这一格写死 200dp
+                    // 会把「稍后再说」「立即更新」顶到屏幕外；`heightIn` 排在后面兜住上限，
+                    // 所以即便外层给的是无限高，也只会退回竖屏那一个读数，不会更长。
                     Box(
                         Modifier
                             .fillMaxWidth()
+                            .weight(1f, fill = false)
                             .heightIn(max = 200.dp)
                             .verticalScroll(rememberScrollState()),
                     ) {
