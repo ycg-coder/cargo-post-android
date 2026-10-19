@@ -64,17 +64,27 @@ RC_LOG=$(cnt 'BUS_UPDATE' "$AUP")
 RC_POS=$(cnt 'APK_ASSET_NAME' "$AU")
 
 # ---------- RW-d 真跑一次取公告 ----------
+# ⚠ 解释器要 `python` 兜到 `python3`，并且**拿不到就 rc=2 不跑**：CI 上只有 python3，
+#   第一版写死 `python` ⇒ 命令不存在退 127，而 RD_MISS/RD_NEAR 那两格判的是"退码不为 0"，
+#   127 也算不为 0 ⇒ 一格假红带着另一格**假绿**（CI 实测：命中/占位 0、词边界却报 1）。
+#   所以三条都收成"退码必须恰好是那一个"，解释器缺席则整本不采信。
+PY=$(command -v python || command -v python3 || true)
 NEWEST=$(grep -oE '^## v[0-9]+' "$RN" | head -1 | sed 's/^## //')
 RD_HIT=0; RD_MISS=0; RD_NEAR=0
-if [ -n "$NEWEST" ]; then
-  python "$PICK" --tag "$NEWEST" --file "$RN" --out tmp/rw_hit.txt >/dev/null 2>&1
-  [ $? = 0 ] && [ -s tmp/rw_hit.txt ] && ! grep -q '没有写更新公告' tmp/rw_hit.txt && RD_HIT=1
+if [ -z "$PY" ]; then
+  echo "× RW-d 找不到 python/python3：这一族三格没有输入，本轮读数不采信"
+  exit 2
 fi
-python "$PICK" --tag v999999 --file "$RN" --out tmp/rw_miss.txt >/dev/null 2>&1
-[ $? != 0 ] && grep -q '没有写更新公告' tmp/rw_miss.txt && RD_MISS=1
+"$PY" "$PICK" --tag "$NEWEST" --file "$RN" --out tmp/rw_hit.txt >/dev/null 2>&1
+RC_HIT=$?
+[ "$RC_HIT" = 0 ] && [ -s tmp/rw_hit.txt ] && ! grep -q '没有写更新公告' tmp/rw_hit.txt && RD_HIT=1
+"$PY" "$PICK" --tag v999999 --file "$RN" --out tmp/rw_miss.txt >/dev/null 2>&1
+RC_MISS=$?
+[ "$RC_MISS" = 1 ] && grep -q '没有写更新公告' tmp/rw_miss.txt && RD_MISS=1
 # 词边界：`v21` 不许命中 `v214`（命中了就等于把别的版本的公告发给这一版）
-python "$PICK" --tag v21 --file "$RN" --out tmp/rw_near.txt >/dev/null 2>&1
-[ $? != 0 ] && RD_NEAR=1
+"$PY" "$PICK" --tag v21 --file "$RN" --out tmp/rw_near.txt >/dev/null 2>&1
+RC_NEAR=$?
+[ "$RC_NEAR" = 1 ] && RD_NEAR=1
 rm -f tmp/rw_hit.txt tmp/rw_miss.txt tmp/rw_near.txt
 
 printf 'RW-a 小节/取脚本main/CI取数/CI正文/CI兜底/旧固定语 : %s/%s/%s/%s/%s/%s（目标 >=1/1/1/1/1/0）\n' \
