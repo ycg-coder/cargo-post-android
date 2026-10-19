@@ -83,21 +83,26 @@ sealed class EngineReadiness {
     /**
      * 不可用，且必须带**成因码**与可展示的原因（审计 §77：`BLOCKED` 要写缺什么，不能只写"不支持"）。
      * 这里只允许 `NOT_INSTALLED` / `SDK_UNAVAILABLE` / `ERROR`；`READY`/`INITIALIZING`/`NO_ROUTE` 是入口层结论。
+     *
+     * ⚠ 两个字各走一头：[detail] 是**诊断原文**（`sdkPresent=false` 那一类），只进 logcat；
+     * [hint] 才是给人看的那一句"那我现在该做什么"。以前只有原文可展示，于是司机在屏上读到字段名（D-177）。
      */
     data class Blocked(
         val code: NavigationGateCode,
         val reason: String,
         val detail: String = "",
+        val hint: String = "",
     ) : EngineReadiness()
 
     val canNavigate: Boolean get() = this is Ready
 
-    /** 面向用户的文案；`Loading`/`Initializing`/`Blocked` 三态分开，避免"还没轮到"被当成"这台机器不能导航" */
+    /** 面向用户的文案；`Loading`/`Initializing`/`Blocked` 三态分开，避免"还没轮到"被当成"这台机器不能导航"。
+     * ⚠ 这一句会直接上屏（chip 与收起态都念它），所以不写"引擎/初始化"这类内部词（D-177） */
     val userText: String
         get() = when (this) {
             is Ready -> "内置导航可用"
-            is Loading -> "导航引擎正在加载"
-            is Initializing -> "导航引擎初始化中"
+            is Loading -> "导航正在加载"
+            is Initializing -> "导航正在启动"
             is Blocked -> reason
         }
 }
@@ -114,7 +119,10 @@ sealed class EngineReadiness {
 data class NavigationGate(
     val code: NavigationGateCode,
     val reason: String = "",
+    /** 诊断原文（`hasOrigin=false` 那一类）：**只进 logcat**，屏幕上不出现（D-177） */
     val detail: String = "",
+    /** 给人看的那一句"那我现在该做什么"；空 = 这一格没什么要交代的，就不占行 */
+    val hint: String = "",
 ) {
     val canNavigate: Boolean get() = code == NavigationGateCode.READY
 
@@ -143,31 +151,36 @@ fun navigationGateOf(
         code = readiness.code,
         reason = readiness.reason,
         detail = readiness.detail,
+        hint = readiness.hint,
     )
 
     EngineReadiness.Loading -> NavigationGate(
         code = NavigationGateCode.LOADING,
-        reason = "导航引擎正在加载（首次进入约需数秒）",
-        detail = "导航组件正在后台加载，加载完这一格会自动变成「导航可用」，不需要退出重进。",
+        reason = "导航正在加载（第一次进来约要几秒）",
+        detail = "readiness=Loading（原生组件在后台加载）",
+        hint = "加载完这一格自己会变成「导航可用」，不用退出重进。",
     )
 
     EngineReadiness.Initializing -> NavigationGate(
         code = NavigationGateCode.INITIALIZING,
-        reason = "导航引擎正在初始化",
+        reason = "导航正在启动",
         detail = "initResult=null",
+        hint = "已经发起启动了，就差它回一声。稍等一两秒再看；一直不回来就退出这个页面重进一次。",
     )
 
     EngineReadiness.Ready -> when {
         !hasOrigin -> NavigationGate(
             code = NavigationGateCode.NO_ROUTE,
-            reason = "暂无定位，没有起点就不算路",
+            reason = "还没拿到你的位置，没有起点就不算路",
             detail = "hasOrigin=false（不用终点或默认点顶替）",
+            hint = "到窗边或开阔处站一下，或下拉刷新位置；拿到点就能算。不拿终点或默认位置替你顶一个起点。",
         )
 
         !hasNavigableDestination -> NavigationGate(
             code = NavigationGateCode.NO_ROUTE,
-            reason = "调度还没给未完成且有坐标的任务点",
+            reason = "调度还没给下一个要去的站点",
             detail = "hasNavigableDestination=false（硬规则 3：导航不自己决定去哪里）",
+            hint = "先在工作台看这一趟还有哪些站没做；调度给出下一个要去的站点后，这里自己就能点。",
         )
 
         else -> NavigationGate(NavigationGateCode.READY)
@@ -468,22 +481,25 @@ fun readinessOf(
 ): EngineReadiness = when {
     !sdkPresent -> EngineReadiness.Blocked(
         code = NavigationGateCode.NOT_INSTALLED,
-        reason = "导航能力未就绪：导航组件未随包发布",
+        reason = "这台机器上没装上导航组件",
         detail = "sdkPresent=false",
+        hint = "查件、寄货、班车这些照常能用，只是不能一键导航。要恢复导航得让站点重装带导航的那一版。",
     )
 
     !keyConfigured -> EngineReadiness.Blocked(
         code = NavigationGateCode.SDK_UNAVAILABLE,
-        reason = "导航能力未就绪：没有配置高德 key",
+        reason = "这一版没配上高德的授权",
         detail = "keyConfigured=false（缺 key 时 SDK 不会回调，导航不能算可用）",
+        hint = "这一格不是手机的问题，是这一版没配好授权。找站点把导航配上就有；先按站牌和班次表自己走。",
     )
 
     initResult == null -> EngineReadiness.Initializing
     initResult -> EngineReadiness.Ready
     else -> EngineReadiness.Blocked(
         code = NavigationGateCode.ERROR,
-        reason = "导航能力未就绪：导航引擎初始化失败",
+        reason = "导航一启动就没成功",
         detail = "onInitNaviFailure",
+        hint = "这一单先按不导航走。退出这个页面再进来一次；还是不行就报给站点，别在路口等它。",
     )
 }
 

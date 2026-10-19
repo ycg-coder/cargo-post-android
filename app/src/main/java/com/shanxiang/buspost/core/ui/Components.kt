@@ -882,21 +882,34 @@ fun BadgeDot(count: Int, modifier: Modifier = Modifier, color: Color = LocalBusT
 /** 数据来源标注：真实上报 / 班次计划推算 / 本地演示，绝不伪装 */
 @Composable
 fun SourceTag(source: String?, modifier: Modifier = Modifier) {
-    if (source.isNullOrBlank()) return
+    val label = sourceTagLabel(source) ?: return
     val tone = when {
-        source.contains("REAL") || source.contains("实时") -> BusTone.OK
-        source.contains("SIMULATED") || source.contains("推算") || source.contains("模拟") -> BusTone.WARN
+        source != null && (source.contains("REAL") || source.contains("实时")) -> BusTone.OK
+        source != null && (source.contains("SIMULATED") || source.contains("推算") || source.contains("模拟")) -> BusTone.WARN
         else -> BusTone.NEUTRAL
     }
-    val label = when {
-        source.contains("REAL_TRANSIT") -> "现实公交"
-        source.contains("REAL") -> "实时"
-        // 后端的 SIMULATED 说的是"位置由班次计划推算"，不是说这条记录是演示数据（见 Models.kt 枚举文案注释）
-        source.contains("SIMULATED") || source.contains("推算") -> "位置推算"
-        source.contains("DEMO") -> "演示数据"
-        else -> source
-    }
     BusTag(label, modifier, tone = tone)
+}
+
+/**
+ * 来源标签的**唯一措辞出口**（纯函数，所以 JVM 用例钉得住）。
+ *
+ * ⚠ 以前这里最后一支是 `else -> source`：后端或演示面给出一个没见过的枚举（`REAL_XXX`、`locationSource`
+ * 那种内部词），就把内部词原样印到屏上（D-177，用户口径"这是要发的包，不许出现开发专业词汇"）。
+ * 现在认不出来就说实话「来源没认出来」——**不猜一个好听的、也不把这一格悄悄删掉**，
+ * 因为这一格存在的目的本来就是"别让人把推算当成实测"（#41/#55 那条诚实线）。
+ * 返回 null = 根本没有来源可标，那一格不出现。
+ */
+internal fun sourceTagLabel(source: String?): String? {
+    if (source.isNullOrBlank()) return null
+    return when {
+        source.contains("REAL_TRANSIT") -> "现实公交"
+        source.contains("REAL") || source.contains("实时") -> "实时"
+        // 后端的 SIMULATED 说的是"位置由班次计划推算"，不是说这条记录是演示数据（见 Models.kt 枚举文案注释）
+        source.contains("SIMULATED") || source.contains("推算") || source.contains("模拟") -> "位置推算"
+        source.contains("DEMO") -> "演示数据"
+        else -> "来源没认出来"
+    }
 }
 
 @Composable

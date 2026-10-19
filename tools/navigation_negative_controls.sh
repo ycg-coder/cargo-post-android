@@ -283,9 +283,14 @@ sub "$UI" 'enabled = gate.canNavigate && !calculating' 'enabled = !blocked && !c
 ctl N-r "按钮 enabled 退回 !blocked（初始化中被当成可点）"
 
 # N-r：灰按钮不再说原因（用户只能猜是 App 坏了）
-# ⚠ D-082 空转闸门重锚：这一格现在是单行 `if (!gate.canNavigate) InfoRow(…)`，旧锚点带花括号的那条不存在。
-sub "$UI" 'if (!gate.canNavigate) InfoRow("差在哪一步", gate.detail)' 'InfoRow("差在哪一步", "")'
-ctl N-r "不可点时不再显示具体缺什么"
+# ⚠ D-082 空转闸门重锚：这一格现在是单行 `if (…) InfoRow(…)`，旧锚点带花括号的那条不存在。
+# ⚠ D-177 再重锚：那一行改读 `gate.hint`（原文撤下屏），旧锚点 `gate.detail` 的字面已经不在树里 ——
+#   锚点跟着改，注入的破口还是同一件事：**这一行不再说"缺什么/下一步"，只留一个空壳**。
+#   名字也要跟着改准：过去写的是"不再显示具体缺什么"，而判据那句是"不再说出缺什么"，
+#   对不上时 ctl 只会报 △（红了但抓到别的），这一格等于没验过。
+sub "$UI" 'if (!gate.canNavigate && gate.hint.isNotEmpty()) InfoRow("下一步该做什么", gate.hint)' \
+           'if (!gate.canNavigate) InfoRow("下一步该做什么", "")'
+ctl "N-r 不可点时不再说出缺什么" "那一行不再读 hint（灰按钮不给原因）"
 
 # N-s：引擎退回只挡 Blocked —— 算路与开始导航都会放行"还在等回执"的引擎
 sub "$AM" 'if (!state.canNavigate) {' 'if (state is EngineReadiness.Blocked) {'
@@ -875,6 +880,34 @@ ctl "N-rm 提醒被做成了弹窗" "模态弹窗吃掉地图手势与返回键"
 # 否则上面那两个"恰好 2"可能是扫描根本看不见这一屏（D-082 那批空转闸门的同族）。
 sub "$WB" 'reminder ?: distanceText' 'distanceText'
 ctl "N-rm 工作台那一行不再读提醒" "正对照失效：扫描看不见这一屏时上面那些读数不采信"
+
+# ---------- N-wd（D-177）：司机导航卡那三族内部原文 ----------
+# 这一族的破口有两种方向，各配一条：把原文**念回屏上**（那一格又变回字段名），
+# 以及把原文**连同日志一起删掉**（屏上干净了，装机的人却再没处查）。
+CMP2="$A/core/ui/Components.kt"
+[ -f "$CMP2" ] || { echo "✘ 副本缺 $CMP2，N-wd 无法负控"; exit 2; }
+
+sub "$UI" 'if (!gate.canNavigate && gate.hint.isNotEmpty()) InfoRow("下一步该做什么", gate.hint)' \
+           'if (!gate.canNavigate) InfoRow("差在哪一步", gate.detail)'
+ctl "N-wd 卡片读 hint 的次数不是 1" "旧那一格把诊断原文念回屏上了"
+
+sub "$UI" 'android.util.Log.w("BUS_NAV", "route_check rejected: ${check.reason} | ${check.detail}")' 'Unit'
+ctl "N-wd 算路被拒的原文进日志不是两处" "屏上撤了、日志也没接住（撤措辞顺手撤证据）"
+
+sub "$UI" '                            Text(
+                                check.reason,' \
+           '                            Text(
+                                check.reason + "（${check.detail}）",'
+ctl "N-wd 又有屏上那句把 detail 拼回去了" "面向日志的那一半被拼进给用户看的那一句"
+
+sub "$CMP2" '        else -> "来源没认出来"' '        else -> source'
+ctl "N-wd 来源标签退回把原词印上屏" "认不出的枚举原样上屏"
+
+sub "$NE" '            hint = "到窗边或开阔处站一下，或下拉刷新位置；拿到点就能算。不拿终点或默认位置替你顶一个起点。",' ''
+ctl "N-wd 引擎里「下一步该做什么」那一句不再是 8 处" "某个不可点码没话可说（只报不行、不说下一步）"
+
+sub "$NE" '        detail = "sdkPresent=false",' '        detail = "",'
+ctl "N-wd 引擎原文被删了" "屏上撤词的同时把证据也扔了"
 
 echo "---"
 echo "负控制跑完：上面每行都必须是 ✔（△ 说明这条破口被别的判据误抓，✘ 说明这条判据根本不判）"

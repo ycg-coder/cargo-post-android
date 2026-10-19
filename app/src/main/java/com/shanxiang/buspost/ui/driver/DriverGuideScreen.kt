@@ -221,12 +221,15 @@ fun DriverGuideScreen() {
         val result = attempt {
             engine.calculateRoute(me, Geo(dest.lat, dest.lng), plan?.wayPoints?.map { it.geo } ?: emptyList())
         }
-            .getOrElse { RouteCheck.Rejected(reason = "导航引擎调用异常", detail = it.toString()) }
+            .getOrElse { RouteCheck.Rejected(reason = "导航没答上来，这一趟先按不导航走", detail = it.toString()) }
         phase = when (result) {
             is RouteCheck.Accepted -> GuidePhase.Ready(result.route.roadDistanceMeters, result.route.roadEtaSeconds)
-            is RouteCheck.Rejected -> GuidePhase.Refused(
-                result.reason + if (result.detail.isEmpty()) "" else "（${result.detail}）",
-            )
+            // ⚠ 屏上只念 `reason`：`detail` 是这个类的"面向日志"那一半（`road=…m straight=…m`、
+            //   `getNaviPath()=null`、异常 `toString()`），D-177 起不再拼进给用户看的那一句。
+            is RouteCheck.Rejected -> {
+                android.util.Log.w("BUS_NAV", "guide route rejected: ${result.reason} | ${result.detail}")
+                GuidePhase.Refused(result.reason)
+            }
         }
     }
 

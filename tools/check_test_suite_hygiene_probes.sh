@@ -119,7 +119,11 @@ done
 # 基数 80 → 81 的唯一增量（2026-10-19 D-170）= 新增 ui/driver/ApproachReminderContractTest.kt（实读 8 条 @Test：
 # 四档各一态 / 完成与失败都不提醒 / 第一次不出声 / 60 秒一遍最多三遍 / 没到间隔不响 / 换站重新武装 /
 # 那一行只念后端给过的字段 / 提醒与播报读同一个距离口径）。同轮 SU-a 由 78/0 变 79/0 ⇒ 不是空壳。
-SUSB_EXPECT=81
+# 基数 81 → 82 的唯一增量（2026-10-19 D-177）= 新增 core/ui/SourceTagLabelTest.kt（实读 5 条 @Test：
+# 认得出的四种来源各一句人话 / 没有来源时是空而不是一个词 / 认不出来不许把内部词印上屏 /
+# REAL 打头的陌生后缀仍按真实上报说 / 五格五种说法）。
+# 同轮 NavigationContractTest 由 59 → 60 条（N-a 是 ≥55 的下限闸，不在这格记账）。
+SUSB_EXPECT=82
 
 echo "SU-a *Test.kt 文件数 / 其中 0 条 @Test 的空壳 = $SUA_FILES/$SUA_EMPTY （目标 ≥47/0：凑数空类归零）$SUA_EMPTY_LIST"
 echo "SU-b 反证 源集 .kt 总数 / 无 @Test 的夹具数     = $SUSB_ALL/$SUSB_NOTEST （目标 $SUSB_EXPECT/2：同一机制数得出 0 条，SU-a 的 0 不是空跑）"
