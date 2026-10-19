@@ -163,7 +163,10 @@ class RepoTest : ServerTest() {
             Repo.uploadPhoto(byteArrayOf(1), "proof.jpg")
             assertTrue(false)
         } catch (e: NetworkException) {
-            assertTrue(e.message!!.contains("HTTP 503"))
+            // 钉的是"必须抛、且抛出来那句人读得懂"，不钉它走哪一条分支：
+            // 上一版写的是 `contains("HTTP 503")` —— 那等于把"结果码印在屏上"当成了契约本身。
+            assertTrue("上屏那句不许带结果码：" + e.message, !e.message!!.contains("HTTP"))
+            assertTrue("要说清是照片这一件事没成：" + e.message, e.message!!.contains("照片"))
         }
     }
 

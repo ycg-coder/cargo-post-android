@@ -5,16 +5,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.shanxiang.buspost.core.ui.BusRadius
 import com.shanxiang.buspost.core.ui.LocalBusTokens
 import android.content.Context
@@ -36,6 +43,7 @@ import com.shanxiang.buspost.core.update.AppUpdater
 import com.shanxiang.buspost.core.update.CurrentVersion
 import com.shanxiang.buspost.core.update.Release
 import com.shanxiang.buspost.core.update.UpdateOutcome
+import com.shanxiang.buspost.core.update.announcementText
 import com.shanxiang.buspost.core.update.updateText
 import kotlinx.coroutines.launch
 
@@ -105,15 +113,29 @@ fun UpdateCheckRow() {
             onDismissRequest = { outcome = null },
             title = { Text("发现新版本") },
             text = {
-                val size = o.release.apkSize
-                Text(
-                    buildString {
-                        append("版本 ${o.release.tagName}。")
-                        if (size != null) append(" 安装包约 ${(size + 512_000) / 1_000_000} MB。")
-                        // 更新说明是发布作者在 GitHub 上写的那段原文，本机不重写、不补写
-                        if (o.release.body.isNotEmpty()) append("\n\n").append(o.release.body.take(600))
+                Column {
+                    val size = o.release.apkSize
+                    Text(
+                        buildString {
+                            append("版本 ${o.release.tagName}。")
+                            // 发布页没给安装包大小就说没给，不报一个猜的数字
+                            if (size != null) append(" 安装包约 ${(size + 512_000) / 1_000_000} MB。")
+                        },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("更新公告", fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(4.dp))
+                    // 与冷启动那个弹窗同一个出口、同一条口径：公告原文不重写，
+                    // 空与超长都由 announcementText 说实话，这里给可滚的高度而不是切一半。
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        Text(announcementText(o.release.body), lineHeight = 19.sp)
                     }
-                )
+                }
             },
             confirmButton = {
                 BusDialogAction(

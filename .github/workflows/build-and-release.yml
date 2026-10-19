@@ -232,7 +232,17 @@ jobs:
             echo "::error::同一 tag 重复发布（手工触发点重了）：请先删掉 $TAG 或换一次运行，别把两个包混在一个 Release 里"
             exit 1
           fi
-          gh release create "$TAG" app-release.apk            --title "乡邮智联 $TAG"            --notes "自动发布：本次运行 $GITHUB_RUN_NUMBER。装了这个包之后，App 里「设置 → 关于 → 检查更新」就能就地更新。"            --latest
+          # 更新公告：从仓库 RELEASE_NOTES.md 取**本次 tag 那一节**，作为 Release 正文。
+          # 为什么在 CI 里取而不是在这里手写一句：App 里那两处升级弹窗显示的公告就是这段正文，
+          # 以前固定发"自动发布：本次运行 NNN"，于是"更新公告"这一格永远没内容可读。
+          # 取不到那一节时**不编内容**：脚本落一份明说"这一版没写公告"的占位并退 1，
+          # 这里只打 warning（发布要继续），但正文文件必须存在且非空，否则直接红。
+          if ! python3 tools/release_notes_pick.py --tag "$TAG" --file RELEASE_NOTES.md --out .release-notes.md; then
+            echo "::warning::${TAG} 在 RELEASE_NOTES.md 里没有对应小节 —— 公告格会明说「这一版没写公告」，不拿别版的内容顶上"
+          fi
+          [ -s .release-notes.md ] || { echo "::error::.release-notes.md 没写出来（取公告的通路坏了）—— 宁可有那句「没写公告」，不许发一份正文缺失的 Release"; exit 1; }
+          echo "本次 Release 正文 $(wc -c < .release-notes.md) 字节"
+          gh release create "$TAG" app-release.apk            --title "乡邮智联 $TAG"            --notes-file .release-notes.md            --latest
       - name: 发布后回读取证（App 那一格真的能查到这一版）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

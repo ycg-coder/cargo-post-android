@@ -101,26 +101,52 @@ internal fun parseRelease(text: String): Release? {
  * 结论判定。`httpCode`/`error` 与 `body` 三者的关系是这本判据的重点：
  *
  * · 404 且报文是 GitHub 那句 `Not Found` ⇒ `NoReleaseYet`（**不是** UpToDate）；
- * · 403/429（未认证 60 次/时的限流）⇒ `Failed("…限流…")`，页面不许把它显示成"已是最新"；
+ * · 403/429（未认证 60 次/时的限流）⇒ `Failed("…")`，页面不许把它显示成"已是最新"；
  * · 200 但解析不出 APK 资源 ⇒ `Failed`；
  * · 预发布（`prerelease=true`）默认**不推**：正式版用户不该被 CI 的手工试验包催着装。
+ *
+ * ⚠ 2026-10-19 发布口径：这几句 `reason` 是**要上屏**的（「设置 → 关于 → 检查更新」那一行与升级弹窗），
+ *   所以里面不再写 HTTP / 接口 / 报文 / APK 这些开发词，改成"谁没给 + 下一步做什么"。
+ *   结果码本身没有丢 —— 它在 `AppUpdater.check` 那一格进 logcat（`BUS_UPDATE`）。
+ *   这一族措辞由 `check_release_wording_probes.sh` 钉住，改回带码的那句会红。
  */
 internal fun decideUpdate(body: String?, httpCode: Int, error: String?, current: CurrentVersion): UpdateOutcome {
     if (httpCode == 404) return UpdateOutcome.NoReleaseYet
     if (httpCode == 403 || httpCode == 429) {
         return UpdateOutcome.Failed(
-            if (error != null) error else "GitHub 接口限流（未认证 60 次/时），稍后再试或去发布页看新版本"
+            if (error != null) error else "问更新服务器问得太频繁，它让我们一小时后再问。稍后再点一次「检查更新」。"
         )
     }
     if (error != null) return UpdateOutcome.Failed(error)
-    if (httpCode != 200 || body.isNullOrEmpty()) return UpdateOutcome.Failed("更新服务没有返回内容（HTTP $httpCode）")
+    if (httpCode != 200 || body.isNullOrEmpty()) {
+        return UpdateOutcome.Failed("更新服务器这会儿没回话。稍后再点一次「检查更新」。")
+    }
     val release = parseRelease(body)
-        ?: return UpdateOutcome.Failed("最新版本报文里没有可直接安装的 APK")
+        ?: return UpdateOutcome.Failed("最新那一版里没有能直接装的安装包，请让站点人工给一个。")
     if (release.prerelease) return UpdateOutcome.UpToDate(current.versionName)
     val code = releaseCodeOf(release.tagName)
-        ?: return UpdateOutcome.Failed("版本号「${release.tagName}」不是可比较的数字，请去发布页手动看")
+        ?: return UpdateOutcome.Failed("更新页写的版本「${release.tagName}」跟本机对不上号，请让站点确认要装哪一版。")
     return if (code > current.versionCode) UpdateOutcome.Available(release)
     else UpdateOutcome.UpToDate(current.versionName)
+}
+
+/**
+ * 更新公告的展示口径 —— **纯函数**，JVM 用例逐格钉着（界面上那两格升级弹窗都读这一个出口）。
+ *
+ * 公告原文是发布作者写在 `RELEASE_NOTES.md` 里、由 CI 抄进 GitHub Release 的那一段，
+ * 本机**不重写、不补写**，只做两件事：
+ *  · 空的就说空 —— 不许塞一句"修复了一些问题，提升使用体验"，那句话谁都没写过；
+ *  · 长了要**说明一共多少、这里显示了多少** —— 安静地切一刀会让用户以为那就是全部公告。
+ */
+internal const val ANNOUNCEMENT_MAX = 1200
+
+internal fun announcementText(body: String): String {
+    val t = body.trim()
+    return when {
+        t.isEmpty() -> "这条发布没写更新公告。"
+        t.length <= ANNOUNCEMENT_MAX -> t
+        else -> t.take(ANNOUNCEMENT_MAX) + "\n…（公告共 " + t.length + " 字，这里只显示前 " + ANNOUNCEMENT_MAX + " 字）"
+    }
 }
 
 /** GitHub 未认证限流的判别：`X-RateLimit-Remaining: 0` 时报文里带 `rate limit`，别把它演成"没有新版本" */
@@ -129,9 +155,9 @@ internal fun isRateLimited(httpCode: Int, body: String?): Boolean =
 
 /** 一屏只该说一句话：把结论翻成界面文案（`Failed` 与 `NoReleaseYet` 不共用一句） */
 internal fun updateText(o: UpdateOutcome, current: CurrentVersion): String = when (o) {
-    is UpdateOutcome.Available -> "发现新版本 v${o.release.tagName.removePrefix("v")}（当前 ${current.versionName}）"
+    is UpdateOutcome.Available -> "发现新版本 ${o.release.tagName}（你现在的是 ${current.versionName}）"
     is UpdateOutcome.UpToDate -> "已是最新版本（${current.versionName}）"
-    UpdateOutcome.NoReleaseYet -> "这个应用还没有发布过可更新的版本"
+    UpdateOutcome.NoReleaseYet -> "还没有可更新的新版本"
     is UpdateOutcome.Failed -> "没查到新版本：${o.reason}"
 }
 

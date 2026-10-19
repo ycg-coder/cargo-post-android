@@ -403,7 +403,10 @@ object Api {
         body: Map<String, Any?>?,
         attempt: Int = 0,
     ): Payload {
-        if (baseUrl.isEmpty()) throw NetworkException("未配置后端地址（local.properties 的 buspost.baseUrl）")
+        if (baseUrl.isEmpty()) throw netFail(
+            "这台设备还没填站点服务器地址，连不上。请联系站点的装机人员。",
+            "config: local.properties 的 buspost.baseUrl 为空",
+        )
         // 本机已经知道这个 access token 过期了（后端一直发 expiresTime，此前只写不读）：
         // 先静默续一次再发，省掉"必然 401 → 清盘 → 跳登录"那一整圈。
         // 三重护栏：① 认证接口自己不触发（续期走 /auth/，否则递归）；② 只在一分钟内主动续一次 ——
@@ -451,13 +454,19 @@ object Api {
         val response = try {
             http.callCancellable(request)
         } catch (e: IOException) {
-            throw NetworkException(e.message ?: "网络连接失败", e)
+            throw netFail(
+                "连不上站点服务器。请看看手机能不能上网，再刷新一次。",
+                "connect: ${e.javaClass.simpleName} ${e.message}",
+            )
         }
         return response.use { resp ->
             val text = try {
                 resp.body?.string() ?: ""
             } catch (e: IOException) {
-                throw NetworkException(e.message ?: "读取响应失败", e)
+                throw netFail(
+                    "站点服务器的回话没读完整。请刷新再试。",
+                    "read-body: ${e.javaClass.simpleName} ${e.message}",
+                )
             }
             val root = JSONObjectOrNull(text)
             val bizCode = root?.optInt("code", -1) ?: -1
@@ -476,7 +485,10 @@ object Api {
                 throw kick(path, reason401)
             }
             if (root == null) {
-                if (resp.isSuccessful) throw NetworkException("响应格式异常（HTTP ${resp.code}）")
+                if (resp.isSuccessful) throw netFail(
+                    "站点服务器发回来的内容读不懂。请刷新再试；一直这样请联系站点。",
+                    "bad-json http=${resp.code} head=${text.take(160)}",
+                )
                 throw businessOrTransport(resp.code, text)
             }
             if (bizCode == -1) throw businessOrTransport(resp.code, text)
@@ -490,10 +502,19 @@ object Api {
 
     private fun businessOrTransport(httpCode: Int, text: String): Exception {
         val snippet = text.take(60).replace(Regex("\\s+"), " ")
+        // 服务器回的那 60 字原文以前是**拼在屏上那句后面**的（一段 HTML 错误页也能上屏）。
+        // 现在它只进日志；屏上留的是"谁没应答 + 下一步"。
         return if (httpCode in 500..599) {
-            NetworkException("服务暂时不可用（HTTP $httpCode）")
+            netFail(
+                "站点服务器这会儿不接受询问。过一会儿再刷新一次。",
+                "server http=$httpCode body=$snippet",
+            )
         } else {
-            ApiException(httpCode, if (snippet.isEmpty()) "请求失败（HTTP $httpCode）" else "请求失败（HTTP $httpCode）$snippet")
+            apiFail(
+                httpCode,
+                "站点服务器拒绝了这次操作。请刷新再试；一直这样请联系站点。",
+                "client http=$httpCode body=$snippet",
+            )
         }
     }
 
@@ -517,16 +538,26 @@ object Api {
         val resp = try {
             http.callCancellable(Request.Builder().url(url).get().build())
         } catch (e: IOException) {
-            throw NetworkException(e.message ?: "网络连接失败", e)
+            throw netFail(
+                "连不上外部服务。请看看手机能不能上网，稍后再试一次。",
+                "rawGet connect: ${e.javaClass.simpleName} ${e.message}",
+            )
         }
         resp.use { r ->
             val body = try {
                 r.body?.string() ?: ""
             } catch (e: IOException) {
-                throw NetworkException(e.message ?: "读取响应失败", e)
+                throw netFail(
+                    "外部服务的回话没读完整。稍后再试一次。",
+                    "rawGet read-body: ${e.javaClass.simpleName} ${e.message}",
+                )
             }
-            if (!r.isSuccessful) throw ApiException(r.code, "外部接口 ${r.code}")
-            if (body.isEmpty()) throw NetworkException("外部接口无响应体")
+            if (!r.isSuccessful) throw apiFail(
+                r.code,
+                "外部服务这会儿没回话（天气这类第三方数据就是这一路）。稍后再试。",
+                "rawGet http=${r.code}",
+            )
+            if (body.isEmpty()) throw netFail("外部服务回了空内容。稍后再试。", "rawGet 空响应体 http=${r.code}")
             body
         }
     }
@@ -552,7 +583,10 @@ object Api {
     }
 
     private suspend fun rawUpload(path: String, bytes: ByteArray, fileName: String): Payload {
-        if (baseUrl.isEmpty()) throw NetworkException("未配置后端地址（local.properties 的 buspost.baseUrl）")
+        if (baseUrl.isEmpty()) throw netFail(
+            "这台设备还没填站点服务器地址，连不上。请联系站点的装机人员。",
+            "config: local.properties 的 buspost.baseUrl 为空",
+        )
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", fileName, bytes.toRequestBody("application/octet-stream".toMediaType()))
             .build()
@@ -564,22 +598,34 @@ object Api {
         val resp = try {
             http.callCancellable(request)
         } catch (e: IOException) {
-            throw NetworkException(e.message ?: "上传连接失败", e)
+            throw netFail(
+                "照片传不出去：连不上站点服务器。请换一张能上网的卡或 Wi-Fi 再试。",
+                "upload connect: ${e.javaClass.simpleName} ${e.message}",
+            )
         }
         return resp.use { r ->
             val text = try {
                 r.body?.string() ?: ""
             } catch (e: IOException) {
-                throw NetworkException(e.message ?: "读取上传响应失败", e)
+                throw netFail(
+                    "照片传上去后的回话没读完整。请重拍再传一次。",
+                    "upload-read: ${e.javaClass.simpleName} ${e.message}",
+                )
             }
             if (r.code == 401) throw kick(path, "登录已失效，请重新登录")
-            val root = JSONObjectOrNull(text) ?: throw NetworkException("上传响应格式异常（HTTP ${r.code}）")
+            val root = JSONObjectOrNull(text) ?: throw netFail(
+                "照片传上去后服务器回的内容读不懂。请重拍再传一次。",
+                "upload bad-json http=${r.code} head=${text.take(160)}",
+            )
             val code = root.optInt("code", -1)
             if (code == 401) throw kick(path, "登录已失效，请重新登录")
             if (code == -1) throw businessOrTransport(r.code, text)
             if (code != 0) throw ApiException(code, root.optString("msg", "上传失败"))
             val data = root.opt("data")
-            if (data == null || data === JSONObject.NULL) throw NetworkException("上传未返回文件地址")
+            if (data == null || data === JSONObject.NULL) throw netFail(
+                "照片传成功了，但服务器没回图片地址。请重传一次。",
+                "upload no-url http=${r.code} body=${text.take(160)}",
+            )
             toPayload(data, demo = false)
         }
     }
@@ -601,4 +647,22 @@ object Api {
         if (!demoAllowed) throw IllegalStateException("生产构建禁止演示数据")
         return toPayload(data ?: JSONObject(), demo = true)
     }
+    /**
+     * 上屏的话与留在 logcat 的话**分两头说**（2026-10-19 发布口径：这一版是要发的包，
+     * 屏上不许出现结果码、IP、端口、毫秒、"接口/报文"这类开发词）。
+     *
+     * ⚠ 这不是把原因藏起来：屏上那句照样说清**谁没应答、用户下一步做什么**（#109 定的口径，
+     * 拿"网络不太好"盖掉一切才是缺陷）。丢掉的只有开发者才读得懂的那半截，
+     * 它整条进 logcat 的 `BUS_NET`，装机与排查的人照旧读得到 —— **撤的是措辞，不是证据**。
+     */
+    private fun netFail(userWords: String, detail: String): NetworkException {
+        Log.w(TAG, "BUS_NET $detail")
+        return NetworkException(userWords)
+    }
+
+    private fun apiFail(httpCode: Int, userWords: String, detail: String): ApiException {
+        Log.w(TAG, "BUS_NET $detail")
+        return ApiException(httpCode, userWords)
+    }
+
 }

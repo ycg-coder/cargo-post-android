@@ -156,17 +156,16 @@ fun WeatherDetailCard(
                             if (weather.humidity.isNotEmpty()) WeatherTag(weather.humidity)
                             if (weather.wind.isNotEmpty()) WeatherTag(weather.wind)
                         }
-                        // 更新状态：加载中 / 三档来源都没给（现在不再兜一组本地数，所以只说没取到）
-                        // ⚠ 时间与来源**都要露出来**：旧写法是 `updateTime` 一非空就把来源整行盖掉，
-                        //   于是高德天气限流那天，屏上完全看不出这组数其实来自 open-meteo（D-173 真机抓的）。
+                        // 这一格只回答两件事：**这份数是谁给的、什么时候给的**。
+                        // 为什么另一路没用上（内部结果码、配额、口令那一套）不再上屏 —— 那是装机的人要查的东西，
+                        // 已经改走 logcat（`BUS_FALLBACK`，见 Repo.weather）。D-173 要的是"换源这件事让人看见"，
+                        // 看见的主体是**现在给数的那一家**，不是失败那一家的一串码。
                         val meta = when {
-                            loading -> "更新中…"
-                            weather.mock -> "天气未取到（高德与 open-meteo 都没返回）" +
-                                if (weather.primaryFailure.isEmpty()) "" else "；${weather.primaryFailure}"
+                            loading -> "天气更新中…"
+                            weather.mock -> "天气暂时没取到，先按没天气安排"
                             else -> listOfNotNull(
+                                weather.source.ifEmpty { null }?.let { "${it}提供" },
                                 updateTime.ifEmpty { null },
-                                if (weather.source.isEmpty()) null else "来源 ${weather.source}",
-                                weather.primaryFailure.ifEmpty { null }?.let { "主源没用上：$it" },
                             ).joinToString(" · ")
                         }
                         if (meta.isNotEmpty()) {

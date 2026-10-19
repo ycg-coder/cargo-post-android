@@ -452,6 +452,11 @@ object Repo {
     suspend fun weather(geo: Geo, adcode: String = "", noAdcodeReason: String = ""): WeatherInfo {
         val (fromAmap, amapWhy) = amapWeather(adcode, noAdcodeReasonOf(noAdcodeReason))
         fromAmap?.let { return it }
+        // 主源为什么没给 —— 这句原话**只进 logcat**（2026-10-19 用户口径：这一版是发的包，
+        // 屏上不许出现内部码与服务商配额那套话；而装机的人还得查得到降级原因）。
+        // 界面上留的是"这份数由谁提供"（`WeatherCard` 的 meta 那行），D-173 那件事没被撤：
+        // 换源仍然看得见，看见的是现在给数的那一家。
+        if (amapWhy.isNotEmpty()) android.util.Log.w("BUS_FALLBACK", "天气主源没给：$amapWhy")
         openMeteoWeather(geo)?.let { return it.copy(primaryFailure = amapWhy) }
         // 旧兜底发的是「多云 22°、湿度 68%、4 日预报」——一个数都没来自后端/服务商，纯本机编的，
         // 挂在首屏就是拿假天气给司机和用户做装车决策。现在只回结构空值 + mock=true，

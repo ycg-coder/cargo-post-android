@@ -616,6 +616,18 @@ enum class LocationSource {
     }
 }
 
+/**
+ * 车辆卡「看这条线」要用的线路编号（#110）。两个来源，一条优先级：
+ * **后端随车辆给的那个编号是权威的**，按线路名回查 `/bus/lines` 得到的只是兜底
+ * （旧服务器还没发这一键、以及现实公交/高德那一路今天根本给不出编号）。
+ *
+ * 为什么值得单独一条纯函数：这条次序以前是反的（先名字、后编号），而名字会因改名、全半角括号、
+ * 「(公交站)」这类后缀失配 —— 拿一个字符串去覆盖一个权威整数，就是车辆卡点了没反应那一族根因。
+ * 两个都给不出 ⇒ 交回空串，由页面决定"不给可点态并说实话"，不许跳进一条空白详情。
+ */
+fun busLineLinkOf(vehicleRouteId: String, nameMatchedId: String?): String =
+    vehicleRouteId.ifEmpty { nameMatchedId.orEmpty() }
+
 data class BusVehicle(
     val id: String,
     val plate: String,
@@ -630,9 +642,11 @@ data class BusVehicle(
     val lineName: String,
     val shiftCode: String,
     /**
-     * 线路编号：真实车辆 VO（`AppBusRespVO` 19 字段 / `AppBusNearbyRespVO.NearbyBus` 20 字段，2026-09-29 逐字段核对）
-     * 里**没有** `routeId` 这个键，车辆只带 `routeName` —— 所以这里在真接口下恒为空串，
-     * 想跳线路详情必须按 `lineName` 回查 `/bus/lines` 的 `routeId`（审计 §69）。字段留着是为了兼容旧演示/旧接口，不许删。
+     * 线路编号。2026-10-19（#110）之前真实车辆 VO 里**没有**这个键（`AppBusRespVO` 19 字段 /
+     * `AppBusNearbyRespVO.NearbyBus` 20 字段，2026-09-29 逐字段核对，审计 §69），车辆只带 `routeName`，
+     * 跳详情只能按名字回查 `/bus/lines`。现在后端把编号随车辆一起给出来了（与起终点同一个 join），
+     * 于是这一格有了**两个来源**：后端给的是权威的，按名字回查退成兜底（旧服务器、以及现实公交那一路仍给不出）。
+     * 两个都没有 ⇒ `busLineLinkOf` 交回空串，页面据此不给可点态。
      */
     val routeId: String = "",
     // ---- 小程序 index.js 车辆卡字段（到站预估/线路/状态） ----
@@ -821,6 +835,8 @@ data class BusVehicle(
                 lineName = o.multiStr("routeName", "lineName", "name"),
                 shiftCode = o.multiStr("shiftCode", "busCode"),
                 routeId = o.multiStr("routeId"),
+                // ↑ 后端给了就收着（`AppBusRespVO.routeId`，2026-10-19 起）；没给是空串，
+                //   由 `busLineLinkOf` 退到"按线路名回查"那一路 —— 缺键与空串在这里同形，都不算编号。
                 startStation = o.multiStr("startStation", "fromStation", "frontName"),
                 endStation = o.multiStr("endStation", "toStation", "terminalName"),
                 status = statusOf(o.multiStr("status", "runStatus")),

@@ -4,6 +4,7 @@ import com.shanxiang.buspost.data.model.Arrangement
 import com.shanxiang.buspost.data.model.BusVehicle
 import com.shanxiang.buspost.data.model.LocationSource
 import com.shanxiang.buspost.data.model.VehicleStatus
+import com.shanxiang.buspost.data.model.busLineLinkOf
 import com.shanxiang.buspost.data.model.byUserDistance
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -352,5 +353,27 @@ class BusEtaContractTest {
         val a = Arrangement.parse(obj("orderNo" to "YP20260930011", "etaMinutes" to null, "eta" to 6))
         assertNull(a.etaMinutes)
         assertEquals(6, Arrangement.parse(obj("orderNo" to "YP20260930012", "etaMinutes" to 6)).etaMinutes)
+    }
+
+    // ── #110：车辆卡「看这条线」的编号从哪来 ─────────────────────────────
+    // 钉的是**优先级**这一件事。旧次序是"先按线路名回查 /bus/lines，查不到才看后端给的 routeId"，
+    // 那是 §69 那轮在"后端根本没有车辆编号"的前提下写的唯一出路；前提变了次序就得反过来 ——
+    // 让一个会因改名、全半角括号、「(公交站)」后缀而失配的字符串去覆盖一个权威整数，
+    // 就是"卡片点了没反应"那一族的根。
+    @Test
+    fun `车辆编号以后端随车辆给的那个为准，名字回查退成兜底`() {
+        assertEquals("41", busLineLinkOf("41", "9"))
+        assertEquals("41", busLineLinkOf("41", null))
+    }
+
+    @Test
+    fun `后端没给编号才退回按线路名查到的那个`() {
+        assertEquals("9", busLineLinkOf("", "9"))
+    }
+
+    @Test
+    fun `两个来源都给不出就是空串，页面据此不给可点态而不是跳进空白详情`() {
+        assertEquals("", busLineLinkOf("", null))
+        assertEquals("", busLineLinkOf("", ""))
     }
 }

@@ -127,16 +127,25 @@ check WS-7 "× W-h" "$WC" \
   '                        weather.driverTips,'
 
 restore
-# W-k（D-173 限流当天的来源可见性）三条
+# W-k（限流当天的来源可见性；2026-10-19 按发布口径改成"谁在给上屏、为什么没给进日志"）五条
 check WK-1 "× W-k" "$REPO" \
   'return null to amapWeatherFailureOf(live)' \
   'return null'
 check WK-2 "× W-k" "$REPO" \
   'internal fun amapWeatherFailureOf(live: JSONObject): String =' \
   'internal fun amapWeatherFailureOfRenamed(live: JSONObject): String ='
+# WK-3 把"由谁提供"整段摘掉 → K4S/K4W 一起红
 check WK-3 "× W-k" "$WC" \
-  'if (weather.source.isEmpty()) null else "来源 ${weather.source}",' \
-  'if (false) null else "",'
+  'weather.source.ifEmpty { null }?.let { "${it}提供" },' \
+  'null,'
+# WK-4 把那串带 infocode 的降级原因放回屏上 → K4P 红（这一版是发的包）
+check WK-4 "× W-k" "$WC" \
+  'weather.mock -> "天气暂时没取到，先按没天气安排"' \
+  'weather.mock -> "天气暂时没取到：" + weather.primaryFailure'
+# WK-5 屏上撤了话、日志也没接住 → K4L 红（撤的是措辞，不是证据）
+check WK-5 "× W-k" "$REPO" \
+  'if (amapWhy.isNotEmpty()) android.util.Log.w("BUS_FALLBACK", "天气主源没给：$amapWhy")' \
+  'if (amapWhy.isNotEmpty()) Unit'
 
 # W-l（D-173 第二格：逆地理为什么没给区域码）四条
 # WL-1 高德逆地理限流那一支退回裸 EMPTY：原因在 return 那一刻被丢掉 → L2/L3

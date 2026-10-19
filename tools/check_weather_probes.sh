@@ -79,11 +79,15 @@ fail=0
 [ "$WJ" = 2 ] || { echo "× W-j 天气生产者不是 2（现 $WJ）：多了=第三处就地编天气，少了=某一来源不再出提示"; fail=1; }
 [ "$WJR" = 3 ] || { echo "× W-j 读这张表的总数不是 3（现 $WJR：两处生产者 + 推送）：多一处就是有人又起了第二张天气→建议表"; fail=1; }
 
-# W-k 限流当天的"这组数是谁给的"（D-173）。三格合起来反的是一件事：
-#     高德天气被限流时，旧写法 `status != "1" → return null` **把错误码丢掉**，open-meteo 顶上，
+# W-k 限流当天的"这组数是谁给的"（D-173 起，2026-10-19 按发布口径改判）。
+#     旧写法 `status != "1" → return null` **把错误码丢掉**，open-meteo 顶上，
 #     而 `WeatherCard` 的 meta 那行优先显示"更新于 HH:mm"、把 `source` 整行盖掉
-#     ⇒ 屏上没有任何一处说得出"这组数来自 open-meteo、高德为什么没给"。
-#     ⚠ `Repo.kt` 里那句旧注释"界面已经明写来源高德天气"当场是假的（K5 钉它不许回来）。
+#     ⇒ 屏上没有任何一处说得出"这组数来自哪一路"。
+#     ⚠ 2026-10-19 用户口径改了一半：「天气预报限流了不要写出原因，就实时标出由哪个提供」，
+#       而这一版是要发的包 —— 所以**"谁在给"必须上屏，"为什么没给"不许上屏**（那串话带 infocode、
+#       配额、key 这些开发词）。降级原因改走 logcat 的 `BUS_FALLBACK`（K4L），字段本身继续填（K4R 正对照），
+#       否则 K4P 那个 0 就成了"谁都没写过这个字段"而不是"写了但不往屏上放"。
+#     ⚠ `Repo.kt` 里那句旧注释"界面已经明写来源高德天气"仍然是假的（K5 钉它不许回来）。
 # ⚠ K1 的锚点必须带上参数表：只写 `internal fun amapWeatherFailureOf` 时，把它改名成
 #   `amapWeatherFailureOfRenamed` 仍然是"恰好 1"（负控 WK-2 第一轮实测就是这么绿的）——
 #   改名等于把翻译器摘掉，但 grep 的形状没变。带上 `(live: JSONObject)` 之后改名念 0。
@@ -92,17 +96,23 @@ K2=$(grep -c "null to " "$REPO")
 K3=$(sed -n '/private suspend fun amapWeather/,/^    private suspend fun openMeteoWeather/p' "$REPO" \
   | grep -E "return null" | grep -vc "null to")
 K4S=$(grep -c "weather.source" "$WC")
+K4W=$(grep -c '\${it}提供' "$WC")
 K4P=$(grep -c "primaryFailure" "$WC")
+K4L=$(grep -c 'Log.w("BUS_FALLBACK"' "$REPO")
+K4R=$(grep -c "primaryFailure = amapWhy" "$REPO")
 K4OLD=$(grep -c "updateTime.isNotEmpty() -> updateTime" "$WC")
 K5=$(grep -c "界面已经明写来源" "$REPO")
 K5P=$(grep -c "D-173" "$REPO")
-printf 'W-k 失败码翻译器/带因返回/裸 null/来源露出/主因露出/旧盖法/旧假注释 : %s/%s/%s/%s/%s/%s/%s（目标 1/≥5/0/≥1/≥2/0/0）\n' \
-  "$K1" "$K2" "$K3" "$K4S" "$K4P" "$K4OLD" "$K5"
+printf 'W-k 翻译器/带因返回/裸null/来源上屏/提供句式/内部码上屏/降级进日志/字段仍填/旧盖法/旧假注释 : %s/%s/%s/%s/%s/%s/%s/%s/%s/%s（目标 1/≥5/0/≥1/1/0/1/≥2/0/0）\n' \
+  "$K1" "$K2" "$K3" "$K4S" "$K4W" "$K4P" "$K4L" "$K4R" "$K4OLD" "$K5"
 [ "$K1" = 1 ] || { echo "× W-k 高德失败码翻译器不是恰好一份（现 $K1）：两份映射表迟早对同一个码说两句不同的话"; fail=1; }
 [ "$K2" -ge 5 ] || { echo "× W-k 只有 $K2/5 处失败带上了原因（应 5：没区域码/没配 key/状态非 1/没给 lives/抛异常）：漏一处就是又回到静默 null"; fail=1; }
-[ "$K3" = 0 ] || { echo "× W-k amapWeather 里还有 $K3 处裸 return null：错误码在那一刻被丢掉，屏上再怎么改也说不清是谁没给"; fail=1; }
+[ "$K3" = 0 ] || { echo "× W-k amapWeather 里还有 $K3 处裸 return null：错误码在那一刻被丢掉，日志再怎么改也说不清是谁没给"; fail=1; }
 [ "$K4S" -ge 1 ] || { echo "× W-k 天气卡不再显示 source：限流当天没人知道这组数来自哪一路"; fail=1; }
-[ "$K4P" -ge 2 ] || { echo "× W-k 天气卡没把 primaryFailure 露出来（现 $K4P，要 ≥2：兜底态与降级态各一处）：换源这件事又变回静默"; fail=1; }
+[ "$K4W" = 1 ] || { echo "× W-k 天气卡那句「由谁提供」不是恰好一处（现 $K4W）：0=又不说来源，2=同一句话长出两个说法"; fail=1; }
+[ "$K4P" = 0 ] || { echo "× W-k 有 $K4P 处把降级原因（带 infocode 那串）放回屏上：这一版是发的包，屏上不许出现开发词"; fail=1; }
+[ "$K4L" = 1 ] || { echo "× W-k 主源没给这件事不再写日志（现 $K4L）：屏上撤了话，装机的人就没处可查了——撤的是措辞不是证据"; fail=1; }
+[ "$K4R" -ge 2 ] || { echo "× W-k 的 primaryFailure 只剩 $K4R 处填充（应 ≥2）：K4P 那个 0 就成了字段没了，而不是不往屏上放"; fail=1; }
 [ "$K4OLD" = 0 ] || { echo "× W-k 旧写法回来了（updateTime 一非空就顶掉整行 meta）：来源永远显示不出来"; fail=1; }
 [ "$K5" = 0 ] || { echo "× W-k 那句假注释「界面已经明写来源」又回到 Repo.kt：注释承诺了一件屏上没有的事，比没注释更坏"; fail=1; }
 [ "$K5P" -ge 1 ] || { echo "× W-k Repo.kt 里没有 D-173 的更正说明：K5 那个 0 就成了『谁都没碰过这段』而不是『改过且不许回退』"; fail=1; }

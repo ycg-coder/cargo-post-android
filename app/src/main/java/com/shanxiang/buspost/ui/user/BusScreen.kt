@@ -65,6 +65,7 @@ import com.shanxiang.buspost.core.ui.TicketCard
 import com.shanxiang.buspost.core.ui.TimelineStop
 import com.shanxiang.buspost.data.model.BusLine
 import com.shanxiang.buspost.data.model.BusVehicle
+import com.shanxiang.buspost.data.model.busLineLinkOf
 import com.shanxiang.buspost.data.model.byUserDistance
 import com.shanxiang.buspost.data.model.Geo
 import com.shanxiang.buspost.data.model.GeoMath
@@ -388,13 +389,17 @@ class BusViewModel : ScreenViewModel() {
     }
 
     /**
-     * 车辆卡「跳线路详情」的线路编号。真实车辆 VO 里**没有** `routeId`
-     * （`AppBusRespVO` 19 个字段、`AppBusNearbyRespVO.NearbyBus` 20 个字段都只有 `routeName`，2026-09-29 逐字段核对），
-     * 所以只能按线路名回查 `/bus/lines` 的线路编号；查不到就返回空串，页面据此不给可点态（审计 §69）。
+     * 车辆卡「跳线路详情」的线路编号。**后端给的那个优先，按名字回查退成兜底**（#110 反转了旧的次序）。
+     *
+     * 旧写法是"先按名字查 `/bus/lines`，查不到才看 `v.routeId`"，那是§69 那轮在"后端根本没有车辆编号"
+     * 的前提下写的唯一出路；现在后端随车辆一起把编号给出来了（与起终点同一个 join），
+     * 再让名字匹配排在前面就等于**拿一个会因改名/全半角/括号后缀而失配的字符串去覆盖一个权威整数**。
+     * 两个来源都给不出 ⇒ 空串，页面据此不给可点态并把原因写在卡上（见 `VehicleCard`）。
      */
-    fun lineIdOf(v: BusVehicle): String =
-        lines.firstOrNull { it.name.isNotEmpty() && it.name == v.lineName }?.id?.ifEmpty { null }
-            ?: v.routeId
+    fun lineIdOf(v: BusVehicle): String = busLineLinkOf(
+        vehicleRouteId = v.routeId,
+        nameMatchedId = lines.firstOrNull { it.name.isNotEmpty() && it.name == v.lineName }?.id,
+    )
 }
 
 @Composable
@@ -1139,7 +1144,9 @@ private fun VehicleCard(
         stubValue = v.etaValueText,
         stubLabel = v.etaUnitText,
         stubColor = if (v.running && v.etaMinutes != null && v.etaMinutes <= 5) t.danger else t.primaryOnLight,
-        onClick = { if (lineId.isNotEmpty()) nav.navigate(Routes.busDetail(lineId)) },
+        // 没编号就**根本不可点**（旧写法是"可点、点了 if 不成立什么都不做"）：
+        // 那是把"这一格今天做不到"演成"这按钮坏了"。现在不可点的样子与原因一起摆在卡上。
+        onClick = if (lineId.isEmpty()) null else { { nav.navigate(Routes.busDetail(lineId)) } },
     ) {
         Column(Modifier.weight(1f).padding(vertical = 2.dp)) {
             // vehicle-head：线路名 + 「离你最近」+ 状态
@@ -1176,6 +1183,15 @@ private fun VehicleCard(
                     },
                     fontSize = (12 * scale).sp,
                     fontWeight = FontWeight.Bold,
+                )
+            }
+            // 编号缺失那一格：说"这一条跳不过去"，不含糊、也不怪网络
+            if (lineId.isEmpty()) {
+                Text(
+                    "这条线路没拿到编号 · 暂时打不开地图",
+                    color = t.textTertiary,
+                    fontSize = (10.5 * scale).sp,
+                    modifier = Modifier.padding(top = 3.dp),
                 )
             }
             // ETA 来源标识（对标车来了：实时计算 vs 按时刻表）
