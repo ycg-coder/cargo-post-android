@@ -26,4 +26,12 @@
     都要"引擎/算路失败"或"后端给了个没见过的来源标注"才出现，本机高德配好、导航此刻 Ready，
     走不到那几支 ⇒ 只做到用例 + 静态闸级，标 NOT VERIFIED ON DEVICE。
 
+
+20-v232-release-splash-loading.png
+  包：**GitHub Release v232 那只 app-release.apk**（sha256 02e6362d…、78,927,416 B = Release 资产声明的 size，
+      先量字节数再推设备，避免把还在下载的文件装上去；`dumpsys` 读回 `versionName=1.0.232-android`）
+  屏：竖屏冷启动加载中 —— 车在**实线**上、前面还剩**虚线**到站牌、状态行「正在准备您的班次…」、底部 v1.0.232-android
+  读法：D-177 那三格（导航卡/来源标签）本机走不到，所以这一张是**发布件跑起来的冒烟凭证**：
+      新包能装、能起、闪屏这一屏零开发词。它不证明那三格的屏幕形态（那三格仍是 NOT VERIFIED ON DEVICE）。
+
 收尾：取证时把 `accelerometer_rotation` 临时置 0 固定朝向，**已按原值还原**（动手前 `accel=1 user=0`）。
