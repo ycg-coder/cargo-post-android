@@ -97,15 +97,15 @@ expect_red "NC-2 弹窗不吃令牌" "× HC-c 升级弹窗只吃到"
 # NC-3 撤掉乘车码那颗的理由标记 → HC-d 红，且点名是哪一行
 del "$QR" '                            // 硬编码色：支付宝品牌蓝 1677FF —— 品牌方规定的入口色，不随本 App 四套配色变
 '
-expect_red "NC-3 字面量没理由" "× HC-d 只有 8/9 处字面量带着理由注释"
+expect_red "NC-3 字面量没理由" "× HC-d 只有 15/16 处字面量带着理由注释"
 
 # NC-4 令牌定义文件里自己加一处字面量 → 仍绿（证明排除的是定义本身，不是整本没扫）
 ins "$BT" 'val isDark: Boolean,' '    val probeNew: Color = Color(0xFF123456),'
-expect_green "NC-4 令牌定义内的字面量被正确排除" "总数 9"
+expect_green "NC-4 令牌定义内的字面量被正确排除" "总数 16"
 
 # NC-5 探针脚本没了 → fail-closed（判据不许拿"跑不了"当 0）
 rm -f "$SC/tools/hardcoded_color_reasons.py"
-expect_red "NC-5 探针脚本缺失" "× HC-d 扫描认到的字面量不是 9" 1
+expect_red "NC-5 探针脚本缺失" "× HC-d 扫描认到的字面量不是 16" 1
 
 # NC-6 把弹窗调用点搬回 BusAppTheme **外面**（HC-b/HC-c 仍然全绿的那种写法）→ HC-e 必须红
 #      这一条是整簿最要紧的一条：D-163 那轮"0 处字面量 + 五个令牌都在"念的是绿，

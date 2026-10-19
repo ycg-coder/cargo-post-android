@@ -128,7 +128,7 @@ class SendOrderTest : ServerTest() {
             Repo.createSendOrder(form)
             assertTrue(false)
         } catch (e: NetworkException) {
-            assertTrue(e.message!!, e.message!!.contains("HTTP 502"))
+            assertTrue(e.message!!, e.message!!.contains("不接受询问"))
         }
         assertEquals(1, server.requestCount)
     }

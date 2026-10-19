@@ -91,7 +91,7 @@ class DriverStateTest : ServerTest() {
         respond("<html>err</html>", 500, "text/html")
         val failed = Repo.driverShifts()
         assertNotNull("HTTP 500 必须是错误，不能渲染成今天没有班次", failed.error)
-        assertTrue(failed.error!!, failed.error!!.contains("HTTP 500"))
+        assertTrue(failed.error!!, failed.error!!.contains("不接受询问"))
     }
 
     @Test
@@ -202,7 +202,7 @@ class DriverStateTest : ServerTest() {
             Repo.reportLocation(66L, Geo(29.5, 106.5), 30.0)
             assertTrue("网络失败不能静默吞掉", false)
         } catch (e: NetworkException) {
-            assertTrue(e.message!!.contains("HTTP 503"))
+            assertTrue(e.message!!.contains("不接受询问"))
         }
 
         respondBizError(1005004004, "班次已结束")

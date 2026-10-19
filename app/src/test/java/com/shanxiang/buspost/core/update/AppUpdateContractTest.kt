@@ -66,7 +66,7 @@ class AppUpdateContractTest {
     fun `tag 不是纯数字时报没查到而不是没更新`() {
         val o = decideUpdate(apkJson(tag = "1.0.12-android"), 200, null, cur)
         assertTrue("实际：$o", o is UpdateOutcome.Failed)
-        assertTrue((o as UpdateOutcome.Failed).reason.contains("发布页"))
+        assertTrue((o as UpdateOutcome.Failed).reason.contains("对不上号"))
         // 这一条是收紧的拒绝侧：不许把"我读不懂这个版本号"演成"你已经是最新"
         assertFalse(updateText(o, cur).contains("已是最新"))
     }
@@ -85,7 +85,7 @@ class AppUpdateContractTest {
         val o = decideUpdate(null, 404, "外部接口 404", cur)
         assertEquals(UpdateOutcome.NoReleaseYet, o)
         val text = updateText(o, cur)
-        assertTrue(text, text.contains("还没有发布过"))
+        assertTrue(text, text.contains("还没有可更新"))
         assertFalse(text, text.contains("已是最新"))
     }
 
@@ -144,7 +144,59 @@ class AppUpdateContractTest {
         )
         assertEquals("四句应互不相同：$texts", 4, texts.distinct().size)
         assertTrue(texts[0], texts[0].contains("发现新版本"))
-        assertTrue(texts[2], texts[2].contains("还没有发布过"))
+        assertTrue(texts[2], texts[2].contains("还没有可更新"))
         assertTrue(texts[3], texts[3].contains("没查到"))
+    }
+
+    /**
+     * 更新公告那一格（两个升级弹窗共用的出口）。
+     * 2026-10-19 用户点名"更新弹窗要写上更新公告"，所以这三格是那句要求的**下限**：
+     * 有就原样给，没有就明说没有，太长要说截了多少 —— 唯独不许本机编一句。
+     */
+    @Test
+    fun `公告空就说没写 不编一句提升体验`() {
+        assertEquals("这条发布没写更新公告。", announcementText(""))
+        assertEquals("这条发布没写更新公告。", announcementText("   \n  "))
+        assertFalse("不许出现没人写过的漂亮话", announcementText("").contains("优化"))
+    }
+
+    @Test
+    fun `公告有就原样给 一个字都不改`() {
+        val note = "- 闪屏页重做\n- 公交卡片能进地图了"
+        assertEquals(note, announcementText(note))
+        assertEquals(note, announcementText("\n" + note + "\n\n"))
+    }
+
+    @Test
+    fun `公告超长要说明截了多少而不是安静切`() {
+        val long = "字".repeat(ANNOUNCEMENT_MAX + 37)
+        val shown = announcementText(long)
+        assertTrue(shown.startsWith("字".repeat(ANNOUNCEMENT_MAX)))
+        assertTrue("要报出总字数与显示了多少：$shown", shown.contains("共 ${long.length} 字"))
+        assertTrue(shown.contains("只显示前 $ANNOUNCEMENT_MAX 字"))
+    }
+
+    /**
+     * 发的包不许出现开发专业词汇（2026-10-19 用户口径）。
+     * 这里只钉**更新这一路**会上屏的那几句：判定层的四条 `reason` + 四种结论的文案。
+     * 结果码改走 logcat（`AppUpdater.check` 里那条 `BUS_UPDATE`），所以摘掉码不算把信息弄丢。
+     */
+    @Test
+    fun `更新通路那几句不含开发词`() {
+        val banned = listOf("HTTP", "http", "接口", "报文", "APK", "infocode", "GitHub", "JSON", "json")
+        val sentences = listOf(
+            updateText(decideUpdate(null, 403, null, cur), cur),
+            updateText(decideUpdate(null, 500, null, cur), cur),
+            updateText(decideUpdate("""{"tag_name":"v12","assets":[]}""", 200, null, cur), cur),
+            updateText(decideUpdate(apkJson(tag = "nightly-3"), 200, null, cur), cur),
+            updateText(UpdateOutcome.Available(parseRelease(apkJson())!!), cur),
+            updateText(UpdateOutcome.NoReleaseYet, cur),
+            announcementText("修了三个问题"),
+        )
+        for (s in sentences) {
+            for (w in banned) {
+                assertFalse("这句屏上要出现开发词「$w」：$s", s.contains(w))
+            }
+        }
     }
 }

@@ -65,7 +65,10 @@ class ApiTest : ServerTest() {
             Api.get("/app-api/transport/bus/nearby")
             fail("5xx 必须抛 NetworkException")
         } catch (e: NetworkException) {
-            assertTrue(e.message!!, e.message!!.contains("HTTP 500"))
+            assertTrue("5xx 要说清是谁没应答：" + e.message, e.message!!.contains("不接受询问"))
+            // 2026-10-19 发布口径：屏上那句不带结果码。改的是**期望串**，不是把断言摘掉——
+            // 这一行同时钉住"码没漏回屏上"，写回 HTTP 就会红。
+            assertTrue("发的包不许把结果码印上屏：" + e.message, !e.message!!.contains("HTTP"))
         }
     }
 
@@ -96,7 +99,7 @@ class ApiTest : ServerTest() {
             Api.get("/app-api/transport/home/summary")
             fail("无 JSON 信封的 2xx 不能当成功")
         } catch (e: NetworkException) {
-            assertTrue(e.message!!.contains("响应格式异常"))
+            assertTrue("读不懂就说读不懂：" + e.message, e.message!!.contains("读不懂"))
         }
     }
 

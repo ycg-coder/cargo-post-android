@@ -54,7 +54,12 @@ object AppUpdater {
         fetch: suspend (String) -> String = { url -> Api.rawGet(url) },
     ): UpdateOutcome {
         val raw = fetchRaw(fetch)
-        return decideUpdate(raw.body, raw.code, raw.error, current)
+        val outcome = decideUpdate(raw.body, raw.code, raw.error, current)
+        // 屏上那几句不带结果码（发的包不许出现开发词），码与原文留在这里给装机的人查 —— 撤的是措辞，不是证据。
+        if (outcome is UpdateOutcome.Failed) {
+            android.util.Log.w("BUS_UPDATE", "检查更新没成 httpCode=${raw.code} error=${raw.error} 屏上那句=${outcome.reason}")
+        }
+        return outcome
     }
 
     /**

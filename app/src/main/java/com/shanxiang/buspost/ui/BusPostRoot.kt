@@ -258,6 +258,9 @@ fun BusPostRoot() {
             progress = splashProgress,
             ready = splashReady,
             statusText = splashStatus,
+            // 版本号必须传真的：以前这一格没人传，闪屏一直吃 SplashOverlay 的默认值 "v1.0.0"，
+            // 于是每台机器上都写着 v1.0.0，而"关于"页与更新页念的是 1.0.212 —— 同一版号两处答案。
+            version = "v" + com.shanxiang.buspost.BuildConfig.VERSION_NAME,
         )
     }
     }

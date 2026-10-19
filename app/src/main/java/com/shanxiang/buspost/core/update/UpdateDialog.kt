@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -77,15 +80,25 @@ fun UpdateDialog(
                 )
                 Spacer(Modifier.height(12.dp))
 
-                Text("更新内容", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("更新公告", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    // 这段文字是发布作者在 GitHub 上写的原文；空的就说空，不补一句"修复问题，提升稳定性"
-                    if (release.body.isEmpty()) "发布页没写更新说明" else release.body.take(500),
-                    fontSize = 13.sp,
-                    color = t.ink,
-                    lineHeight = 18.sp,
-                )
+                // 公告原文是发布作者写在仓库 `RELEASE_NOTES.md` 里、CI 发版时抄进这一格的那段话，
+                // 本机不重写、不补写：空的就说"没写"，超长的就说"截了多少"（[announcementText]）。
+                // 这里给一个**可滚**的高度而不是 `.take(500)`：一版改了五六件事的长公告，
+                // 安静地切一半比不显示更容易骗人 —— 用户会以为那就是全部。
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 190.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        announcementText(release.body),
+                        fontSize = 13.sp,
+                        color = t.ink,
+                        lineHeight = 19.sp,
+                    )
+                }
                 Spacer(Modifier.height(16.dp))
 
                 when {
