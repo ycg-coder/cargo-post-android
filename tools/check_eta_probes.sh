@@ -54,15 +54,30 @@ th2=$(grep -n "BusVehicle(" "$RP" | grep -vc "BusVehicle.parse" || true)
 ti=$(grep -rn "byUserDistance" $A | wc -l)
 # T-j1 progress 只在 lines 端点出现一次（nearby 的 NearbyBus 没有这个键）
 tj1=$(printf '%s' "$VJ" | grep -c '\.put("progress"')
-# T-j2 演示面不许再发自造的车辆 routeId（真实车辆 VO 只有 routeName）
+# T-j2 演示面不许发自造的车辆 routeId。#110 之后真实车辆 VO **确实有**这一键了，
+#      但那一键是后端按线路名回查监控地图数据得到的 —— 演示面没有那个 join，
+#      自己编一个编号只会让"看这条线"跳进一条不存在的详情（期望值不变，理由换掉）
 tj2=$(printf '%s' "$VJ" | grep -c '"routeId"')
 # T-j3 routeProvider 只写后端真会写的标签
 tj3=$(printf '%s' "$VJ" | grep -c '"routeProvider", "SCHEDULE"')
 # T-j4 演示面"后端给不出"要写成显式 null（与真实 HTTP 体同形），数量必须撑得起三条 state 分支
 tj4=$(printf '%s' "$VJ" | grep -o "JSONObject.NULL" | wc -l)
+# T-j6 车辆跳详情的线路编号：后端那个优先、名字回查退成兜底（#110 反转了 §69 那轮的次序）
+tj6def=$(grep -cE '^fun busLineLinkOf\(' "$MD")
+tj6use=$(grep -c 'busLineLinkOf(' "$BS")
+tj6order=$(grep -c 'vehicleRouteId = v.routeId' "$BS")
+# T-j7 没编号 ⇒ **不给可点态**并把原因写在卡上；旧形状（可点、点了 if 不成立什么都不做）必须为 0；
+#      正对照：有编号那一格仍然真的会跳（少了这条，"两格都不可点"也能把上面那个 0 判绿）
+tj7null=$(grep -c 'onClick = if (lineId.isEmpty()) null' "$BS")
+tj7old=$(grep -c 'if (lineId.isNotEmpty()) nav.navigate' "$BS")
+tj7say=$(grep -c '这条线路没拿到编号' "$BS")
+tj7go=$(grep -c 'nav.navigate(Routes.busDetail(lineId))' "$BS")
 # T-j5 etaMinutes 只有一处写入点，且走的是"有值才写数字"的那条分支
 tj5=$(printf '%s' "$VJ" | grep -c '"etaMinutes"')
 # T-k 契约测试用例数（只数行首 @Test，被注释掉的 //@Test 不算）
+#     ⚠ 这一格 2026-10-19 由"≥13"收成"恰好 16"：#110 往这个文件加了 3 条用例，
+#       下界没跟着动，于是"注释掉第一条 @Test"那条负控当场不咬（16-1=15 仍然 ≥13）。
+#       下界型计数的通病：**文件一增长它就悄悄变松**，所以要么每轮复量，要么钉死。
 #     ⑬ 之后实测 12 条：下限必须跟着抬，否则"注释掉一条"的负控制会从红变灰（本轮实测到过：
 #     用例 9→11 而 pin 还是 9，T-k 的负控制静默失效，直到重跑负控表才发现）。
 #     E-1（删自造别名 "eta"）加了一条"只带别名的报文必须读成 null"的用例 ⇒ 12→13，同轮把下限抬到 13。
@@ -234,11 +249,13 @@ echo "T-h1 Repo 车辆解析出口               : $th1  （预期 2：nearby �
 echo "T-h2 Repo 直接构造 BusVehicle        : $th2  （预期 0）"
 echo "T-i  byUserDistance 引用点            : $ti   （预期 10：声明 1 + import 4 + 调用 5，逐点见上方 T-i 注释）"
 echo "T-j1 演示面 progress 写入点          : $tj1  （预期 1：只在 lines 分支）"
-echo "T-j2 演示面车辆 routeId              : $tj2  （预期 0：真实车辆 VO 没有这个键）"
+echo "T-j2 演示面车辆 routeId              : $tj2  （预期 0：这一键只能由后端那个 join 给，演示面没有 join）"
 echo "T-j3 演示面 routeProvider=SCHEDULE   : $tj3  （预期 1）"
 echo "T-j4 演示面显式 JSONObject.NULL      : $tj4  （预期 ≥8：三条 state 分支的未给值）"
+echo "T-j6 编号纯规则 定义/调用/后端优先    : $tj6def/$tj6use/$tj6order   （预期 1/1/1）"
+echo "T-j7 不可点/说实话/旧形状/会跳     : $tj7null/$tj7say/$tj7old/$tj7go   （预期 1/1/0/1）"
 echo "T-j5 演示面 etaMinutes 写入点        : $tj5  （预期 1）"
-echo "T-k  BusEtaContractTest 用例数       : ${tk:-0}   （预期 ≥13：⑬ 加了端点语义 + 位置报文用例，E-1 加了别名不采纳用例）"
+echo "T-k  BusEtaContractTest 用例数       : ${tk:-0}   （预期恰好 16：⑬ 端点语义 + 位置报文、E-1 别名不采纳、#110 车辆编号优先级三条）"
 echo "T-l  用户端/卡片裸拼 ETA             : $tl   （预期 0：一律走 etaValueText/etaCaptionText）"
 echo "T-m  『没给』文案（逐条点名）           : $tm/4 条在场 （预期 4/4）"
 echo "T-n  桌面卡片同口径 getter           : $tn   （预期 3）"
@@ -299,11 +316,18 @@ ok=1
 [ "$th2" = 0 ] || { echo "× T-h2 Repo 又开始自己拼 BusVehicle"; ok=0; }
 [ "$ti" = 10 ] || { echo "× T-i 排序口径引用点数量不是 10（现 $ti）：多一处或少一处都要逐点点名，口径散掉就是 nullsLast 失守"; ok=0; }
 [ "$tj1" = 1 ] || { echo "× T-j1 演示面给 nearby 也编了 progress"; ok=0; }
-[ "$tj2" = 0 ] || { echo "× T-j2 演示面又发自造的车辆 routeId"; ok=0; }
+[ "$tj2" = 0 ] || { echo "× T-j2 演示面又发自造的车辆 routeId（后端那一路才有编号，这里编一个就是假链接）"; ok=0; }
 [ "$tj3" = 1 ] || { echo "× T-j3 演示面 routeProvider 又写自造码"; ok=0; }
 [ "$tj4" -ge 8 ] || { echo "× T-j4 演示面把『没给』写成缺键，真实契约态测不到"; ok=0; }
 [ "$tj5" = 1 ] || { echo "× T-j5 演示面 etaMinutes 出现第二个写入点"; ok=0; }
-[ "${tk:-0}" -ge 13 ] || { echo "× T-k 公交 ETA 契约测试被删"; ok=0; }
+[ "$tj6def" = 1 ] || { echo "× T-j6 编号优先级不是恰好一份纯规则（现 $tj6def）：两处定义就会一处后端优先、一处名字优先"; ok=0; }
+[ "$tj6use" = 1 ] || { echo "× T-j6 页面没在用那条纯规则（现 $tj6use）：规则成了摆设，次序又回到页面里"; ok=0; }
+[ "$tj6order" = 1 ] || { echo "× T-j6 车辆编号又不优先读后端那个（现 $tj6order）：#110 反转的次序被改回去 —— 名字一失配就点不进地图（审计 §69 那一族）"; ok=0; }
+[ "$tj7null" = 1 ] || { echo "× T-j7 没编号时又给了可点态（现 $tj7null）：可点、点了什么都不做＝把「这一格今天做不到」演成「这按钮坏了」"; ok=0; }
+[ "$tj7old" = 0 ] || { echo "× T-j7 旧的\"可点但什么都不做\"形状回来了（现 $tj7old）：同上一条"; ok=0; }
+[ "$tj7say" = 1 ] || { echo "× T-j7 没编号那一格不再说实话（现 $tj7say）：不可点要连着原因一起摆出来"; ok=0; }
+[ "$tj7go" = 1 ] || { echo "× T-j7 有编号那一格也不再跳（现 $tj7go）：正对照没了，上面那个 0 可能是整条链路被删"; ok=0; }
+[ "${tk:-0}" = 16 ] || { echo "× T-k 公交 ETA 契约测试的条数不是恰好 16（现 ${tk:-0}）：少了就是被删/被注释，多了就要连同本行与负控一起重钉（下界会把这条闸门变松）"; ok=0; }
 [ "$tl" = 0 ] || { echo "× T-l 页面把 null ETA 裸拼进文案"; ok=0; }
 [ "$tm" = 4 ] || { echo "× T-m 『没给』的如实文案没齐（$tm/4）：每一条都要单独在场，少一条就是那一格又变静默"; ok=0; }
 [ "$tn" = 3 ] || { echo "× T-n 桌面卡片与页面口径脱钩"; ok=0; }

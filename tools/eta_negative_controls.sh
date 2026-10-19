@@ -114,6 +114,11 @@ open(p, 'w', encoding='utf-8').write(s[:i] + body + s[j:])
 PY
                                                                                                                        ctl T-j4 "演示面把『没给』写成数字，显式 null 契约态消失"
 sed -i 's/base.put("etaMinutes"/base.put("etaMinuteX"/' "$DM";                                                        ctl T-j5 "演示面 etaMinutes 写入点改名/多出第二个"
+# ── #110 这两族各配反证：次序改回去 / 不可点改回"可点但什么都不做" / 正对照被删 ──
+sed -i 's/^fun busLineLinkOf(/fun busLineLinkRenamed(/' "$MD";                                                          ctl T-j6 "编号优先级那条纯规则被改名（页面又各写一套次序）"
+sed -i 's/vehicleRouteId = v.routeId,/vehicleRouteId = "",/' "$BS";                                                     ctl T-j6 "车辆编号又不优先读后端那个（退回只信名字）"
+sed -i 's/onClick = if (lineId.isEmpty()) null else { { nav.navigate(Routes.busDetail(lineId)) } }/onClick = { if (lineId.isNotEmpty()) nav.navigate(Routes.busDetail(lineId)) }/' "$BS"; ctl T-j7 "没编号又回到可点、点了什么都不做"
+sed -i 's/这条线路没拿到编号/这条线路没有编号哦/' "$BS";                                                                ctl T-j7 "说实话那一行被改写成不含原因的话（不可点了但没人说为什么）"
 python - "$TS" <<'PY'
 import sys
 p = sys.argv[1]; s = open(p, encoding='utf-8').read()
