@@ -174,7 +174,7 @@ HC=$(vm_body arrive | grep -cE '^[[:space:]]*docked = ')
 # H-d 取件核销：空白取件码必须早退（Api 出网前会把空串整个键丢掉，后端收到的是没有 pickupCode 的请求）
 HD=$(vm_body verify | grep -c 'if (code.trim().isEmpty()) {')
 # H-e 两处早退都必须留一句回执，不许静默 return（静默 = 司机以为点中了却没任何反应）
-HE1=$(vm_body arrive | grep -c 'receipt = "后端没给本站编号')
+HE1=$(vm_body arrive | grep -c 'receipt = "系统没给本站编号')
 HE2=$(vm_body verify | grep -c 'receipt = "取件码还没填')
 # H-f 早退闸门不许顺手改报文：两处后端字段名必须还是原来那两个键
 HF=$(grep -o '"stationId" to stationId\|"pickupCode" to pickupCode' "$REPO" | wc -l | tr -d ' ')

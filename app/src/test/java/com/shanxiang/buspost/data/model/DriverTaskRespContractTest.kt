@@ -194,9 +194,9 @@ class DriverTaskRespContractTest {
         fun seg(start: String, end: String) = DriverTaskSegment(1L, start, end, emptyList())
         val both = seg("2026-10-29 08:00", "2026-10-29 10:00")
         assertTrue(both.windowText, both.windowText.startsWith("任务窗口 2026-10-29 08:00 ~ "))
-        assertTrue(seg("2026-10-29 08:00", "").windowText.contains("结束时刻接口未给"))
-        assertTrue(seg("", "2026-10-29 10:00").windowText.contains("开始时刻接口未给"))
-        assertEquals("任务窗口接口未给", seg("", "").windowText)
+        assertTrue(seg("2026-10-29 08:00", "").windowText.contains("结束时刻没给"))
+        assertTrue(seg("", "2026-10-29 10:00").windowText.contains("开始时刻没给"))
+        assertEquals("任务窗口没给", seg("", "").windowText)
     }
 
     /** 同段内某一行没带窗口（plan 在 planMap 里取不到时后端就不 set）：取有值那行，全空才说没给 */
@@ -211,7 +211,7 @@ class DriverTaskRespContractTest {
         assertEquals(1, segs.size)
         assertTrue(segs[0].windowStartText.isNotEmpty())
         assertEquals("", segs[0].windowEndText)
-        assertTrue(segs[0].windowText.contains("结束时刻接口未给"))
+        assertTrue(segs[0].windowText.contains("结束时刻没给"))
     }
 
     /** ETA 的"没有"有几种写法（缺键 / 显式 null / 0 / 负数），结论都只能是"未给"，不许变成 1970 年那一次到站 */

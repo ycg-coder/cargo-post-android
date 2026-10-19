@@ -121,7 +121,7 @@ check W-d2 "× W-d 未识别类型那一格没了" sub "$WR" '    else -> "未�
 check W-d3 "× W-d 又用 multiStr 读状态码" sub "$MD" 'statusCode = o.multiNumOrNull("status")?.toInt(),' 'statusCode = o.multiStr("status").toIntOrNull(),'
 
 # ---------- W-e 金额缺席不塌成 0 ----------
-check W-e1 "× W-e 金额缺席不再念「后端没给」" sub "$WR" 'internal fun walletMoney(v: Double?): String = v?.let { "¥" + String.format(java.util.Locale.CHINA, "%.2f", it) } ?: NOT_GIVEN' \
+check W-e1 "× W-e 金额缺席不再念「系统没给这一项」" sub "$WR" 'internal fun walletMoney(v: Double?): String = v?.let { "¥" + String.format(java.util.Locale.CHINA, "%.2f", it) } ?: NOT_GIVEN' \
   'internal fun walletMoney(v: Double?): String = "¥0.00"'
 check W-e2 "× W-e 四个余额键的可空读法不齐" sub "$MD" 'balance = o.multiNumOrNull("balance"),' 'balance = o.multiNum("balance"),'
 check W-e3 "× W-e 四个余额键的可空读法不齐" sub "$MD" 'frozenAmount = o.multiNumOrNull("frozenAmount"),' 'frozenAmount = o.multiNum("frozenAmount"),'
@@ -129,7 +129,7 @@ check W-e3 "× W-e 四个余额键的可空读法不齐" sub "$MD" 'frozenAmount
 # ---------- W-f 渠道那一格不替后端下结论 ----------
 check W-f1 "× W-f 渠道那一格的标签变了" sub "$WR" '"渠道（后端原词）" to tx.payMethod.ifBlank { NOT_GIVEN },' '"渠道" to tx.payMethod.ifBlank { NOT_GIVEN },'
 check W-f2 "× W-f 页面开始替后端宣布扣款" sub "$WR" '"渠道（后端原词）" to tx.payMethod.ifBlank { NOT_GIVEN },' '"渠道" to (tx.payMethod.ifBlank { NOT_GIVEN } + "，已通过支付宝扣款"),'
-check W-f3 "× W-f 同文件正对照掉了" sub "$WR" 'null -> "后端没给"' 'null -> NOT_GIVEN'
+check W-f3 "× W-f 同文件正对照掉了" sub "$WR" 'null -> NOT_GIVEN' 'null -> "系统没给这一项"'
 
 # ---------- W-g total 不冒充全量 ----------
 check W-g1 "× W-g 「本次返回 N 条」那句没了" sub "$WR" 'internal fun walletTxScopeText(count: Int, limit: Int): String =

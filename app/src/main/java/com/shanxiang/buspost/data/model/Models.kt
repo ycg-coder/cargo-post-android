@@ -2299,9 +2299,9 @@ data class Reachability(
     /** 距离文案：null 一律说"接口未给"，不出现"0 公里" */
     val distanceText: String
         get() = distanceKm?.let { "约 ${String.format(java.util.Locale.CHINA, "%.2f", it)} 公里$providerLabel" }
-            ?: "距离接口未给"
+            ?: "距离没给"
 
-    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间接口未给"
+    val walkText: String get() = walkMinutes?.let { "步行约 $it 分钟" } ?: "步行时间没给"
 
     /**
      * 不可达原因文案：只按后端 `reasonCode` 分支，本机不猜。
@@ -2417,9 +2417,9 @@ data class DriverTaskSegment(
     val windowText: String
         get() = when {
             windowStartText.isNotEmpty() && windowEndText.isNotEmpty() -> "任务窗口 $windowStartText ~ $windowEndText"
-            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻接口未给）"
-            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻接口未给）"
-            else -> "任务窗口接口未给"
+            windowStartText.isNotEmpty() -> "任务窗口自 $windowStartText 起（结束时刻没给）"
+            windowEndText.isNotEmpty() -> "任务窗口至 $windowEndText（开始时刻没给）"
+            else -> "任务窗口没给"
         }
 
     companion object {

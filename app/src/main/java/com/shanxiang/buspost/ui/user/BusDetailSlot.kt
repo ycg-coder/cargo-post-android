@@ -105,4 +105,4 @@ internal fun lineBriefSubtitle(line: BusLine): String {
  * 那是把**后端没给编号**说成**这条线不存在**。现在尾巴上直接念真实原因，点它只把它选给主图。
  */
 internal fun lineCardNoDetailReason(line: BusLine): String? =
-    if (line.id.isNotEmpty()) null else "后端没给这条线的编号，看不了它的地图与经停"
+    if (line.id.isNotEmpty()) null else "系统没给这条线的编号，看不了它的地图与经停"

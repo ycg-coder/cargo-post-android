@@ -228,7 +228,7 @@ object MissionMarkers {
         }
         guide.deviationUndeterminable -> "偏航距离：后端说这一趟判定不了" +
             if (guide.deviated) " · 但后端标记了偏航" else ""
-        else -> "偏航读数：后端没给" + if (guide.deviated) " · 不过后端标记了偏航" else ""
+        else -> "偏航读数：系统没给" + if (guide.deviated) " · 不过系统标了偏航" else ""
     }
 
     fun MissionStop.markerTitle(): String {

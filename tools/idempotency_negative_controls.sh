@@ -205,7 +205,7 @@ inject "$WB" "if (!ack.notSent) docked = !isTerminal" "            docked = true
 # H-d 核销不再判空白取件码：Api 出网前把空串整个键丢掉，发出去的是没有 pickupCode 的请求
 sed -i 's|if (code.trim().isEmpty()) {|if (code.length() < 0) {|' "$WB"; ctl H-d "空白取件码照样出网"
 # H-e 早退变成静默 return（司机点了没任何反应）—— 只删回执那一行，守卫结构留着
-sed -i '/receipt = "后端没给本站编号/d' "$WB"; ctl H-e "早退不再留回执"
+sed -i '/receipt = "系统没给本站编号/d' "$WB"; ctl H-e "早退不再留回执"
 # H-f 顺手改报文：把后端的键名 stationId 改掉（早退闸门只该决定发不发，不该动 wire）
 sed -i 's|"stationId" to stationId|"stationNo" to stationId|' "$RP"; ctl H-f "报文字段名被改动"
 # H-g 用例被注释掉但 @Test 字样还在（考行首锚定，与 I-j/U-h 同一手法）

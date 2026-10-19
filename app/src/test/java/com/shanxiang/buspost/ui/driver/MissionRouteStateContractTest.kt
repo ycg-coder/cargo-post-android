@@ -300,7 +300,7 @@ class MissionRouteStateContractTest : ServerTest() {
             assertFalse(undeterminable.contains("距规划线"))
 
             val absent = deviationText(guideForNote(deviationMeters = null))
-            assertTrue("没发键要说『没给』，不能借 -1 那一格的话：$absent", absent.contains("后端没给"))
+            assertTrue("没发键要说『没给』，不能借 -1 那一格的话：$absent", absent.contains("系统没给"))
             assertFalse(absent.contains("判定不了"))
         }
     }

@@ -142,7 +142,7 @@ check PW-e2 "× PW-e 三句话不再是各自唯一出处" sub "$PW" \
   'internal const val PICKUP_UNSET_TEXT = "随时可取（不限制最早取货时间）"' \
   'internal const val PICKUP_UNSET_TEXT = "随时可取"'
 check PW-e3 "× PW-e 三句话不再是各自唯一出处" sub "$PW" \
-  'internal const val PICKUP_ABSENT_TEXT = "后端没给这一项（下单时没填也会这样，本机分不开）"' \
+  'internal const val PICKUP_ABSENT_TEXT = "系统没给这一项（下单时没填也会这样，本机分不开）"' \
   'internal const val PICKUP_ABSENT_TEXT = "未设置"'
 
 # ---------- PW-f 回读只认数字 ----------

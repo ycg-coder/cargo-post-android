@@ -146,8 +146,8 @@ class ReachabilityContractTest : ServerTest() {
         assertEquals(ReachabilityState.NOT_REACHABLE, r.state)
         assertNull(r.distanceKm)
         assertNull(r.walkMinutes)
-        assertEquals("距离接口未给", r.distanceText)
-        assertEquals("步行时间接口未给", r.walkText)
+        assertEquals("距离没给", r.distanceText)
+        assertEquals("步行时间没给", r.walkText)
         assertFalse("不许出现 0 公里这种假数字", r.distanceText.contains("0"))
         assertEquals(0L, r.stationId)
         assertEquals("", r.stationLabel)
@@ -168,7 +168,7 @@ class ReachabilityContractTest : ServerTest() {
         val missing = Repo.reachability(Geo(30.9, 106.9)).value!!
         assertEquals(ReachabilityState.UNKNOWN, missing.state)
         assertEquals("", missing.reasonCode)
-        assertEquals("距离接口未给", missing.distanceText)
+        assertEquals("距离没给", missing.distanceText)
     }
 
     @Test
