@@ -15,6 +15,8 @@
 #          所以那个 0 是"字面量里没有"，不是"这个文件根本没这些字"。
 #   RW-d 可执行反证：判据**真的跑一次**取公告脚本 —— 命中的那一版必须出正文、
 #        没写的版本必须退 1 并落"没写公告"的占位、`v21` 不许命中 `v214`（词边界）。
+#   RW-f 弹窗装得下：两处弹窗的公告框先吃剩余空间再封顶，否则横屏上"稍后再说/立即更新"
+#        会掉到屏幕外（真机量到过），那一屏就没有出口了。
 #
 # 用法：bash tools/check_release_wording_probes.sh
 set -u
@@ -145,8 +147,31 @@ printf 'RW-e 旧开发词/原始异常文案/netFail/apiFail/日志出口/401 �
 [ "$RE_LOG_SINK" = 2 ] || { echo "× RW-e 网络失败写日志的出口不是那两颗（现 $RE_LOG_SINK）：屏上撤了码，装机的人就没处可查了"; fail=1; }
 [ "$RE_KICK" -ge 2 ] || { echo "× RW-e 401 那两条出口没了（现 $RE_KICK）：上面那几个 0 就成了『整条错误通路被删』，不是『改干净』"; fail=1; }
 
+# ---------- RW-f 两处弹窗的公告框：横屏不许把那两颗按钮顶出屏幕 ----------
+# 真机读数（2026-10-19，1f71ee9b 横屏 app 高 393dp，本地 v215 包 + 云上 v219 那份公告）：
+#   公告框写死 `heightIn(max = 190.dp)` 时，dump 里只剩「发现新版本 / v219·安装包约 79 MB / 更新公告」
+#   三个节点 —— 「稍后再说」「立即更新」连节点都没有，就是摸不到；而这一屏唯一的出口就是那两颗。
+#   同一份包转竖屏，两颗按钮回到 [269,1651][811,1731]（两态成对，才是这个缺陷）。
+# 钉的是**顺序**：先 `weight(1f, fill = false)`（吃剩余空间，随字号与横竖屏自己缩），
+# 再 `heightIn(max = …)`（封住竖屏那一档上限，也让外层给无限高时退回旧读数而不是更长）。
+# 只数"有 weight"不够：负控 RW-12 把两行调个顺序，功能照样坏，所以行号也要比。
+RF_W1=$(cnt '.weight(1f, fill = false)' "$UD")
+RF_W2=$(cnt '.weight(1f, fill = false)' "$US")
+RF_O1=$(grep -n -F '.weight(1f, fill = false)' "$UD" | head -1 | cut -d: -f1)
+RF_H1=$(grep -n -F '.heightIn(max = 190.dp)' "$UD" | head -1 | cut -d: -f1)
+RF_O2=$(grep -n -F '.weight(1f, fill = false)' "$US" | head -1 | cut -d: -f1)
+RF_H2=$(grep -n -F '.heightIn(max = 200.dp)' "$US" | head -1 | cut -d: -f1)
+RF_ORDER1=0; RF_ORDER2=0
+[ -n "$RF_O1" ] && [ -n "$RF_H1" ] && [ "$RF_O1" -lt "$RF_H1" ] && RF_ORDER1=1
+[ -n "$RF_O2" ] && [ -n "$RF_H2" ] && [ "$RF_O2" -lt "$RF_H2" ] && RF_ORDER2=1
+
+printf 'RW-f 两处 weight/两处顺序(weight 在 heightIn 之前) : %s+%s/%s+%s（目标 1+1/1+1）\n' \
+  "$RF_W1" "$RF_W2" "$RF_ORDER1" "$RF_ORDER2"
+{ [ "$RF_W1" = 1 ] && [ "$RF_W2" = 1 ]; } || { echo "× RW-f 有一处弹窗的公告框不再吃剩余空间（$RF_W1/$RF_W2）：横屏上那两颗按钮会掉到屏幕外"; fail=1; }
+{ [ "$RF_ORDER1" = 1 ] && [ "$RF_ORDER2" = 1 ]; } || { echo "× RW-f weight 与 heightIn 顺序倒了（$RF_ORDER1/$RF_ORDER2）：封顶排在前面时 weight 就不生效，横屏照样溢出"; fail=1; }
+
 if [ "$fail" = 0 ]; then
-  echo "更新公告与发布文案判据通过（$RA_SECT 节公告 / 两处弹窗同一出口 / 上屏几句零开发词 / 取公告真跑 $RD_HIT$RD_MISS$RD_NEAR / 网络咽喉 $RE_NETFAIL+$RE_APIFAIL 处走双出口）"
+  echo "更新公告与发布文案判据通过（$RA_SECT 节公告 / 两处弹窗同一出口 / 上屏几句零开发词 / 取公告真跑 $RD_HIT$RD_MISS$RD_NEAR / 网络咽喉 $RE_NETFAIL+$RE_APIFAIL 处走双出口 / 两处公告框先吃剩余空间 $RF_ORDER1$RF_ORDER2）"
   exit 0
 fi
 exit 1

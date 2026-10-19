@@ -86,9 +86,13 @@ fun UpdateDialog(
                 // 本机不重写、不补写：空的就说"没写"，超长的就说"截了多少"（[announcementText]）。
                 // 这里给一个**可滚**的高度而不是 `.take(500)`：一版改了五六件事的长公告，
                 // 安静地切一半比不显示更容易骗人 —— 用户会以为那就是全部。
+                // ⚠ 高度必须先 `weight` 再 `heightIn`：真机横屏（app 高 393dp）上写死 190dp 时，
+                // 公告框把「稍后再说」「立即更新」整对顶到屏幕外（uiautomator 里连节点都没有 = 摸不到），
+                // 而这一屏唯一的出口就是那两颗按钮。`fill = false` 让短公告不必撑满剩余空间。
                 Box(
                     Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = false)
                         .heightIn(max = 190.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
