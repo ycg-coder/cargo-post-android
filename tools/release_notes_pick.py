@@ -50,6 +50,20 @@ def section_for(text, tag):
     return None
 
 
+def write_out(path, text):
+    """落输出文件。打不开就是通路坏了 —— 退 2 让人看见，别留一句"退 1 = 没命中"的假象。
+
+    （CI 判据簿那一格第一次就撞上过这个：输出目录不存在 ⇒ Python 抛异常退 1，
+      读判据的人把它当成"这一版没写公告"，而真正的原因是没地方写。）
+    """
+    try:
+        with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+    except (OSError, IOError) as e:
+        sys.stderr.write("CANNOT-WRITE out=%s err=%s\n" % (path, e))
+        sys.exit(2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", required=True, help="本次发布的 tag，例如 v214")
@@ -66,16 +80,14 @@ def main():
 
     body = section_for(text, a.tag)
     if body:
-        with io.open(a.out, "w", encoding="utf-8", newline="\n") as f:
-            f.write(body + TAIL + "\n")
+        write_out(a.out, body + TAIL + "\n")
         # 这一行刻意只用 ASCII：本机 Git Bash 的 stdout 编码不是 UTF-8 时，
         # 打印中文会抛 UnicodeEncodeError —— 文件已经写对了，退出码却变成"没命中"，白丢一格证据。
         print("HIT tag=%s chars=%d" % (a.tag, len(body)))
         return 0
 
     # 没命中 —— 占位话要说清"是没人写"，不能写成"没有更新"（那是另一件事）
-    with io.open(a.out, "w", encoding="utf-8", newline="\n") as f:
-        f.write(MISSING + TAIL + "\n")
+    write_out(a.out, MISSING + TAIL + "\n")
     print("MISS tag=%s no-section-in=%s -> placeholder written" % (a.tag, a.file))
     return 1
 

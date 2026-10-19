@@ -75,17 +75,23 @@ if [ -z "$PY" ]; then
   echo "× RW-d 找不到 python/python3：这一族三格没有输入，本轮读数不采信"
   exit 2
 fi
-"$PY" "$PICK" --tag "$NEWEST" --file "$RN" --out tmp/rw_hit.txt >/dev/null 2>&1
+# ⚠ 输出必须落在 `mktemp -d`，不能写 `tmp/`：`tmp/` 是我本机的scratch 目录、**不入库**，
+#   CI 的 checkout 里没有它 ⇒ 脚本打不开输出文件而抛异常退 1，
+#   于是"命中/占位"两格读 0（真因），而"词边界"那格只看退码不为 0 ⇒ 同一件事报成一绿一红（CI 实测 0/0/1）。
+RW_TMP=$(mktemp -d)
+[ -d "$RW_TMP" ] || { echo "× RW-d 开不出临时目录：这一族三格没有落点，本轮读数不采信"; exit 2; }
+"$PY" "$PICK" --tag "$NEWEST" --file "$RN" --out "$RW_TMP/hit.txt" >/dev/null 2>&1
 RC_HIT=$?
-[ "$RC_HIT" = 0 ] && [ -s tmp/rw_hit.txt ] && ! grep -q '没有写更新公告' tmp/rw_hit.txt && RD_HIT=1
-"$PY" "$PICK" --tag v999999 --file "$RN" --out tmp/rw_miss.txt >/dev/null 2>&1
+[ "$RC_HIT" = 0 ] && [ -s "$RW_TMP/hit.txt" ] && ! grep -q '没有写更新公告' "$RW_TMP/hit.txt" && RD_HIT=1
+"$PY" "$PICK" --tag v999999 --file "$RN" --out "$RW_TMP/miss.txt" >/dev/null 2>&1
 RC_MISS=$?
-[ "$RC_MISS" = 1 ] && grep -q '没有写更新公告' tmp/rw_miss.txt && RD_MISS=1
-# 词边界：`v21` 不许命中 `v214`（命中了就等于把别的版本的公告发给这一版）
-"$PY" "$PICK" --tag v21 --file "$RN" --out tmp/rw_near.txt >/dev/null 2>&1
+[ "$RC_MISS" = 1 ] && [ -s "$RW_TMP/miss.txt" ] && grep -q '没有写更新公告' "$RW_TMP/miss.txt" && RD_MISS=1
+# 词边界：`v21` 不许命中 `v214`（命中了就等于把别的版本的公告发给这一版）。
+# 这一格同样要求"占位文件真写出来了"——只看退码的话，脚本崩掉退 1 也会被读成"守住了"。
+"$PY" "$PICK" --tag v21 --file "$RN" --out "$RW_TMP/near.txt" >/dev/null 2>&1
 RC_NEAR=$?
-[ "$RC_NEAR" = 1 ] && RD_NEAR=1
-rm -f tmp/rw_hit.txt tmp/rw_miss.txt tmp/rw_near.txt
+[ "$RC_NEAR" = 1 ] && [ -s "$RW_TMP/near.txt" ] && grep -q '没有写更新公告' "$RW_TMP/near.txt" && RD_NEAR=1
+rm -rf "$RW_TMP"
 
 printf 'RW-a 小节/取脚本main/CI取数/CI正文/CI兜底/旧固定语 : %s/%s/%s/%s/%s/%s（目标 >=1/1/1/1/1/0）\n' \
   "$RA_SECT" "$RA_PICK" "$RA_TAKE" "$RA_FILE" "$RA_GUARD" "$RA_OLD"
